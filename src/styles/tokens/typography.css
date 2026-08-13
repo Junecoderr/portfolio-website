@@ -1,0 +1,38 @@
+:root {
+  --fs-eyebrow: 11px;
+  --fs-nav: 12px;
+  --fs-caption: 12px;
+  --fs-body-sm: 14px;
+  --fs-body: 16px;
+  --fs-lead: 18px;
+  --fs-title-sm: 24px;
+  --fs-title: 36px;
+  --fs-title-lg: 48px;
+  --fs-display: 72px;
+  --fs-display-lg: 96px;
+
+  --lh-tight: 1.05;
+  --lh-title: 1.12;
+  --lh-snug: 1.35;
+  --lh-body: 1.65;
+  --lh-relaxed: 1.75;
+
+  --fw-light: 300;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --ls-display: -0.03em;
+  --ls-title: -0.025em;
+  --ls-tight: -0.01em;
+  --ls-normal: 0em;
+  --ls-label: 0.14em;
+  --ls-eyebrow: 0.18em;
+
+  --type-display: var(--fw-semibold) var(--fs-display) / var(--lh-tight) var(--font-display);
+  --type-title: var(--fw-semibold) var(--fs-title) / var(--lh-title) var(--font-display);
+  --type-lead: var(--fw-regular) var(--fs-lead) / var(--lh-relaxed) var(--font-sans);
+  --type-body: var(--fw-regular) var(--fs-body-sm) / var(--lh-body) var(--font-sans);
+  --type-label: var(--fw-medium) var(--fs-eyebrow) / 1.2 var(--font-mono);
+}

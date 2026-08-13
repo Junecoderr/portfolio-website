@@ -1,0 +1,78 @@
+:root {
+  /* ink / canvas — violet-biased blacks, not neutral greys */
+  --ink-1000: #000000;
+  --ink-975: #05030a;
+  --ink-950: #0a0710;
+  --ink-900: #0d0a15;
+  --ink-850: #120e1c;
+  --ink-800: #181327;
+  --ink-700: #221a38;
+  --ink-600: #2e2447;
+
+  /* paper / foreground steps */
+  --paper-100: #f4f2f7;
+  --paper-200: #e6e3ee;
+  --paper-300: #c9c5d6;
+  --paper-400: #a9a4bb;
+  --paper-500: #8b8798;
+  --paper-600: #6b6676;
+  --paper-700: #4a4657;
+
+  /* accents */
+  --violet-300: #c4a6ff;
+  --violet-400: #a56bff;
+  --violet-500: #7c3ced;
+  --violet-600: #5f1fd6;
+  --violet-700: #43149b;
+  --magenta-300: #ff9de0;
+  --magenta-400: #ff5fd0;
+  --magenta-500: #ff2fbe;
+  --magenta-600: #c2168f;
+  --blue-500: #2e6bff;
+  --cyan-400: #00d9ff;
+  --cyan-500: #00a8c8;
+
+  /* signal */
+  --signal-up: #3ddc97;
+  --signal-down: #ff4d5e;
+  --signal-warn: #ffb238;
+  --signal-flat: var(--paper-500);
+}
+
+:root {
+  --bg-base: var(--ink-1000);
+  --bg-sunken: var(--ink-975);
+  --bg-raised: var(--ink-950);
+  --surface-card: #0b0812;
+  --surface-card-hover: #100c1a;
+  --surface-inset: var(--ink-900);
+  --surface-overlay: rgba(10, 7, 16, 0.82);
+
+  --border-hairline: #1c1728;
+  --border-quiet: #252036;
+  --border-strong: #3a3350;
+  --border-accent: rgba(124, 60, 237, 0.55);
+
+  --text-primary: var(--paper-100);
+  --text-lead: #bebeb8;
+  --text-body: #a8a3b5;
+  --text-muted: #8b8798;
+  --text-faint: var(--paper-600);
+  --text-on-accent: #ffffff;
+  --text-on-paper: #05030a;
+
+  --accent-primary: var(--violet-500);
+  --accent-primary-hover: var(--violet-400);
+  --accent-secondary: var(--magenta-500);
+  --accent-tertiary: var(--cyan-400);
+  --accent-gradient: linear-gradient(100deg, var(--violet-500) 0%, var(--magenta-500) 62%, var(--cyan-400) 118%);
+  --accent-gradient-quiet: linear-gradient(100deg, rgba(124, 60, 237, 0.18), rgba(255, 47, 190, 0.14) 60%, rgba(0, 217, 255, 0.1));
+
+  --link-rest: #bfbfba;
+  --link-hover: var(--paper-100);
+  --link-accent: var(--violet-400);
+
+  --grid-line: rgba(255, 255, 255, 0.035);
+  --grid-line-alt: rgba(255, 255, 255, 0.03);
+  --hairline-fade: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+}

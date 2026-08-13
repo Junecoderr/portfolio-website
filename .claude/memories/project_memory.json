@@ -1,0 +1,20 @@
+{
+  "memories": [],
+  "manual_memories": [],
+  "realtime_memories": [
+    {
+      "type": "claude_response",
+      "content": "**God Nodes**\n1. `script.js` — 4 edges\n2. `Site Navigation Header` — 4 edges\n3. `Placeholder Content Convention` — 4 edges\n4. `Services Section` — 3 edges\n5. `FAQ Section` — 3 edges\n\n**Surprising Conn",
+      "added_at": "2026-08-13T10:59:25.101440",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Use the claude_design MCP (https://api.anthropic.com/v1/design/mcp, auth via /design-login) to import this project: https://claude.ai/design/p/b8c599c9-0a8b-4d67-a6c0-f3ed0929dbd8?file=Security+Portfo",
+      "added_at": "2026-08-13T10:59:25.101456",
+      "source": "realtime_capture"
+    }
+  ],
+  "created_at": "2026-08-13T10:59:25.099498",
+  "updated_at": "2026-08-13T10:59:25.101458"
+}
