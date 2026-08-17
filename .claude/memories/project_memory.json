@@ -3,18 +3,48 @@
   "manual_memories": [],
   "realtime_memories": [
     {
-      "type": "claude_response",
-      "content": "**God Nodes**\n1. `script.js` — 4 edges\n2. `Site Navigation Header` — 4 edges\n3. `Placeholder Content Convention` — 4 edges\n4. `Services Section` — 3 edges\n5. `FAQ Section` — 3 edges\n\n**Surprising Conn",
-      "added_at": "2026-08-13T10:59:25.101440",
+      "type": "message",
+      "content": "portfolio-website (Vite + React) is for \"Tanisha Brahma\" (SOC / detection engineering / applied cryptography). GitHub repo: github.com/Junecoderr/portfolio-website (public, origin/main), gh CLI authenticated as myselfRaifMondal.",
+      "added_at": "2026-08-13T10:09:43.611028",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "Use the claude_design MCP (https://api.anthropic.com/v1/design/mcp, auth via /design-login) to import this project: https://claude.ai/design/p/b8c599c9-0a8b-4d67-a6c0-f3ed0929dbd8?file=Security+Portfo",
-      "added_at": "2026-08-13T10:59:25.101456",
+      "content": "Two Claude Design projects referenced across sessions: an earlier one titled \"Security Portfolio\" (claude.ai/design/p/b8c599c9-0a8b-4d67-a6c0-f3ed0929dbd8) from 2026-08-13, and \"Tanisha Brahma - Portfolio\" (project fb82127e-3d38-4094-a6ff-d8e7809dbd8) from 2026-08-17, which is the one actually implemented (read via DesignSync) as the current 5-route SPA (home/work/case/about/contact, React state, no router).",
+      "added_at": "2026-08-17T09:32:21.568588",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Stack: three.js only (gsap dropped — scroll-reveal is plain IntersectionObserver). LatticeScene.jsx is a config-driven WebGL glass-node background, position:fixed (must stay fixed, not absolute, or it stretches to full page scroll height). Kept a percent-gate Preloader (4-piece spinner) as a deliberate addition on top of the imported design, themed to its blue/violet/magenta palette.",
+      "added_at": "2026-08-17T10:20:00.000001",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "IP boundary: when a design reference is a real third-party commercial site (e.g. noomo agency showcase), match the interaction mechanic with original assets only — never copy their licensed fonts/SVGs/code verbatim. The user's own Claude Design projects are their own content and are fine to implement in full.",
+      "added_at": "2026-08-17T08:48:27.621746",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "No OPENROUTER_API_KEY configured on this machine — real image generation (generate-image skill) unavailable. Repo convention is labeled placeholder panels until a key is provided. A tanisha.png was manually dropped in the repo root by the user (a name-card/wordmark promo graphic, not a personal photo) but isn't wired into the current fully-typographic design.",
+      "added_at": "2026-08-17T09:01:38.161248",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Full design review completed and fixed once already: LatticeScene absolute-vs-fixed positioning bug, and missing --ls-h3/--ls-h4/--lh-body/--lh-h1/--lh-h2/--lh-h3 tokens in typography.css. Verified clean (build + Playwright, zero console errors) as of 2026-08-17.",
+      "added_at": "2026-08-17T11:00:00.000000",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Correction: this repo's project-scoped memory file lives at portfolio-website/.claude/memories/project_memory.json (cwd-relative), NOT at the parent Junecoderr/.claude/ one — a prior session edited the wrong file for many turns, which is why the cleanup hook kept re-firing. Always resolve the project_memory.json path relative to the current working directory.",
+      "added_at": "2026-08-17T16:17:02.062358",
       "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-08-13T10:59:25.101458"
+  "updated_at": "2026-08-17T16:17:02.062358"
 }

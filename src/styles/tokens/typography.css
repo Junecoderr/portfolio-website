@@ -1,38 +1,42 @@
-:root {
-  --fs-eyebrow: 11px;
-  --fs-nav: 12px;
-  --fs-caption: 12px;
-  --fs-body-sm: 14px;
-  --fs-body: 16px;
-  --fs-lead: 18px;
-  --fs-title-sm: 24px;
-  --fs-title: 36px;
-  --fs-title-lg: 48px;
-  --fs-display: 72px;
-  --fs-display-lg: 96px;
+@import url("https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,300;0,400;0,500;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
-  --lh-tight: 1.05;
-  --lh-title: 1.12;
-  --lh-snug: 1.35;
-  --lh-body: 1.65;
-  --lh-relaxed: 1.75;
+:root {
+  --font-display: "Chivo", "Helvetica Neue", Arial, sans-serif;
+  --font-text: "Chivo", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --fw-light: 300;
   --fw-regular: 400;
   --fw-medium: 500;
-  --fw-semibold: 600;
   --fw-bold: 700;
+  --fw-black: 900;
 
-  --ls-display: -0.03em;
-  --ls-title: -0.025em;
-  --ls-tight: -0.01em;
-  --ls-normal: 0em;
+  --fs-display-xl: clamp(52px, 11.5vw, 196px);
+  --fs-display-l: clamp(56px, 8.5vw, 104px);
+  --fs-display-m: 56px;
+  --fs-h1: 40px;
+  --fs-h2: 32px;
+  --fs-h3: 24px;
+  --fs-h4: 20px;
+  --fs-body-l: 18px;
+  --fs-body: 16px;
+  --fs-body-s: 14px;
+  --fs-caption: 13px;
+  --fs-label: 12px;
+  --fs-micro: 11px;
+
   --ls-label: 0.14em;
-  --ls-eyebrow: 0.18em;
+  --ls-micro: 0.10em;
+  --ls-display-xl: -0.045em;
+  --ls-display-l: -0.035em;
+  --ls-h1: -0.024em;
+  --ls-h2: -0.028em;
+  --ls-h3: -0.016em;
+  --ls-h4: -0.012em;
 
-  --type-display: var(--fw-semibold) var(--fs-display) / var(--lh-tight) var(--font-display);
-  --type-title: var(--fw-semibold) var(--fs-title) / var(--lh-title) var(--font-display);
-  --type-lead: var(--fw-regular) var(--fs-lead) / var(--lh-relaxed) var(--font-sans);
-  --type-body: var(--fw-regular) var(--fs-body-sm) / var(--lh-body) var(--font-sans);
-  --type-label: var(--fw-medium) var(--fs-eyebrow) / 1.2 var(--font-mono);
+  --lh-body: 1.6;
+  --lh-body-l: 1.55;
+  --lh-h1: 1.06;
+  --lh-h2: 1.12;
+  --lh-h3: 1.2;
 }

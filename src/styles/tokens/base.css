@@ -1,14 +1,16 @@
 html {
-  background: var(--bg-base);
+  background: var(--surface-page);
   color-scheme: dark;
+  scroll-behavior: smooth;
 }
 body {
   margin: 0;
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font: var(--type-body);
+  background: var(--surface-page);
+  color: var(--fg-2);
+  font-family: var(--font-text);
   -webkit-font-smoothing: antialiased;
   text-wrap: pretty;
+  overflow-x: hidden;
 }
 *,
 *::before,
@@ -16,17 +18,16 @@ body {
   box-sizing: border-box;
 }
 ::selection {
-  background: rgba(124, 60, 237, 0.4);
-  color: var(--paper-100);
+  background: var(--brand-magenta);
+  color: #fff;
 }
 a {
-  color: var(--link-rest);
+  color: var(--fg-1);
   text-decoration: none;
-  transition: color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+  transition: color var(--dur-2) var(--ease-out);
 }
 a:hover {
-  color: var(--link-hover);
-  transform: translateY(var(--lift-hover-soft));
+  color: #FFFFFF;
 }
 a:focus-visible,
 button:focus-visible,
@@ -34,17 +35,25 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  box-shadow: var(--glow-violet);
-}
-hr {
-  border: 0;
-  height: var(--rule-height);
-  background: var(--hairline-fade);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 code,
 kbd,
 samp {
   font-family: var(--font-mono);
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface-page);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ink-700);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-600);
 }
 @media (prefers-reduced-motion: reduce) {
   * {

@@ -1,24 +1,21 @@
 :root {
-  --ease-quant: cubic-bezier(0.165, 0.84, 0.44, 1);
-  --ease-standard: cubic-bezier(0, 0, 0.58, 1);
-  --ease-sine: cubic-bezier(0.37, 0, 0.63, 1);
-  --ease-linear: linear;
+  --ease-out: cubic-bezier(.22, .68, .24, 1);
+  --ease-in-out: cubic-bezier(.66, 0, .24, 1);
+  --ease-entrance: cubic-bezier(.16, 1, .3, 1);
 
-  --dur-instant: 120ms;
-  --dur-fast: 200ms;
-  --dur-hover: 300ms;
-  --dur-reveal: 450ms;
-  --dur-entrance: 800ms;
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 560ms;
+  --dur-5: 900ms;
+}
 
-  --stagger-tight: 70ms;
-  --stagger: 80ms;
-  --stagger-loose: 120ms;
-
-  --lift-hover: -4px;
-  --lift-hover-soft: -1px;
-  --press-scale: 0.985;
-
-  --loop-slow: 16s;
-  --loop-medium: 9s;
-  --loop-fast: 3s;
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+    --dur-3: 0ms;
+    --dur-4: 0ms;
+    --dur-5: 0ms;
+  }
 }

@@ -1,41 +1,66 @@
-import { useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
-import ParticleField3D from './components/backgrounds/ParticleField3D.jsx';
-import Overview from './sections/Overview.jsx';
-import WhyMe from './sections/WhyMe.jsx';
-import Tooling from './sections/Tooling.jsx';
-import Quote from './sections/Quote.jsx';
-import Process from './sections/Process.jsx';
-import Writing from './sections/Writing.jsx';
+import Preloader from './components/Preloader.jsx';
+import LatticeScene from './components/backgrounds/LatticeScene.jsx';
+import Home from './sections/Home.jsx';
+import Work from './sections/Work.jsx';
+import CaseStudy from './sections/CaseStudy.jsx';
+import About from './sections/About.jsx';
+import Contact from './sections/Contact.jsx';
 import useScrollReveal from './hooks/useScrollReveal.js';
-import useScrollSpy from './hooks/useScrollSpy.js';
+
+const LEVELS = { low: 0.4, med: 0.68, high: 0.95 };
 
 export default function App() {
   const rootRef = useRef(null);
+  const [route, setRoute] = useState('home');
+  const [activeId, setActiveId] = useState('blackout');
+  const [sceneOn, setSceneOn] = useState(true);
+  const [sceneLevel, setSceneLevel] = useState('high');
+  const [sceneReady, setSceneReady] = useState(false);
+  const [entered, setEntered] = useState(false);
 
-  useScrollReveal(rootRef);
-  useScrollSpy(rootRef);
+  useScrollReveal(rootRef, route);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [route]);
+
+  const navigate = useCallback((next) => setRoute(next), []);
+  const openCase = useCallback((id) => {
+    setActiveId(id);
+    setRoute('case');
+  }, []);
+
+  const handleSceneReady = useCallback(() => setSceneReady(true), []);
+  const handleEnter = useCallback(() => setEntered(true), []);
 
   return (
-    <div ref={rootRef} className="page">
-      <div className="bg-fixed">
-        <ParticleField3D />
+    <Preloader ready={sceneReady} onEnter={handleEnter}>
+      <div ref={rootRef} className="page">
+        {sceneOn ? (
+          <LatticeScene config={route} intensity={LEVELS[sceneLevel]} onReady={handleSceneReady} />
+        ) : null}
+
+        <Header
+          route={route}
+          onNavigate={navigate}
+          entered={entered}
+          sceneOn={sceneOn}
+          sceneLevel={sceneLevel}
+          onToggleScene={() => setSceneOn((v) => !v)}
+          onSetLevel={setSceneLevel}
+        />
+
+        {route === 'home' && <Home onOpenCase={openCase} onNavigate={navigate} />}
+        {route === 'work' && <Work onOpenCase={openCase} />}
+        {route === 'case' && <CaseStudy activeId={activeId} onOpenCase={openCase} onNavigate={navigate} />}
+        {route === 'about' && <About />}
+        {route === 'contact' && <Contact />}
+
+        <Footer />
       </div>
-      <div className="bg-grid" aria-hidden="true" />
-
-      <Header />
-
-      <main style={{ position: 'relative', zIndex: 1 }}>
-        <Overview />
-        <WhyMe />
-        <Tooling />
-        <Quote />
-        <Process />
-        <Writing />
-      </main>
-
-      <Footer />
-    </div>
+    </Preloader>
   );
 }

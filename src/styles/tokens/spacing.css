@@ -8,24 +8,34 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  --space-14: 56px;
   --space-16: 64px;
   --space-20: 80px;
-  --space-28: 112px;
+  --space-24: 96px;
+  --space-30: 120px;
   --space-40: 160px;
 
-  --gutter: var(--space-6);
-  --gutter-lg: var(--space-10);
-  --section-y: var(--space-28);
-  --section-y-lg: var(--space-40);
-  --card-pad: var(--space-6);
-  --card-pad-lg: var(--space-8);
-  --grid-gap: var(--space-4);
-  --grid-gap-lg: var(--space-5);
-  --stack-gap: var(--space-8);
+  --gutter: 24px;
+  --container-max: 1280px;
+  --container-narrow: 760px;
+  --section-y: 120px;
+  --section-y-compact: 80px;
+  --app-header: 64px;
 
-  --content-max: 1024px;
-  --content-max-wide: 1152px;
-  --measure: 768px;
-  --grid-cell: 44px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+  --radius-card: var(--radius-lg);
+  --radius-control: var(--radius-md);
+  --radius-cta: var(--radius-pill);
+  --border-hairline: 1px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .50);
+  --shadow-2: 0 8px 24px -8px rgba(0, 0, 0, .70);
+  --shadow-3: 0 32px 64px -24px rgba(0, 0, 0, .80);
+  --glow-brand: 0 0 48px -8px rgba(122, 18, 245, .45);
+  --glow-magenta: 0 0 32px -6px rgba(238, 0, 233, .40);
+  --blur-panel: saturate(160%) blur(20px);
 }

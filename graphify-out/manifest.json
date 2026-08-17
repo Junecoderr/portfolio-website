@@ -1,12 +1,97 @@
 {
-  "script.js": {
-    "mtime": 1786596246.5272214,
-    "ast_hash": "3be110c79e8044b38f7240d3da1950b3",
-    "semantic_hash": "3be110c79e8044b38f7240d3da1950b3"
-  },
   "index.html": {
-    "mtime": 1786596208.031101,
-    "ast_hash": "7862a22e479d07964735d447f4b70ea6",
-    "semantic_hash": "7862a22e479d07964735d447f4b70ea6"
+    "mtime": 1786599366.038388,
+    "ast_hash": "86293960547ce693fb1269f1e85932ea",
+    "semantic_hash": "86293960547ce693fb1269f1e85932ea"
+  },
+  ".claude/memories/project_memory.json": {
+    "mtime": 1786607853.7467692,
+    "ast_hash": "7c63b8a2196441a6a56a7876e6751bef",
+    "semantic_hash": "7c63b8a2196441a6a56a7876e6751bef"
+  },
+  "package.json": {
+    "mtime": 1786599360.2662199,
+    "ast_hash": "e0466ec2c686b4d0f6dca4e86f9a7fdd",
+    "semantic_hash": "e0466ec2c686b4d0f6dca4e86f9a7fdd"
+  },
+  "src/App.jsx": {
+    "mtime": 1786599575.4293377,
+    "ast_hash": "c0afc90fe7218c74621634649c730d20",
+    "semantic_hash": "c0afc90fe7218c74621634649c730d20"
+  },
+  "src/components/Footer.jsx": {
+    "mtime": 1786599570.1987884,
+    "ast_hash": "8f79ea43a3a72eab4d91641ddc1c37cd",
+    "semantic_hash": "8f79ea43a3a72eab4d91641ddc1c37cd"
+  },
+  "src/components/Header.jsx": {
+    "mtime": 1786599527.3941896,
+    "ast_hash": "a212aff0e3e05c89d4b5a66e7c0c23dc",
+    "semantic_hash": "a212aff0e3e05c89d4b5a66e7c0c23dc"
+  },
+  "src/components/backgrounds/ParticleField3D.jsx": {
+    "mtime": 1786599488.0779018,
+    "ast_hash": "b9f50675e0c241ab7d65e6c794792592",
+    "semantic_hash": "b9f50675e0c241ab7d65e6c794792592"
+  },
+  "src/components/backgrounds/PointerBloom.jsx": {
+    "mtime": 1786599494.1659672,
+    "ast_hash": "eff9c8aaf57687e85f4f2fe67776a932",
+    "semantic_hash": "eff9c8aaf57687e85f4f2fe67776a932"
+  },
+  "src/components/backgrounds/ScanGrid.jsx": {
+    "mtime": 1786599501.3695817,
+    "ast_hash": "5a002e830397160f203668d88f3c723c",
+    "semantic_hash": "5a002e830397160f203668d88f3c723c"
+  },
+  "src/hooks/useScrollReveal.js": {
+    "mtime": 1786599508.3013468,
+    "ast_hash": "0d9ff01b3f4e95df7231d9d4aef55b4f",
+    "semantic_hash": "0d9ff01b3f4e95df7231d9d4aef55b4f"
+  },
+  "src/hooks/useScrollSpy.js": {
+    "mtime": 1786599519.7219868,
+    "ast_hash": "4dd9e41a9c0c84a2be3fc186df225c7d",
+    "semantic_hash": "4dd9e41a9c0c84a2be3fc186df225c7d"
+  },
+  "src/main.jsx": {
+    "mtime": 1786599578.3853784,
+    "ast_hash": "56eef02999c5ec694ba16347571afe2e",
+    "semantic_hash": "56eef02999c5ec694ba16347571afe2e"
+  },
+  "src/sections/Overview.jsx": {
+    "mtime": 1786599532.9163203,
+    "ast_hash": "bd9c4d4dd8c72f0e00acd54056f8b37a",
+    "semantic_hash": "bd9c4d4dd8c72f0e00acd54056f8b37a"
+  },
+  "src/sections/Process.jsx": {
+    "mtime": 1786599556.775439,
+    "ast_hash": "a184e3c7d90af8f84da54faa14bc8a9f",
+    "semantic_hash": "a184e3c7d90af8f84da54faa14bc8a9f"
+  },
+  "src/sections/Quote.jsx": {
+    "mtime": 1786599547.4639356,
+    "ast_hash": "4c859cc2f2dcaaea68bcc97f560b9587",
+    "semantic_hash": "4c859cc2f2dcaaea68bcc97f560b9587"
+  },
+  "src/sections/Tooling.jsx": {
+    "mtime": 1786599543.421277,
+    "ast_hash": "e72b3104d49f96b0353b6041d4bce7e0",
+    "semantic_hash": "e72b3104d49f96b0353b6041d4bce7e0"
+  },
+  "src/sections/WhyMe.jsx": {
+    "mtime": 1786599539.8432267,
+    "ast_hash": "688b4a99ef6e8ada6257eae5f485e3db",
+    "semantic_hash": "688b4a99ef6e8ada6257eae5f485e3db"
+  },
+  "src/sections/Writing.jsx": {
+    "mtime": 1786599562.782595,
+    "ast_hash": "4bc91d8f953d231ac9a983f1c4544f9e",
+    "semantic_hash": "4bc91d8f953d231ac9a983f1c4544f9e"
+  },
+  "vite.config.js": {
+    "mtime": 1786599362.808344,
+    "ast_hash": "eb98c53348e57a55028f415914969a6b",
+    "semantic_hash": "eb98c53348e57a55028f415914969a6b"
   }
 }

@@ -1,40 +1,59 @@
 import { useEffect } from 'react';
 
 /**
- * Reveals every `.reveal` element inside `containerRef` once it enters the
- * viewport: fade + rise, staggered by sibling index (max 5 x 80ms). Fires
- * once per element and is a no-op under prefers-reduced-motion.
+ * Reveals every `[data-reveal]` element inside `containerRef`: fade + rise,
+ * staggered in groups of 4 x 70ms, elements already on-screen animate in on
+ * a double-RAF, elements below the fold animate via IntersectionObserver.
+ * Re-arms on `route` change. No-op under prefers-reduced-motion.
  */
-export default function useScrollReveal(containerRef) {
+export default function useScrollReveal(containerRef, route) {
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return undefined;
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const revealables = Array.from(root.querySelectorAll('.reveal'));
-    if (reduced || !('IntersectionObserver' in window)) {
-      revealables.forEach((el) => el.classList.add('is-visible'));
-      return undefined;
-    }
+    if (reduced) return undefined;
 
+    let seq = 0;
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
-          const el = entry.target;
-          const siblings = el.parentElement
-            ? Array.from(el.parentElement.children).filter((n) => n.classList.contains('reveal'))
-            : [el];
-          const delay = Math.min(siblings.indexOf(el), 5) * 80;
-          el.style.transition = `opacity 620ms cubic-bezier(0,0,.58,1) ${delay}ms, transform 720ms cubic-bezier(.165,.84,.44,1) ${delay}ms`;
-          el.classList.add('is-visible');
-          io.unobserve(el);
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+          io.unobserve(entry.target);
         });
       },
-      { rootMargin: '0px 0px -26% 0px', threshold: 0.01 }
+      { rootMargin: '0px 0px -10% 0px', threshold: 0.04 }
     );
-    revealables.forEach((el) => io.observe(el));
 
-    return () => io.disconnect();
-  }, [containerRef]);
+    const prep = () => {
+      const els = root.querySelectorAll('[data-reveal]:not([data-revealed])');
+      els.forEach((el) => {
+        el.setAttribute('data-revealed', '');
+        const box = el.getBoundingClientRect();
+        const onscreen = box.top < window.innerHeight * 0.92;
+        el.style.transition = 'opacity 900ms cubic-bezier(.16,1,.3,1), transform 900ms cubic-bezier(.16,1,.3,1)';
+        el.style.transitionDelay = `${(seq++ % 4) * 70}ms`;
+        if (onscreen) {
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(24px)';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+          }));
+        } else {
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(28px)';
+          io.observe(el);
+        }
+      });
+    };
+    const timers = [0, 60, 200, 500, 1000].map((ms) => setTimeout(prep, ms));
+
+    return () => {
+      timers.forEach(clearTimeout);
+      io.disconnect();
+    };
+  }, [containerRef, route]);
 }
