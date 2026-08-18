@@ -383,8 +383,20 @@ export default function LatticeScene({ config = 'home', intensity = 1, onReady }
     };
     frame();
 
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      } else if (!raf) {
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pointermove', onPointer);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);

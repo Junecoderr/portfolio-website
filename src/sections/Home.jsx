@@ -81,7 +81,7 @@ export default function Home({ onOpenCase, onNavigate }) {
   return (
     <main id="top" className="page-fade">
       <section className="hero">
-        <HeroCipherField density={15} className="hero-canvas" style={{ opacity: 0.42, mixBlendMode: 'screen' }} />
+        <HeroCipherField density={22} className="hero-canvas" style={{ opacity: 0.42, mixBlendMode: 'screen' }} />
         <div className="hero-scrim" aria-hidden="true" />
 
         <div className="hero-topline">
@@ -104,7 +104,7 @@ export default function Home({ onOpenCase, onNavigate }) {
             <div className="hero-facts">
               <div className="hero-fact">
                 <span className="mono-label">Based</span>
-                <span className="hero-fact-value">Bengaluru · UTC+5:30</span>
+                <span className="hero-fact-value">Durgapur · UTC+5:30</span>
               </div>
               <div className="hero-fact">
                 <span className="mono-label">Status</span>

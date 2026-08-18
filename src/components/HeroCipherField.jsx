@@ -14,7 +14,7 @@ const GRAY_PALETTE = buildPalette(69, 69, 90);
 const VIOLET_FIXED = 'rgba(122,18,245,0.30)';
 const paletteColor = (palette, opacity) => palette[Math.max(0, Math.min(OPACITY_STEPS, Math.round(opacity * OPACITY_STEPS)))];
 
-const FRAME_BUDGET_MS = 32; // ~30fps cap — ambient glyph field doesn't need 60fps
+const FRAME_BUDGET_MS = 42; // ~24fps cap — ambient glyph field doesn't need more
 
 /**
  * Canvas glyph field behind the hero: a hidden phrase resolves near the
@@ -66,6 +66,15 @@ export default function HeroCipherField({ density = 15, style, ...rest }) {
     const radius = 132;
     let raf;
     let last = 0;
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      } else if (!raf) {
+        raf = requestAnimationFrame(draw);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     const draw = (now) => {
       raf = requestAnimationFrame(draw);
       if (now - last < FRAME_BUDGET_MS) return;
@@ -114,6 +123,7 @@ export default function HeroCipherField({ density = 15, style, ...rest }) {
 
     return () => {
       cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointermove', onMouse);
     };
