@@ -104,8 +104,6 @@ export default function CaseStudy({ activeId, onOpenCase, onNavigate }) {
               </Button>
             </div>
             <div className="timeline-body">
-              <div className="timeline-rail" />
-              <div className="timeline-rail-fill" style={{ height: `${total ? (step / total) * 100 : 0}%` }} />
               <div className="timeline-events">
                 {active.timeline.map((e, i) => {
                   const on = i < step;
@@ -113,13 +111,21 @@ export default function CaseStudy({ activeId, onOpenCase, onNavigate }) {
                     <div key={e.t} className="timeline-event" style={{ opacity: on ? 1 : 0.28 }}>
                       <span className="mono-micro timeline-t">{e.t}</span>
                       <div className="timeline-event-row">
-                        <span
-                          className="timeline-dot"
-                          style={{
-                            background: on ? (i === step - 1 ? 'var(--brand-magenta)' : 'var(--fg-1)') : 'var(--ink-600)',
-                            boxShadow: i === step - 1 && on ? '0 0 0 6px rgba(238,0,233,.14)' : 'none',
-                          }}
-                        />
+                        <span className="timeline-dot-col">
+                          <span
+                            className="timeline-dot"
+                            style={{
+                              background: on ? (i === step - 1 ? 'var(--brand-magenta)' : 'var(--fg-1)') : 'var(--ink-600)',
+                              boxShadow: i === step - 1 && on ? '0 0 0 6px rgba(238,0,233,.14)' : 'none',
+                            }}
+                          />
+                          {i < active.timeline.length - 1 && (
+                            <span
+                              className="timeline-connector"
+                              style={{ background: i + 1 < step ? 'var(--brand-gradient-line)' : 'var(--line-1)' }}
+                            />
+                          )}
+                        </span>
                         <div className="timeline-event-copy">
                           <span className="timeline-event-title">{e.title}</span>
                           <span className="timeline-event-detail">{e.detail}</span>

@@ -7,7 +7,7 @@ export default function Footer() {
     <footer className="site-footer">
       <div className="footer-inner">
         <span className="footer-meta">© 2026 Tanisha Brahma</span>
-        <span className="footer-meta">All project names, figures and CVE identifiers on this site are illustrative</span>
+        <span className="footer-meta">Every claim on this site is one I can defend in an interview</span>
         <span className="footer-meta">{clock}</span>
       </div>
     </footer>

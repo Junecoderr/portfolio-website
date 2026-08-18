@@ -472,13 +472,13 @@
 .timeline-card { border: 1px solid var(--line-1); background: var(--surface-raised); align-self: start; position: sticky; top: 104px; }
 .timeline-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--line-1); }
 .timeline-body { position: relative; padding: 28px 24px; }
-.timeline-rail { position: absolute; left: 47px; top: 36px; bottom: 36px; width: 1px; background: var(--line-1); }
-.timeline-rail-fill { position: absolute; left: 47px; top: 36px; width: 1px; background: var(--brand-gradient-line); transition: height 560ms var(--ease-entrance); }
 .timeline-events { display: flex; flex-direction: column; gap: 26px; }
 .timeline-event { display: grid; grid-template-columns: 48px 1fr; gap: 16px; align-items: start; transition: opacity var(--dur-3) var(--ease-out); }
 .timeline-t { padding-top: 2px; }
 .timeline-event-row { display: flex; gap: 16px; }
-.timeline-dot { width: 9px; height: 9px; border-radius: 999px; margin-top: 5px; flex: none; transition: all var(--dur-3); }
+.timeline-dot-col { position: relative; width: 9px; flex: none; align-self: stretch; }
+.timeline-dot { position: absolute; top: 5px; left: 0; width: 9px; height: 9px; border-radius: 999px; transition: all var(--dur-3); }
+.timeline-connector { position: absolute; top: 9px; bottom: -35px; left: 4px; width: 1px; background: var(--line-1); transition: background var(--dur-3); }
 .timeline-event-copy { display: flex; flex-direction: column; gap: 5px; }
 .timeline-event-title { font-size: 15px; line-height: 1.45; color: var(--fg-1); }
 .timeline-event-detail { font-size: 14px; line-height: 1.55; color: var(--fg-3); }

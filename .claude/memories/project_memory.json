@@ -4,19 +4,13 @@
   "realtime_memories": [
     {
       "type": "message",
-      "content": "portfolio-website (Vite + React) is for \"Tanisha Brahma\" (SOC / detection engineering / applied cryptography). GitHub repo: github.com/Junecoderr/portfolio-website (public, origin/main), gh CLI authenticated as myselfRaifMondal.",
+      "content": "portfolio-website (Vite + React) is for \"Tanisha Brahma\" (SOC / detection engineering / applied cryptography). GitHub repo: github.com/Junecoderr/portfolio-website (public, origin/main), gh CLI authenticated as myselfRaifMondal. Implementation is sourced from the user's Claude Design project \"Tanisha Brahma - Portfolio\" (fb82127e-3d38-4094-a6ff-d8e7809dbd8, read via DesignSync); an earlier \"Security Portfolio\" design project was superseded. Site is a 5-route SPA (home/work/case/about/contact) driven by React state, no router library.",
       "added_at": "2026-08-13T10:09:43.611028",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "Two Claude Design projects referenced across sessions: an earlier one titled \"Security Portfolio\" (claude.ai/design/p/b8c599c9-0a8b-4d67-a6c0-f3ed0929dbd8) from 2026-08-13, and \"Tanisha Brahma - Portfolio\" (project fb82127e-3d38-4094-a6ff-d8e7809dbd8) from 2026-08-17, which is the one actually implemented (read via DesignSync) as the current 5-route SPA (home/work/case/about/contact, React state, no router).",
-      "added_at": "2026-08-17T09:32:21.568588",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "Stack: three.js only (gsap dropped — scroll-reveal is plain IntersectionObserver). LatticeScene.jsx is a config-driven WebGL glass-node background, position:fixed (must stay fixed, not absolute, or it stretches to full page scroll height). Kept a percent-gate Preloader (4-piece spinner) as a deliberate addition on top of the imported design, themed to its blue/violet/magenta palette.",
+      "content": "Stack: three.js only (gsap dropped — scroll-reveal is plain IntersectionObserver). LatticeScene.jsx is a config-driven WebGL glass-node background — must stay position:fixed, not absolute, or it stretches to full page scroll height. Preloader is a deliberate addition on top of the imported design (not from the original), themed to the site's blue/violet/magenta palette; simplified on 2026-08-18 to just a pulsing brand orb + percent numeral after user feedback that the earlier bracket-spinner/rule/label version had design flaws.",
       "added_at": "2026-08-17T10:20:00.000001",
       "source": "realtime_capture"
     },
@@ -34,41 +28,35 @@
     },
     {
       "type": "message",
-      "content": "Full design review completed and fixed once already: LatticeScene absolute-vs-fixed positioning bug, and missing --ls-h3/--ls-h4/--lh-body/--lh-h1/--lh-h2/--lh-h3 tokens in typography.css. Verified clean (build + Playwright, zero console errors) as of 2026-08-17.",
-      "added_at": "2026-08-17T11:00:00.000000",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
       "content": "Correction: this repo's project-scoped memory file lives at portfolio-website/.claude/memories/project_memory.json (cwd-relative), NOT at the parent Junecoderr/.claude/ one — a prior session edited the wrong file for many turns, which is why the cleanup hook kept re-firing. Always resolve the project_memory.json path relative to the current working directory.",
       "added_at": "2026-08-17T16:17:02.062358",
       "source": "realtime_capture"
     },
     {
-      "type": "claude_response",
-      "content": "Fixed. Home's lag was `HeroCipherField.jsx` (the decrypt-on-hover glyph grid) doing ~3,840 `fillText` calls a frame at 60fps, each rebuilding a fresh `rgba(...)` string via template literal — real GC ",
-      "added_at": "2026-08-17T17:43:57.613501",
-      "source": "realtime_capture"
-    },
-    {
       "type": "message",
-      "content": "Fix the pre-loading screen, it's not upto the design, it has design flaws.",
-      "added_at": "2026-08-17T17:43:57.613527",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Pushed to `main` at github.com/Junecoderr/portfolio-website. Commit `3268de2`: contact info swap + simplified preloader (dropped rule/label, now just brand orb + percent numeral, centered). Build veri",
-      "added_at": "2026-08-18T17:36:35.031839",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "I want you to edit the home page, where based, should be Durgapur. At the same time, I get to see that, the home page is lagging a lot due to something, kindly take a look and fix it for me please",
+      "content": "Fixes shipped and pushed to main: (1) 2026-08-17 design review — corrected LatticeScene absolute-vs-fixed positioning bug and added missing --ls-h3/--ls-h4/--lh-body/--lh-h1/--lh-h2/--lh-h3 typography tokens, verified via build + Playwright. (2) 2026-08-18 contact info placeholders (email/Instagram/GitHub/Medium/location) replaced with real values across content.js and Contact.jsx, and home hero \"Based\" fact corrected Bengaluru -> Durgapur. (3) 2026-08-18 home-page lag root-caused: Home was the only route stacking a second full-canvas 2D animation (HeroCipherField, ~fillText-heavy glyph grid with mix-blend-mode: screen) on top of the always-on WebGL lattice — fixed by coarsening the glyph grid, lowering its frame budget, and pausing both HeroCipherField's and LatticeScene's rAF loops via visibilitychange when the tab is hidden. Commits: 3268de2, 6a88210.",
       "added_at": "2026-08-18T17:36:35.031868",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "User preference on footer copy: dislikes the legal-disclaimer tone (\"All project names, figures and CVE identifiers on this site are illustrative\") — replaced in Footer.jsx with a brand-value line: \"Every claim on this site is one I can defend in an interview.\" General direction — favor confidence/credibility copy over disclaimers when editing site text. Not yet committed/pushed as of 2026-08-18T17:48.",
+      "added_at": "2026-08-18T17:48:31.043887",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Memory cleaned: 10 → 7 entries. Dropped the \"pushed?\" Q&A and self-referential cleanup note, folded the footer-copy change in as a new signal entry (with the still-pending-push status noted).",
+      "added_at": "2026-08-18T17:52:14.431985",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "[Image #1] Fix the design issue please for every project.",
+      "added_at": "2026-08-18T17:52:14.432024",
       "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-08-18T17:36:35.031870"
+  "updated_at": "2026-08-18T17:52:14.432026"
 }
