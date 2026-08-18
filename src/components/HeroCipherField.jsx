@@ -3,6 +3,19 @@ import { useEffect, useRef } from 'react';
 const PHRASE = 'THE QUIET WORK OF KEEPING THINGS SECRET IS MOSTLY BOOKKEEPING ';
 const GLYPHS = '0123456789ABCDEF/\\|<>{}[]#$%&*+=~^';
 
+// Precomputed rgba() palettes (quantized opacity steps) so the draw loop
+// never builds a template-literal color string per cell per frame.
+const OPACITY_STEPS = 32;
+const buildPalette = (r, g, b) =>
+  Array.from({ length: OPACITY_STEPS + 1 }, (_, i) => `rgba(${r},${g},${b},${(i / OPACITY_STEPS).toFixed(3)})`);
+const WHITE_PALETTE = buildPalette(245, 245, 247);
+const MAGENTA_PALETTE = buildPalette(238, 0, 233);
+const GRAY_PALETTE = buildPalette(69, 69, 90);
+const VIOLET_FIXED = 'rgba(122,18,245,0.30)';
+const paletteColor = (palette, opacity) => palette[Math.max(0, Math.min(OPACITY_STEPS, Math.round(opacity * OPACITY_STEPS)))];
+
+const FRAME_BUDGET_MS = 32; // ~30fps cap — ambient glyph field doesn't need 60fps
+
 /**
  * Canvas glyph field behind the hero: a hidden phrase resolves near the
  * pointer, the rest of the grid cycles random hex/symbol glyphs.
@@ -52,7 +65,12 @@ export default function HeroCipherField({ density = 15, style, ...rest }) {
 
     const radius = 132;
     let raf;
-    const draw = () => {
+    let last = 0;
+    const draw = (now) => {
+      raf = requestAnimationFrame(draw);
+      if (now - last < FRAME_BUDGET_MS) return;
+      last = now;
+
       state.mx += (state.tx - state.mx) * 0.12;
       state.my += (state.ty - state.my) * 0.12;
       ctx.clearRect(0, 0, state.w, state.h);
@@ -70,11 +88,11 @@ export default function HeroCipherField({ density = 15, style, ...rest }) {
             const t = 1 - d / radius;
             const ch = PHRASE[(col + row * 7) % PHRASE.length];
             if (t > 0.55) {
-              ctx.fillStyle = `rgba(245,245,247,${(0.35 + t * 0.65).toFixed(3)})`;
+              ctx.fillStyle = paletteColor(WHITE_PALETTE, 0.35 + t * 0.65);
               ctx.fillText(ch, x, y);
             } else {
               const mix = (t - 0.2) / 0.35;
-              ctx.fillStyle = mix > 0 ? `rgba(238,0,233,${(0.25 + mix * 0.5).toFixed(3)})` : 'rgba(122,18,245,0.30)';
+              ctx.fillStyle = mix > 0 ? paletteColor(MAGENTA_PALETTE, 0.25 + mix * 0.5) : VIOLET_FIXED;
               ctx.fillText(Math.random() > 0.4 ? ch : state.chars[i], x, y);
             }
           } else {
@@ -86,14 +104,13 @@ export default function HeroCipherField({ density = 15, style, ...rest }) {
               }
             }
             const fade = Math.min(1, Math.max(0, (state.h - y) / state.h));
-            ctx.fillStyle = `rgba(69,69,90,${(0.2 + fade * 0.34).toFixed(3)})`;
+            ctx.fillStyle = paletteColor(GRAY_PALETTE, 0.2 + fade * 0.34);
             ctx.fillText(state.chars[i], x, y);
           }
         }
       }
-      raf = requestAnimationFrame(draw);
     };
-    draw();
+    raf = requestAnimationFrame(draw);
 
     return () => {
       cancelAnimationFrame(raf);

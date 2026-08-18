@@ -262,31 +262,42 @@
   clip-path: inset(0 0 0 0);
 }
 .preloader.is-exiting { clip-path: inset(0 0 100% 0); }
+.preloader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  transition: opacity 400ms var(--ease-out);
+}
+.preloader.is-exiting .preloader-content { opacity: 0; }
+.preloader-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--brand-gradient);
+  box-shadow: var(--glow-brand);
+  display: block;
+  animation: markPulse 2.2s var(--ease-in-out) infinite;
+}
 .preloader-numeral {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  letter-spacing: var(--ls-label);
+  font-family: var(--font-display);
+  font-weight: var(--fw-light);
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: var(--ls-h1);
   color: var(--fg-1);
-  transition: opacity 300ms var(--ease-out);
+  font-variant-numeric: tabular-nums lining-nums;
 }
-.preloader.is-exiting .preloader-numeral { opacity: 0; }
-.preloader-bracket { transform-origin: 70px 50px; animation: bracketPulse 1.8s var(--ease-in-out) infinite; transition: transform 500ms var(--ease-out), opacity 500ms var(--ease-out); }
-.preloader-bracket-r { animation-delay: .3s; }
-.preloader.is-exiting .preloader-bracket-l { transform: translateX(-30px); opacity: 0; }
-.preloader.is-exiting .preloader-bracket-r { transform: translateX(30px); opacity: 0; }
-.preloader-arc { transform-origin: 70px 70px; transition: transform 500ms var(--ease-out), opacity 500ms var(--ease-out); }
-.preloader-arc-l { animation: spinCW 3.2s linear infinite; }
-.preloader-arc-r { animation: spinCCW 4s linear infinite; }
-.preloader.is-exiting .preloader-arc-l { transform: rotate(-120deg); opacity: 0; }
-.preloader.is-exiting .preloader-arc-r { transform: rotate(120deg); opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .preloader-bracket, .preloader-arc-l, .preloader-arc-r { animation: none; }
+  .preloader-mark { animation: none; }
   .preloader { transition: opacity 300ms; }
-  .preloader.is-exiting { opacity: 0; clip-path: none; }
+  .preloader.is-exiting { clip-path: none; }
+  .preloader.is-exiting .preloader-content { opacity: 0; }
 }
-@keyframes bracketPulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
-@keyframes spinCW { to { transform: rotate(360deg); } }
-@keyframes spinCCW { to { transform: rotate(-360deg); } }
+@keyframes markPulse {
+  0%, 100% { transform: scale(0.94); opacity: .75; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
 
 /* ── Hero ───────────────────────────────────────────────────────────── */
 .hero { position: relative; height: 100vh; min-height: 720px; overflow: hidden; }

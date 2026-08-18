@@ -16,8 +16,8 @@ export default function Contact() {
             <div className="contact-direct">
               <div className="contact-block">
                 <span className="mono-label">Direct</span>
-                <a href="mailto:tanisha@brahma.sec" className="contact-email">
-                  tanisha@brahma.sec
+                <a href="mailto:tanishabrahma26@gmail.com" className="contact-email">
+                  tanishabrahma26@gmail.com
                 </a>
               </div>
               <p className="body-text wide">

@@ -191,11 +191,12 @@ export const RECOGNITION = [
 ];
 
 export const CONTACT_ROWS = [
-  { k: 'Email', v: 'tanisha@brahma.sec', href: 'mailto:tanisha@brahma.sec' },
-  { k: 'Signal', v: '@tanisha.42', href: '#contact' },
-  { k: 'GitHub', v: 'github.com/tbrahma', href: '#contact' },
-  { k: 'Mastodon', v: '@tanisha@infosec.exchange', href: '#contact' },
-  { k: 'Speaking', v: 'Request a topic list', href: 'mailto:tanisha@brahma.sec' },
+  { k: 'Email', v: 'tanishabrahma26@gmail.com', href: 'mailto:tanishabrahma26@gmail.com' },
+  { k: 'Instagram', v: '@mysstttt', href: 'https://instagram.com/mysstttt' },
+  { k: 'GitHub', v: 'github.com/Junecoderr', href: 'https://github.com/Junecoderr' },
+  { k: 'Medium', v: 'medium.com/@Junecodder', href: 'https://medium.com/@Junecodder' },
+  { k: 'Location', v: 'Durgapur, West Bengal', href: '#contact' },
+  { k: 'Speaking', v: 'Request a topic list', href: 'mailto:tanishabrahma26@gmail.com' },
 ];
 
 export const PGP_FINGERPRINT = '9F2C 47AD 10B8 6E31 D4A9  2C05 88FE 7B14 A3D6 0E92';

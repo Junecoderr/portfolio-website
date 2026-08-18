@@ -43,8 +43,20 @@
       "content": "Correction: this repo's project-scoped memory file lives at portfolio-website/.claude/memories/project_memory.json (cwd-relative), NOT at the parent Junecoderr/.claude/ one — a prior session edited the wrong file for many turns, which is why the cleanup hook kept re-firing. Always resolve the project_memory.json path relative to the current working directory.",
       "added_at": "2026-08-17T16:17:02.062358",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Fixed. Home's lag was `HeroCipherField.jsx` (the decrypt-on-hover glyph grid) doing ~3,840 `fillText` calls a frame at 60fps, each rebuilding a fresh `rgba(...)` string via template literal — real GC ",
+      "added_at": "2026-08-17T17:43:57.613501",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Fix the pre-loading screen, it's not upto the design, it has design flaws.",
+      "added_at": "2026-08-17T17:43:57.613527",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-08-17T16:17:02.062358"
+  "updated_at": "2026-08-17T17:43:57.613529"
 }
