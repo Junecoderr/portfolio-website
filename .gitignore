@@ -3,3 +3,5 @@ dist/
 .DS_Store
 src/assets/fonts/google.css
 src/assets/fonts/instrument-serif.ttf
+test-results/
+playwright-report/

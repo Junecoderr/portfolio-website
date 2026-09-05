@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Background from './components/Background.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Preloader from './components/Preloader.jsx';
 import Nav from './components/Nav.jsx';
 import Footer from './components/Footer.jsx';
@@ -85,7 +86,9 @@ export default function App({ initialCase = null }) {
   return (
     <div className="page" ref={rootRef}>
       <a href="#main" className="skip-link">Skip to content</a>
-      <Background motion />
+      <ErrorBoundary fallback={null}>
+        <Background motion />
+      </ErrorBoundary>
       <Preloader skip={skipPreloader} />
       <Nav menuOpen={menuOpen} onToggle={() => setMenuOpen((v) => !v)} onClose={() => setMenuOpen(false)} activeId={activeId} />
       <main id="main" className="main">

@@ -185,8 +185,7 @@ export const HERO = {
 export const RESUME_URL = null;
 export const BLOG_URL = null;
 
-// Drop a photo at public/portrait.jpg to replace the generated abstract.
-export const PORTRAIT_SRC = '/portrait.jpg';
+// Drop a photo at public/portrait.jpg to replace the generated abstract (detected at build time in About.jsx).
 export const PORTRAIT_FALLBACK = '/portrait-abstract.svg';
 
 export const NAV_SECTIONS = [

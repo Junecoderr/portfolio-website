@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import SectionHeading from '../components/SectionHeading.jsx';
-import { ABOUT, STATS, PORTRAIT_SRC, PORTRAIT_FALLBACK } from '../data/content.js';
+import { ABOUT, STATS, PORTRAIT_FALLBACK } from '../data/content.js';
+
+// Resolved at build time: a photo at public/portrait.jpg (or .png/.webp) wins, otherwise the abstract.
+const PHOTOS = import.meta.glob('../../public/portrait.{jpg,jpeg,png,webp}', { eager: true, query: '?url', import: 'default' });
+const PORTRAIT_SRC = Object.values(PHOTOS)[0] || null;
 
 export default function About() {
   const [tab, setTab] = useState('stats');
-  const [hasPhoto, setHasPhoto] = useState(true);
+  const [hasPhoto, setHasPhoto] = useState(Boolean(PORTRAIT_SRC));
 
   return (
     <section id="about" className="section">

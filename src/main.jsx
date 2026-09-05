@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { hydrateRoot, createRoot } from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App.jsx';
 import { caseIdFromPath } from './seo.js';
 import './styles/global.css';
@@ -11,6 +12,7 @@ const initialCase = caseIdFromPath(window.location.pathname) || (hash ? caseIdFr
 const tree = (
   <StrictMode>
     <App initialCase={initialCase} />
+    {window.location.hostname !== 'localhost' ? <Analytics /> : null}
   </StrictMode>
 );
 

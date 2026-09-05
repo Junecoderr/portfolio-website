@@ -43,8 +43,20 @@
       "content": "Standing caveat: case-study metrics, client names, CVE identifiers, talks and bounty figures all originate from the design template, not from Tanisha. Flagged to the user on 2026-09-06 as the top risk (now also in JSON-LD). Do not present them as verified; ask the user to confirm or replace before any further SEO submission.",
       "added_at": "2026-09-06T03:10:00.000000",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Memory trimmed to 7 entries and pushed as `e7b785b`. Prompt captures dropped; one standing note added so the unverified case-study figures stay flagged for the next session.",
+      "added_at": "2026-09-06T02:30:15.906843",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "The first thing - verification is being done, but sitemap.xml is pending go ahead and help me out and also for the rest of the things to be done as well.",
+      "added_at": "2026-09-06T02:30:15.906866",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-06T03:10:00.000000"
+  "updated_at": "2026-09-06T02:30:15.906867"
 }

@@ -534,3 +534,29 @@ a.xp-name:hover { color: var(--accent); }
 @media (min-width: 1024px) { .nav-inline { display: flex; } }
 .nav-menu-btn { padding: 8px; }
 }
+
+/* ---------- print ---------- */
+@media print {
+  .bg, .preloader, .nav, .drawer, .drawer-scrim, .scroll-cue, .hero-rotator, .marquee-row, .portrait-scanlines,
+  .footer-top, .footer-word, .signature-rule, .copy-btn, .contact-form, .about-tabs, .skip-link { display: none !important; }
+  html, body, .page, .content-band, .section, .footer { background: #fff !important; color: #111 !important; backdrop-filter: none !important; }
+  .content-band { background: none !important; }
+  .section { padding: 24px 0 !important; break-inside: avoid; }
+  .hero { min-height: auto !important; padding: 0 0 24px !important; text-align: left !important; align-items: flex-start !important; }
+  .hero::before { display: none; }
+  .hero-title, .section-title, .about-brief, .xp-name, .work-title, .rec-title, .skill-col-title, .contact-title { color: #111 !important; text-shadow: none !important; }
+  .section-number { display: none !important; }
+  .section-lead, .work-copy p, .xp-points, .rec-name, .skill-item, .about-path-body { color: #333 !important; }
+  .about-card, .portrait-card, .xp-card, .work-card, .rec-col, .skill-col, .contact-panel, .stat, .tag, .chip, .xp-period, .hero-status, .about-since {
+    background: none !important; border-color: #ccc !important; box-shadow: none !important; backdrop-filter: none !important; color: #111 !important;
+  }
+  .about-card-tint, .about-card-fade, .work-cover, .work-notch, .contact-glow { display: none !important; }
+  .work-body { margin-top: 0 !important; }
+  .work-grid { grid-template-columns: 1fr 1fr !important; }
+  .xp-rail::before, .xp-year::after { display: none !important; }
+  .about-card-body [key] { display: block; }
+  a { color: #111 !important; text-decoration: none; }
+  .contact-email::after, .footer-direct-row > a::after { content: none; }
+  .footer-links a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 11px; color: #555; }
+  .dialog-scrim { position: static !important; background: none !important; backdrop-filter: none !important; }
+}
