@@ -1,11 +1,20 @@
+@font-face {
+  font-family: "Nasalization";
+  src: url("/fonts/nasalization.otf") format("opentype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Bastliga";
+  src: url("/fonts/bastliga-one.otf") format("opentype");
+  font-display: swap;
+}
+
 :root {
   --font-text: "Geist", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-serif: "Instrument Serif", Georgia, serif;
-  /* Design specifies Nasalization and Bastliga One (third-party, not bundled).
-     Michroma and Great Vibes are the open-licence stand-ins. */
-  --font-display: "Michroma", "Geist", sans-serif;
-  --font-script: "Great Vibes", "Instrument Serif", serif;
+  --font-display: "Nasalization", "Geist", sans-serif;
+  --font-script: "Bastliga", "Instrument Serif", serif;
 
   --fs-hero: clamp(60px, 12vw, 128px);
   --fs-section-num: clamp(110px, 16vw, 200px);

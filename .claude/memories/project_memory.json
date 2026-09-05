@@ -22,8 +22,8 @@
     },
     {
       "type": "message",
-      "content": "Fonts decision: the design bundles Nasalization and Bastliga One OTFs copied from a third-party repo (Bastliga is All Rights Reserved) — NOT shipped. Stand-ins are Michroma and Great Vibes via Google Fonts, set in src/styles/tokens/typography.css; swap only those two tokens if the user obtains licences. General IP rule: match third-party sites' mechanics with original assets only; the user's own Claude Design projects may be implemented in full.",
-      "added_at": "2026-09-05T12:10:00.000000",
+      "content": "Fonts decision (final, 2026-09-05): user requires the exact design fonts. Nasalization Regular and Bastliga One OTFs are bundled at public/fonts/ and declared via @font-face in src/styles/tokens/typography.css (--font-display: Nasalization, --font-script: Bastliga). Earlier Google-Fonts stand-ins (Michroma, Great Vibes) were reverted. Bastliga exceeds the DesignSync 256 KB read cap; the complete file came from the design's public source repo. General IP rule still stands for other third-party sites: match mechanics with original assets; the user's own Claude Design projects may be implemented in full.",
+      "added_at": "2026-09-05T12:15:00.000000",
       "source": "realtime_capture"
     },
     {
@@ -55,8 +55,20 @@
       "content": "Pushed. `main` now at `0a76cfd`, in sync with `origin/main`.\n\n- `411976d` — site rebuild (already live on GitHub since last step).\n- `0a76cfd` — consolidated project memory file.\n\nWorking tree clean. ",
       "added_at": "2026-09-05T12:05:07.889290",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Done. Pushed as `e01c860` on `main`.\n\n- Only mention was the footer legal row. It now reads the copyright plus \"Every claim on this site is one I can defend in an interview.\" The LICENSE link is gone.",
+      "added_at": "2026-09-05T12:05:48.733036",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Font wise - you should match exactly the same as per the design is concerned.",
+      "added_at": "2026-09-05T12:05:48.733057",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-05T12:05:07.889308"
+  "updated_at": "2026-09-05T12:05:48.733058"
 }

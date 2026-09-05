@@ -49,7 +49,7 @@
 }
 .nav-bar.is-scrolled { background: rgba(0,0,0,.6); border-color: var(--line-fg-2); box-shadow: 0 20px 25px -5px rgba(0,0,0,.5); }
 .brand { display: flex; align-items: center; gap: 12px; }
-.brand-mark { font-family: var(--font-script); font-size: 30px; line-height: 1; padding-top: 2px; color: var(--accent); text-shadow: 0 0 1px rgba(94,210,242,.6); }
+.brand-mark { font-family: var(--font-script); font-size: 26px; font-weight: 700; line-height: 1; padding-top: 2px; color: var(--accent); text-shadow: 0 0 1px rgba(94,210,242,.6); }
 .brand-name { font-family: var(--font-mono); font-size: 18px; font-weight: 500; color: var(--fg-2); }
 .nav-menu-btn {
   display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 12px;
@@ -139,7 +139,7 @@
 .about-card-body { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 150px; }
 .about-slide { animation: slideIn .35s var(--ease-out); display: flex; flex-direction: column; gap: 10px; }
 .about-brief { font-size: clamp(16px, 1.7vw, 20px); font-weight: 700; letter-spacing: -.01em; line-height: 1.6; color: #fff; margin: 0; }
-.about-path-title { font-family: var(--font-display); font-size: clamp(15px, 1.6vw, 19px); font-weight: 700; color: #fff; line-height: 1.45; margin: 0; }
+.about-path-title { font-family: var(--font-display); font-size: clamp(17px, 1.8vw, 21px); font-weight: 700; color: #fff; line-height: 1.45; margin: 0; }
 .about-path-body { font-family: var(--font-mono); font-size: 13px; color: var(--fg-3); font-weight: 500; margin: 0; }
 .about-path-meta { display: flex; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--fg-4); padding-top: 4px; }
 .about-since { padding: 2px 8px; border-radius: 6px; background: #171717; border: 1px solid var(--line-2); color: var(--accent); }
@@ -151,7 +151,7 @@
 .stat-value { font-family: var(--font-mono); font-size: 24px; font-weight: 800; color: #fff; }
 .stat-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: var(--fg-4); margin-top: 4px; font-weight: 600; }
 .about-quote { gap: 12px; padding: 8px 0; justify-content: center; }
-.about-quote blockquote { font-family: var(--font-display); font-size: clamp(17px, 2vw, 24px); font-weight: 800; font-style: italic; letter-spacing: -.01em; color: #fff; line-height: 1.3; margin: 0; }
+.about-quote blockquote { font-family: var(--font-display); font-size: clamp(19px, 2.3vw, 27px); font-weight: 800; font-style: italic; letter-spacing: -.01em; color: #fff; line-height: 1.3; margin: 0; }
 .about-quote-by { font-family: var(--font-mono); font-size: 12px; color: var(--fg-4); align-self: flex-end; font-weight: 500; }
 .about-pills { position: relative; padding-top: 16px; border-top: 1px solid rgba(38,38,38,.8); margin-top: 16px; display: flex; align-items: center; gap: 8px; overflow-x: auto; }
 .pill {
@@ -203,7 +203,7 @@
 .xp-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line-soft); padding-bottom: 16px; }
 .xp-org { display: flex; flex-direction: column; gap: 4px; }
 .xp-name {
-  display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: clamp(16px, 2vw, 22px);
+  display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: clamp(18px, 2.2vw, 24px);
   font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; color: #fff;
 }
 a.xp-name:hover { color: var(--accent); }
@@ -263,7 +263,7 @@ a.xp-name:hover { color: var(--accent); }
 .contact-glow.br { bottom: -96px; right: -96px; }
 .contact-content { position: relative; z-index: 10; display: flex; flex-direction: column; gap: 44px; }
 .contact-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 32px; }
-.contact-title { font-family: var(--font-display); font-size: clamp(32px, 5.5vw, 54px); font-weight: 700; letter-spacing: .02em; color: #fff; margin: 0; user-select: none; text-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.contact-title { font-family: var(--font-display); font-size: clamp(36px, 6vw, 60px); font-weight: 700; letter-spacing: .02em; color: #fff; margin: 0; user-select: none; text-shadow: 0 4px 12px rgba(0,0,0,.4); }
 .contact-form { flex: 1 1 320px; max-width: 420px; }
 .form-step { display: flex; flex-direction: column; gap: 8px; }
 .form-step-head { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--fg-4); margin-bottom: 4px; }
@@ -286,8 +286,9 @@ a.xp-name:hover { color: var(--accent); }
 .signature-rule { display: flex; width: 100%; align-items: center; gap: 16px; padding: 8px 0; user-select: none; }
 .signature-rule::before, .signature-rule::after { content: ""; height: 1px; flex: 1; background: rgba(225,229,235,.25); }
 .signature-rule.strong { margin: 16px 0; }
+.signature-rule.strong .signature { font-size: clamp(24px, 3vw, 32px); }
 .signature-rule.strong::before, .signature-rule.strong::after { background: rgba(225,229,235,.6); }
-.signature { font-family: var(--font-script); font-size: clamp(30px, 3.6vw, 42px); letter-spacing: .02em; color: var(--fg-2); flex-shrink: 0; line-height: 1; }
+.signature { font-family: var(--font-script); font-size: clamp(26px, 3vw, 34px); letter-spacing: .05em; color: var(--fg-2); flex-shrink: 0; }
 
 .contact-foot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 32px; }
 .contact-socials { display: flex; flex-wrap: wrap; align-items: center; column-gap: 24px; row-gap: 12px; }
@@ -333,7 +334,7 @@ a.xp-name:hover { color: var(--accent); }
   background: var(--bg-card); padding: clamp(24px, 4vw, 40px); box-shadow: 0 32px 64px -24px rgba(0,0,0,.9); animation: slideIn .3s var(--ease-out);
 }
 .dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.dialog-title { font-family: var(--font-display); font-size: clamp(20px, 3vw, 30px); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: #fff; margin: 10px 0 0; }
+.dialog-title { font-family: var(--font-display); font-size: clamp(24px, 3.5vw, 34px); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: #fff; margin: 10px 0 0; }
 .dialog-close { padding: 8px; border-radius: 8px; border: 1px solid var(--line-2); color: var(--fg-4); background: transparent; display: flex; flex-shrink: 0; }
 .dialog-close:hover { color: var(--fg-1); border-color: var(--line-3); }
 .dialog-summary { font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7; color: var(--fg-3); margin: 16px 0 0; }
