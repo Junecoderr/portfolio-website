@@ -28,8 +28,8 @@
     },
     {
       "type": "message",
-      "content": "Open placeholders carried from the design: \"View Resume\", \"Resume\" and \"Blog\" links point to '#'. Contact details are real (tanishabrahma26@gmail.com, @mysstttt, github.com/Junecoderr, medium.com/@Junecodder, Durgapur). User rule: no mention of the reference design author or site anywhere on the website; footer legal row is just the copyright plus the interview line.",
-      "added_at": "2026-09-05T12:10:00.000000",
+      "content": "Placeholders and hooks for missing assets: RESUME_URL and BLOG_URL in src/data/content.js are null, which hides the Resume/Blog links everywhere (hero shows 'See the work' instead). Portrait card loads public/portrait.jpg first and falls back to the generated public/portrait-abstract.svg when the photo is missing; the old tanisha.png wordmark is no longer shown. Contact details are real (tanishabrahma26@gmail.com, @mysstttt, github.com/Junecoderr, medium.com/@Junecodder, Durgapur). User rule: no mention of the reference design author or site anywhere on the website.",
+      "added_at": "2026-09-05T18:30:00.000000",
       "source": "realtime_capture"
     },
     {
