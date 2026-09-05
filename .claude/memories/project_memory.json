@@ -10,7 +10,7 @@
     },
     {
       "type": "message",
-      "content": "2026-09-05 rebuild (commit 411976d): site now implements Claude Design project 99589604-0d37-4541-8fee-0f4d3033830f, file \"Tanisha Portfolio.dc.html\" (third-party-inspired design filled with Tanisha's content). Single-page scroll layout: preloader, glass nav + drawer, serif hero with rotating word, About bento slider + portrait, skill marquees, experience cards, four work cards opening case-study dialogs, four-step mailto contact form, big-type footer. Earlier five-route design and its LatticeScene / HeroCipherField / ds components were removed. Reading the design requires a successful /design-login; a plain /login token gets HTTP 403 from the design API.",
+      "content": "2026-09-05 rebuild (commit 411976d): site now implements Claude Design project 99589604-0d37-4541-8fee-0f4d3033830f, file \"Tanisha Portfolio.dc.html\" (third-party-inspired design filled with Tanisha's content). Single-page scroll layout: preloader, glass nav + drawer, serif hero with rotating word, About bento slider + portrait, skill marquees, experience cards, four work cards opening case-study dialogs, four-step mailto contact form, big-type footer. Earlier five-route design and its LatticeScene / HeroCipherField / ds components were removed. Reading the design requires a successful /design-login; a plain /login token gets HTTP 403 from the design API. Follow-ups the same day: mobile pass (commit 612e332 — one-line nav brand down to 360px, pills wrap, work grid min capped at container width, dialog docks to bottom, portrait served as responsive WebP via <picture>, viewport-fit=cover + theme-color) and favicon set (commit e2a29cf — TB signature traced from the Bastliga outlines into public/favicon.svg, plus favicon-32.png, apple-touch-icon.png, icon-512.png rendered from the font). Verify mobile at 360px and 390px with Playwright element screenshots per section.",
       "added_at": "2026-09-05T12:10:00.000000",
       "source": "realtime_capture"
     },
@@ -37,32 +37,8 @@
       "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Memory trimmed to 6 entries and pushed as `1444cb1`. Kept project identity, the rebuild record, conventions, the final fonts decision, open placeholders, and user preferences. Dropped the raw prompt c",
-      "added_at": "2026-09-05T12:21:34.641223",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "Make it mobile compliant as well",
-      "added_at": "2026-09-05T12:21:34.641236",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Done. Pushed as `612e332` on `main`, tree clean. Vercel deploys from it.\n\n**What was broken on phones and what changed**\n- **Nav brand wrapped to two lines** at 390 px. Brand name and mark now scale d",
-      "added_at": "2026-09-05T15:34:30.507255",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "make the favicon, it's signature.",
-      "added_at": "2026-09-05T15:34:30.507271",
-      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-05T15:34:30.507273"
+  "updated_at": "2026-09-05T15:40:00.000000"
 }
