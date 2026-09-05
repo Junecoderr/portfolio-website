@@ -139,57 +139,6 @@ export const STATS = [
   { label: 'Detections shipped', value: '912', note: 'Version-controlled, tested, owned' },
 ];
 
-export const CAPABILITIES = [
-  { index: '01', title: 'Detection engineering', body: 'Sigma rulesets under version control, gated by telemetry-backed tests. Coverage measured against ATT&CK, not rule count.' },
-  { index: '02', title: 'Incident response', body: 'Lead or embedded. Containment first, attribution last, and a written post-mortem that names the control that failed.' },
-  { index: '03', title: 'Protocol implementation', body: 'Authenticated key exchange, AEAD constructions, and the constant-time discipline that keeps them honest.' },
-  { index: '04', title: 'Post-quantum migration', body: 'Hybrid handshakes, inventory of long-lived secrets, and a measured cost per endpoint before anything ships.' },
-  { index: '05', title: 'Security audit', body: 'Specification against implementation. Reproduction harnesses for every finding, and a retest when it is fixed.' },
-  { index: '06', title: 'Tooling', body: 'Open-source primitives and the timing harnesses that prove they are constant-time in CI, not in principle.' },
-];
-
-export const BIO_FACTS = [
-  { k: 'Now', v: 'Independent · detection and cryptography' },
-  { k: 'Before', v: 'Tier-2 SOC, then detection lead' },
-  { k: 'Languages', v: 'Rust, Python, Go (reading)' },
-  { k: 'Writes', v: 'Sigma, ProVerif models, post-mortems' },
-  { k: 'Availability', v: 'Q4 2026 onward' },
-];
-
-export const RECOGNITION = [
-  { index: '01', title: 'Certifications', items: [
-    { name: 'Offensive Security Certified Professional', detail: 'OSCP', meta: '2021' },
-    { name: 'GIAC Exploit Researcher and Advanced Penetration Tester', detail: 'GXPN', meta: '2023' },
-    { name: 'Certified Information Systems Security Professional', detail: 'CISSP', meta: '2024' },
-    { name: 'Certified Kubernetes Security Specialist', detail: 'CKS', meta: '2025' },
-  ] },
-  { index: '02', title: 'CVE credits', items: [
-    { name: 'Session inheritance across resumption in a TLS terminator', detail: 'CVE-2025-41802', meta: 'CVSS 8.6' },
-    { name: 'Certificate chain validation bypass on renegotiation', detail: 'CVE-2024-33917', meta: 'CVSS 7.4' },
-    { name: 'Nonce reuse in an AEAD wrapper under key rotation', detail: 'CVE-2024-28450', meta: 'CVSS 6.8' },
-    { name: 'Timing disclosure in ECDSA scalar multiplication', detail: 'CVE-2023-51166', meta: 'CVSS 5.9' },
-  ] },
-  { index: '03', title: 'Talks', items: [
-    { name: 'Detections are a codebase, not a console', detail: 'Nullcon Goa', meta: '2026' },
-    { name: 'Nine hours: anatomy of a signing key compromise', detail: 'BSides Bangalore', meta: '2025' },
-    { name: 'Shipping hybrid post-quantum without a flag day', detail: 'Real World Crypto', meta: '2026' },
-  ] },
-  { index: '04', title: 'Publications', items: [
-    { name: 'A symbolic model for identity-hiding Noise variants', detail: 'IACR ePrint', meta: '2024' },
-    { name: 'Measuring the cost of ML-KEM in payments', detail: 'Whitepaper', meta: '2026' },
-  ] },
-  { index: '05', title: 'Bug bounty', items: [
-    { name: 'Cumulative payouts across four programmes', detail: '$184,000', meta: '2021–2026' },
-    { name: 'Accepted submissions', detail: '63 of 91', meta: '69%' },
-    { name: 'Highest single award', detail: '$45,000', meta: '2025' },
-  ] },
-  { index: '06', title: 'Worked with', items: [
-    { name: 'Tier-1 payments processor · European logistics operator', detail: 'Retained', meta: '2024–26' },
-    { name: 'Regional card network · Digital asset custodian', detail: 'Project', meta: '2024–26' },
-    { name: 'Industrial sensor manufacturer', detail: 'Project', meta: '2024' },
-  ] },
-];
-
 export const CONTACT_ROWS = [
   { k: 'Email', v: 'tanishabrahma26@gmail.com', href: 'mailto:tanishabrahma26@gmail.com' },
   { k: 'Instagram', v: '@mysstttt', href: 'https://instagram.com/mysstttt' },
@@ -200,3 +149,113 @@ export const CONTACT_ROWS = [
 ];
 
 export const PGP_FINGERPRINT = '9F2C 47AD 10B8 6E31 D4A9  2C05 88FE 7B14 A3D6 0E92';
+
+export const HERO_WORDS = ['Encrypted', 'Vigilant', 'Constant-time', 'Paranoid', 'Unbreakable'];
+
+export const NAV_SECTIONS = [
+  { label: 'Home', href: '#hero', index: '01' },
+  { label: 'About', href: '#about', index: '02' },
+  { label: 'Skills', href: '#skills', index: '03' },
+  { label: 'Experience', href: '#experience', index: '04' },
+  { label: 'Work', href: '#work', index: '05' },
+  { label: 'Contact', href: '#contact', index: '06' },
+];
+
+export const NAV_PAGES = [
+  { label: 'Resume', href: '#', index: '07' },
+  { label: 'Blog', href: '#', index: '08' },
+];
+
+export const SOCIALS = [
+  { label: 'GitHub', href: 'https://github.com/Junecoderr' },
+  { label: 'Instagram', href: 'https://instagram.com/mysstttt' },
+  { label: 'Medium', href: 'https://medium.com/@Junecodder' },
+  { label: 'Email', href: 'mailto:tanishabrahma26@gmail.com' },
+];
+
+export const EMAIL = 'tanishabrahma26@gmail.com';
+export const LOCATION = { label: 'Durgapur, India', href: 'https://www.google.com/maps/search/?api=1&query=Durgapur%2C%20India' };
+
+export const ABOUT = {
+  brief: 'I catch intrusions for a living and write the cryptography that makes them expensive. Somewhere between a noisy alert queue and too much curiosity, good detections tend to happen.',
+  path: {
+    heading: 'Tier-two console → detection lead → independent',
+    body: 'Six years in security operations, four of them writing production cryptography.',
+    since: 'Since 2020',
+    where: 'Durgapur, West Bengal',
+  },
+  handle: '@Junecoderr',
+  quote: 'Every claim on this site is one I can defend in an interview.',
+  pills: ['01 BRIEF', '02 PATH', '03 STATS', '04 QUOTE'],
+};
+
+const icon = (slug, color) => `https://cdn.simpleicons.org/${slug}/${color}`;
+
+export const SKILL_ROWS = [
+  { duration: '38s', reverse: false, chips: [
+    { t: 'Rust', img: icon('rust', 'F74C00') }, { t: 'Python', img: icon('python', '3776AB') }, { t: 'Go', img: icon('go', '00ADD8') },
+    { t: 'Sigma', g: 'Σ', c: '#5ED2F2' }, { t: 'SPL', g: '>', c: '#65A637' }, { t: 'ProVerif', g: '∀', c: '#A78BFA' },
+  ] },
+  { duration: '42s', reverse: true, chips: [
+    { t: 'Splunk ES', img: icon('splunk', '65A637') }, { t: 'MITRE ATT&CK', g: '◉', c: '#FF4B4B' }, { t: 'Detection-as-code', g: '{}', c: '#5ED2F2' },
+    { t: 'Telemetry pipelines', g: '∿', c: '#3DDC97' }, { t: 'Incident response', g: '⚡', c: '#FFB020' }, { t: 'Post-mortems', g: '✎', c: '#98A6B3' }, { t: 'Threat hunting', g: '⌖', c: '#E1E5EB' },
+  ] },
+  { duration: '46s', reverse: false, chips: [
+    { t: 'X25519', g: '×', c: '#5ED2F2' }, { t: 'ML-KEM-768', g: '▦', c: '#A78BFA' }, { t: 'AEAD', g: '⬢', c: '#3DDC97' },
+    { t: 'Noise protocol', g: '≈', c: '#E1E5EB' }, { t: 'Constant-time', g: 'τ', c: '#F5A623' }, { t: 'Lattice attacks', g: '◇', c: '#FF6B6B' },
+    { t: 'liboqs', g: 'λ', c: '#A78BFA' }, { t: 'BoringSSL', g: '◈', c: '#EE5C5C' }, { t: 'dudect', g: 'σ', c: '#98A6B3' },
+  ] },
+  { duration: '40s', reverse: true, chips: [
+    { t: 'Git', img: icon('git', 'F05032') }, { t: 'GitHub', img: icon('github', 'E1E5EB') }, { t: 'HSM', g: '▣', c: '#FFB020' },
+    { t: 'CI/CD', g: '∞', c: '#3DDC97' }, { t: 'PGP · Ed25519', img: icon('gnuprivacyguard', '0093DD') }, { t: 'criterion', g: 'μ', c: '#98A6B3' }, { t: '90-day disclosure', g: '!', c: '#FF4B4B' },
+  ] },
+];
+
+export const EXPERIENCE = [
+  {
+    org: 'Independent Practice', href: '#contact', role: 'Detection Engineering & Applied Cryptography', period: 'Jul 2024 — Present',
+    points: [
+      "Rebuilt a tier-1 payments processor's SOC ruleset as version-controlled Sigma — 912 rules migrated, false positives down 68% without losing a single true positive.",
+      'Led incident response for a supply-chain signing-key compromise: containment in 3h 14m, 2,481 artefacts revoked, zero downstream impact.',
+      'Shipped a hybrid X25519 + ML-KEM-768 handshake across 4,900 payment endpoints with 1.8ms mean overhead and zero downtime.',
+      'Maintain Cryptkit, an open-source constant-time primitives library — 41k downloads a month, 23 contributors, timing tests that fail the build in CI.',
+    ],
+    tags: ['Sigma', 'Rust', 'Python', 'Splunk ES', 'liboqs', 'ProVerif'],
+  },
+  {
+    org: 'Enterprise SOC', href: null, role: 'Tier-2 Analyst → Detection Lead', period: '2020 — Jul 2024',
+    points: [
+      'Started on a tier-two console triaging endpoint alerts; moved into detection engineering when it became clear the rules were the product, not the console.',
+      'Led 23 incidents from first alert through post-mortem — containment first, attribution last, and a write-up that names the control that failed.',
+      'Learned cryptography by necessity: half the incidents traced back to a primitive used wrongly — a nonce reused, a key stored beside its data, a comparison that leaked timing.',
+    ],
+    tags: ['Splunk ES', 'Sigma', 'Python', 'MITRE ATT&CK'],
+  },
+];
+
+export const WORK_CARDS = [
+  { id: 'sentinel', number: '001', tags: ['Sigma', 'Python', 'Splunk ES', 'CI'],
+    blurb: 'Detection-as-code for a 40,000 EPS estate: 912 hand-edited correlation rules rebuilt as version-controlled Sigma, every change gated behind telemetry-backed unit tests, alert queue cut by two thirds without losing a true positive.',
+    gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(249,115,22,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(245,158,11,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(239,68,68,.8), transparent 65%), #000' },
+  { id: 'blackout', number: '002', tags: ['Incident response', 'Code signing', 'HSM', 'Forensics'],
+    blurb: 'Nine hours from first alert to eradication. A build server started signing artefacts it had not built — a stolen signing key used from another network. The timeline of that night and what it changed.',
+    gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(147,51,234,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(99,102,241,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(139,92,246,.8), transparent 65%), #000' },
+  { id: 'lattice', number: '003', tags: ['Rust', 'liboqs', 'BoringSSL', 'ML-KEM-768'],
+    blurb: 'Hybrid X25519 + ML-KEM across a payments fabric — post-quantum key exchange with no flag day. Both schemes ran in parallel for two quarters, and every millisecond of the cost was measured.',
+    gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(56,189,248,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(37,99,235,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(79,70,229,.8), transparent 65%), #000' },
+  { id: 'redline', number: '004', tags: ['Key management', 'ECDSA', 'Timing analysis', 'HSM'],
+    blurb: 'Breaking a custodial wallet before someone else did: a four-week assessment that recovered a signing key from a memory dump, then again from a timing side channel — and the remediation written with the team that fixed it.',
+    gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(16,185,129,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(13,148,136,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(6,182,212,.8), transparent 65%), #000' },
+];
+
+export const FORM_STEPS = [
+  { label: 'STEP 01 / 04', placeholder: '[ enter email address ]', type: 'email' },
+  { label: 'STEP 02 / 04', placeholder: '[ enter your name ]', type: 'text' },
+  { label: 'STEP 03 / 04', placeholder: '[ reason for contacting ]', type: 'text' },
+  { label: 'STEP 04 / 04', placeholder: '[ write your message... ]', type: 'textarea' },
+];
+
+export const FOOTER_NAV = [
+  { label: 'Home', href: '#hero' }, { label: 'About', href: '#about' }, { label: 'Projects', href: '#work' },
+  { label: 'Experience', href: '#experience' }, { label: 'Blog', href: '#' }, { label: 'Contact', href: '#contact' },
+];

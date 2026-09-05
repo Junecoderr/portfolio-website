@@ -1,66 +1,49 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Header from './components/Header.jsx';
-import Footer from './components/Footer.jsx';
+import { useCallback, useEffect, useState } from 'react';
+import Background from './components/Background.jsx';
 import Preloader from './components/Preloader.jsx';
-import LatticeScene from './components/backgrounds/LatticeScene.jsx';
-import Home from './sections/Home.jsx';
-import Work from './sections/Work.jsx';
-import CaseStudy from './sections/CaseStudy.jsx';
+import Nav from './components/Nav.jsx';
+import Footer from './components/Footer.jsx';
+import CaseDialog from './components/CaseDialog.jsx';
+import Hero from './sections/Hero.jsx';
 import About from './sections/About.jsx';
+import Skills from './sections/Skills.jsx';
+import Experience from './sections/Experience.jsx';
+import Work from './sections/Work.jsx';
 import Contact from './sections/Contact.jsx';
-import useScrollReveal from './hooks/useScrollReveal.js';
-
-const LEVELS = { low: 0.4, med: 0.68, high: 0.95 };
+import { PROJECTS } from './data/content.js';
 
 export default function App() {
-  const rootRef = useRef(null);
-  const [route, setRoute] = useState('home');
-  const [activeId, setActiveId] = useState('blackout');
-  const [sceneOn, setSceneOn] = useState(true);
-  const [sceneLevel, setSceneLevel] = useState('high');
-  const [sceneReady, setSceneReady] = useState(false);
-  const [entered, setEntered] = useState(false);
-
-  useScrollReveal(rootRef, route);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [caseId, setCaseId] = useState(null);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [route]);
+    document.body.style.overflow = caseId ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [caseId]);
 
-  const navigate = useCallback((next) => setRoute(next), []);
-  const openCase = useCallback((id) => {
-    setActiveId(id);
-    setRoute('case');
-  }, []);
-
-  const handleSceneReady = useCallback(() => setSceneReady(true), []);
-  const handleEnter = useCallback(() => setEntered(true), []);
+  const openCase = useCallback((id) => setCaseId(id), []);
+  const closeCase = useCallback(() => setCaseId(null), []);
+  const project = caseId ? PROJECTS.find((p) => p.id === caseId) : null;
 
   return (
-    <Preloader ready={sceneReady} onEnter={handleEnter}>
-      <div ref={rootRef} className="page">
-        {sceneOn ? (
-          <LatticeScene config={route} intensity={LEVELS[sceneLevel]} onReady={handleSceneReady} />
-        ) : null}
-
-        <Header
-          route={route}
-          onNavigate={navigate}
-          entered={entered}
-          sceneOn={sceneOn}
-          sceneLevel={sceneLevel}
-          onToggleScene={() => setSceneOn((v) => !v)}
-          onSetLevel={setSceneLevel}
-        />
-
-        {route === 'home' && <Home onOpenCase={openCase} onNavigate={navigate} />}
-        {route === 'work' && <Work onOpenCase={openCase} />}
-        {route === 'case' && <CaseStudy activeId={activeId} onOpenCase={openCase} onNavigate={navigate} />}
-        {route === 'about' && <About />}
-        {route === 'contact' && <Contact />}
-
+    <div className="page">
+      <Background motion />
+      <Preloader />
+      <Nav menuOpen={menuOpen} onToggle={() => setMenuOpen((v) => !v)} onClose={() => setMenuOpen(false)} />
+      <main className="main">
+        <Hero />
+        <div className="content-band">
+          <About paused={Boolean(caseId)} />
+          <Skills />
+          <Experience />
+          <Work onOpenCase={openCase} />
+          <Contact />
+        </div>
         <Footer />
-      </div>
-    </Preloader>
+      </main>
+      <CaseDialog project={project} onClose={closeCase} />
+    </div>
   );
 }

@@ -4,6 +4,25 @@
 @import "./tokens/motion.css";
 @import "./tokens/base.css";
 
-#root {
-  min-height: 100vh;
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; background: var(--bg); color-scheme: dark; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg-1);
+  font-family: var(--font-text);
+  letter-spacing: 0.05rem;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+#root { min-height: 100vh; }
+a { color: var(--fg-2); text-decoration: none; transition: color .2s; }
+a:hover { color: #fff; }
+::selection { background: var(--accent); color: #06121a; }
+*::-webkit-scrollbar { display: none; }
+input, textarea, button { letter-spacing: inherit; font: inherit; }
+button { cursor: pointer; }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

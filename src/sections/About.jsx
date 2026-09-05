@@ -1,71 +1,100 @@
-import { BIO_FACTS, RECOGNITION } from '../data/content.js';
+import { useEffect, useState } from 'react';
+import SectionHeading from '../components/SectionHeading.jsx';
+import { ABOUT, STATS } from '../data/content.js';
 
-export default function About() {
+const SLIDES = 4;
+
+export default function About({ paused }) {
+  const [slide, setSlide] = useState(0);
+  const [hover, setHover] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (hover || paused) return;
+      setSlide((s) => (s + 1) % SLIDES);
+    }, 4500);
+    return () => clearInterval(id);
+  }, [hover, paused]);
+
   return (
-    <main id="about" className="page-fade route-main">
-      <section className="section-pad">
-        <div className="container">
-          <span className="mono-label">About</span>
-          <h1 className="route-title wide">
-            I work the two ends of the same problem: catching intrusions, and making them expensive.
-          </h1>
-        </div>
-      </section>
-
-      <section className="section-pad-b">
-        <div className="container about-grid">
-          <div data-reveal="1" className="about-copy">
-            <p>
-              Six years in security operations, four of them writing cryptography for production systems. I started on a
-              tier-two console triaging endpoint alerts and moved into detection engineering when it became clear the rules
-              were the product, not the console.
-            </p>
-            <p>
-              The cryptography came later and by necessity. Half the incidents I worked traced back to a primitive used
-              wrongly: a nonce reused, a key stored beside the data it protected, a comparison that leaked timing. Learning to
-              build them correctly was the fastest way to stop reading about them at 3am.
-            </p>
-            <p>
-              Today I split my time between detection-as-code programmes and protocol implementation reviews. I write Rust and
-              Python, read Go, and prefer a specification to a diagram.
-            </p>
-          </div>
-          <div data-reveal="1" className="fact-list">
-            {BIO_FACTS.map((f) => (
-              <div key={f.k} className="fact-row">
-                <span className="mono-label">{f.k}</span>
-                <span className="fact-value">{f.v}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section-pad-b">
-        <div className="container">
-          <div data-reveal="1" className="section-head">
-            <h2 className="section-title">Recognition</h2>
-            <span className="mono-label">As of 30 Jun 2026</span>
-          </div>
-          {RECOGNITION.map((g) => (
-            <div key={g.index} data-reveal="1" className="recognition-row">
-              <div className="recognition-head">
-                <span className="mono-index">{g.index}</span>
-                <h3 className="h3-title">{g.title}</h3>
-              </div>
-              <div className="recognition-items">
-                {g.items.map((i) => (
-                  <div key={i.name} className="recognition-item">
-                    <span className="recognition-item-name">{i.name}</span>
-                    <span className="mono-label soft">{i.detail}</span>
-                    <span className="mono-label align-end">{i.meta}</span>
-                  </div>
-                ))}
-              </div>
+    <section id="about" className="section">
+      <div className="container">
+        <SectionHeading number="02" title="About" />
+        <div className="about-grid" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+          <div className="about-card">
+            <div className="about-card-tint" />
+            <div className="about-card-fade" />
+            <div className="about-card-head">
+              <span className="about-counter">{`0${slide + 1} / 04`}</span>
             </div>
-          ))}
+            <div className="about-card-body">
+              {slide === 0 ? (
+                <div key="s0" className="about-slide">
+                  <h3 className="about-brief">{ABOUT.brief}</h3>
+                </div>
+              ) : null}
+              {slide === 1 ? (
+                <div key="s1" className="about-slide about-path">
+                  <span className="eyebrow">// Path &amp; Background</span>
+                  <h3 className="about-path-title">{ABOUT.path.heading}</h3>
+                  <p className="about-path-body">{ABOUT.path.body}</p>
+                  <div className="about-path-meta">
+                    <span className="about-since">{ABOUT.path.since}</span>
+                    <span>•</span>
+                    <span>{ABOUT.path.where}</span>
+                  </div>
+                </div>
+              ) : null}
+              {slide === 2 ? (
+                <div key="s2" className="about-slide about-stats">
+                  <div className="about-stats-head">
+                    <span className="eyebrow">// Field Metrics</span>
+                    <span className="about-handle">{ABOUT.handle}</span>
+                  </div>
+                  <div className="stat-grid">
+                    {STATS.map((s) => (
+                      <div key={s.label} className="stat">
+                        <span className="stat-value">{s.value}</span>
+                        <span className="stat-label">{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {slide === 3 ? (
+                <div key="s3" className="about-slide about-quote">
+                  <span className="eyebrow">// Core Philosophy</span>
+                  <blockquote>&ldquo;{ABOUT.quote}&rdquo;</blockquote>
+                  <span className="about-quote-by">— Tanisha Brahma</span>
+                </div>
+              ) : null}
+            </div>
+            <div className="about-pills">
+              {ABOUT.pills.map((label, i) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={`pill${i === slide ? ' is-active' : ''}`}
+                  onClick={() => setSlide(i)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="portrait-card">
+            <div className="portrait-frame">
+              <img src="/tanisha.png" alt="Tanisha Brahma" />
+            </div>
+            <div className="portrait-scanlines" />
+            <span className="portrait-corner tl">┌</span>
+            <span className="portrait-corner tr">┐</span>
+            <span className="portrait-corner bl">└</span>
+            <span className="portrait-corner br">┘</span>
+          </div>
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
   );
 }
