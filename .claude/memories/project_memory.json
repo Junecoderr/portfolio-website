@@ -28,7 +28,7 @@
     },
     {
       "type": "message",
-      "content": "Placeholders and hooks for missing assets: RESUME_URL and BLOG_URL in src/data/content.js are null, which hides the Resume/Blog links everywhere (hero shows 'See the work' instead). Portrait card loads public/portrait.jpg first and falls back to the generated public/portrait-abstract.svg when the photo is missing; the old tanisha.png wordmark is no longer shown. Contact details are real (tanishabrahma26@gmail.com, @mysstttt, github.com/Junecoderr, medium.com/@Junecodder, Durgapur). User rule: no mention of the reference design author or site anywhere on the website.",
+      "content": "Placeholders and hooks for missing assets: RESUME_URL and BLOG_URL in src/data/content.js are null, which hides the Resume/Blog links everywhere (hero shows 'See the work' instead). Portrait card loads public/portrait.jpg first and falls back to the generated public/portrait-abstract.svg when the photo is missing; the old tanisha.png wordmark is no longer shown. Contact details are real (tanishabrahma26@gmail.com, @mysstttt, github.com/Junecoderr, medium.com/@Junecodder, Durgapur). User rule: no mention of the reference design author or site anywhere on the website. Backlog offered 2026-09-06 (not started): long-form case pages, ATT&CK heatmap + incident timeline visuals, Medium RSS writing section, build-time resume PDF, talks media + Event/credential schema, live GitHub facts, references; security.txt + /pgp.txt + site threat model + console banner; contact backend (Vercel fn + Resend), branded 404, Lighthouse CI + axe, visual regression snapshots, Dependabot + Sentry, content schema validation, save-data shader skip, hover prefetch, light theme.",
       "added_at": "2026-09-05T18:30:00.000000",
       "source": "realtime_capture"
     },
@@ -43,20 +43,8 @@
       "content": "Standing caveat: case-study metrics, client names, CVE identifiers, talks and bounty figures all originate from the design template, not from Tanisha. Flagged to the user on 2026-09-06 as the top risk (now also in JSON-LD). Do not present them as verified; ask the user to confirm or replace before any further SEO submission.",
       "added_at": "2026-09-06T03:10:00.000000",
       "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Memory trimmed to 7 entries and pushed as `8b8cc39`. Prompt captures dropped; the minimalist direction, SEO pipeline, deployment-protection finding, conventions, placeholders, preferences, and the con",
-      "added_at": "2026-09-06T02:49:06.903870",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "let us have the earlier format - but keep having the cherry red dynamic background for the same.",
-      "added_at": "2026-09-06T02:49:06.903903",
-      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-06T02:49:06.903905"
+  "updated_at": "2026-09-06T05:00:00.000000"
 }
