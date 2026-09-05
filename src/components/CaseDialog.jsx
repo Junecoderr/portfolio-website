@@ -1,26 +1,53 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { CloseIcon } from './Icons.jsx';
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input, textarea, select, [tabindex]:not([tabindex="-1"])';
+
 export default function CaseDialog({ project, onClose }) {
+  const dialogRef = useRef(null);
+  const closeRef = useRef(null);
+
   useEffect(() => {
+    if (!project) return undefined;
+    const opener = document.activeElement;
+    closeRef.current?.focus();
+
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      const nodes = dialogRef.current.querySelectorAll(FOCUSABLE);
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (opener && typeof opener.focus === 'function') opener.focus();
+    };
+  }, [project, onClose]);
 
   if (!project) return null;
 
   return (
     <div className="dialog-scrim" onClick={onClose}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="case-title" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby="case-title" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
           <div>
             <span className="eyebrow">{project.discipline} · {project.year}</span>
             <h3 id="case-title" className="dialog-title">{project.title}</h3>
           </div>
-          <button type="button" className="dialog-close" onClick={onClose} aria-label="Close case study">
+          <button ref={closeRef} type="button" className="dialog-close" onClick={onClose} aria-label="Close case study">
             <CloseIcon />
           </button>
         </div>
@@ -54,6 +81,9 @@ export default function CaseDialog({ project, onClose }) {
               </div>
             ))}
           </div>
+        </div>
+        <div className="dialog-foot">
+          <span className="dialog-link-hint">Link to this case: <code>{`${window.location.origin}${window.location.pathname}#work/${project.id}`}</code></span>
         </div>
       </div>
     </div>

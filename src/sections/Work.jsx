@@ -7,7 +7,7 @@ export default function Work({ onOpenCase }) {
   return (
     <section id="work" className="section">
       <div className="container">
-        <SectionHeading number="05" title="Work" align="right" />
+        <SectionHeading number="02" title="Work" align="right" />
         <div className="work-grid">
           {WORK_CARDS.map((card) => {
             const project = PROJECTS.find((p) => p.id === card.id);

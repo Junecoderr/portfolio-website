@@ -1,4 +1,5 @@
-import { FOOTER_NAV, SOCIALS, FOOTER_BLURB } from '../data/content.js';
+import { SOCIALS, FOOTER_BLURB, EMAIL, PGP_FINGERPRINT } from '../data/content.js';
+import CopyButton from './CopyButton.jsx';
 import { ArrowUp } from './Icons.jsx';
 
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -14,10 +15,15 @@ export default function Footer() {
             </button>
             <span className="footer-word footer-word-first" aria-hidden="true">Tanisha</span>
           </div>
-          <div className="footer-col">
-            <span className="footer-label">Navigation</span>
-            <div className="footer-links">
-              {FOOTER_NAV.map((n) => <a key={n.label} href={n.href}>{n.label}</a>)}
+          <div className="footer-col footer-direct">
+            <span className="footer-label">Direct</span>
+            <div className="footer-direct-row">
+              <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+              <CopyButton text={EMAIL} label="Copy" className="copy-btn-sm" />
+            </div>
+            <div className="footer-direct-row">
+              <span className="footer-pgp"><span className="footer-pgp-k">PGP</span><code>{PGP_FINGERPRINT}</code></span>
+              <CopyButton text={PGP_FINGERPRINT.replace(/\s+/g, '')} label="Copy" className="copy-btn-sm" />
             </div>
           </div>
           <div className="footer-divider" />

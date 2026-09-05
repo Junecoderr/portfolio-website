@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SectionHeading from '../components/SectionHeading.jsx';
-import { FORM_STEPS, SOCIALS, EMAIL, LOCATION } from '../data/content.js';
+import CopyButton from '../components/CopyButton.jsx';
+import { FORM_STEPS, SOCIALS, EMAIL, LOCATION, PGP_FINGERPRINT } from '../data/content.js';
 import { ArrowLeft, ArrowRight, AlertIcon, MailIcon, PinIcon } from '../components/Icons.jsx';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -16,10 +17,13 @@ export default function Contact() {
   const [step, setStep] = useState(0);
   const [vals, setVals] = useState(EMPTY);
   const [err, setErr] = useState(null);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(null); // null | 'opened' | 'unsure'
+  const blurTimer = useRef(null);
 
   const cfg = FORM_STEPS[step];
   const last = step === FORM_STEPS.length - 1;
+
+  useEffect(() => () => clearTimeout(blurTimer.current), []);
 
   const validate = () => {
     const v = (vals[step] || '').trim();
@@ -35,14 +39,26 @@ export default function Contact() {
     return true;
   };
 
+  const submit = () => {
+    let opened = false;
+    const onBlur = () => {
+      opened = true;
+    };
+    window.addEventListener('blur', onBlur, { once: true });
+    window.location.href = buildMailto(vals);
+    blurTimer.current = setTimeout(() => {
+      window.removeEventListener('blur', onBlur);
+      setDone(opened ? 'opened' : 'unsure');
+    }, 1500);
+  };
+
   const next = () => {
     if (!validate()) return;
     if (!last) {
       setStep((s) => s + 1);
       return;
     }
-    window.location.href = buildMailto(vals);
-    setDone(true);
+    submit();
   };
 
   const onChange = (e) => {
@@ -63,21 +79,37 @@ export default function Contact() {
   const reset = () => {
     setVals(EMPTY);
     setStep(0);
-    setDone(false);
+    setDone(null);
     setErr(null);
   };
+
+  const draft = vals.map((v) => v.trim()).some(Boolean) ? buildMailto(vals) : `mailto:${EMAIL}`;
 
   return (
     <section id="contact" className="section contact">
       <div className="container contact-inner">
-        <SectionHeading number="06" title="Contact" />
+        <SectionHeading number="07" title="Contact" />
         <div className="contact-panel" data-reveal="1">
           <div className="contact-glow tl" />
           <div className="contact-glow br" />
           <div className="contact-content">
             <div className="contact-row">
-              <h2 className="contact-title">let's talk</h2>
+              <div className="contact-lead">
+                <h2 className="contact-title">let's talk</h2>
+                <div className="contact-direct">
+                  <span className="eyebrow">Fastest route</span>
+                  <a href={`mailto:${EMAIL}`} className="contact-email">
+                    <MailIcon stroke="#5ED2F2" />
+                    <span>{EMAIL}</span>
+                  </a>
+                  <div className="contact-direct-actions">
+                    <CopyButton text={EMAIL} label="Copy address" />
+                    <span className="contact-direct-note">Replies within two working days.</span>
+                  </div>
+                </div>
+              </div>
               <div className="contact-form">
+                <span className="eyebrow soft">Or draft it here</span>
                 {!done ? (
                   <div className="form-step">
                     <div className="form-step-head">
@@ -90,23 +122,27 @@ export default function Contact() {
                     </div>
                     <div className="form-field">
                       {cfg.type === 'textarea' ? (
-                        <textarea rows={2} value={vals[step]} onChange={onChange} onKeyDown={onKey} placeholder={cfg.placeholder} />
+                        <textarea rows={2} value={vals[step]} onChange={onChange} onKeyDown={onKey} placeholder={cfg.placeholder} aria-label={cfg.placeholder} />
                       ) : (
-                        <input type={cfg.type} value={vals[step]} onChange={onChange} onKeyDown={onKey} placeholder={cfg.placeholder} />
+                        <input type={cfg.type} value={vals[step]} onChange={onChange} onKeyDown={onKey} placeholder={cfg.placeholder} aria-label={cfg.placeholder} />
                       )}
-                      <button type="button" className="form-next" onClick={next} title="Next step" aria-label="Next step">
+                      <button type="button" className="form-next" onClick={next} title={last ? 'Open in mail app' : 'Next step'} aria-label={last ? 'Open in mail app' : 'Next step'}>
                         <ArrowRight />
                       </button>
                     </div>
                     {err ? (
-                      <div className="form-error"><AlertIcon size={14} /><span>{err}</span></div>
+                      <div className="form-error" role="alert"><AlertIcon size={14} /><span>{err}</span></div>
                     ) : null}
-                    {last && !err ? <span className="form-hint">Press Ctrl+Enter or click arrow to send</span> : null}
+                    {last && !err ? <span className="form-hint">Enter or the arrow opens your mail app with this draft</span> : null}
                   </div>
                 ) : (
-                  <div className="form-done">
-                    <p>Message drafted in your mail app — send it and I will get back to you as soon as possible.</p>
-                    <button type="button" onClick={reset}>Send another message</button>
+                  <div className="form-done" role="status">
+                    {done === 'opened' ? (
+                      <p>Draft opened in your mail app. Hit send there and I will get back to you.</p>
+                    ) : (
+                      <p>No mail app answered. Copy the address above, or <a href={draft}>try the draft link</a> again.</p>
+                    )}
+                    <button type="button" onClick={reset}>Start another message</button>
                   </div>
                 )}
               </div>
@@ -121,7 +157,7 @@ export default function Contact() {
                 ))}
               </div>
               <div className="contact-meta">
-                <a href={`mailto:${EMAIL}`}><MailIcon stroke="#5ED2F2" /><span>{EMAIL}</span></a>
+                <span className="contact-pgp" title="PGP fingerprint · Ed25519"><span className="eyebrow sm">PGP</span> <code>{PGP_FINGERPRINT}</code></span>
                 <a href={LOCATION.href} target="_blank" rel="noopener noreferrer"><PinIcon stroke="#5ED2F2" /><span>{LOCATION.label}</span></a>
               </div>
             </div>

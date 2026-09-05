@@ -10,7 +10,7 @@
     },
     {
       "type": "message",
-      "content": "2026-09-05 rebuild (commit 411976d): site now implements Claude Design project 99589604-0d37-4541-8fee-0f4d3033830f, file \"Tanisha Portfolio.dc.html\" (third-party-inspired design filled with Tanisha's content). Single-page scroll layout: preloader, glass nav + drawer, serif hero with rotating word, About bento slider + portrait, skill marquees, experience cards, four work cards opening case-study dialogs, four-step mailto contact form, big-type footer. Earlier five-route design and its LatticeScene / HeroCipherField / ds components were removed. Reading the design requires a successful /design-login; a plain /login token gets HTTP 403 from the design API. Follow-ups the same day: mobile pass (commit 612e332 — one-line nav brand down to 360px, pills wrap, work grid min capped at container width, dialog docks to bottom, portrait served as responsive WebP via <picture>, viewport-fit=cover + theme-color) and favicon set (commit e2a29cf — TB signature traced from the Bastliga outlines into public/favicon.svg, plus favicon-32.png, apple-touch-icon.png, icon-512.png rendered from the font). Verify mobile at 360px and 390px with Playwright element screenshots per section. Polish pass (commit 8e68cdb) applied all 20 critique items: hero status pill + role line + scroll cue + dark scrim, body copy in Geist not mono, natural-width footer wordmarks, 2x2 work grid with hover lift/glow, outlined section numbers, scroll-reveal via src/hooks/useScrollReveal.js, cyan-only palette, monochrome skill chips, content band fade, inline desktop nav links, 11px label floor, 36-40px touch targets, 1.3s preloader.",
+      "content": "2026-09-05 rebuild (commit 411976d): site now implements Claude Design project 99589604-0d37-4541-8fee-0f4d3033830f, file \"Tanisha Portfolio.dc.html\" (third-party-inspired design filled with Tanisha's content). Single-page scroll layout: preloader, glass nav + drawer, serif hero with rotating word, About bento slider + portrait, skill marquees, experience cards, four work cards opening case-study dialogs, four-step mailto contact form, big-type footer. Earlier five-route design and its LatticeScene / HeroCipherField / ds components were removed. Reading the design requires a successful /design-login; a plain /login token gets HTTP 403 from the design API. Follow-ups the same day: mobile pass (commit 612e332 — one-line nav brand down to 360px, pills wrap, work grid min capped at container width, dialog docks to bottom, portrait served as responsive WebP via <picture>, viewport-fit=cover + theme-color) and favicon set (commit e2a29cf — TB signature traced from the Bastliga outlines into public/favicon.svg, plus favicon-32.png, apple-touch-icon.png, icon-512.png rendered from the font). Verify mobile at 360px and 390px with Playwright element screenshots per section. Polish pass (commit 8e68cdb) applied all 20 critique items: hero status pill + role line + scroll cue + dark scrim, body copy in Geist not mono, natural-width footer wordmarks, 2x2 work grid with hover lift/glow, outlined section numbers, scroll-reveal via src/hooks/useScrollReveal.js, cyan-only palette, monochrome skill chips, content band fade, inline desktop nav links, 11px label floor, 36-40px touch targets, 1.3s preloader. UX pass (2026-09-06): section order is Hero, Work (02), About (03), Experience (04), Recognition (05), Skills (06), Contact (07). Case studies are hash-routed (#work/<id>) with pushState, popstate/hashchange sync, Escape and back-button close, focus trap and focus return; deep links skip the preloader, which is otherwise gated to once a day in localStorage. Contact leads with the email plus a copy button and detects whether the mailto opened via window blur. Footer nav replaced by Direct column (email + PGP fingerprint, copy buttons). Skills are three static columns with 'core' tags plus one decorative marquee that pauses off-screen. Nav has active-section highlight (IntersectionObserver) and a scroll progress bar. Background shader stops on prefers-reduced-motion and when the tab is hidden.",
       "added_at": "2026-09-05T12:10:00.000000",
       "source": "realtime_capture"
     },
@@ -37,8 +37,32 @@
       "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Memory trimmed to 6 entries and pushed as `6f2cb52`. The polish pass was folded into the rebuild entry.",
+      "added_at": "2026-09-06T02:01:29.262452",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "What are the things, which you critically analyze based on the UI/UX experience level and let me know here itself for the same.",
+      "added_at": "2026-09-06T02:01:29.262491",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "UX critique of the site as it stands now, from a visitor's point of view. The visual layer is done. What follows is about whether someone can get what they came for.\n\n## Who visits and what they need\n",
+      "added_at": "2026-09-06T02:02:36.305210",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Go ahead and fix everything please.",
+      "added_at": "2026-09-06T02:02:36.305233",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-05T18:40:00.000000"
+  "updated_at": "2026-09-06T02:02:36.305234"
 }

@@ -1,57 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import SectionHeading from '../components/SectionHeading.jsx';
 import { ABOUT, STATS, PORTRAIT_SRC, PORTRAIT_FALLBACK } from '../data/content.js';
 
-const SLIDES = 4;
-
-export default function About({ paused }) {
-  const [slide, setSlide] = useState(0);
-  const [hover, setHover] = useState(false);
+export default function About() {
+  const [tab, setTab] = useState('stats');
   const [hasPhoto, setHasPhoto] = useState(true);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (hover || paused) return;
-      setSlide((s) => (s + 1) % SLIDES);
-    }, 4500);
-    return () => clearInterval(id);
-  }, [hover, paused]);
 
   return (
     <section id="about" className="section">
       <div className="container">
-        <SectionHeading number="02" title="About" />
-        <div className="about-grid" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+        <SectionHeading number="03" title="About" />
+        <div className="about-grid">
           <div className="about-card" data-reveal="1">
             <div className="about-card-tint" />
             <div className="about-card-fade" />
             <div className="about-card-head">
-              <span className="about-counter">{`0${slide + 1} / 04`}</span>
+              <span className="eyebrow">// Brief</span>
+              <span className="about-handle">{ABOUT.handle}</span>
             </div>
-            <div className="about-card-body">
-              {slide === 0 ? (
-                <div key="s0" className="about-slide">
-                  <h3 className="about-brief">{ABOUT.brief}</h3>
-                </div>
-              ) : null}
-              {slide === 1 ? (
-                <div key="s1" className="about-slide about-path">
-                  <span className="eyebrow">// Path &amp; Background</span>
-                  <h3 className="about-path-title">{ABOUT.path.heading}</h3>
-                  <p className="about-path-body">{ABOUT.path.body}</p>
-                  <div className="about-path-meta">
-                    <span className="about-since">{ABOUT.path.since}</span>
-                    <span>•</span>
-                    <span>{ABOUT.path.where}</span>
-                  </div>
-                </div>
-              ) : null}
-              {slide === 2 ? (
-                <div key="s2" className="about-slide about-stats">
-                  <div className="about-stats-head">
-                    <span className="eyebrow">// Field Metrics</span>
-                    <span className="about-handle">{ABOUT.handle}</span>
-                  </div>
+            <h3 className="about-brief">{ABOUT.brief}</h3>
+            <div className="about-tabs" role="tablist" aria-label="More about Tanisha">
+              {ABOUT.tabs.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  className={`pill${tab === t.key ? ' is-active' : ''}`}
+                  onClick={() => setTab(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="about-card-body" role="tabpanel">
+              {tab === 'stats' ? (
+                <div key="stats" className="about-slide about-stats">
                   <div className="stat-grid">
                     {STATS.map((s) => (
                       <div key={s.label} className="stat">
@@ -62,25 +46,23 @@ export default function About({ paused }) {
                   </div>
                 </div>
               ) : null}
-              {slide === 3 ? (
-                <div key="s3" className="about-slide about-quote">
-                  <span className="eyebrow">// Core Philosophy</span>
+              {tab === 'path' ? (
+                <div key="path" className="about-slide about-path">
+                  <h4 className="about-path-title">{ABOUT.path.heading}</h4>
+                  <p className="about-path-body">{ABOUT.path.body}</p>
+                  <div className="about-path-meta">
+                    <span className="about-since">{ABOUT.path.since}</span>
+                    <span>•</span>
+                    <span>{ABOUT.path.where}</span>
+                  </div>
+                </div>
+              ) : null}
+              {tab === 'quote' ? (
+                <div key="quote" className="about-slide about-quote">
                   <blockquote>&ldquo;{ABOUT.quote}&rdquo;</blockquote>
                   <span className="about-quote-by">— Tanisha Brahma</span>
                 </div>
               ) : null}
-            </div>
-            <div className="about-pills">
-              {ABOUT.pills.map((label, i) => (
-                <button
-                  key={label}
-                  type="button"
-                  className={`pill${i === slide ? ' is-active' : ''}`}
-                  onClick={() => setSlide(i)}
-                >
-                  {label}
-                </button>
-              ))}
             </div>
           </div>
 

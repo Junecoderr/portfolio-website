@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { NAV_SECTIONS, NAV_PAGES, SOCIALS } from '../data/content.js';
 import { MenuIcon, CloseIcon } from './Icons.jsx';
 
-export default function Nav({ menuOpen, onToggle, onClose }) {
+export default function Nav({ menuOpen, onToggle, onClose, activeId }) {
   const [hidden, setHidden] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [progress, setProgress] = useState(0);
   const lastY = useRef(0);
 
   useEffect(() => {
@@ -14,6 +15,8 @@ export default function Nav({ menuOpen, onToggle, onClose }) {
       if (y <= 10) setHidden(false);
       else if (Math.abs(delta) > 5) setHidden(delta > 0);
       setScrolled(y > 10);
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(max > 0 ? Math.min(1, y / max) : 0);
       lastY.current = y;
     };
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -29,14 +32,15 @@ export default function Nav({ menuOpen, onToggle, onClose }) {
             <span className="brand-name">Tanisha Brahma.</span>
           </a>
           <div className="nav-inline">
-            {NAV_SECTIONS.filter((n) => ['About', 'Experience', 'Work', 'Contact'].includes(n.label)).map((n) => (
-              <a key={n.href} href={n.href} className="nav-inline-link">{n.label}</a>
+            {NAV_SECTIONS.filter((n) => ['Work', 'About', 'Experience', 'Contact'].includes(n.label)).map((n) => (
+              <a key={n.href} href={n.href} className={`nav-inline-link${activeId === n.id ? ' is-active' : ''}`} aria-current={activeId === n.id ? 'true' : undefined}>{n.label}</a>
             ))}
           </div>
           <button type="button" className="nav-menu-btn" onClick={onToggle} aria-expanded={menuOpen}>
             <span>{menuOpen ? 'Close' : 'Menu'}</span>
             {menuOpen ? <CloseIcon stroke="#5ED2F2" /> : <MenuIcon />}
           </button>
+          <span className="nav-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden="true" />
         </div>
       </nav>
 
@@ -52,7 +56,7 @@ export default function Nav({ menuOpen, onToggle, onClose }) {
           <div className="drawer-group">
             <span className="eyebrow soft">Sections</span>
             {NAV_SECTIONS.map((n) => (
-              <a key={n.href} href={n.href} className="drawer-link" onClick={onClose}>
+              <a key={n.href} href={n.href} className={`drawer-link${activeId === n.id ? ' is-active' : ''}`} onClick={onClose} aria-current={activeId === n.id ? 'true' : undefined}>
                 <span className="drawer-link-label">{n.label}</span>
                 <span className="drawer-link-index">{n.index}</span>
               </a>

@@ -11,6 +11,19 @@ const PALETTE = ['hsl(193, 85%, 66%)', 'hsl(196, 100%, 83%)', 'hsl(195, 100%, 50
 export default function Background({ motion = true }) {
   const [shaderOn, setShaderOn] = useState(false);
   const [webgl, setWebgl] = useState(true);
+  const [active, setActive] = useState(true);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setActive(!mq.matches && !document.hidden);
+    update();
+    mq.addEventListener('change', update);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      mq.removeEventListener('change', update);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -42,14 +55,14 @@ export default function Background({ motion = true }) {
             offsetY={0}
             scale={1}
             rotation={0}
-            speed={motion ? 1 : 0}
+            speed={motion && active ? 1 : 0}
             colors={PALETTE}
           />
         </div>
       ) : null}
       <div className="bg-fallback" style={{ opacity: shaderOn ? 0 : 1 }}>
-        <div className={`bg-blob bg-blob-a${motion ? ' is-animated' : ''}`} />
-        <div className={`bg-blob bg-blob-b${motion ? ' is-animated' : ''}`} />
+        <div className={`bg-blob bg-blob-a${motion && active ? ' is-animated' : ''}`} />
+        <div className={`bg-blob bg-blob-b${motion && active ? ' is-animated' : ''}`} />
         <div className="bg-blob bg-blob-c" />
         <div className="bg-noise" />
       </div>

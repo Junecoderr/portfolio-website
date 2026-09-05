@@ -154,8 +154,9 @@ export const HERO_WORDS = ['Encrypted', 'Vigilant', 'Constant-time', 'Paranoid',
 
 export const HERO = {
   role: 'SOC analyst · Detection engineering · Applied cryptography',
-  status: 'Open to work',
-  where: 'Durgapur · IST',
+  status: 'Open to full-time & contract',
+  where: 'From Q4 2026 · Durgapur, IST',
+  proof: ['912 detections shipped', '11 credited CVEs', '3h 14m fastest containment'],
 };
 
 // Set these to real URLs to reveal the Resume and Blog links; null hides them.
@@ -167,12 +168,13 @@ export const PORTRAIT_SRC = '/portrait.jpg';
 export const PORTRAIT_FALLBACK = '/portrait-abstract.svg';
 
 export const NAV_SECTIONS = [
-  { label: 'Home', href: '#hero', index: '01' },
-  { label: 'About', href: '#about', index: '02' },
-  { label: 'Skills', href: '#skills', index: '03' },
-  { label: 'Experience', href: '#experience', index: '04' },
-  { label: 'Work', href: '#work', index: '05' },
-  { label: 'Contact', href: '#contact', index: '06' },
+  { label: 'Home', href: '#hero', id: 'hero', index: '01' },
+  { label: 'Work', href: '#work', id: 'work', index: '02' },
+  { label: 'About', href: '#about', id: 'about', index: '03' },
+  { label: 'Experience', href: '#experience', id: 'experience', index: '04' },
+  { label: 'Recognition', href: '#recognition', id: 'recognition', index: '05' },
+  { label: 'Skills', href: '#skills', id: 'skills', index: '06' },
+  { label: 'Contact', href: '#contact', id: 'contact', index: '07' },
 ];
 
 export const NAV_PAGES = [
@@ -200,34 +202,37 @@ export const ABOUT = {
   },
   handle: '@Junecoderr',
   quote: 'Every claim on this site is one I can defend in an interview.',
-  pills: ['01 BRIEF', '02 PATH', '03 STATS', '04 QUOTE'],
+  tabs: [{ key: 'stats', label: 'Field metrics' }, { key: 'path', label: 'Path' }, { key: 'quote', label: 'Philosophy' }],
 };
 
 const icon = (slug) => `https://cdn.simpleicons.org/${slug}/E1E5EB`;
 
-export const SKILL_ROWS = [
-  { duration: '38s', reverse: false, chips: [
-    { t: 'Rust', img: icon('rust') }, { t: 'Python', img: icon('python') }, { t: 'Go', img: icon('go') },
-    { t: 'Sigma', g: 'Σ' }, { t: 'SPL', g: '>' }, { t: 'ProVerif', g: '∀' },
+export const SKILL_GROUPS = [
+  { title: 'Detection & response', items: [
+    { t: 'Sigma', core: true }, { t: 'Splunk ES / SPL', core: true }, { t: 'MITRE ATT&CK', core: true }, { t: 'Detection-as-code', core: true },
+    { t: 'Telemetry pipelines' }, { t: 'Incident response', core: true }, { t: 'Threat hunting' }, { t: 'Post-mortems' },
   ] },
-  { duration: '42s', reverse: true, chips: [
-    { t: 'Splunk ES', img: icon('splunk') }, { t: 'MITRE ATT&CK', g: '◉' }, { t: 'Detection-as-code', g: '{}' },
-    { t: 'Telemetry pipelines', g: '∿' }, { t: 'Incident response', g: '↯' }, { t: 'Post-mortems', g: '¶' }, { t: 'Threat hunting', g: '⌖' },
+  { title: 'Cryptography', items: [
+    { t: 'X25519', core: true }, { t: 'ML-KEM-768', core: true }, { t: 'AEAD constructions', core: true }, { t: 'Noise protocol' },
+    { t: 'Constant-time code', core: true }, { t: 'Lattice attacks' }, { t: 'liboqs' }, { t: 'BoringSSL' }, { t: 'dudect' },
   ] },
-  { duration: '46s', reverse: false, chips: [
-    { t: 'X25519', g: '×' }, { t: 'ML-KEM-768', g: '▦' }, { t: 'AEAD', g: '⬢' },
-    { t: 'Noise protocol', g: '≈' }, { t: 'Constant-time', g: 'τ' }, { t: 'Lattice attacks', g: '◇' },
-    { t: 'liboqs', g: 'λ' }, { t: 'BoringSSL', g: '◈' }, { t: 'dudect', g: 'σ' },
+  { title: 'Languages & tooling', items: [
+    { t: 'Rust', core: true }, { t: 'Python', core: true }, { t: 'Go (reading)' }, { t: 'ProVerif', core: true },
+    { t: 'Git / GitHub' }, { t: 'HSM integration' }, { t: 'CI/CD' }, { t: 'PGP · Ed25519' }, { t: 'criterion' }, { t: '90-day disclosure' },
   ] },
-  { duration: '40s', reverse: true, chips: [
-    { t: 'Git', img: icon('git') }, { t: 'GitHub', img: icon('github') }, { t: 'HSM', g: '▣' },
-    { t: 'CI/CD', g: '∞' }, { t: 'PGP · Ed25519', img: icon('gnuprivacyguard') }, { t: 'criterion', g: 'μ' }, { t: '90-day disclosure', g: '‼' },
-  ] },
+];
+
+export const SKILL_MARQUEE = [
+  { t: 'Rust', img: icon('rust') }, { t: 'Python', img: icon('python') }, { t: 'Go', img: icon('go') }, { t: 'Sigma', g: 'Σ' },
+  { t: 'Splunk ES', img: icon('splunk') }, { t: 'MITRE ATT&CK', g: '◉' }, { t: 'X25519', g: '×' }, { t: 'ML-KEM-768', g: '▦' },
+  { t: 'AEAD', g: '⬢' }, { t: 'Noise protocol', g: '≈' }, { t: 'Constant-time', g: 'τ' }, { t: 'ProVerif', g: '∀' },
+  { t: 'liboqs', g: 'λ' }, { t: 'BoringSSL', g: '◈' }, { t: 'HSM', g: '▣' }, { t: 'Git', img: icon('git') }, { t: 'GitHub', img: icon('github') },
+  { t: 'PGP · Ed25519', img: icon('gnuprivacyguard') }, { t: 'dudect', g: 'σ' }, { t: 'criterion', g: 'μ' },
 ];
 
 export const EXPERIENCE = [
   {
-    org: 'Independent Practice', href: '#contact', role: 'Detection Engineering & Applied Cryptography', period: 'Jul 2024 — Present',
+    org: 'Independent Practice', href: '#contact', year: '2024', role: 'Detection Engineering & Applied Cryptography', period: 'Jul 2024 — Present',
     points: [
       "Rebuilt a tier-1 payments processor's SOC ruleset as version-controlled Sigma — 912 rules migrated, false positives down 68% without losing a single true positive.",
       'Led incident response for a supply-chain signing-key compromise: containment in 3h 14m, 2,481 artefacts revoked, zero downstream impact.',
@@ -237,7 +242,7 @@ export const EXPERIENCE = [
     tags: ['Sigma', 'Rust', 'Python', 'Splunk ES', 'liboqs', 'ProVerif'],
   },
   {
-    org: 'Enterprise SOC', href: null, role: 'Tier-2 Analyst → Detection Lead', period: '2020 — Jul 2024',
+    org: 'Enterprise SOC', href: null, year: '2020', role: 'Tier-2 Analyst → Detection Lead', period: '2020 — Jul 2024',
     points: [
       'Started on a tier-two console triaging endpoint alerts; moved into detection engineering when it became clear the rules were the product, not the console.',
       'Led 23 incidents from first alert through post-mortem — containment first, attribution last, and a write-up that names the control that failed.',
@@ -269,9 +274,25 @@ export const FORM_STEPS = [
   { label: 'STEP 04 / 04', placeholder: '[ write your message... ]', type: 'textarea' },
 ];
 
-export const FOOTER_NAV = [
-  { label: 'Home', href: '#hero' }, { label: 'About', href: '#about' }, { label: 'Projects', href: '#work' },
-  { label: 'Experience', href: '#experience' }, { label: 'Blog', href: BLOG_URL }, { label: 'Contact', href: '#contact' },
-].filter((n) => n.href);
+export const RECOGNITION = [
+  { title: 'Certifications', items: [
+    { name: 'Offensive Security Certified Professional', detail: 'OSCP', meta: '2021' },
+    { name: 'GIAC Exploit Researcher and Advanced Penetration Tester', detail: 'GXPN', meta: '2023' },
+    { name: 'Certified Information Systems Security Professional', detail: 'CISSP', meta: '2024' },
+    { name: 'Certified Kubernetes Security Specialist', detail: 'CKS', meta: '2025' },
+  ] },
+  { title: 'CVE credits', items: [
+    { name: 'Session inheritance across resumption in a TLS terminator', detail: 'CVE-2025-41802', meta: 'CVSS 8.6' },
+    { name: 'Certificate chain validation bypass on renegotiation', detail: 'CVE-2024-33917', meta: 'CVSS 7.4' },
+    { name: 'Nonce reuse in an AEAD wrapper under key rotation', detail: 'CVE-2024-28450', meta: 'CVSS 6.8' },
+    { name: 'Timing disclosure in ECDSA scalar multiplication', detail: 'CVE-2023-51166', meta: 'CVSS 5.9' },
+  ] },
+  { title: 'Talks & papers', items: [
+    { name: 'Detections are a codebase, not a console', detail: 'Nullcon Goa', meta: '2026' },
+    { name: 'Shipping hybrid post-quantum without a flag day', detail: 'Real World Crypto', meta: '2026' },
+    { name: 'Nine hours: anatomy of a signing key compromise', detail: 'BSides Bangalore', meta: '2025' },
+    { name: 'A symbolic model for identity-hiding Noise variants', detail: 'IACR ePrint', meta: '2024' },
+  ] },
+];
 
 export const FOOTER_BLURB = 'Detection reviews, protocol work, incident retainers. If it involves an alert queue or a private key, I want to hear about it.';

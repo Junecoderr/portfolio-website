@@ -7,9 +7,10 @@ export default function Experience() {
     <section id="experience" className="section">
       <div className="container">
         <SectionHeading number="04" title="Experience" />
-        <div className="xp-list">
+        <div className="xp-rail">
           {EXPERIENCE.map((x) => (
             <article key={x.org} className="xp-card" data-reveal="1">
+              <span className="xp-year" aria-hidden="true">{x.year}</span>
               <div className="xp-head">
                 <div className="xp-org">
                   {x.href ? (
@@ -35,6 +36,7 @@ export default function Experience() {
               </div>
             </article>
           ))}
+          <span className="xp-year xp-year-end" aria-hidden="true">Now</span>
         </div>
       </div>
     </section>
