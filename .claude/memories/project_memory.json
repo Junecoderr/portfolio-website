@@ -43,32 +43,8 @@
       "content": "Standing caveat: case-study metrics, client names, CVE identifiers, talks and bounty figures all originate from the design template, not from Tanisha. Flagged to the user on 2026-09-06 as the top risk (now also in JSON-LD). Do not present them as verified; ask the user to confirm or replace before any further SEO submission.",
       "added_at": "2026-09-06T03:10:00.000000",
       "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Memory trimmed to 7 entries and pushed as `1d51d16`. Prompt captures dropped; the deployment-protection finding, SEO pipeline, conventions, fonts decision, placeholders, preferences, and the content-a",
-      "added_at": "2026-09-06T02:36:21.793742",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "I want the website should have a minimalist kind of the vibe, is it giving now and if it doesn't what all things needed to be done for the same.",
-      "added_at": "2026-09-06T02:36:21.793791",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Short answer: no. The site right now is the opposite of minimalist. It is cinematic and layered, which is what the Claude Design source asked for, and every pass since has added rather than removed. M",
-      "added_at": "2026-09-06T02:37:58.477482",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "Go ahead and work on making it minimalist for the same. Also work with the background gradient dynamic and make it cherry red if possible for the same.",
-      "added_at": "2026-09-06T02:37:58.477512",
-      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-06T02:37:58.477513"
+  "updated_at": "2026-09-06T04:30:00.000000"
 }
