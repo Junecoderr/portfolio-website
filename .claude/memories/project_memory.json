@@ -10,7 +10,7 @@
     },
     {
       "type": "message",
-      "content": "2026-09-05 rebuild (commit 411976d): site now implements Claude Design project 99589604-0d37-4541-8fee-0f4d3033830f, file \"Tanisha Portfolio.dc.html\" (third-party-inspired design filled with Tanisha's content). Single-page scroll layout: preloader, glass nav + drawer, serif hero with rotating word, About bento slider + portrait, skill marquees, experience cards, four work cards opening case-study dialogs, four-step mailto contact form, big-type footer. Earlier five-route design and its LatticeScene / HeroCipherField / ds components were removed. Reading the design requires a successful /design-login; a plain /login token gets HTTP 403 from the design API. Follow-ups the same day: mobile pass (commit 612e332 — one-line nav brand down to 360px, pills wrap, work grid min capped at container width, dialog docks to bottom, portrait served as responsive WebP via <picture>, viewport-fit=cover + theme-color) and favicon set (commit e2a29cf — TB signature traced from the Bastliga outlines into public/favicon.svg, plus favicon-32.png, apple-touch-icon.png, icon-512.png rendered from the font). Verify mobile at 360px and 390px with Playwright element screenshots per section.",
+      "content": "2026-09-05 rebuild (commit 411976d): site now implements Claude Design project 99589604-0d37-4541-8fee-0f4d3033830f, file \"Tanisha Portfolio.dc.html\" (third-party-inspired design filled with Tanisha's content). Single-page scroll layout: preloader, glass nav + drawer, serif hero with rotating word, About bento slider + portrait, skill marquees, experience cards, four work cards opening case-study dialogs, four-step mailto contact form, big-type footer. Earlier five-route design and its LatticeScene / HeroCipherField / ds components were removed. Reading the design requires a successful /design-login; a plain /login token gets HTTP 403 from the design API. Follow-ups the same day: mobile pass (commit 612e332 — one-line nav brand down to 360px, pills wrap, work grid min capped at container width, dialog docks to bottom, portrait served as responsive WebP via <picture>, viewport-fit=cover + theme-color) and favicon set (commit e2a29cf — TB signature traced from the Bastliga outlines into public/favicon.svg, plus favicon-32.png, apple-touch-icon.png, icon-512.png rendered from the font). Verify mobile at 360px and 390px with Playwright element screenshots per section. Polish pass (commit 8e68cdb) applied all 20 critique items: hero status pill + role line + scroll cue + dark scrim, body copy in Geist not mono, natural-width footer wordmarks, 2x2 work grid with hover lift/glow, outlined section numbers, scroll-reveal via src/hooks/useScrollReveal.js, cyan-only palette, monochrome skill chips, content band fade, inline desktop nav links, 11px label floor, 36-40px touch targets, 1.3s preloader.",
       "added_at": "2026-09-05T12:10:00.000000",
       "source": "realtime_capture"
     },
@@ -37,32 +37,8 @@
       "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Memory trimmed to 6 entries and pushed as `6a1df38`. The mobile pass and favicon work were folded into the rebuild entry rather than kept as separate captures.",
-      "added_at": "2026-09-05T15:59:39.276041",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "I want you to then critically analyze what all things should be done to make this website look stunning and aesthetically pleasing for the same.",
-      "added_at": "2026-09-05T15:59:39.276075",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Critique below is from the desktop and mobile screenshots I took during the build, measured against the design's own intent: dark, cinematic, cyan-accented, editorial.\n\n## First impression\n\nThe hero i",
-      "added_at": "2026-09-05T23:47:01.342180",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "Go ahead and implement all of these.",
-      "added_at": "2026-09-05T23:47:01.342214",
-      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-05T23:47:01.342217"
+  "updated_at": "2026-09-05T18:40:00.000000"
 }
