@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/fetch-writing.mjs && vite",
     "build": "vite build && vite build --ssr src/entry-server.jsx --outDir dist/server && node scripts/prerender.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\" scripts tests",
-    "test": "playwright test"
+    "test": "playwright test",
+    "prebuild": "node scripts/fetch-writing.mjs"
   },
   "dependencies": {
     "@paper-design/shaders-react": "0.0.80",
@@ -18,7 +19,9 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.63.0",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^10.10.0",

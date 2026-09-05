@@ -17,7 +17,9 @@ export default function Contact() {
   const [step, setStep] = useState(0);
   const [vals, setVals] = useState(EMPTY);
   const [err, setErr] = useState(null);
-  const [done, setDone] = useState(null); // null | 'opened' | 'unsure'
+  const [done, setDone] = useState(null); // null | 'sent' | 'opened' | 'unsure'
+  const [busy, setBusy] = useState(false);
+  const [website, setWebsite] = useState(''); // honeypot
   const blurTimer = useRef(null);
 
   const cfg = FORM_STEPS[step];
@@ -39,7 +41,7 @@ export default function Contact() {
     return true;
   };
 
-  const submit = () => {
+  const submitMailto = () => {
     let opened = false;
     const onBlur = () => {
       opened = true;
@@ -50,6 +52,31 @@ export default function Contact() {
       window.removeEventListener('blur', onBlur);
       setDone(opened ? 'opened' : 'unsure');
     }, 1500);
+  };
+
+  const submit = async () => {
+    const [email, name, reason, msg] = vals;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, name, reason, message: msg, website }),
+      });
+      if (r.ok) {
+        setDone('sent');
+        return;
+      }
+      if (r.status === 429) {
+        setErr('Too many messages from this address for now. Try again in a few minutes.');
+        return;
+      }
+    } catch {
+      /* no function available: fall through to mailto */
+    } finally {
+      setBusy(false);
+    }
+    submitMailto();
   };
 
   const next = () => {
@@ -126,18 +153,21 @@ export default function Contact() {
                       ) : (
                         <input type={cfg.type} value={vals[step]} onChange={onChange} onKeyDown={onKey} placeholder={cfg.placeholder} aria-label={cfg.placeholder} />
                       )}
-                      <button type="button" className="form-next" onClick={next} title={last ? 'Open in mail app' : 'Next step'} aria-label={last ? 'Open in mail app' : 'Next step'}>
+                      <input type="text" name="website" value={website} onChange={(e) => setWebsite(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" className="hp-field" />
+                      <button type="button" className="form-next" onClick={next} disabled={busy} title={last ? 'Send' : 'Next step'} aria-label={last ? 'Send' : 'Next step'}>
                         <ArrowRight />
                       </button>
                     </div>
                     {err ? (
                       <div className="form-error" role="alert"><AlertIcon size={14} /><span>{err}</span></div>
                     ) : null}
-                    {last && !err ? <span className="form-hint">Enter or the arrow opens your mail app with this draft</span> : null}
+                    {last && !err ? <span className="form-hint">Enter or the arrow sends it</span> : null}
                   </div>
                 ) : (
                   <div className="form-done" role="status">
-                    {done === 'opened' ? (
+                    {done === 'sent' ? (
+                      <p>Sent. I will get back to you within two working days.</p>
+                    ) : done === 'opened' ? (
                       <p>Draft opened in your mail app. Hit send there and I will get back to you.</p>
                     ) : (
                       <p>No mail app answered. Copy the address above, or <a href={draft}>try the draft link</a> again.</p>

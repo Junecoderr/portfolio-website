@@ -71,6 +71,14 @@ export default function CaseDialog({ project, onClose }) {
         </div>
         <div className="dialog-timeline">
           <span className="eyebrow sm">{project.timelineTitle}</span>
+          <ol className="timeline-track" aria-hidden="true">
+            {project.timeline.map((e, i) => (
+              <li key={e.t + i} style={{ left: `${(i / Math.max(1, project.timeline.length - 1)) * 100}%` }}>
+                <span className="timeline-track-dot" />
+                <span className="timeline-track-t">{e.t}</span>
+              </li>
+            ))}
+          </ol>
           <div className="timeline">
             {project.timeline.map((e) => (
               <div key={e.t + e.title} className="timeline-row">

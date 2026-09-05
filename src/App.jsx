@@ -10,6 +10,7 @@ import Work from './sections/Work.jsx';
 import About from './sections/About.jsx';
 import Experience from './sections/Experience.jsx';
 import Recognition from './sections/Recognition.jsx';
+import Writing from './sections/Writing.jsx';
 import Skills from './sections/Skills.jsx';
 import Contact from './sections/Contact.jsx';
 import { PROJECTS, NAV_SECTIONS } from './data/content.js';
@@ -98,6 +99,7 @@ export default function App({ initialCase = null }) {
           <About />
           <Experience />
           <Recognition />
+          <Writing />
           <Skills />
           <Contact />
         </div>

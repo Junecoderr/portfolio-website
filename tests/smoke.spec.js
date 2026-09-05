@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const noConsoleErrors = (page) => {
   const errors = [];
@@ -49,4 +50,23 @@ test('sitemap and robots are served', async ({ request }) => {
   expect(await sitemap.text()).toContain('/work/blackout');
   const robots = await request.get('/robots.txt');
   expect(await robots.text()).toContain('Sitemap:');
+});
+
+test('resume, security and 404 pages are prerendered with their own titles', async ({ page }) => {
+  await page.goto('/resume.html');
+  await expect(page).toHaveTitle(/Resume/);
+  await expect(page.locator('.resume-xp')).toHaveCount(2);
+  await page.goto('/security.html');
+  await expect(page).toHaveTitle(/secured/);
+  await page.goto('/404.html');
+  await expect(page).toHaveTitle(/not found/i);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+});
+
+test('home page has no serious accessibility violations', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForTimeout(1800);
+  const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze();
+  const serious = results.violations.filter((v) => ['serious', 'critical'].includes(v.impact));
+  expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
 });

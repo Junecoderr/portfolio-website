@@ -45,7 +45,7 @@ export default function Nav({ menuOpen, onToggle, onClose, activeId }) {
       </nav>
 
       {menuOpen ? <div className="drawer-scrim" onClick={onClose} /> : null}
-      <aside className={`drawer${menuOpen ? ' is-open' : ''}`} aria-hidden={!menuOpen}>
+      <aside className={`drawer${menuOpen ? ' is-open' : ''}`} {...(menuOpen ? {} : { inert: '' })}>
         <div className="drawer-head">
           <span className="eyebrow">Navigation</span>
           <button type="button" className="drawer-close" onClick={onClose} aria-label="Close menu">

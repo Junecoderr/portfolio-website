@@ -1,4 +1,5 @@
-import { PROJECTS, SEO, SITE_URL, SITE_NAME, SOCIALS, EMAIL, CASE_IDS } from './data/content.js';
+import { PROJECTS, SEO, SITE_URL, SITE_NAME, SOCIALS, EMAIL, CASE_IDS, RECOGNITION } from './data/content.js';
+import { pageFor } from './routes.js';
 
 const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 const clip = (text, max = 155) => (text.length <= max ? text : `${text.slice(0, max - 1).replace(/\s+\S*$/, '')}…`);
@@ -17,6 +18,12 @@ export const person = {
   address: { '@type': 'PostalAddress', addressLocality: SEO.locality, addressRegion: SEO.region, addressCountry: SEO.country },
   knowsAbout: SEO.knowsAbout,
   sameAs,
+  hasCredential: (RECOGNITION.find((g) => g.title === 'Certifications')?.items || []).map((c) => ({
+    '@type': 'EducationalOccupationalCredential', name: c.name, alternateName: c.detail, credentialCategory: 'certification', dateCreated: c.meta,
+  })),
+  performerIn: (RECOGNITION.find((g) => g.title === 'Talks & papers')?.items || []).filter((t) => !/ePrint|Whitepaper/.test(t.detail)).map((t) => ({
+    '@type': 'Event', name: t.name, startDate: t.meta, location: { '@type': 'Place', name: t.detail }, performer: { '@id': `${SITE_URL}/#person` },
+  })),
 };
 
 const website = {
@@ -30,8 +37,14 @@ const website = {
 
 /** Every route the prerender emits, with its own head. */
 export function routes() {
-  return ['/', ...CASE_IDS.map((id) => `/work/${id}`)];
+  return ['/', ...CASE_IDS.map((id) => `/work/${id}`), '/resume', '/security', '/404'];
 }
+
+const PAGES = {
+  resume: { title: `Resume – ${SITE_NAME}, ${SEO.jobTitle}`, description: `One-page resume for ${SITE_NAME}: experience, skills, certifications, CVE credits and talks. Print or save as PDF.`, path: '/resume' },
+  security: { title: `How this site is secured | ${SITE_NAME}`, description: 'The threat model behind this portfolio: content security policy, no third parties, contact path, analytics, build and disclosure.', path: '/security' },
+  notfound: { title: `Page not found | ${SITE_NAME}`, description: 'Nothing at this address.', path: '/404', noindex: true },
+};
 
 export function caseIdFromPath(path) {
   const m = /^\/work\/([a-z0-9-]+)(?:\.html)?\/?$/.exec(path || '');
@@ -43,6 +56,32 @@ function meta(list) {
 }
 
 export function headFor(path) {
+  const page = pageFor(path);
+  if (page !== 'home') {
+    const cfg = PAGES[page];
+    const url = `${SITE_URL}${cfg.path}`;
+    const image = `${SITE_URL}/og/home.png`;
+    return [
+      `<title>${esc(cfg.title)}</title>`,
+      meta([
+        ['description', cfg.description],
+        ['author', SITE_NAME],
+        ['robots', cfg.noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large'],
+        ['og:type', 'website', 'property'],
+        ['og:site_name', `${SITE_NAME} — Portfolio`, 'property'],
+        ['og:title', cfg.title, 'property'],
+        ['og:description', cfg.description, 'property'],
+        ['og:url', url, 'property'],
+        ['og:image', image, 'property'],
+        ['twitter:card', 'summary_large_image'],
+        ['twitter:title', cfg.title],
+        ['twitter:description', cfg.description],
+        ['twitter:image', image],
+      ]),
+      cfg.noindex ? '' : `<link rel="canonical" href="${url}" />`,
+      json({ '@context': 'https://schema.org', '@graph': [person, website, { '@type': 'WebPage', '@id': `${url}#page`, url, name: cfg.title, isPartOf: { '@id': `${SITE_URL}/#website` }, about: { '@id': `${SITE_URL}/#person` } }] }),
+    ].filter(Boolean).join('\n  ');
+  }
   const id = caseIdFromPath(path);
   const project = id ? PROJECTS.find((p) => p.id === id) : null;
   const url = project ? `${SITE_URL}/work/${project.id}` : `${SITE_URL}/`;

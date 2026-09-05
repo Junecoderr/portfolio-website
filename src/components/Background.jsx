@@ -25,13 +25,29 @@ export default function Background({ motion = true }) {
     };
   }, []);
 
+  // Skip the shader entirely on data-saver, very slow links, or a low battery.
   useEffect(() => {
-    try {
-      const c = document.createElement('canvas');
-      setWebgl(Boolean(c.getContext('webgl2') || c.getContext('webgl')));
-    } catch {
-      setWebgl(false);
+    let alive = true;
+    const conn = navigator.connection;
+    if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return undefined;
+    const probe = () => {
+      try {
+        const c = document.createElement('canvas');
+        if (alive) setWebgl(Boolean(c.getContext('webgl2') || c.getContext('webgl')));
+      } catch {
+        if (alive) setWebgl(false);
+      }
+    };
+    if (navigator.getBattery) {
+      navigator.getBattery().then((b) => {
+        if (alive && !(b.level < 0.2 && !b.charging)) probe();
+      }).catch(probe);
+    } else {
+      probe();
     }
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Load the shader after first paint so it never blocks the initial render.

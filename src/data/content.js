@@ -182,7 +182,7 @@ export const HERO = {
 };
 
 // Set these to real URLs to reveal the Resume and Blog links; null hides them.
-export const RESUME_URL = null;
+export const RESUME_URL = '/resume';
 export const BLOG_URL = null;
 
 // Drop a photo at public/portrait.jpg to replace the generated abstract (detected at build time in About.jsx).

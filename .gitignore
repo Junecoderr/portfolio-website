@@ -5,3 +5,5 @@ src/assets/fonts/google.css
 src/assets/fonts/instrument-serif.ttf
 test-results/
 playwright-report/
+src/data/writing.generated.json
+.lighthouseci/
