@@ -4,59 +4,53 @@
   "realtime_memories": [
     {
       "type": "message",
-      "content": "portfolio-website (Vite + React) is for \"Tanisha Brahma\" (SOC / detection engineering / applied cryptography). GitHub repo: github.com/Junecoderr/portfolio-website (public, origin/main), gh CLI authenticated as myselfRaifMondal. Implementation is sourced from the user's Claude Design project \"Tanisha Brahma - Portfolio\" (fb82127e-3d38-4094-a6ff-d8e7809dbd8, read via DesignSync); an earlier \"Security Portfolio\" design project was superseded. Site is a 5-route SPA (home/work/case/about/contact) driven by React state, no router library.",
+      "content": "portfolio-website (Vite + React, no router) is for \"Tanisha Brahma\" (SOC / detection engineering / applied cryptography). GitHub: github.com/Junecoderr/portfolio-website (origin/main), gh CLI authenticated as myselfRaifMondal, Vercel deploys main to portfolio-website-junix1.vercel.app. Commits go straight to main per user preference.",
       "added_at": "2026-08-13T10:09:43.611028",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "Stack: three.js only (gsap dropped — scroll-reveal is plain IntersectionObserver). LatticeScene.jsx is a config-driven WebGL glass-node background — must stay position:fixed, not absolute, or it stretches to full page scroll height. Preloader is a deliberate addition on top of the imported design (not from the original), themed to the site's blue/violet/magenta palette; simplified on 2026-08-18 to just a pulsing brand orb + percent numeral after user feedback that the earlier bracket-spinner/rule/label version had design flaws.",
-      "added_at": "2026-08-17T10:20:00.000001",
+      "content": "2026-09-05 rebuild (commit 411976d): site now implements Claude Design project 99589604-0d37-4541-8fee-0f4d3033830f, file \"Tanisha Portfolio.dc.html\" (aarab.me / aarabii/An design, MIT, filled with Tanisha's content). Single-page scroll layout: preloader, glass nav + drawer, serif hero with rotating word, About bento slider + portrait, skill marquees, experience cards, four work cards opening case-study dialogs, four-step mailto contact form, big-type footer. Earlier five-route design and its LatticeScene / HeroCipherField / ds components were removed. Reading the design requires a successful /design-login; a plain /login token gets HTTP 403 from the design API.",
+      "added_at": "2026-09-05T12:10:00.000000",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "IP boundary: when a design reference is a real third-party commercial site (e.g. noomo agency showcase), match the interaction mechanic with original assets only — never copy their licensed fonts/SVGs/code verbatim. The user's own Claude Design projects are their own content and are fine to implement in full.",
-      "added_at": "2026-08-17T08:48:27.621746",
+      "content": "Conventions: all copy/data in src/data/content.js (PROJECTS, STATS, WORK_CARDS, EXPERIENCE, SKILL_ROWS, ABOUT, FORM_STEPS, NAV_*, SOCIALS); class-based CSS in src/styles/site.css with tokens in src/styles/tokens/*.css; components in src/components, page sections in src/sections. Background is @paper-design/shaders-react GrainGradient with a CSS blob fallback (three.js dropped). Portrait lives at public/tanisha.png (a wordmark promo graphic, not a photo).",
+      "added_at": "2026-09-05T12:10:00.000000",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "No OPENROUTER_API_KEY configured on this machine — real image generation (generate-image skill) unavailable. Repo convention is labeled placeholder panels until a key is provided. A tanisha.png was manually dropped in the repo root by the user (a name-card/wordmark promo graphic, not a personal photo) but isn't wired into the current fully-typographic design.",
-      "added_at": "2026-08-17T09:01:38.161248",
+      "content": "Fonts decision: the design bundles Nasalization and Bastliga One OTFs copied from a third-party repo (Bastliga is All Rights Reserved) — NOT shipped. Stand-ins are Michroma and Great Vibes via Google Fonts, set in src/styles/tokens/typography.css; swap only those two tokens if the user obtains licences. General IP rule: match third-party sites' mechanics with original assets only; the user's own Claude Design projects may be implemented in full.",
+      "added_at": "2026-09-05T12:10:00.000000",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "Correction: this repo's project-scoped memory file lives at portfolio-website/.claude/memories/project_memory.json (cwd-relative), NOT at the parent Junecoderr/.claude/ one — a prior session edited the wrong file for many turns, which is why the cleanup hook kept re-firing. Always resolve the project_memory.json path relative to the current working directory.",
-      "added_at": "2026-08-17T16:17:02.062358",
+      "content": "Open placeholders carried from the design: \"View Resume\", \"Resume\" and \"Blog\" links point to '#'. Contact details are real (tanishabrahma26@gmail.com, @mysstttt, github.com/Junecoderr, medium.com/@Junecodder, Durgapur). Footer credit reads \"Design adapted from aarab.me (MIT), used with attribution\".",
+      "added_at": "2026-09-05T12:10:00.000000",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "Fixes shipped and pushed to main: (1) 2026-08-17 design review — corrected LatticeScene absolute-vs-fixed positioning bug and added missing --ls-h3/--ls-h4/--lh-body/--lh-h1/--lh-h2/--lh-h3 typography tokens, verified via build + Playwright. (2) 2026-08-18 contact info placeholders (email/Instagram/GitHub/Medium/location) replaced with real values across content.js and Contact.jsx, and home hero \"Based\" fact corrected Bengaluru -> Durgapur. (3) 2026-08-18 home-page lag root-caused: Home was the only route stacking a second full-canvas 2D animation (HeroCipherField, ~fillText-heavy glyph grid with mix-blend-mode: screen) on top of the always-on WebGL lattice — fixed by coarsening the glyph grid, lowering its frame budget, and pausing both HeroCipherField's and LatticeScene's rAF loops via visibilitychange when the tab is hidden. Commits: 3268de2, 6a88210.",
-      "added_at": "2026-08-18T17:36:35.031868",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "User preference on footer copy: dislikes the legal-disclaimer tone (\"All project names, figures and CVE identifiers on this site are illustrative\") — replaced in Footer.jsx with a brand-value line: \"Every claim on this site is one I can defend in an interview.\" General direction — favor confidence/credibility copy over disclaimers when editing site text. Not yet committed/pushed as of 2026-08-18T17:48.",
+      "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
     },
     {
       "type": "claude_response",
-      "content": "Memory cleaned: 10 → 7 entries. Dropped the \"pushed?\" Q&A and self-referential cleanup note, folded the footer-copy change in as a new signal entry (with the still-pending-push status noted).",
-      "added_at": "2026-08-18T17:52:14.431985",
+      "content": "Memory consolidated: 11 entries down to 6 in the repo's `project_memory.json`. Kept the project identity and deploy target, the 2026-09-05 rebuild record, code conventions, the fonts decision, open pl",
+      "added_at": "2026-09-05T12:02:29.199471",
       "source": "realtime_capture"
     },
     {
       "type": "message",
-      "content": "[Image #1] Fix the design issue please for every project.",
-      "added_at": "2026-08-18T17:52:14.432024",
+      "content": "push the code for the same.",
+      "added_at": "2026-09-05T12:02:29.199490",
       "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-08-18T17:52:14.432026"
+  "updated_at": "2026-09-05T12:02:29.199492"
 }
