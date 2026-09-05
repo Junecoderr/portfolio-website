@@ -47,8 +47,8 @@ export default function Footer() {
           <span className="signature">Tanisha Brahma</span>
         </div>
         <div className="footer-legal">
-          <span>© 2026 Tanisha Brahma. Design adapted from aarab.me (MIT), used with attribution.</span>
-          <a href="https://www.aarab.me/license" target="_blank" rel="noopener noreferrer">LICENSE</a>
+          <span>© 2026 Tanisha Brahma.</span>
+          <span>Every claim on this site is one I can defend in an interview.</span>
         </div>
       </div>
     </footer>
