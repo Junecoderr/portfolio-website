@@ -49,8 +49,20 @@
       "content": "Make it mobile compliant as well",
       "added_at": "2026-09-05T12:21:34.641236",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Done. Pushed as `612e332` on `main`, tree clean. Vercel deploys from it.\n\n**What was broken on phones and what changed**\n- **Nav brand wrapped to two lines** at 390 px. Brand name and mark now scale d",
+      "added_at": "2026-09-05T15:34:30.507255",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "make the favicon, it's signature.",
+      "added_at": "2026-09-05T15:34:30.507271",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-05T12:21:34.641237"
+  "updated_at": "2026-09-05T15:34:30.507273"
 }
