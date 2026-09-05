@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 
-const PALETTE = ['hsl(193, 85%, 66%)', 'hsl(196, 100%, 83%)', 'hsl(195, 100%, 50%)'];
+/** Cherry palette for the grain gradient. Low intensity, slow drift. */
+const PALETTE = ['hsl(348, 78%, 44%)', 'hsl(352, 70%, 28%)', 'hsl(345, 85%, 56%)'];
 
 /**
- * Fixed full-page backdrop. Grain-gradient shader on top of a CSS blob
- * fallback that stays visible until the shader reports its first frame,
- * so a WebGL failure still leaves the page lit.
+ * Fixed backdrop: a dynamic grain gradient loaded after first paint, with a CSS
+ * blob fallback underneath and a dark veil on top so text stays quiet.
  */
 export default function Background({ motion = true }) {
   const [shaderOn, setShaderOn] = useState(false);
@@ -34,7 +34,6 @@ export default function Background({ motion = true }) {
     }
   }, []);
 
-  // Load the shader after first paint so it never blocks the initial render.
   useEffect(() => {
     if (!webgl) return undefined;
     let cancelled = false;
@@ -51,6 +50,8 @@ export default function Background({ motion = true }) {
     };
   }, [webgl]);
 
+  const moving = motion && active;
+
   return (
     <div className="bg" aria-hidden="true">
       {webgl && Shader ? (
@@ -58,25 +59,24 @@ export default function Background({ motion = true }) {
           <Shader
             style={{ width: '100%', height: '100%' }}
             colorBack="hsl(0, 0%, 0%)"
-            softness={0.5}
-            intensity={0.3}
-            noise={0}
+            softness={0.75}
+            intensity={0.32}
+            noise={0.15}
             shape="corners"
             offsetX={0}
             offsetY={0}
-            scale={1}
+            scale={1.1}
             rotation={0}
-            speed={motion && active ? 1 : 0}
+            speed={moving ? 0.5 : 0}
             colors={PALETTE}
           />
         </div>
       ) : null}
       <div className="bg-fallback" style={{ opacity: shaderOn ? 0 : 1 }}>
-        <div className={`bg-blob bg-blob-a${motion && active ? ' is-animated' : ''}`} />
-        <div className={`bg-blob bg-blob-b${motion && active ? ' is-animated' : ''}`} />
-        <div className="bg-blob bg-blob-c" />
-        <div className="bg-noise" />
+        <div className={`bg-blob bg-blob-a${moving ? ' is-animated' : ''}`} />
+        <div className={`bg-blob bg-blob-b${moving ? ' is-animated' : ''}`} />
       </div>
+      <div className="bg-veil" />
     </div>
   );
 }

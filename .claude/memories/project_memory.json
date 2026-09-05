@@ -22,8 +22,8 @@
     },
     {
       "type": "message",
-      "content": "Fonts decision (final, 2026-09-05): user requires the exact design fonts. Nasalization Regular and Bastliga One OTFs are bundled at public/fonts/ and declared via @font-face in src/styles/tokens/typography.css (--font-display: Nasalization, --font-script: Bastliga). Earlier Google-Fonts stand-ins (Michroma, Great Vibes) were reverted. Bastliga exceeds the DesignSync 256 KB read cap; the complete file came from the design's public source repo. General IP rule still stands for other third-party sites: match mechanics with original assets; the user's own Claude Design projects may be implemented in full.",
-      "added_at": "2026-09-05T12:15:00.000000",
+      "content": "Design direction (final, 2026-09-06): MINIMALIST dark site with a dynamic CHERRY-RED grain gradient (GrainGradient palette hsl(348..352), low intensity, dark veil on top). Two typefaces only: Instrument Serif for name/headings, Geist for text, Geist Mono for small labels. Nasalization and Bastliga were retired (moved out of public/fonts); the favicon still uses the TB signature mark, now cherry on near-black. No preloader, no section numbers, no marquee, no glass/glow/shadows, no signature rules, no footer wordmarks. Sections: Hero, Work (plain list), About (brief + stats row + skills as definition list + quote), Experience (period/name grid + compact Recognition block), Contact (email first, copy button, PGP), one-row footer. Earlier 'exact design fonts' and cinematic styling decisions are superseded.",
+      "added_at": "2026-09-06T04:20:00.000000",
       "source": "realtime_capture"
     },
     {
@@ -43,8 +43,32 @@
       "content": "Standing caveat: case-study metrics, client names, CVE identifiers, talks and bounty figures all originate from the design template, not from Tanisha. Flagged to the user on 2026-09-06 as the top risk (now also in JSON-LD). Do not present them as verified; ask the user to confirm or replace before any further SEO submission.",
       "added_at": "2026-09-06T03:10:00.000000",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Memory trimmed to 7 entries and pushed as `1d51d16`. Prompt captures dropped; the deployment-protection finding, SEO pipeline, conventions, fonts decision, placeholders, preferences, and the content-a",
+      "added_at": "2026-09-06T02:36:21.793742",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "I want the website should have a minimalist kind of the vibe, is it giving now and if it doesn't what all things needed to be done for the same.",
+      "added_at": "2026-09-06T02:36:21.793791",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Short answer: no. The site right now is the opposite of minimalist. It is cinematic and layered, which is what the Claude Design source asked for, and every pass since has added rather than removed. M",
+      "added_at": "2026-09-06T02:37:58.477482",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Go ahead and work on making it minimalist for the same. Also work with the background gradient dynamic and make it cherry red if possible for the same.",
+      "added_at": "2026-09-06T02:37:58.477512",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-06T03:50:00.000000"
+  "updated_at": "2026-09-06T02:37:58.477513"
 }

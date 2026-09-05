@@ -1,28 +1,13 @@
+/* Minimal dark palette. One accent: cherry. */
 :root {
-  --bg: #050507;
-  --bg-card: #09090C;
-  --bg-panel: rgba(10, 10, 10, .8);
-  --bg-chip: rgba(225, 229, 235, .08);
-  --bg-tag: rgba(225, 229, 235, .05);
-  --bg-inset: rgba(23, 23, 23, .8);
-
-  --fg-1: #F1F2F4;
-  --fg-2: #E1E5EB;
-  --fg-3: #d4d4d4;
-  --fg-4: #a3a3a3;
-  --fg-5: #98A6B3;
-  --fg-6: #8B8B8B;
-
-  --accent: #5ED2F2;
-  --accent-soft: rgba(94, 210, 242, .8);
-  --accent-dim: rgba(94, 210, 242, .4);
-  --accent-glow: rgba(94, 210, 242, .15);
-  --danger: #e35b6f;
-
-  --line-1: #181825;
-  --line-2: #262626;
-  --line-3: #2D2D43;
-  --line-soft: rgba(38, 38, 38, .6);
-  --line-fg: rgba(225, 229, 235, .1);
-  --line-fg-2: rgba(225, 229, 235, .2);
+  --bg: #0C0B0C;
+  --bg-2: #121113;
+  --fg-1: #F3F1EE;
+  --fg-2: #B8B3B0;
+  --fg-3: #7D7876;
+  --line: rgba(255, 255, 255, .1);
+  --line-2: rgba(255, 255, 255, .18);
+  --accent: #E5203F;
+  --accent-soft: rgba(229, 32, 63, .16);
+  --ok: #4ED39A;
 }
