@@ -35,7 +35,7 @@ test('case study page opens its dialog and has its own metadata', async ({ page 
 
 test('opening a case from the grid updates the URL and back closes it', async ({ page }) => {
   await page.goto('/');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(1600);
   await page.locator('.work-card').first().locator('.work-cta').click();
   await expect(page.locator('[role="dialog"]')).toBeVisible();
   await expect(page).toHaveURL(/\/work\/sentinel$/);

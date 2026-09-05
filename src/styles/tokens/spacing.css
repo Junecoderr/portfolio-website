@@ -1,6 +1,12 @@
 :root {
-  --container: 960px;
-  --gutter: clamp(20px, 4vw, 40px);
-  --section-y: clamp(72px, 10vw, 128px);
-  --radius: 6px;
+  --container: 1024px;
+  --container-wide: 1280px;
+  --section-y: 96px 24px 112px;
+  --radius-card: 28px;
+  --radius-panel: 24px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --shadow-card: 0 25px 50px -12px rgba(0, 0, 0, .6);
+  --shadow-card-deep: 0 25px 50px -12px rgba(0, 0, 0, .7);
+  --shadow-chip: 0 4px 8px rgba(0, 0, 0, .3);
 }

@@ -1,3 +1,10 @@
+import rustIcon from '../assets/icons/rust.svg';
+import pythonIcon from '../assets/icons/python.svg';
+import goIcon from '../assets/icons/go.svg';
+import splunkIcon from '../assets/icons/splunk.svg';
+import gitIcon from '../assets/icons/git.svg';
+import githubIcon from '../assets/icons/github.svg';
+import gpgIcon from '../assets/icons/gnuprivacyguard.svg';
 
 // Canonical origin. Change here when a custom domain lands.
 export const SITE_URL = 'https://portfolio-website-junix1.vercel.app';
@@ -178,13 +185,17 @@ export const HERO = {
 export const RESUME_URL = null;
 export const BLOG_URL = null;
 
-// Drop a photo at public/portrait.jpg and About shows it (detected at build time in About.jsx).
+// Drop a photo at public/portrait.jpg to replace the generated abstract (detected at build time in About.jsx).
+export const PORTRAIT_FALLBACK = '/portrait-abstract.svg';
 
 export const NAV_SECTIONS = [
-  { label: 'Work', href: '#work', id: 'work' },
-  { label: 'About', href: '#about', id: 'about' },
-  { label: 'Experience', href: '#experience', id: 'experience' },
-  { label: 'Contact', href: '#contact', id: 'contact' },
+  { label: 'Home', href: '#hero', id: 'hero', index: '01' },
+  { label: 'Work', href: '#work', id: 'work', index: '02' },
+  { label: 'About', href: '#about', id: 'about', index: '03' },
+  { label: 'Experience', href: '#experience', id: 'experience', index: '04' },
+  { label: 'Recognition', href: '#recognition', id: 'recognition', index: '05' },
+  { label: 'Skills', href: '#skills', id: 'skills', index: '06' },
+  { label: 'Contact', href: '#contact', id: 'contact', index: '07' },
 ];
 
 export const NAV_PAGES = [
@@ -212,8 +223,11 @@ export const ABOUT = {
   },
   handle: '@Junecoderr',
   quote: 'Every claim on this site is one I can defend in an interview.',
+  tabs: [{ key: 'stats', label: 'Field metrics' }, { key: 'path', label: 'Path' }, { key: 'quote', label: 'Philosophy' }],
 };
 
+const ICONS = { rust: rustIcon, python: pythonIcon, go: goIcon, splunk: splunkIcon, git: gitIcon, github: githubIcon, gnuprivacyguard: gpgIcon };
+const icon = (slug) => ICONS[slug];
 
 export const SKILL_GROUPS = [
   { title: 'Detection & response', items: [
@@ -230,7 +244,13 @@ export const SKILL_GROUPS = [
   ] },
 ];
 
-
+export const SKILL_MARQUEE = [
+  { t: 'Rust', img: icon('rust') }, { t: 'Python', img: icon('python') }, { t: 'Go', img: icon('go') }, { t: 'Sigma', g: 'Σ' },
+  { t: 'Splunk ES', img: icon('splunk') }, { t: 'MITRE ATT&CK', g: '◉' }, { t: 'X25519', g: '×' }, { t: 'ML-KEM-768', g: '▦' },
+  { t: 'AEAD', g: '⬢' }, { t: 'Noise protocol', g: '≈' }, { t: 'Constant-time', g: 'τ' }, { t: 'ProVerif', g: '∀' },
+  { t: 'liboqs', g: 'λ' }, { t: 'BoringSSL', g: '◈' }, { t: 'HSM', g: '▣' }, { t: 'Git', img: icon('git') }, { t: 'GitHub', img: icon('github') },
+  { t: 'PGP · Ed25519', img: icon('gnuprivacyguard') }, { t: 'dudect', g: 'σ' }, { t: 'criterion', g: 'μ' },
+];
 
 export const EXPERIENCE = [
   {
@@ -263,7 +283,7 @@ export const WORK_CARDS = [
     gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(147,51,234,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(99,102,241,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(139,92,246,.8), transparent 65%), #000' },
   { id: 'lattice', number: '003', tags: ['Rust', 'liboqs', 'BoringSSL', 'ML-KEM-768'],
     blurb: 'Hybrid X25519 + ML-KEM across a payments fabric — post-quantum key exchange with no flag day. Both schemes ran in parallel for two quarters, and every millisecond of the cost was measured.',
-    gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(56,189,248,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(37,99,235,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(79,70,229,.8), transparent 65%), #000' },
+    gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(229,32,63,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(37,99,235,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(79,70,229,.8), transparent 65%), #000' },
   { id: 'redline', number: '004', tags: ['Key management', 'ECDSA', 'Timing analysis', 'HSM'],
     blurb: 'Breaking a custodial wallet before someone else did: a four-week assessment that recovered a signing key from a memory dump, then again from a timing side channel — and the remediation written with the team that fixed it.',
     gradient: 'radial-gradient(120% 100% at 18% 0%, rgba(16,185,129,.85), transparent 60%), radial-gradient(110% 120% at 85% 25%, rgba(13,148,136,.65), transparent 60%), radial-gradient(130% 120% at 50% 115%, rgba(6,182,212,.8), transparent 65%), #000' },
@@ -297,3 +317,4 @@ export const RECOGNITION = [
   ] },
 ];
 
+export const FOOTER_BLURB = 'Detection reviews, protocol work, incident retainers. If it involves an alert queue or a private key, I want to hear about it.';

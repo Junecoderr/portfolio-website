@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Background from './components/Background.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import Preloader from './components/Preloader.jsx';
 import Nav from './components/Nav.jsx';
 import Footer from './components/Footer.jsx';
 import CaseDialog from './components/CaseDialog.jsx';
@@ -8,6 +9,8 @@ import Hero from './sections/Hero.jsx';
 import Work from './sections/Work.jsx';
 import About from './sections/About.jsx';
 import Experience from './sections/Experience.jsx';
+import Recognition from './sections/Recognition.jsx';
+import Skills from './sections/Skills.jsx';
 import Contact from './sections/Contact.jsx';
 import { PROJECTS, NAV_SECTIONS } from './data/content.js';
 import { caseIdFromPath } from './seo.js';
@@ -28,6 +31,7 @@ export default function App({ initialCase = null }) {
   const [caseId, setCaseId] = useState(initialCase);
   const [activeId, setActiveId] = useState('hero');
   const rootRef = useRef(null);
+  const skipPreloader = Boolean(initialCase);
   useScrollReveal(rootRef);
 
   // Body scroll lock while a case is open.
@@ -51,7 +55,7 @@ export default function App({ initialCase = null }) {
 
   // Active section for the nav.
   useEffect(() => {
-    const els = ['hero', ...NAV_SECTIONS.map((n) => n.id)].map((id) => document.getElementById(id)).filter(Boolean);
+    const els = NAV_SECTIONS.map((n) => document.getElementById(n.id)).filter(Boolean);
     const io = new IntersectionObserver(
       (entries) => {
         const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
@@ -85,13 +89,18 @@ export default function App({ initialCase = null }) {
       <ErrorBoundary fallback={null}>
         <Background motion />
       </ErrorBoundary>
+      <Preloader skip={skipPreloader} />
       <Nav menuOpen={menuOpen} onToggle={() => setMenuOpen((v) => !v)} onClose={() => setMenuOpen(false)} activeId={activeId} />
       <main id="main" className="main">
         <Hero />
+        <div className="content-band">
           <Work onOpenCase={openCase} />
           <About />
           <Experience />
+          <Recognition />
+          <Skills />
           <Contact />
+        </div>
         <Footer />
       </main>
       <CaseDialog project={project} onClose={closeCase} />

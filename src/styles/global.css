@@ -12,15 +12,14 @@ body {
   background: var(--bg);
   color: var(--fg-1);
   font-family: var(--font-text);
-  font-size: var(--fs-body);
-  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 #root { min-height: 100vh; }
-a { color: var(--fg-1); text-decoration: none; transition: color .2s; }
-a:hover { color: var(--accent); }
-::selection { background: var(--accent); color: #fff; }
+a { color: var(--fg-2); text-decoration: none; transition: color .2s; }
+a:hover { color: #fff; }
+::selection { background: var(--accent); color: #ffffff; }
+*::-webkit-scrollbar { display: none; }
 input, textarea, button { font: inherit; }
 button { cursor: pointer; }
 a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible {

@@ -22,8 +22,8 @@
     },
     {
       "type": "message",
-      "content": "Design direction (final, 2026-09-06): MINIMALIST dark site with a dynamic CHERRY-RED grain gradient (GrainGradient palette hsl(348..352), low intensity, dark veil on top). Two typefaces only: Instrument Serif for name/headings, Geist for text, Geist Mono for small labels. Nasalization and Bastliga were retired (moved out of public/fonts); the favicon still uses the TB signature mark, now cherry on near-black. No preloader, no section numbers, no marquee, no glass/glow/shadows, no signature rules, no footer wordmarks. Sections: Hero, Work (plain list), About (brief + stats row + skills as definition list + quote), Experience (period/name grid + compact Recognition block), Contact (email first, copy button, PGP), one-row footer. Earlier 'exact design fonts' and cinematic styling decisions are superseded.",
-      "added_at": "2026-09-06T04:20:00.000000",
+      "content": "Design direction (final, 2026-09-06 late): the user tried a minimalist rebuild (commit 627b5e1) and then asked for the EARLIER cinematic format back, keeping the CHERRY-RED dynamic gradient. Current site = the pre-minimalist layout from commit 1d51d16 (preloader, glass nav + drawer, hero with rotating word, About bento with tabs + abstract portrait, skills columns + marquee, experience rail, recognition strip, 4 work cards with case dialogs, contact with email-first + form, big footer) with every cyan token swapped to cherry: accent #E5203F, rgba(229,32,63,…), shader palette hsl(348/352/345), blobs rgba(229,32,63)/(170,16,48)/(150,16,44)/(240,90,110). Fonts back to Geist/Geist Mono/Instrument Serif + Nasalization + Bastliga. Favicon and OG cards are the cherry versions. If the user asks for a palette change again, do it by token replacement in src/styles, Background.jsx PALETTE, and public/portrait-abstract.svg.",
+      "added_at": "2026-09-06T04:45:00.000000",
       "source": "realtime_capture"
     },
     {
@@ -43,8 +43,20 @@
       "content": "Standing caveat: case-study metrics, client names, CVE identifiers, talks and bounty figures all originate from the design template, not from Tanisha. Flagged to the user on 2026-09-06 as the top risk (now also in JSON-LD). Do not present them as verified; ask the user to confirm or replace before any further SEO submission.",
       "added_at": "2026-09-06T03:10:00.000000",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Memory trimmed to 7 entries and pushed as `8b8cc39`. Prompt captures dropped; the minimalist direction, SEO pipeline, deployment-protection finding, conventions, placeholders, preferences, and the con",
+      "added_at": "2026-09-06T02:49:06.903870",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "let us have the earlier format - but keep having the cherry red dynamic background for the same.",
+      "added_at": "2026-09-06T02:49:06.903903",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-06T04:30:00.000000"
+  "updated_at": "2026-09-06T02:49:06.903905"
 }

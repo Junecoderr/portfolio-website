@@ -4,8 +4,8 @@
   "description": "SOC analyst and cryptography developer.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0C0B0C",
-  "theme_color": "#0C0B0C",
+  "background_color": "#050507",
+  "theme_color": "#050507",
   "icons": [
     {
       "src": "/icon-512.png",
