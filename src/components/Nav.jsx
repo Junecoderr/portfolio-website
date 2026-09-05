@@ -28,6 +28,11 @@ export default function Nav({ menuOpen, onToggle, onClose }) {
             <span className="brand-mark">TB</span>
             <span className="brand-name">Tanisha Brahma.</span>
           </a>
+          <div className="nav-inline">
+            {NAV_SECTIONS.filter((n) => ['About', 'Experience', 'Work', 'Contact'].includes(n.label)).map((n) => (
+              <a key={n.href} href={n.href} className="nav-inline-link">{n.label}</a>
+            ))}
+          </div>
           <button type="button" className="nav-menu-btn" onClick={onToggle} aria-expanded={menuOpen}>
             <span>{menuOpen ? 'Close' : 'Menu'}</span>
             {menuOpen ? <CloseIcon stroke="#5ED2F2" /> : <MenuIcon />}
@@ -53,6 +58,7 @@ export default function Nav({ menuOpen, onToggle, onClose }) {
               </a>
             ))}
           </div>
+          {NAV_PAGES.length ? (
           <div className="drawer-group is-pages">
             <span className="eyebrow soft">Pages</span>
             {NAV_PAGES.map((n) => (
@@ -62,6 +68,7 @@ export default function Nav({ menuOpen, onToggle, onClose }) {
               </a>
             ))}
           </div>
+          ) : null}
         </div>
         <div className="drawer-foot">
           <span className="eyebrow soft">Socials</span>

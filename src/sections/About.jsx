@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import SectionHeading from '../components/SectionHeading.jsx';
-import { ABOUT, STATS } from '../data/content.js';
+import { ABOUT, STATS, PORTRAIT_SRC, PORTRAIT_FALLBACK } from '../data/content.js';
 
 const SLIDES = 4;
 
 export default function About({ paused }) {
   const [slide, setSlide] = useState(0);
   const [hover, setHover] = useState(false);
+  const [hasPhoto, setHasPhoto] = useState(true);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -21,7 +22,7 @@ export default function About({ paused }) {
       <div className="container">
         <SectionHeading number="02" title="About" />
         <div className="about-grid" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-          <div className="about-card">
+          <div className="about-card" data-reveal="1">
             <div className="about-card-tint" />
             <div className="about-card-fade" />
             <div className="about-card-head">
@@ -83,18 +84,20 @@ export default function About({ paused }) {
             </div>
           </div>
 
-          <div className="portrait-card">
+          <div className={`portrait-card${hasPhoto ? ' has-photo' : ''}`} data-reveal="1">
             <div className="portrait-frame">
-              <picture>
-                <source type="image/webp" srcSet="/tanisha-720.webp 720w, /tanisha-1200.webp 1200w" sizes="(max-width: 768px) 100vw, 400px" />
-                <img src="/tanisha.png" alt="Tanisha Brahma" loading="lazy" decoding="async" />
-              </picture>
+              {hasPhoto ? (
+                <img src={PORTRAIT_SRC} alt="Tanisha Brahma" loading="lazy" decoding="async" onError={() => setHasPhoto(false)} />
+              ) : (
+                <img src={PORTRAIT_FALLBACK} alt="" aria-hidden="true" loading="lazy" decoding="async" />
+              )}
             </div>
             <div className="portrait-scanlines" />
             <span className="portrait-corner tl">┌</span>
             <span className="portrait-corner tr">┐</span>
             <span className="portrait-corner bl">└</span>
             <span className="portrait-corner br">┘</span>
+            {!hasPhoto ? <span className="portrait-caption">Tanisha Brahma</span> : null}
           </div>
         </div>
       </div>

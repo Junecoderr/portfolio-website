@@ -9,7 +9,7 @@ export default function Experience() {
         <SectionHeading number="04" title="Experience" />
         <div className="xp-list">
           {EXPERIENCE.map((x) => (
-            <article key={x.org} className="xp-card">
+            <article key={x.org} className="xp-card" data-reveal="1">
               <div className="xp-head">
                 <div className="xp-org">
                   {x.href ? (

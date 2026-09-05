@@ -21,7 +21,7 @@ export default function Skills() {
       </div>
       <div className="marquee-stack">
         {SKILL_ROWS.map((row, i) => (
-          <div key={i} className="marquee-row">
+          <div key={i} className="marquee-row" data-reveal="1">
             {GROUPS.map((g) => (
               <div
                 key={g}

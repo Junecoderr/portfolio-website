@@ -12,7 +12,7 @@ export default function Work({ onOpenCase }) {
           {WORK_CARDS.map((card) => {
             const project = PROJECTS.find((p) => p.id === card.id);
             return (
-              <article key={card.id} className="work-card">
+              <article key={card.id} className="work-card" data-reveal="1">
                 <div className="work-cover">
                   <div className="work-cover-gradient" style={{ background: card.gradient }} />
                   <div className="work-cover-noise" />

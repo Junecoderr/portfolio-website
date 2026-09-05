@@ -71,7 +71,7 @@ export default function Contact() {
     <section id="contact" className="section contact">
       <div className="container contact-inner">
         <SectionHeading number="06" title="Contact" />
-        <div className="contact-panel">
+        <div className="contact-panel" data-reveal="1">
           <div className="contact-glow tl" />
           <div className="contact-glow br" />
           <div className="contact-content">

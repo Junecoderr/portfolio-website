@@ -152,6 +152,20 @@ export const PGP_FINGERPRINT = '9F2C 47AD 10B8 6E31 D4A9  2C05 88FE 7B14 A3D6 0E
 
 export const HERO_WORDS = ['Encrypted', 'Vigilant', 'Constant-time', 'Paranoid', 'Unbreakable'];
 
+export const HERO = {
+  role: 'SOC analyst · Detection engineering · Applied cryptography',
+  status: 'Open to work',
+  where: 'Durgapur · IST',
+};
+
+// Set these to real URLs to reveal the Resume and Blog links; null hides them.
+export const RESUME_URL = null;
+export const BLOG_URL = null;
+
+// Drop a photo at public/portrait.jpg to replace the generated abstract.
+export const PORTRAIT_SRC = '/portrait.jpg';
+export const PORTRAIT_FALLBACK = '/portrait-abstract.svg';
+
 export const NAV_SECTIONS = [
   { label: 'Home', href: '#hero', index: '01' },
   { label: 'About', href: '#about', index: '02' },
@@ -162,9 +176,9 @@ export const NAV_SECTIONS = [
 ];
 
 export const NAV_PAGES = [
-  { label: 'Resume', href: '#', index: '07' },
-  { label: 'Blog', href: '#', index: '08' },
-];
+  { label: 'Resume', href: RESUME_URL, index: '07' },
+  { label: 'Blog', href: BLOG_URL, index: '08' },
+].filter((n) => n.href);
 
 export const SOCIALS = [
   { label: 'GitHub', href: 'https://github.com/Junecoderr' },
@@ -189,25 +203,25 @@ export const ABOUT = {
   pills: ['01 BRIEF', '02 PATH', '03 STATS', '04 QUOTE'],
 };
 
-const icon = (slug, color) => `https://cdn.simpleicons.org/${slug}/${color}`;
+const icon = (slug) => `https://cdn.simpleicons.org/${slug}/E1E5EB`;
 
 export const SKILL_ROWS = [
   { duration: '38s', reverse: false, chips: [
-    { t: 'Rust', img: icon('rust', 'F74C00') }, { t: 'Python', img: icon('python', '3776AB') }, { t: 'Go', img: icon('go', '00ADD8') },
-    { t: 'Sigma', g: 'Σ', c: '#5ED2F2' }, { t: 'SPL', g: '>', c: '#65A637' }, { t: 'ProVerif', g: '∀', c: '#A78BFA' },
+    { t: 'Rust', img: icon('rust') }, { t: 'Python', img: icon('python') }, { t: 'Go', img: icon('go') },
+    { t: 'Sigma', g: 'Σ' }, { t: 'SPL', g: '>' }, { t: 'ProVerif', g: '∀' },
   ] },
   { duration: '42s', reverse: true, chips: [
-    { t: 'Splunk ES', img: icon('splunk', '65A637') }, { t: 'MITRE ATT&CK', g: '◉', c: '#FF4B4B' }, { t: 'Detection-as-code', g: '{}', c: '#5ED2F2' },
-    { t: 'Telemetry pipelines', g: '∿', c: '#3DDC97' }, { t: 'Incident response', g: '⚡', c: '#FFB020' }, { t: 'Post-mortems', g: '✎', c: '#98A6B3' }, { t: 'Threat hunting', g: '⌖', c: '#E1E5EB' },
+    { t: 'Splunk ES', img: icon('splunk') }, { t: 'MITRE ATT&CK', g: '◉' }, { t: 'Detection-as-code', g: '{}' },
+    { t: 'Telemetry pipelines', g: '∿' }, { t: 'Incident response', g: '↯' }, { t: 'Post-mortems', g: '¶' }, { t: 'Threat hunting', g: '⌖' },
   ] },
   { duration: '46s', reverse: false, chips: [
-    { t: 'X25519', g: '×', c: '#5ED2F2' }, { t: 'ML-KEM-768', g: '▦', c: '#A78BFA' }, { t: 'AEAD', g: '⬢', c: '#3DDC97' },
-    { t: 'Noise protocol', g: '≈', c: '#E1E5EB' }, { t: 'Constant-time', g: 'τ', c: '#F5A623' }, { t: 'Lattice attacks', g: '◇', c: '#FF6B6B' },
-    { t: 'liboqs', g: 'λ', c: '#A78BFA' }, { t: 'BoringSSL', g: '◈', c: '#EE5C5C' }, { t: 'dudect', g: 'σ', c: '#98A6B3' },
+    { t: 'X25519', g: '×' }, { t: 'ML-KEM-768', g: '▦' }, { t: 'AEAD', g: '⬢' },
+    { t: 'Noise protocol', g: '≈' }, { t: 'Constant-time', g: 'τ' }, { t: 'Lattice attacks', g: '◇' },
+    { t: 'liboqs', g: 'λ' }, { t: 'BoringSSL', g: '◈' }, { t: 'dudect', g: 'σ' },
   ] },
   { duration: '40s', reverse: true, chips: [
-    { t: 'Git', img: icon('git', 'F05032') }, { t: 'GitHub', img: icon('github', 'E1E5EB') }, { t: 'HSM', g: '▣', c: '#FFB020' },
-    { t: 'CI/CD', g: '∞', c: '#3DDC97' }, { t: 'PGP · Ed25519', img: icon('gnuprivacyguard', '0093DD') }, { t: 'criterion', g: 'μ', c: '#98A6B3' }, { t: '90-day disclosure', g: '!', c: '#FF4B4B' },
+    { t: 'Git', img: icon('git') }, { t: 'GitHub', img: icon('github') }, { t: 'HSM', g: '▣' },
+    { t: 'CI/CD', g: '∞' }, { t: 'PGP · Ed25519', img: icon('gnuprivacyguard') }, { t: 'criterion', g: 'μ' }, { t: '90-day disclosure', g: '‼' },
   ] },
 ];
 
@@ -257,5 +271,7 @@ export const FORM_STEPS = [
 
 export const FOOTER_NAV = [
   { label: 'Home', href: '#hero' }, { label: 'About', href: '#about' }, { label: 'Projects', href: '#work' },
-  { label: 'Experience', href: '#experience' }, { label: 'Blog', href: '#' }, { label: 'Contact', href: '#contact' },
-];
+  { label: 'Experience', href: '#experience' }, { label: 'Blog', href: BLOG_URL }, { label: 'Contact', href: '#contact' },
+].filter((n) => n.href);
+
+export const FOOTER_BLURB = 'Detection reviews, protocol work, incident retainers. If it involves an alert queue or a private key, I want to hear about it.';

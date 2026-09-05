@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 const KEY = 'tb_preloader';
-const EXIT_AT = 1700;
-const REMOVE_AT = 2300;
+const EXIT_AT = 900;
+const REMOVE_AT = 1300;
 
 /** Name splash shown once per session, then fades out. */
 export default function Preloader() {
