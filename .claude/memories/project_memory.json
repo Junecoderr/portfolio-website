@@ -37,38 +37,8 @@
       "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Memory consolidated: 11 entries down to 6 in the repo's `project_memory.json`. Kept the project identity and deploy target, the 2026-09-05 rebuild record, code conventions, the fonts decision, open pl",
-      "added_at": "2026-09-05T12:02:29.199471",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "push the code for the same.",
-      "added_at": "2026-09-05T12:02:29.199490",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Pushed. `main` now at `0a76cfd`, in sync with `origin/main`.\n\n- `411976d` — site rebuild (already live on GitHub since last step).\n- `0a76cfd` — consolidated project memory file.\n\nWorking tree clean. ",
-      "added_at": "2026-09-05T12:05:07.889290",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Done. Pushed as `e01c860` on `main`.\n\n- Only mention was the footer legal row. It now reads the copyright plus \"Every claim on this site is one I can defend in an interview.\" The LICENSE link is gone.",
-      "added_at": "2026-09-05T12:05:48.733036",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "Font wise - you should match exactly the same as per the design is concerned.",
-      "added_at": "2026-09-05T12:05:48.733057",
-      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-05T12:05:48.733058"
+  "updated_at": "2026-09-05T12:20:00.000000"
 }
