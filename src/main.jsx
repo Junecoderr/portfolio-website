@@ -1,11 +1,18 @@
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { hydrateRoot, createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import { caseIdFromPath } from './seo.js';
 import './styles/global.css';
 import './styles/site.css';
 
-createRoot(document.getElementById('root')).render(
+const root = document.getElementById('root');
+const hash = /^#work\/([a-z0-9-]+)$/.exec(window.location.hash);
+const initialCase = caseIdFromPath(window.location.pathname) || (hash ? caseIdFromPath(`/work/${hash[1]}`) : null);
+const tree = (
   <StrictMode>
-    <App />
+    <App initialCase={initialCase} />
   </StrictMode>
 );
+
+if (root.hasChildNodes()) hydrateRoot(root, tree);
+else createRoot(root).render(tree);

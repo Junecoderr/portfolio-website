@@ -12,21 +12,25 @@ import Recognition from './sections/Recognition.jsx';
 import Skills from './sections/Skills.jsx';
 import Contact from './sections/Contact.jsx';
 import { PROJECTS, NAV_SECTIONS } from './data/content.js';
+import { caseIdFromPath } from './seo.js';
 import useScrollReveal from './hooks/useScrollReveal.js';
 
-const CASE_RE = /^#work\/([a-z0-9-]+)$/;
+const HASH_RE = /^#work\/([a-z0-9-]+)$/;
 
-function caseFromHash() {
-  const m = CASE_RE.exec(window.location.hash);
-  return m && PROJECTS.some((p) => p.id === m[1]) ? m[1] : null;
+/** Case id from the current URL: /work/<id> (prerendered pages) or the legacy #work/<id> hash. */
+function caseFromLocation() {
+  const byPath = caseIdFromPath(window.location.pathname);
+  if (byPath) return byPath;
+  const m = HASH_RE.exec(window.location.hash);
+  return m ? caseIdFromPath(`/work/${m[1]}`) : null;
 }
 
-export default function App() {
+export default function App({ initialCase = null }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [caseId, setCaseId] = useState(() => caseFromHash());
+  const [caseId, setCaseId] = useState(initialCase);
   const [activeId, setActiveId] = useState('hero');
   const rootRef = useRef(null);
-  const skipPreloader = useRef(Boolean(window.location.hash)).current;
+  const skipPreloader = Boolean(initialCase);
   useScrollReveal(rootRef);
 
   // Body scroll lock while a case is open.
@@ -37,9 +41,9 @@ export default function App() {
     };
   }, [caseId]);
 
-  // Back/forward and manual hash edits drive the dialog.
+  // Back/forward and manual URL edits drive the dialog.
   useEffect(() => {
-    const sync = () => setCaseId(caseFromHash());
+    const sync = () => setCaseId(caseFromLocation());
     window.addEventListener('popstate', sync);
     window.addEventListener('hashchange', sync);
     return () => {
@@ -63,7 +67,7 @@ export default function App() {
   }, []);
 
   const openCase = useCallback((id) => {
-    window.history.pushState({ case: id }, '', `#work/${id}`);
+    window.history.pushState({ case: id }, '', `/work/${id}`);
     setCaseId(id);
   }, []);
 
@@ -71,7 +75,7 @@ export default function App() {
     if (window.history.state && window.history.state.case) {
       window.history.back();
     } else {
-      window.history.replaceState(null, '', '#work');
+      window.history.replaceState(null, '', '/#work');
       setCaseId(null);
     }
   }, []);
@@ -80,10 +84,11 @@ export default function App() {
 
   return (
     <div className="page" ref={rootRef}>
+      <a href="#main" className="skip-link">Skip to content</a>
       <Background motion />
       <Preloader skip={skipPreloader} />
       <Nav menuOpen={menuOpen} onToggle={() => setMenuOpen((v) => !v)} onClose={() => setMenuOpen(false)} activeId={activeId} />
-      <main className="main">
+      <main id="main" className="main">
         <Hero />
         <div className="content-band">
           <Work onOpenCase={openCase} />

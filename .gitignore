@@ -1,3 +1,5 @@
 node_modules/
 dist/
 .DS_Store
+src/assets/fonts/google.css
+src/assets/fonts/instrument-serif.ttf

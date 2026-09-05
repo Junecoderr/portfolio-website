@@ -88,7 +88,7 @@ export default function Contact() {
   return (
     <section id="contact" className="section contact">
       <div className="container contact-inner">
-        <SectionHeading number="07" title="Contact" />
+        <SectionHeading number="07" title="Contact" lead="Email is fastest. Encrypted mail welcome; the PGP fingerprint is below." />
         <div className="contact-panel" data-reveal="1">
           <div className="contact-glow tl" />
           <div className="contact-glow br" />

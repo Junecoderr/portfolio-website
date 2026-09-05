@@ -9,7 +9,7 @@ export default function About() {
   return (
     <section id="about" className="section">
       <div className="container">
-        <SectionHeading number="03" title="About" />
+        <SectionHeading number="03" title="About" lead="SOC analyst turned detection lead, now independent, writing production cryptography from Durgapur." />
         <div className="about-grid">
           <div className="about-card" data-reveal="1">
             <div className="about-card-tint" />

@@ -5,7 +5,7 @@ export default function Recognition() {
   return (
     <section id="recognition" className="section">
       <div className="container">
-        <SectionHeading number="05" title="Recognition" />
+        <SectionHeading number="05" title="Recognition" lead="Certifications, credited CVEs, talks and papers." />
         <div className="rec-grid">
           {RECOGNITION.map((group) => (
             <div key={group.title} className="rec-col" data-reveal="1">

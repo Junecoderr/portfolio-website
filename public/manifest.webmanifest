@@ -1,0 +1,22 @@
+{
+  "name": "Tanisha Brahma \u2014 Portfolio",
+  "short_name": "Tanisha Brahma",
+  "description": "SOC analyst and cryptography developer.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050507",
+  "theme_color": "#050507",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

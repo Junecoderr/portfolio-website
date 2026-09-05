@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { CloseIcon } from './Icons.jsx';
+import { SITE_URL } from '../data/content.js';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input, textarea, select, [tabindex]:not([tabindex="-1"])';
 
@@ -83,7 +84,7 @@ export default function CaseDialog({ project, onClose }) {
           </div>
         </div>
         <div className="dialog-foot">
-          <span className="dialog-link-hint">Link to this case: <code>{`${window.location.origin}${window.location.pathname}#work/${project.id}`}</code></span>
+          <span className="dialog-link-hint">Link to this case: <code>{`${SITE_URL}/work/${project.id}`}</code></span>
         </div>
       </div>
     </div>

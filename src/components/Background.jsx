@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { GrainGradient } from '@paper-design/shaders-react';
 
 const PALETTE = ['hsl(193, 85%, 66%)', 'hsl(196, 100%, 83%)', 'hsl(195, 100%, 50%)'];
 
@@ -10,8 +9,9 @@ const PALETTE = ['hsl(193, 85%, 66%)', 'hsl(196, 100%, 83%)', 'hsl(195, 100%, 50
  */
 export default function Background({ motion = true }) {
   const [shaderOn, setShaderOn] = useState(false);
-  const [webgl, setWebgl] = useState(true);
+  const [webgl, setWebgl] = useState(false);
   const [active, setActive] = useState(true);
+  const [Shader, setShader] = useState(null);
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -34,17 +34,28 @@ export default function Background({ motion = true }) {
     }
   }, []);
 
+  // Load the shader after first paint so it never blocks the initial render.
   useEffect(() => {
     if (!webgl) return undefined;
-    const t = setTimeout(() => setShaderOn(true), 400);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    const load = () => import('@paper-design/shaders-react').then((m) => {
+      if (cancelled) return;
+      setShader(() => m.GrainGradient);
+      setTimeout(() => setShaderOn(true), 400);
+    }).catch(() => {});
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(load, { timeout: 1500 }) : setTimeout(load, 300);
+    return () => {
+      cancelled = true;
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
+      else clearTimeout(idle);
+    };
   }, [webgl]);
 
   return (
     <div className="bg" aria-hidden="true">
-      {webgl ? (
+      {webgl && Shader ? (
         <div className="bg-shader">
-          <GrainGradient
+          <Shader
             style={{ width: '100%', height: '100%' }}
             colorBack="hsl(0, 0%, 0%)"
             softness={0.5}

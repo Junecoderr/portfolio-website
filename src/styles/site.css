@@ -151,7 +151,12 @@
 .hero-rotator-word { display: inline-block; font-weight: 700; color: var(--fg-2); animation: wordIn .4s var(--ease-out); }
 
 /* ---------- section heading ---------- */
+.skip-link { position: absolute; left: 16px; top: -60px; z-index: 10000; padding: 10px 14px; border-radius: 8px; background: var(--accent); color: #06121a; font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; transition: top .2s; }
+.skip-link:focus { top: 16px; }
 .section-heading { position: relative; margin-bottom: 64px; display: flex; }
+.section-heading-text { position: relative; display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+.section-heading.is-right .section-heading-text { align-items: flex-end; text-align: right; }
+.section-lead { margin: 0; font-size: 15px; line-height: 1.55; color: var(--fg-5); }
 .section-heading.is-right { flex-direction: row-reverse; }
 .section-number {
   position: absolute; top: -60px; left: 0; font-family: var(--font-display); font-style: italic; font-weight: 900;

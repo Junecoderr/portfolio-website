@@ -37,8 +37,32 @@
       "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Memory trimmed to 6 entries and pushed as `2063537`. Only prompt captures were dropped; the six substantive entries stay.",
+      "added_at": "2026-09-06T02:13:21.067938",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "what are the things, which can be done to fix the entire website critically???",
+      "added_at": "2026-09-06T02:13:21.067965",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Third pass. Visual and UX layers are done, so this one is about everything underneath: truth of the content, discoverability, speed, robustness, and the repo itself. Ranked by how much damage each doe",
+      "added_at": "2026-09-06T02:15:29.176122",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "I want this website to be hell crazy based on SEO is concerned for the same.",
+      "added_at": "2026-09-06T02:15:29.176147",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-06T02:50:00.000000"
+  "updated_at": "2026-09-06T02:15:29.176149"
 }

@@ -1,3 +1,25 @@
+import rustIcon from '../assets/icons/rust.svg';
+import pythonIcon from '../assets/icons/python.svg';
+import goIcon from '../assets/icons/go.svg';
+import splunkIcon from '../assets/icons/splunk.svg';
+import gitIcon from '../assets/icons/git.svg';
+import githubIcon from '../assets/icons/github.svg';
+import gpgIcon from '../assets/icons/gnuprivacyguard.svg';
+
+// Canonical origin. Change here when a custom domain lands.
+export const SITE_URL = 'https://portfolio-website-junix1.vercel.app';
+export const SITE_NAME = 'Tanisha Brahma';
+
+export const SEO = {
+  title: 'Tanisha Brahma – SOC Analyst & Cryptography Developer',
+  description: 'Portfolio of Tanisha Brahma, SOC analyst and cryptography developer in Durgapur, India: detection engineering, incident response, post-quantum migration and security audit case studies.',
+  jobTitle: 'SOC Analyst and Cryptography Developer',
+  knowsAbout: ['Detection engineering', 'Sigma rules', 'Incident response', 'Applied cryptography', 'Post-quantum cryptography', 'ML-KEM', 'X25519', 'Constant-time implementation', 'Security auditing', 'MITRE ATT&CK', 'Rust', 'Python'],
+  locality: 'Durgapur', region: 'West Bengal', country: 'IN',
+};
+
+export const CASE_IDS = ['sentinel', 'blackout', 'lattice', 'redline'];
+
 export const PROJECTS = [
   {
     id: 'sentinel', index: '01', title: 'Sentinel Grid', tagline: 'Detection-as-code for a 40,000 EPS estate', discipline: 'Threat detection', year: '2025',
@@ -205,7 +227,8 @@ export const ABOUT = {
   tabs: [{ key: 'stats', label: 'Field metrics' }, { key: 'path', label: 'Path' }, { key: 'quote', label: 'Philosophy' }],
 };
 
-const icon = (slug) => `https://cdn.simpleicons.org/${slug}/E1E5EB`;
+const ICONS = { rust: rustIcon, python: pythonIcon, go: goIcon, splunk: splunkIcon, git: gitIcon, github: githubIcon, gnuprivacyguard: gpgIcon };
+const icon = (slug) => ICONS[slug];
 
 export const SKILL_GROUPS = [
   { title: 'Detection & response', items: [

@@ -16,9 +16,13 @@ function seenToday() {
 
 /** Name splash shown at most once a day, skipped entirely on deep links. */
 export default function Preloader({ skip = false }) {
-  const [phase, setPhase] = useState(() => (skip || seenToday() ? 'done' : 'show'));
+  const [phase, setPhase] = useState('show');
 
   useEffect(() => {
+    if (skip || seenToday()) {
+      setPhase('done');
+      return undefined;
+    }
     if (phase === 'done') return undefined;
     const t1 = setTimeout(() => setPhase('exit'), EXIT_AT);
     const t2 = setTimeout(() => {
@@ -33,18 +37,18 @@ export default function Preloader({ skip = false }) {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [phase]);
+  }, [phase, skip]);
 
   if (phase === 'done') return null;
 
   return (
     <div className="preloader" style={{ opacity: phase === 'exit' ? 0 : 1 }}>
       <div className="preloader-glow" />
-      <h1 className="preloader-title">
+      <div className="preloader-title" aria-hidden="true">
         <span className="preloader-word">Tanisha</span>
         <span className="preloader-slash">/</span>
         <span className="preloader-word">Brahma</span>
-      </h1>
+      </div>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export default function Skills() {
   return (
     <section id="skills" className="section skills">
       <div className="container skills-head">
-        <SectionHeading number="06" title="Skills" align="right" />
+        <SectionHeading number="06" title="Skills" align="right" lead="Detection tooling, cryptographic primitives and the languages they ship in." />
       </div>
       <div className="container">
         <div className="skill-cols" data-reveal="1">
