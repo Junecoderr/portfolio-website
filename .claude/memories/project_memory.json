@@ -37,8 +37,20 @@
       "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
+    },
+    {
+      "type": "claude_response",
+      "content": "Memory trimmed to 6 entries and pushed as `1444cb1`. Kept project identity, the rebuild record, conventions, the final fonts decision, open placeholders, and user preferences. Dropped the raw prompt c",
+      "added_at": "2026-09-05T12:21:34.641223",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Make it mobile compliant as well",
+      "added_at": "2026-09-05T12:21:34.641236",
+      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-05T12:20:00.000000"
+  "updated_at": "2026-09-05T12:21:34.641237"
 }

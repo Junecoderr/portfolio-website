@@ -85,7 +85,10 @@ export default function About({ paused }) {
 
           <div className="portrait-card">
             <div className="portrait-frame">
-              <img src="/tanisha.png" alt="Tanisha Brahma" />
+              <picture>
+                <source type="image/webp" srcSet="/tanisha-720.webp 720w, /tanisha-1200.webp 1200w" sizes="(max-width: 768px) 100vw, 400px" />
+                <img src="/tanisha.png" alt="Tanisha Brahma" loading="lazy" decoding="async" />
+              </picture>
             </div>
             <div className="portrait-scanlines" />
             <span className="portrait-corner tl">┌</span>
