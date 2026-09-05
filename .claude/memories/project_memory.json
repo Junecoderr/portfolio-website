@@ -37,32 +37,8 @@
       "content": "User preferences: favour confident credibility copy over disclaimers (footer line \"Every claim on this site is one I can defend in an interview\" is the about-quote). Prefers to be asked follow-up questions rather than have assumptions made, but once a decision is given, execute without re-asking. Project memory file path is cwd-relative: portfolio-website/.claude/memories/project_memory.json.",
       "added_at": "2026-08-18T17:48:31.043887",
       "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "Memory trimmed to 6 entries and pushed as `6f2cb52`. The polish pass was folded into the rebuild entry.",
-      "added_at": "2026-09-06T02:01:29.262452",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "What are the things, which you critically analyze based on the UI/UX experience level and let me know here itself for the same.",
-      "added_at": "2026-09-06T02:01:29.262491",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "claude_response",
-      "content": "UX critique of the site as it stands now, from a visitor's point of view. The visual layer is done. What follows is about whether someone can get what they came for.\n\n## Who visits and what they need\n",
-      "added_at": "2026-09-06T02:02:36.305210",
-      "source": "realtime_capture"
-    },
-    {
-      "type": "message",
-      "content": "Go ahead and fix everything please.",
-      "added_at": "2026-09-06T02:02:36.305233",
-      "source": "realtime_capture"
     }
   ],
   "created_at": "2026-08-13T10:59:25.099498",
-  "updated_at": "2026-09-06T02:02:36.305234"
+  "updated_at": "2026-09-06T02:50:00.000000"
 }
