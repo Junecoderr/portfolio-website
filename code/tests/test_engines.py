@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 import tb
+from tblib import gui
 from tbcore.interp import Interpreter as TreeInterpreter
 from tbcore.vm import VMInterpreter
 
@@ -107,7 +108,14 @@ def test_apps_match(name, args, tmp_path):
     for engine in ("tree", "vm"):
         work = tmp_path / engine
         work.mkdir()
-        runs.append(outcome(engine, source, path=str(path), args=list(args), cwd=work))
+        # Desktop apps run on the headless backend: with a real display (CI)
+        # win.run() would otherwise wait for someone to close the window.
+        previous = gui._use_backend(gui.FakeBackend()) if "import gui" in source else None
+        try:
+            runs.append(outcome(engine, source, path=str(path), args=list(args), cwd=work))
+        finally:
+            if "import gui" in source:
+                gui._use_backend(previous)
     assert runs[1] == runs[0]
     # files the app wrote must match too
     tree_files = sorted(p.relative_to(tmp_path / "tree") for p in (tmp_path / "tree").rglob("*") if p.is_file())
