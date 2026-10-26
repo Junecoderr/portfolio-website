@@ -243,15 +243,15 @@ def test_yaml_multiline_plain_and_quoted_values():
 
 
 @pytest.mark.parametrize("text,message", [
-    ("a: &anchor 1\nb: *anchor", "anchors"),
-    ("a: !!str 1", "tags"),
+    ("a: *nowhere", "alias *nowhere points to an anchor"),
+    ("a: !!date 1", "tag !!date isn't supported"),
     ("? complex\n: key", "complex keys"),
     ("a: 1\na: 2", 'the key "a" appears twice'),
     ("a:\n\tb: 1", "spaces, not tabs"),
     ("a: 1\n   b: 2", "indented"),
-    ("a: [1, [2]]", "inside [...]"),
+    ("a: [1, [2]", "never closes"),
     ("a: 1\n---\nb: 2", "2 YAML documents"),
-    ("just text", "key: value"),
+    ("a: 1\nb", "key: value"),
     ("a: 'never closed", "never ends"),
 ])
 def test_yaml_errors(text, message):
@@ -262,7 +262,7 @@ def test_yaml_errors(text, message):
 
 def test_parse_yaml_from_tb():
     assert run('say(detect.parse_yaml("a: 1\\nb:\\n  - x\\n  - y"))') == ['{"a": 1, "b": ["x", "y"]}']
-    assert "That YAML doesn't work: YAML aliases" in str(tb_error('import detect\ndetect.parse_yaml("a: *x")'))
+    assert "That YAML doesn't work: the alias *x" in str(tb_error('import detect\ndetect.parse_yaml("a: *x")'))
 
 
 # -- Sigma ---------------------------------------------------------------------------------
@@ -426,16 +426,16 @@ for f in ["auth.log", "access.log", "windows_security.json", "firewall.log"] {{
     ("title: t\ndetection:\n  s:\n    a: 1\n  condition: (s", "never closed"),
     ("title: t\ndetection:\n  s:\n    a: 1\n  condition: s*", "only work after '1 of'"),
     ("title: t\ndetection:\n  s:\n    a: 1\n  condition: 1 of x*", 'no selection matches "x*"'),
-    ("title: t\ndetection:\n  s:\n    a|base64offset|contains: x\n  condition: s", "|base64offset modifier isn't supported yet"),
+    ("title: t\ndetection:\n  s:\n    a|utf16le: x\n  condition: s", "|utf16le needs |base64 or |base64offset after it"),
     ("title: t\ndetection:\n  s:\n    a|sparkle: x\n  condition: s", "I don't know the modifier |sparkle"),
-    ("title: t\ndetection:\n  s:\n    a: 1\n  condition: s | count(user) by ip > 5", "count(user) (counting distinct values) isn't supported"),
-    ("title: t\ndetection:\n  s:\n    a: 1\n  condition: s | max(x) > 5", "only \"| count() by field > N\" aggregations"),
+    ("title: t\ndetection:\n  s:\n    a: 1\n  condition: s | median(x) > 5", "I can't read the aggregation \"| median(x) > 5\""),
+    ("title: t\ndetection:\n  s:\n    a: 1\n  condition: s | max() > 5", "max() needs a field"),
     ("title: t\ndetection:\n  s:\n    a: 1\n  condition: s\ntimeframe: soon", "timeframe \"soon\" should look like 30s"),
     ("title: t\nlevel: urgent\ndetection:\n  s:\n    a: 1\n  condition: s", "level should be one of"),
     ("title: t\ndetection:\n  s: []\n  condition: s", "is empty"),
     ("title: t\ndetection:\n  s:\n    - a: 1\n    - x\n  condition: s", "mixes maps and plain values"),
     ("title: t\ndetection:\n  s:\n    a|re: '('\n  condition: s", "doesn't work"),
-    ("title: t\ndetection:\n  s:\n    a: &x 1\n  condition: s", "I couldn't read the Sigma rule 'r.yml': YAML anchors"),
+    ("title: t\ndetection:\n  s:\n    a: *x\n  condition: s", "I couldn't read the Sigma rule 'r.yml': the alias *x"),
 ])
 def test_sigma_errors(text, message):
     with open("r.yml", "w") as f:
@@ -468,3 +468,226 @@ def test_detect_errors(src, message):
 
 def test_rule_errors_are_catchable():
     assert run('try { detect.rule({}) } catch e { say("caught", e.kind) }') == ["caught error"]
+
+
+# -- Sigma 3.0: every modifier, richer conditions, aggregations, near, correlations ----------
+
+import base64 as _b64  # noqa: E402
+import json as _json  # noqa: E402
+
+
+def sigma3_match(detection_yaml, record, extra=""):
+    text = "title: t\ndetection:\n" + detection_yaml + extra
+    src = f"let r = detect.sigma({_json.dumps(text, ensure_ascii=False)})\nsay(detect.match(r, {_json.dumps(record, ensure_ascii=False)}))"
+    return run(src) == ["true"]
+
+
+def b64(text, enc="utf-8"):
+    return _b64.b64encode(text.encode(enc)).decode()
+
+
+@pytest.mark.parametrize("selection,record,expected", [
+    ("    cmd|base64: 'whoami'", {"cmd": b64("whoami")}, True),
+    ("    cmd|base64|contains: 'whoami'", {"cmd": "powershell -enc " + b64("whoami")}, True),
+    ("    cmd|base64offset|contains: 'http://'", {"cmd": "x " + b64("xx http://evil")[4:]}, True),
+    ("    cmd|base64offset|contains: 'http://'", {"cmd": b64("ab http://e")}, True),
+    ("    cmd|utf16le|base64offset|contains: 'Invoke'", {"cmd": "-enc " + b64("IEX; Invoke-Thing", "utf-16-le")}, True),
+    ("    cmd|wide|base64offset|contains: 'Invoke'", {"cmd": b64("abc Invoke", "utf-16-le")}, True),
+    ("    cmd|utf16be|base64|contains: 'hi'", {"cmd": b64("hi", "utf-16-be")}, True),
+    ("    cmd|windash|contains: ' -enc '", {"cmd": "powershell /enc AAA"}, True),
+    ("    cmd|windash|contains: ' -enc '", {"cmd": "powershell \u2013enc AAA"}, True),
+    ("    ip|cidr: '10.0.0.0/8'", {"ip": "10.20.30.40"}, True),
+    ("    ip|cidr:\n      - '192.168.0.0/16'\n      - '2001:db8::/32'", {"ip": "2001:db8::5"}, True),
+    ("    ip|cidr: '10.0.0.0/8'", {"ip": "11.0.0.1"}, False),
+    ("    msg|re|i: '^hello.*WORLD$'", {"msg": "HELLO big world"}, True),
+    ("    msg|re: '^hello'", {"msg": "HELLO"}, False),
+    ("    msg|re|m: '^two$'", {"msg": "one\ntwo"}, True),
+    ("    msg|re|s: 'a.b'", {"msg": "a\nb"}, True),
+    ("    bytes|gt: 1000", {"bytes": 5000}, True),
+    ("    bytes|lte: 1000", {"bytes": 5000}, False),
+    ("    bytes|gte: 10", {"bytes": "12"}, True),
+    ("    bytes|lt: 10", {"bytes": 3.5}, True),
+    ("    user|exists: true", {"user": "x"}, True),
+    ("    user|exists: false", {"user": "x"}, False),
+    ("    user|exists: false", {"other": 1}, True),
+    ("    cmd|contains|all:\n      - 'net'\n      - 'user'\n      - '/add'", {"cmd": "net user bob /add"}, True),
+    ("    cmd|contains|all:\n      - 'net'\n      - '/add'", {"cmd": "net user bob"}, False),
+    ("    src|fieldref: dst", {"src": "a", "dst": "A"}, True),
+    ("    src|fieldref: dst", {"src": "a", "dst": "b"}, False),
+    ("    path|fieldref|startswith: home", {"path": "/home/t/x", "home": "/home/t"}, True),
+    ("    user|cased: Admin", {"user": "admin"}, False),
+])
+def test_sigma_modifiers(selection, record, expected):
+    assert sigma3_match("  sel:\n" + selection + "\n  condition: sel", record) is expected
+
+
+def test_sigma_expand_placeholders():
+    text = "title: t\ndetection:\n  sel:\n    user|expand: '%admins%'\n  condition: sel"
+    out = run(f'let r = detect.sigma({_json.dumps(text)}, {{"placeholders": {{"admins": ["root", "tanisha"]}}}})\n'
+              'say(detect.match(r, {"user": "tanisha"}), detect.match(r, {"user": "bob"}))')
+    assert out == ["true false"]
+
+
+@pytest.mark.parametrize("condition,record,expected", [
+    ("all of them", {"a": 1, "b": 2, "c": 3}, True),
+    ("all of them", {"a": 1, "b": 2}, False),
+    ("1 of them", {"c": 3}, True),
+    ("1 of selection_*", {"b": 2}, True),
+    ("1 of selection_*", {"c": 3}, False),
+    ("all of selection_*", {"a": 1, "b": 2}, True),
+    ("all of selection_* and not filter", {"a": 1, "b": 2, "c": 3}, False),
+    ("not filter", {"a": 1}, True),
+    ("(selection_a or filter) and not selection_b", {"c": 3}, True),
+])
+def test_sigma_condition_forms(condition, record, expected):
+    det = f"  selection_a:\n    a: 1\n  selection_b:\n    b: 2\n  filter:\n    c: 3\n  condition: {condition}"
+    assert sigma3_match(det, record) is expected
+
+
+EVENTS = [
+    {"time": 1000 + i * 10, "ip": "203.0.113.42" if i < 6 else "192.0.2.9", "user": f"u{i % 4}", "bytes": 100 * (i + 1),
+     "action": "failed_login"} for i in range(9)
+]
+
+
+def run_sigma(text, records=EVENTS):
+    return run(f"let r = detect.sigma_all({_json.dumps(text)})\nlet a = detect.run(r, {_json.dumps(records)})\n"
+               "say(len(a))\nfor x in a { say(x.by, x.count, x.get(\"value\", nil)) }")
+
+
+@pytest.mark.parametrize("agg,expected", [
+    ("count() by ip > 5", ["1", "203.0.113.42 6 nil"]),
+    ("count(user) by ip >= 4", ["1", "203.0.113.42 4 4"]),
+    ("count(user) by ip > 4", ["0"]),
+    ("max(bytes) by ip > 800", ["1", "192.0.2.9 3 900"]),
+    ("min(bytes) by ip < 200", ["1", "203.0.113.42 6 100"]),
+    ("sum(bytes) > 4000", ["1", "nil 9 4500"]),
+    ("avg(bytes) by ip >= 800", ["1", "192.0.2.9 3 800"]),
+])
+def test_sigma_aggregations(agg, expected):
+    text = f"title: agg\ndetection:\n  sel:\n    action: failed_login\n  condition: sel | {agg}\n"
+    assert run_sigma(text) == expected
+
+
+def test_sigma_near():
+    records = [{"time": 100, "action": "failed_login", "ip": "x"}, {"time": 130, "action": "login", "ip": "x"},
+               {"time": 5000, "action": "login", "ip": "y"}]
+    text = ("title: success after failure\ndetection:\n  ok:\n    action: login\n  bad:\n    action: failed_login\n"
+            "  condition: ok | near bad\ntimeframe: 1m\n")
+    out = run(f"let a = detect.run(detect.sigma({_json.dumps(text)}), {_json.dumps(records)})\nsay(len(a), a[0].count)")
+    assert out == ["1 2"]
+
+
+CORR_BASE = """title: failed
+name: failed
+logsource:
+  product: linux
+  service: auth
+detection:
+  sel:
+    action: failed_login
+  condition: sel
+---
+title: success
+name: success
+detection:
+  sel:
+    action: login
+  condition: sel
+---
+"""
+
+CORR_RECORDS = (
+    [{"time": 100 + i, "action": "failed_login", "ip": "203.0.113.42", "user": f"u{i}"} for i in range(6)]
+    + [{"time": 150, "action": "login", "ip": "203.0.113.42", "user": "u1"}]
+    + [{"time": 100, "action": "login", "ip": "192.0.2.9", "user": "t"},
+       {"time": 110, "action": "failed_login", "ip": "192.0.2.9", "user": "t"}]
+)
+
+
+@pytest.mark.parametrize("corr,expected", [
+    ("type: event_count\n  rules: [failed]\n  group-by: [ip]\n  timespan: 5m\n  condition:\n    gte: 5", ["203.0.113.42 6"]),
+    ("type: value_count\n  rules: [failed]\n  group-by: [ip]\n  timespan: 5m\n  condition:\n    field: user\n    gt: 3",
+     ["203.0.113.42 6"]),
+    ("type: temporal\n  rules: [failed, success]\n  group-by: [ip]\n  timespan: 2m",
+     ["192.0.2.9 2", "203.0.113.42 7"]),
+    ("type: temporal_ordered\n  rules: [failed, success]\n  group-by: [ip]\n  timespan: 2m", ["203.0.113.42 7"]),
+])
+def test_sigma_correlation_types(corr, expected):
+    text = CORR_BASE + "title: corr\nlevel: critical\ncorrelation:\n  " + corr + "\n"
+    out = run(f"let rules = detect.sigma_all({_json.dumps(text)})\n"
+              f"let a = detect.run(rules.filter(fn(r) {{ return r.has(\"correlation\") }}), {_json.dumps(CORR_RECORDS)})\n"
+              "for x in a.sort_by(fn(x) { return x.by }) { say(x.by, x.count) }")
+    assert out == expected
+
+
+def test_sigma_correlation_hides_building_blocks_and_errors():
+    text = CORR_BASE + "title: corr\ncorrelation:\n  type: event_count\n  rules: [failed]\n  group-by: [ip]\n  timespan: 5m\n  condition:\n    gte: 5\n"
+    out = run(f"let rules = detect.sigma_all({_json.dumps(text)})\nsay(rules.map(fn(r) {{ return r.name + \":\" + str(r.get(\"hidden\", false)) }}))")
+    assert out == ['["corr:false", "failed:true", "success:false"]']
+    bad = CORR_BASE + "title: c\ncorrelation:\n  type: event_count\n  rules: [nope]\n  condition:\n    gte: 1\n"
+    assert 'refers to the rule "nope"' in str(tb_error(f"import detect\ndetect.sigma_all({_json.dumps(bad)})"))
+    bad = CORR_BASE + "title: c\ncorrelation:\n  type: temporal\n  rules: [failed, success]\n"
+    assert "needs a timespan" in str(tb_error(f"import detect\ndetect.sigma_all({_json.dumps(bad)})"))
+
+
+def test_sigma_fields_and_logsource_mapping():
+    text = ("title: t\nlogsource:\n  product: windows\n  service: security\nfields:\n  - TargetUserName\n"
+            "detection:\n  sel:\n    EventID: 4625\n  condition: sel\n")
+    out = run(f'let r = detect.sigma({_json.dumps(text)})\nsay(r.formats, r.fields)\n'
+              'let a = detect.run(r, [{"format": "windows", "EventID": 4625, "TargetUserName": "tanisha", "time": 1}, '
+              '{"format": "auth", "EventID": 4625}])\nsay(len(a), a[0].fields)\n'
+              'say(detect.logsource({"product": "linux", "service": "auth"}).kql)')
+    assert out == ['["windows"] ["TargetUserName"]', '1 {"TargetUserName": "tanisha"}', "Syslog"]
+
+
+BRUTE = """title: SSH brute force
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection:
+    action: failed_login
+  filter:
+    ip|cidr: 10.0.0.0/8
+  condition: selection and not filter | count() by ip > 10
+timeframe: 5m
+"""
+
+
+def test_sigma_to_query_backends():
+    out = run(f"let r = detect.sigma({_json.dumps(BRUTE)})\nsay(detect.sigma_to_query(r, \"splunk\"))\n"
+              "say(detect.sigma_to_query(r, \"kql\"))\nsay(detect.sigma_to_query(r, \"sentinel\") == detect.sigma_to_query(r, \"kql\"))")
+    assert out[0] == ('sourcetype="linux_secure" action="failed_login" NOT cidrmatch("10.0.0.0/8", src) '
+                      '| bin _time span=300s | stats count by _time, src | where count > 10') or \
+        out[0].startswith('sourcetype="linux_secure" action="failed_login"')
+    assert "| stats count by" in out[0] and "where count > 10" in out[0]
+    assert out[1].startswith("Syslog\n| where action =~ \"failed_login\"")
+    assert 'ipv4_is_in_range(ip, "10.0.0.0/8")' in out[1]
+    assert "| summarize count_ = count() by ip, bin(TimeGenerated, 300s)\n| where count_ > 10" in out[1]
+    assert out[-1] == "true"
+    err = str(tb_error(f"import detect\ndetect.sigma_to_query(detect.sigma({_json.dumps(BRUTE)}), \"elastic\")"))
+    assert "can't count or group" in err
+
+
+@pytest.mark.parametrize("backend,expected", [
+    ("splunk", 'source="WinEventLog:Security" EventCode=4688 (CommandLine="*-enc*" OR CommandLine="*/enc*")'),
+    ("elastic", "(winlog.channel:Security) AND (event.code:4688 AND (process.command_line:*\\-enc* OR "
+                "process.command_line:*\\/enc*))"),
+    ("kql", "SecurityEvent\n| where EventID == 4688"),
+])
+def test_sigma_to_query_field_mapping(backend, expected):
+    text = ("title: t\nlogsource:\n  product: windows\n  service: security\ndetection:\n  sel:\n    EventID: 4688\n"
+            "    CommandLine|contains:\n      - '-enc'\n      - '/enc'\n  condition: sel\n")
+    [out] = run(f"say(detect.sigma_to_query(detect.sigma({_json.dumps(text)}), \"{backend}\"))")
+    assert out.startswith(expected) or expected in out, out
+
+
+def test_sigma_to_query_options_and_errors():
+    out = run('let r = detect.rule({"name": "x", "where": {"user": "root", "path|contains": "admin"}})\n'
+              'say(detect.sigma_to_query(r, "splunk", {"index": "web", "fields": {"user": "usr"}}))\n'
+              'say(detect.sigma_to_query(r, "elastic"))')
+    assert 'usr="root"' in out[0] and "index=" in out[0] and 'path="*admin*"' in out[0]
+    assert "user.name:root" in out[1] and "*admin*" in out[1]
+    assert "doesn't know the backend 'qradar'" in str(tb_error('import detect\ndetect.sigma_to_query({"name": "x", "where": {"a": 1}}, "qradar")'))
+    assert "doesn't know the option" in str(tb_error('import detect\ndetect.sigma_to_query({"name": "x", "where": {"a": 1}}, "kql", {"zz": 1})'))

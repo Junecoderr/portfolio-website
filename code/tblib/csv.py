@@ -16,7 +16,7 @@ def _options(line, options, fn):
     check_type(line, options, "map", f"csv.{fn}", "options")
     delimiter = options.get("delimiter", ",")
     if not isinstance(delimiter, str) or len(delimiter) != 1:
-        fail(line, f"csv.{fn}() needs the delimiter to be one letter, like \",\" or \";\".")
+        fail(line, f"csv.{fn}() needs the delimiter to be one letter, like \",\" or \";\".", cls="ValueError")
     return delimiter, _tb.truthy(options.get("header", True))
 
 
@@ -24,7 +24,7 @@ def parse_rows(text: str, line, delimiter=",", header=True) -> list:
     try:
         rows = list(_csv.reader(io.StringIO(text), delimiter=delimiter))
     except _csv.Error as err:
-        fail(line, f"That CSV text is broken: {err}.")
+        fail(line, f"That CSV text is broken: {err}.", cls="ParseError")
     rows = [r for r in rows if r]  # skip blank lines
     if not header:
         return rows
@@ -65,7 +65,7 @@ def rows_to_text(rows, line, fn="stringify", delimiter=",") -> str:
             if isinstance(r, list):
                 writer.writerow([_cell(v) for v in r])
             else:
-                fail(line, f"csv.{fn}() needs a list of maps or a list of lists, but one row is {_tb.type_name(r)}.")
+                fail(line, f"csv.{fn}() needs a list of maps or a list of lists, but one row is {_tb.type_name(r)}.", cls="TypeError")
     return out.getvalue()
 
 

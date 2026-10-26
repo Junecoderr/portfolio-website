@@ -17,7 +17,7 @@ def compile_pattern(line, pattern, fn):
         return _re.compile(pattern)
     except _re.error as err:
         where = f" at position {err.pos}" if err.pos is not None else ""
-        fail(line, f"That pattern doesn't work: {err.msg}{where}. (Pattern: {pattern})")
+        fail(line, f"That pattern doesn't work: {err.msg}{where}. (Pattern: {pattern})", cls="ParseError")
 
 
 def match_map(found) -> dict:
@@ -68,7 +68,7 @@ def load(api):
             try:
                 return regex.sub(replacement, text)
             except (_re.error, IndexError) as err:
-                fail(line, f"re.replace() can't use that replacement text: {err}.")
+                fail(line, f"re.replace() can't use that replacement text: {err}.", cls="ValueError")
         check_type(line, replacement, "function", "re.replace", "with")
         return regex.sub(lambda found: _tb.to_text(api.call(replacement, [match_map(found)], line)), text)
 

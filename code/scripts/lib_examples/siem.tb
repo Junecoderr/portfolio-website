@@ -1,0 +1,10 @@
+import siem
+
+let alert = {"rule": "Brute force", "level": "high", "by": "203.0.113.42", "by_field": "ip", "count": 12}
+say(siem.cef(alert))
+say(siem.syslog_line("disk almost full", {"host": "web01", "app": "tb", "severity": "warning"}))
+
+# Dry run: see the exact Splunk HEC payload without sending anything.
+let hec = siem.splunk("https://splunk.example:8088", "not-a-real-token", {"dry_run": true})
+let preview = hec.send([alert])
+say(preview.headers.Authorization, preview.body)

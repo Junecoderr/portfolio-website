@@ -218,3 +218,52 @@ def test_browser_needs_desktop(monkeypatch):
     monkeypatch.setattr(sys, "platform", "emscripten")
     assert run_tb('import net\nsay(net.is_ip("1.2.3.4"))') == ["true"]
     assert "The net library needs the TB app on your computer" in str(tb_error('import net\nnet.tcp_check("127.0.0.1", 80)'))
+
+
+# -- UDP (data-agent) --------------------------------------------------------------
+
+def test_udp_listen_and_send_round_trip():
+    src = '''import net
+let seen = []
+let l = net.udp_listen(0, fn(msg) {
+  seen.push(msg.data)
+  return "echo:" + msg.data.upper()
+})
+say(l.running, l.host, l.port > 0)
+say(net.udp_send("127.0.0.1", l.port, "hello", 2))
+say(net.udp_send("127.0.0.1", l.port, "again"))
+let i = 0
+while len(seen) < 2 and i < 50 { time.sleep(0.02); i += 1 }
+l.stop()
+say(seen, l.running, l.wait(1))
+'''
+    assert run_tb("import time\n" + src) == ["true 127.0.0.1 true", "echo:HELLO", "nil", '["hello", "again"] false true']
+
+
+def test_udp_send_without_listener_gives_nil():
+    port = closed_port()
+    assert run_tb(f'import net\nsay(net.udp_send("127.0.0.1", {port}, "x", 0.3))') == ["nil"]
+
+
+def test_udp_listener_callback_errors_are_reported_not_fatal():
+    src = '''import net
+let l = net.udp_listen(0, fn(msg) { throw "bad handler" })
+say(net.udp_send("127.0.0.1", l.port, "x", 0.3))
+l.stop()
+say("done")
+'''
+    out = run_tb(src)
+    assert out[-1] == "done" and "nil" in out and "net.udp_listen: bad handler" in out
+
+
+def test_udp_port_in_use_and_errors():
+    src = '''import net
+let a = net.udp_listen(0, fn(m) { })
+try { net.udp_listen(a.port, fn(m) { }) } catch err { say(err.reason) }
+a.stop()
+'''
+    assert run_tb(src) == ["in_use"]
+    assert "needs data to be text" in str(tb_error('import net\nnet.udp_send("127.0.0.1", 9, 5)'))
+    assert "needs a port from 0 to 65535" in str(tb_error('import net\nnet.udp_listen(70000, fn(m) { })'))
+    assert 'doesn\'t know the option "ip"' in str(tb_error('import net\nnet.udp_listen(0, fn(m) { }, {"ip": "x"})'))
+    assert "sends at most 65,507 bytes" in str(tb_error('import net\nnet.udp_send("127.0.0.1", 9, "a" * 70000)'))

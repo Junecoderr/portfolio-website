@@ -4,11 +4,11 @@
 # Lines that start with # are notes for people. TB skips them.
 
 say("Hello, world!")
-say("Hello, Sam!")
+say("Hello, Tanisha!")
 
 # say() can show more than one thing at once, with spaces in between.
 say("Two plus two is", 2 + 2)
 
 # Text in quotes can be joined together with +
-let name = "Priya"
+let name = "Tanisha"
 say("Welcome to TB, " + name + ".")

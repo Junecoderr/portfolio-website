@@ -1,0 +1,9 @@
+{
+  "interval": 5,
+  "timeout": 2,
+  "targets": [
+    {"name": "Local web server", "host": "127.0.0.1", "port": 8000},
+    {"name": "Local SSH", "host": "127.0.0.1", "port": 22},
+    {"name": "Local database", "host": "127.0.0.1", "port": 5432}
+  ]
+}

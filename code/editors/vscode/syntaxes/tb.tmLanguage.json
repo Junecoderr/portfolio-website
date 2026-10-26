@@ -1,0 +1,465 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "TB",
+  "scopeName": "source.tb",
+  "fileTypes": ["tb"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#class-declaration" },
+    { "include": "#enum-declaration" },
+    { "include": "#function-declaration" },
+    { "include": "#import" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#language-variables" },
+    { "include": "#type-annotation" },
+    { "include": "#error-classes" },
+    { "include": "#builtins" },
+    { "include": "#modules" },
+    { "include": "#method-call" },
+    { "include": "#function-call" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.documentation.tb",
+          "match": "##.*$"
+        },
+        {
+          "name": "comment.line.number-sign.tb",
+          "match": "#.*$"
+        }
+      ]
+    },
+
+    "strings": {
+      "patterns": [
+        { "include": "#string-fstring-triple" },
+        { "include": "#string-fstring" },
+        { "include": "#string-raw-triple" },
+        { "include": "#string-raw" },
+        { "include": "#string-bytes" },
+        { "include": "#string-triple" },
+        { "include": "#string-double" },
+        { "include": "#string-single" }
+      ]
+    },
+    "string-escapes": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.tb",
+          "match": "\\\\(?:[ntr0\\\\\"']|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]{1,6}\\})"
+        },
+        {
+          "name": "invalid.illegal.escape.tb",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "fstring-hole": {
+      "comment": "A {expression[!r][:format-spec]} hole inside f-text; {{ and }} are literal braces.",
+      "patterns": [
+        {
+          "name": "constant.character.escape.brace.tb",
+          "match": "\\{\\{|\\}\\}"
+        },
+        {
+          "name": "meta.embedded.expression.tb",
+          "begin": "\\{",
+          "beginCaptures": { "0": { "name": "punctuation.definition.template-expression.begin.tb" } },
+          "end": "\\}",
+          "endCaptures": { "0": { "name": "punctuation.definition.template-expression.end.tb" } },
+          "patterns": [
+            {
+              "name": "meta.format-spec.tb",
+              "match": "(!r)?(:)([^{}]*)(?=\\})",
+              "captures": {
+                "1": { "name": "storage.modifier.conversion.tb" },
+                "2": { "name": "punctuation.separator.format-spec.tb" },
+                "3": { "name": "constant.other.format-spec.tb" }
+              }
+            },
+            {
+              "name": "storage.modifier.conversion.tb",
+              "match": "!r(?=\\})"
+            },
+            { "include": "#expression-in-hole" }
+          ]
+        }
+      ]
+    },
+    "expression-in-hole": {
+      "patterns": [
+        { "include": "#string-double" },
+        { "include": "#string-single" },
+        { "include": "#numbers" },
+        { "include": "#keywords" },
+        { "include": "#constants" },
+        { "include": "#language-variables" },
+        { "include": "#builtins" },
+        { "include": "#method-call" },
+        { "include": "#function-call" },
+        { "include": "#operators" },
+        { "include": "#punctuation" },
+        { "include": "#identifiers" }
+      ]
+    },
+    "string-fstring-triple": {
+      "name": "string.interpolated.multiline.tb",
+      "begin": "(f)(\"\"\")",
+      "beginCaptures": {
+        "1": { "name": "storage.type.string.prefix.tb" },
+        "2": { "name": "punctuation.definition.string.begin.tb" }
+      },
+      "end": "\"\"\"",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } },
+      "patterns": [
+        { "include": "#string-escapes" },
+        { "include": "#fstring-hole" }
+      ]
+    },
+    "string-fstring": {
+      "name": "string.interpolated.tb",
+      "begin": "(f)([\"'])",
+      "beginCaptures": {
+        "1": { "name": "storage.type.string.prefix.tb" },
+        "2": { "name": "punctuation.definition.string.begin.tb" }
+      },
+      "end": "\\2|(?<!\\\\)$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } },
+      "patterns": [
+        { "include": "#string-escapes" },
+        { "include": "#fstring-hole" }
+      ]
+    },
+    "string-raw-triple": {
+      "name": "string.quoted.triple.raw.tb",
+      "begin": "(r)(\"\"\")",
+      "beginCaptures": {
+        "1": { "name": "storage.type.string.prefix.tb" },
+        "2": { "name": "punctuation.definition.string.begin.tb" }
+      },
+      "end": "\"\"\"",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } }
+    },
+    "string-raw": {
+      "name": "string.quoted.raw.tb",
+      "begin": "(r)([\"'])",
+      "beginCaptures": {
+        "1": { "name": "storage.type.string.prefix.tb" },
+        "2": { "name": "punctuation.definition.string.begin.tb" }
+      },
+      "end": "\\2",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } }
+    },
+    "string-bytes": {
+      "name": "string.quoted.bytes.tb",
+      "begin": "(b)([\"'])",
+      "beginCaptures": {
+        "1": { "name": "storage.type.string.prefix.tb" },
+        "2": { "name": "punctuation.definition.string.begin.tb" }
+      },
+      "end": "\\2|(?<!\\\\)$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } },
+      "patterns": [
+        {
+          "name": "constant.character.escape.tb",
+          "match": "\\\\(?:[ntr0\\\\\"']|x[0-9A-Fa-f]{2})"
+        },
+        {
+          "name": "invalid.illegal.non-ascii.tb",
+          "match": "[^\\x00-\\x7F]"
+        }
+      ]
+    },
+    "string-triple": {
+      "name": "string.quoted.triple.tb",
+      "begin": "\"\"\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.tb" } },
+      "end": "\"\"\"",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } },
+      "patterns": [{ "include": "#string-escapes" }]
+    },
+    "string-double": {
+      "name": "string.quoted.double.tb",
+      "begin": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.tb" } },
+      "end": "\"|(?<!\\\\)$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } },
+      "patterns": [{ "include": "#string-escapes" }]
+    },
+    "string-single": {
+      "name": "string.quoted.single.tb",
+      "begin": "'",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.tb" } },
+      "end": "'|(?<!\\\\)$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.tb" } },
+      "patterns": [{ "include": "#string-escapes" }]
+    },
+
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.tb",
+          "match": "\\b0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*\\b"
+        },
+        {
+          "name": "constant.numeric.binary.tb",
+          "match": "\\b0[bB][01](?:_?[01])*\\b"
+        },
+        {
+          "name": "constant.numeric.octal.tb",
+          "match": "\\b0[oO][0-7](?:_?[0-7])*\\b"
+        },
+        {
+          "name": "constant.numeric.float.tb",
+          "match": "\\b\\d(?:_?\\d)*(?:\\.\\d(?:_?\\d)*)?[eE][+-]?\\d(?:_?\\d)*\\b|\\b\\d(?:_?\\d)*\\.\\d(?:_?\\d)*\\b"
+        },
+        {
+          "name": "constant.numeric.integer.tb",
+          "match": "\\b\\d(?:_?\\d)*\\b"
+        }
+      ]
+    },
+
+    "class-declaration": {
+      "name": "meta.class.tb",
+      "match": "\\b(class)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+(extends)\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+      "captures": {
+        "1": { "name": "storage.type.class.tb" },
+        "2": { "name": "entity.name.type.class.tb" },
+        "3": { "name": "storage.modifier.extends.tb" },
+        "4": { "name": "entity.other.inherited-class.tb" }
+      }
+    },
+    "enum-declaration": {
+      "name": "meta.enum.tb",
+      "match": "\\b(enum)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.type.enum.tb" },
+        "2": { "name": "entity.name.type.enum.tb" }
+      }
+    },
+    "function-declaration": {
+      "name": "meta.function.tb",
+      "match": "\\b(?:(export)\\s+)?(?:(static)\\s+)?(?:(async)\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": {
+        "1": { "name": "storage.modifier.export.tb" },
+        "2": { "name": "storage.modifier.static.tb" },
+        "3": { "name": "storage.modifier.async.tb" },
+        "4": { "name": "storage.type.function.tb" },
+        "5": { "name": "entity.name.function.tb" }
+      }
+    },
+    "import": {
+      "patterns": [
+        {
+          "name": "meta.import.tb",
+          "match": "^\\s*(import)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+          "captures": {
+            "1": { "name": "keyword.control.import.tb" },
+            "2": { "name": "entity.name.namespace.tb" },
+            "3": { "name": "keyword.control.as.tb" },
+            "4": { "name": "entity.name.namespace.alias.tb" }
+          }
+        },
+        {
+          "name": "meta.import.from.tb",
+          "match": "^\\s*(from)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(import)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.import.from.tb" },
+            "2": { "name": "entity.name.namespace.tb" },
+            "3": { "name": "keyword.control.import.tb" }
+          }
+        }
+      ]
+    },
+
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.flow.tb",
+          "match": "\\b(?:if|else|then|while|for|in|return|break|continue|match|defer|yield|await|assert|throw|try|catch|finally)\\b"
+        },
+        {
+          "name": "keyword.control.import.tb",
+          "match": "\\b(?:import|from|export|as)\\b"
+        },
+        {
+          "name": "storage.type.tb",
+          "match": "\\b(?:let|const|fn|class|enum)\\b"
+        },
+        {
+          "name": "storage.modifier.tb",
+          "match": "\\b(?:static|extends|async)\\b"
+        },
+        {
+          "comment": "x is number / x is Dog: the type after `is`",
+          "match": "\\b(is)\\s+(?:(number|int|float|text|bool|nil|list|map|bytes|function|class|module|any)|([A-Z][A-Za-z0-9_]*))\\b",
+          "captures": {
+            "1": { "name": "keyword.operator.logical.word.tb" },
+            "2": { "name": "support.type.primitive.tb" },
+            "3": { "name": "entity.name.type.tb" }
+          }
+        },
+        {
+          "name": "keyword.operator.logical.word.tb",
+          "match": "\\b(?:and|or|not|is)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "name": "constant.language.tb",
+      "match": "\\b(?:true|false|nil|done)\\b"
+    },
+    "language-variables": {
+      "patterns": [
+        {
+          "name": "variable.language.self.tb",
+          "match": "\\bself\\b"
+        },
+        {
+          "name": "variable.language.super.tb",
+          "match": "\\bsuper\\b"
+        },
+        {
+          "name": "variable.language.wildcard.tb",
+          "match": "\\b_\\b"
+        }
+      ]
+    },
+
+    "type-annotation": {
+      "comment": "let x: number, fn f(a: text) -> list<number>: a type after ':' or '->'. Type names are also highlighted on their own.",
+      "patterns": [
+        {
+          "name": "meta.type.annotation.tb",
+          "begin": "(->|:)\\s*(?=(?:number|int|float|text|bool|nil|list|map|bytes|function|class|module|any)\\b|[A-Z])",
+          "beginCaptures": { "1": { "name": "punctuation.separator.annotation.tb" } },
+          "end": "(?=[=,){}\\n]|\\bthen\\b|\\s(?!<|\\||[A-Za-z_]))",
+          "patterns": [
+            { "include": "#type-names" },
+            {
+              "name": "entity.name.type.tb",
+              "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+            },
+            {
+              "name": "punctuation.definition.typeparameters.tb",
+              "match": "[<>|,]"
+            }
+          ]
+        }
+      ]
+    },
+    "type-names": {
+      "name": "support.type.primitive.tb",
+      "match": "\\b(?:number|int|float|text|bool|nil|list|map|bytes|function|class|module|any)\\b"
+    },
+    "error-classes": {
+      "name": "support.class.error.tb",
+      "match": "\\b(?:Error|TypeError|ValueError|FileError|ParseError|NetworkError|PermissionError|NotFoundError|TimeoutError|StopIteration|AssertionError)\\b"
+    },
+
+    "builtins": {
+      "name": "support.function.builtin.tb",
+      "match": "\\b(?:say|ask|len|str|num|int|float|range|push|care|type|keys|round|min|max|sum|sorted|exit|format)\\b(?=\\s*\\()"
+    },
+    "modules": {
+      "name": "support.module.tb",
+      "match": "\\b(?:fs|os|time|datetime|decimal|math|random|re|text|json|csv|toml|xml|yaml|http|net|dns|tls|websocket|server|hash|crypto|encode|binary|archive|template|logs|detect|ioc|intel|report|pcap|evtx|pe|elf|scan|siem|attack|stix|sqlite|parallel|gui|test)\\b(?=\\.)"
+    },
+    "method-call": {
+      "match": "(\\.)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": {
+        "1": { "name": "punctuation.accessor.tb" },
+        "2": { "name": "entity.name.function.method.tb" }
+      }
+    },
+    "function-call": {
+      "patterns": [
+        {
+          "comment": "Capitalised call: constructing a class",
+          "name": "entity.name.type.class.call.tb",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b(?=\\s*\\()"
+        },
+        {
+          "name": "entity.name.function.call.tb",
+          "match": "\\b[a-z_][A-Za-z0-9_]*\\b(?=\\s*\\()"
+        }
+      ]
+    },
+
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.tb",
+          "match": "=>|->"
+        },
+        {
+          "name": "keyword.operator.spread.tb",
+          "match": "\\.\\.\\."
+        },
+        {
+          "name": "keyword.operator.range.tb",
+          "match": "\\.\\.=|\\.\\."
+        },
+        {
+          "name": "keyword.operator.assignment.compound.tb",
+          "match": "\\*\\*=|//=|<<=|>>=|[-+*/%&|^]="
+        },
+        {
+          "name": "keyword.operator.comparison.tb",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.assignment.tb",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.arithmetic.tb",
+          "match": "\\*\\*|//|[-+*/%]"
+        },
+        {
+          "name": "keyword.operator.bitwise.tb",
+          "match": "<<|>>|[&|^~]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        { "name": "punctuation.section.block.begin.tb", "match": "\\{" },
+        { "name": "punctuation.section.block.end.tb", "match": "\\}" },
+        { "name": "punctuation.section.brackets.begin.tb", "match": "\\[" },
+        { "name": "punctuation.section.brackets.end.tb", "match": "\\]" },
+        { "name": "punctuation.section.parens.begin.tb", "match": "\\(" },
+        { "name": "punctuation.section.parens.end.tb", "match": "\\)" },
+        { "name": "punctuation.separator.comma.tb", "match": "," },
+        { "name": "punctuation.terminator.statement.tb", "match": ";" },
+        { "name": "punctuation.accessor.tb", "match": "\\." },
+        { "name": "punctuation.separator.key-value.tb", "match": ":" }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.constant.tb",
+          "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
+        },
+        {
+          "name": "entity.name.type.tb",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "variable.other.tb",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

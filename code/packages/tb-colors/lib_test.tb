@@ -1,0 +1,58 @@
+# Tests for tb-colors. Run with:  tb test packages/tb-colors
+
+import test
+import encode
+import "lib.tb" as colors
+
+let ESC = encode.unhex("1b")
+
+test.case("colours wrap text in SGR codes", fn() {
+  colors.force(true)
+  test.equal(colors.red("hi"), ESC + "[31m" + "hi" + ESC + "[0m")
+  test.equal(colors.bold("Tanisha"), ESC + "[1m" + "Tanisha" + ESC + "[0m")
+  test.equal(colors.on("x", "blue"), ESC + "[44m" + "x" + ESC + "[0m")
+  test.equal(colors.rgb("x", 255, 136, 0), ESC + "[38;2;255;136;0m" + "x" + ESC + "[0m")
+  test.equal(colors.hex("x", "#f80"), colors.rgb("x", 255, 136, 0))
+})
+
+test.case("numbers and other values are shown as text", fn() {
+  colors.force(true)
+  test.equal(colors.strip(colors.green(42)), "42")
+})
+
+test.case("strip removes the codes and width ignores them", fn() {
+  colors.force(true)
+  let fancy = colors.bold(colors.underline(colors.cyan("report")))
+  test.equal(colors.strip(fancy), "report")
+  test.equal(colors.width(fancy), 6)
+  test.equal(colors.strip("plain"), "plain")
+})
+
+test.case("colours can be switched off", fn() {
+  colors.force(false)
+  test.equal(colors.red("hi"), "hi")
+  test.equal(colors.rgb("hi", 1, 2, 3), "hi")
+  colors.force(nil)
+})
+
+test.case("hex codes become rgb parts", fn() {
+  test.equal(colors.hex_to_rgb("#008080"), [0, 128, 128])
+  test.equal(colors.hex_to_rgb("FFF"), [255, 255, 255])
+  test.raises(fn() { colors.hex_to_rgb("#12") }, "6 digits")
+  test.raises(fn() { colors.hex_to_rgb("#zzzzzz") }, "hex")
+})
+
+test.case("unknown names are friendly errors", fn() {
+  test.raises(fn() { colors.paint("x", "purple") }, "doesn't know the colour 'purple'")
+  test.raises(fn() { colors.style("x", "wobbly") }, "doesn't know the style 'wobbly'")
+  test.raises(fn() { colors.rgb("x", 300, 0, 0) }, "0 to 255")
+})
+
+test.case("status picks the usual colour", fn() {
+  colors.force(true)
+  test.equal(colors.status("ok"), colors.green("ok"))
+  test.equal(colors.status("WARN"), colors.yellow("WARN"))
+  test.equal(colors.status("failed"), colors.red("failed"))
+  test.equal(colors.status("other"), "other")
+  colors.force(nil)
+})

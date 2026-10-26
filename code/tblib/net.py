@@ -17,6 +17,7 @@ MAX_WORKERS = 64            # threads used by check_ports()
 MAX_BANNER = 512            # bytes banner() reads at most
 MAX_TIMEOUT = 60            # seconds
 DNS_TIMEOUT = 5             # seconds for resolve()/reverse()
+MAX_UDP = 65_507            # bytes in one UDP message
 
 AUTHORISED = ("Only check computers you own or have written permission to test; "
               "checking other people's systems can be against the law.")
@@ -75,7 +76,7 @@ def lookup(host: str, timeout: float = DNS_TIMEOUT) -> list:
 def load(api):
     m = Module(
         "net",
-        "IP addresses, CIDR ranges, DNS lookups and simple TCP checks. "
+        "IP addresses, CIDR ranges, DNS lookups, simple TCP checks and UDP messages. "
         "The checking functions (tcp_check, check_ports, banner) make ordinary connections and are "
         "for defence. " + AUTHORISED,
     )
@@ -378,6 +379,147 @@ def load(api):
         finally:
             sock.close()
         return data.decode("utf-8", errors="replace").strip()
+
+    # -- UDP (data-agent) ---------------------------------------------------------
+
+    def udp_socket(ip):
+        family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        return socket.socket(family, socket.SOCK_DGRAM)
+
+    def data_arg(line, data, fn):
+        if isinstance(data, (bytes, bytearray)):
+            return bytes(data)
+        check_type(line, data, "text", f"net.{fn}", "data")
+        raw = data.encode("utf-8")
+        if len(raw) > MAX_UDP:
+            fail(line, f"net.{fn}() sends at most {MAX_UDP:,} bytes in one UDP message, not {len(raw):,}.")
+        return raw
+
+    @m.fn("udp_send", 3, 4, doc=(
+        "udp_send(host, port, data, timeout?) -> text\n"
+        "Send one UDP message (text) to host:port. Without a timeout it just sends and gives nil (UDP has no "
+        "delivery confirmation). With a timeout in seconds it waits that long for one reply and gives it as "
+        "text, or nil if nothing came back. " + AUTHORISED))
+    def udp_send(line, host, port, data, timeout=None):
+        api.need_desktop(line, "The net library")
+        host = host_arg(line, host, "udp_send")
+        port = port_arg(line, port, "udp_send")
+        raw = data_arg(line, data, "udp_send")
+        wait = timeout_arg(line, timeout, "udp_send", None)
+        ip = resolve_one(line, host, "udp_send")
+        sock = udp_socket(ip)
+        try:
+            sock.settimeout(wait if wait is not None else 2.0)
+            try:
+                sock.sendto(raw, (ip, port))
+            except OSError as err:
+                fail(line, f"I couldn't send to {host} port {port}: {err.strerror or err}.", reason="send",
+                     host=host, port=port)
+            if wait is None:
+                return None
+            try:
+                reply, _addr = sock.recvfrom(MAX_UDP)
+            except (TimeoutError, socket.timeout):
+                return None
+            except ConnectionRefusedError:
+                return None  # ICMP port unreachable: nothing is listening
+            except OSError as err:
+                fail(line, f"Waiting for a reply from {host} port {port} failed: {err.strerror or err}.",
+                     reason="receive", host=host, port=port)
+            return reply.decode("utf-8", errors="replace")
+        finally:
+            sock.close()
+
+    @m.fn("udp_listen", 2, 3, doc=(
+        "udp_listen(port, fn, options?) -> listener\n"
+        "Receive UDP messages on a port, in the background. fn(message) is called for each one with "
+        "{\"data\": text, \"ip\", \"port\"}; if fn gives back text, it is sent as the reply. Port 0 picks a "
+        "free port. options: {\"host\": \"127.0.0.1\" (default; \"0.0.0.0\" to accept from the network)}. "
+        "The listener has .port, .host, .running, stop() and wait(seconds?) (block until stopped). " + AUTHORISED))
+    def udp_listen(line, port, fn, options=None):
+        api.need_desktop(line, "The net library")
+        check_type(line, port, "whole", "net.udp_listen", "port")
+        port = int(port)
+        if not 0 <= port <= 65535:
+            fail(line, f"net.udp_listen() needs a port from 0 to 65535, not {port}.", reason="invalid_port")
+        check_type(line, fn, "function", "net.udp_listen", "fn")
+        host = "127.0.0.1"
+        if options is not None:
+            check_type(line, options, "map", "net.udp_listen", "options")
+            for key in options:
+                if key != "host":
+                    fail(line, f'net.udp_listen() doesn\'t know the option "{key}". Options: host.')
+            if options.get("host") is not None:
+                host = host_arg(line, options["host"], "udp_listen")
+        ip = resolve_one(line, host, "udp_listen") if parse_ip(host) is None else host
+        sock = udp_socket(ip)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind((ip, port))
+        except PermissionError:
+            sock.close()
+            fail(line, f"I'm not allowed to listen on port {port} (ports below 1024 need administrator rights).",
+                 reason="permission", port=port)
+        except OSError as err:
+            sock.close()
+            if getattr(err, "errno", None) in (48, 98, 10048) or "in use" in str(err).lower():
+                fail(line, f"Port {port} is already in use by another program.", reason="in_use", port=port)
+            fail(line, f"I couldn't listen on {host} port {port}: {err.strerror or err}.", reason="bind", port=port)
+        sock.settimeout(0.2)
+        from tblib._threads import guarded_call
+        import threading
+        stop = threading.Event()
+        state = {"error": None}
+        listener = {"port": sock.getsockname()[1], "host": ip, "running": True}
+
+        def serve():
+            try:
+                while not stop.is_set():
+                    try:
+                        data, addr = sock.recvfrom(MAX_UDP)
+                    except (TimeoutError, socket.timeout):
+                        continue
+                    except OSError:
+                        break
+                    message = {"data": data.decode("utf-8", errors="replace"), "ip": addr[0], "port": addr[1]}
+                    reply, err = guarded_call(api, fn, [message], line)
+                    if err is not None:
+                        state["error"] = err
+                        api.output(f"net.udp_listen: {err.message}")
+                        continue
+                    if isinstance(reply, (str, bytes, bytearray)) and reply != "":
+                        raw = reply.encode("utf-8") if isinstance(reply, str) else bytes(reply)
+                        try:
+                            sock.sendto(raw[:MAX_UDP], addr)
+                        except OSError:
+                            pass
+            finally:
+                listener["running"] = False
+                sock.close()
+
+        thread = threading.Thread(target=serve, name=f"tb-udp-{listener['port']}", daemon=True)
+        thread.start()
+
+        def stop_(line):
+            stop.set()
+            thread.join(2.0)
+            listener["running"] = False
+            return None
+
+        def wait(line, seconds=None):
+            if seconds is not None:
+                check_type(line, seconds, "number", "listener.wait", "seconds")
+            try:
+                thread.join(seconds)
+            except KeyboardInterrupt:
+                stop_(line)
+            return not thread.is_alive()
+
+        listener["stop"] = _tb.Builtin("listener.stop", stop_, (0, 0), "stop()\nStop listening and free the port.")
+        listener["wait"] = _tb.Builtin("listener.wait", wait, (0, 1),
+                                       "wait(seconds?) -> bool\nBlock until the listener stops (or the seconds "
+                                       "pass); true if it has stopped. Ctrl+C stops it.")
+        return listener
 
     m.value("common_ports", dict(COMMON_PORTS), doc=(
         "A map of well-known port numbers to the service usually found there: "

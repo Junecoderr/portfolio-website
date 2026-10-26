@@ -1,0 +1,212 @@
+{
+  "Function": {
+    "prefix": "fn",
+    "body": ["fn ${1:name}(${2:inputs}) {", "\t$0", "}"],
+    "description": "Define a function"
+  },
+  "Lambda": {
+    "prefix": "lambda",
+    "body": ["${1:x} => ${2:x * 2}"],
+    "description": "A one-line function value"
+  },
+  "Let": {
+    "prefix": "let",
+    "body": ["let ${1:name} = ${2:value}"],
+    "description": "Make a variable"
+  },
+  "Const": {
+    "prefix": "const",
+    "body": ["const ${1:NAME} = ${2:value}"],
+    "description": "A value that can't be reassigned"
+  },
+  "If": {
+    "prefix": "if",
+    "body": ["if ${1:condition} {", "\t$0", "}"],
+    "description": "if block"
+  },
+  "If else": {
+    "prefix": "ifelse",
+    "body": ["if ${1:condition} {", "\t$2", "} else {", "\t$0", "}"],
+    "description": "if / else"
+  },
+  "Conditional expression": {
+    "prefix": "then",
+    "body": ["if ${1:condition} then ${2:a} else ${3:b}"],
+    "description": "if cond then a else b (as a value)"
+  },
+  "For": {
+    "prefix": "for",
+    "body": ["for ${1:item} in ${2:items} {", "\t$0", "}"],
+    "description": "Loop over a list, map, range or generator"
+  },
+  "For with index": {
+    "prefix": "fori",
+    "body": ["for ${1:i}, ${2:item} in ${3:items}.enumerate() {", "\t$0", "}"],
+    "description": "Loop with the position of each item"
+  },
+  "For range": {
+    "prefix": "forr",
+    "body": ["for ${1:i} in ${2:0}..${3:10} {", "\t$0", "}"],
+    "description": "Count from a to b (exclusive; use ..= for inclusive)"
+  },
+  "While": {
+    "prefix": "while",
+    "body": ["while ${1:condition} {", "\t$0", "}"],
+    "description": "while loop"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": ["match ${1:value} {", "\t${2:\"case\"} => ${3:result}", "\t_ => ${4:other}", "}"],
+    "description": "Pattern match"
+  },
+  "Class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:Name} {",
+      "\tfn init(${2:inputs}) {",
+      "\t\tself.${3:field} = ${3:field}",
+      "\t}",
+      "",
+      "\tfn text() {",
+      "\t\treturn f\"${1:Name}({self.${3:field}})\"",
+      "\t}$0",
+      "}"
+    ],
+    "description": "A class with init and text()"
+  },
+  "Class extends": {
+    "prefix": "classx",
+    "body": [
+      "class ${1:Name} extends ${2:Parent} {",
+      "\tfn init(${3:inputs}) {",
+      "\t\tsuper.init(${3:inputs})$0",
+      "\t}",
+      "}"
+    ],
+    "description": "A subclass calling super.init"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": ["enum ${1:Level} { ${2:low, medium, high} }"],
+    "description": "An enum"
+  },
+  "Try catch": {
+    "prefix": "try",
+    "body": ["try {", "\t$1", "} catch ${2:err} {", "\tsay(\"Oops:\", ${2:err}.message)$0", "}"],
+    "description": "try / catch"
+  },
+  "Try catch typed": {
+    "prefix": "tryt",
+    "body": [
+      "try {",
+      "\t$1",
+      "} catch ${2:err}: ${3:FileError} {",
+      "\t$4",
+      "} finally {",
+      "\t$0",
+      "}"
+    ],
+    "description": "try / catch by error type / finally"
+  },
+  "Throw": {
+    "prefix": "throw",
+    "body": ["throw ${1:Error}(\"${2:message}\")"],
+    "description": "Stop with an error"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": ["import ${1:fs}"],
+    "description": "Use a standard library"
+  },
+  "Import file": {
+    "prefix": "importf",
+    "body": ["import \"${1:helpers}.tb\" as ${2:helpers}"],
+    "description": "Use another .tb file"
+  },
+  "From import": {
+    "prefix": "from",
+    "body": ["from ${1:fs} import ${2:read, write}"],
+    "description": "Pick names out of a module"
+  },
+  "Export function": {
+    "prefix": "export",
+    "body": ["export fn ${1:name}(${2:inputs}) {", "\t$0", "}"],
+    "description": "A function other files can import"
+  },
+  "Generator": {
+    "prefix": "gen",
+    "body": ["fn ${1:name}(${2:inputs}) {", "\tfor ${3:x} in ${4:items} {", "\t\tyield ${3:x}", "\t}", "}"],
+    "description": "A function that yields values lazily"
+  },
+  "Say": {
+    "prefix": "say",
+    "body": ["say(${1:value})"],
+    "description": "Print values"
+  },
+  "Say f-text": {
+    "prefix": "sayf",
+    "body": ["say(f\"${1:text} {${2:value}}\")"],
+    "description": "Print formatted text"
+  },
+  "Ask": {
+    "prefix": "ask",
+    "body": ["let ${1:answer} = ask(\"${2:Question?} \")"],
+    "description": "Ask the person something"
+  },
+  "Test case": {
+    "prefix": "test",
+    "body": ["test.case(\"${1:what it does}\", fn() {", "\ttest.equal(${2:actual}, ${3:expected})$0", "})"],
+    "description": "A test.case for a *_test.tb file"
+  },
+  "Test file": {
+    "prefix": "testfile",
+    "body": [
+      "# Tests for ${1:lib}. Run with:  tb test",
+      "",
+      "import test",
+      "import \"${1:lib}.tb\"",
+      "",
+      "test.case(\"${2:what it does}\", fn() {",
+      "\ttest.equal(${1:lib}.${3:fn}(${4:input}), ${5:expected})",
+      "})",
+      ""
+    ],
+    "description": "A new *_test.tb file"
+  },
+  "Main program": {
+    "prefix": "main",
+    "body": [
+      "# ${1:What this program does}",
+      "",
+      "import os",
+      "",
+      "fn main(args) {",
+      "\t$0",
+      "}",
+      "",
+      "main(os.args)",
+      ""
+    ],
+    "description": "A program skeleton"
+  },
+  "Doc comment": {
+    "prefix": "doc",
+    "body": ["## ${1:What this does.}"],
+    "description": "A ## doc comment that tb doc shows"
+  },
+  "Defer": {
+    "prefix": "defer",
+    "body": ["defer { ${1:file.close()} }"],
+    "description": "Run when the function returns"
+  },
+  "Assert": {
+    "prefix": "assert",
+    "body": ["assert ${1:condition}, \"${2:message}\""],
+    "description": "Stop with AssertionError when the condition is false"
+  },
+  "Parallel task": {
+    "prefix": "parallel",
+    "body": ["let ${1:task} = parallel.run(${2:fn}, ${3:args})", "let ${4:result} = ${1:task}.wait()"],
+    "description": "Run a function in the background"
+  }
+}

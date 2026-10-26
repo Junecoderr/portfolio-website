@@ -83,7 +83,8 @@ def test_imports_relative_to_script_not_cwd(capsys, script, tmp_path, monkeypatc
 def test_error_in_imported_file_via_cli(capsys, script):
     script("fn f() {\n  return 1 / 0\n}\n", "lib.tb")
     assert tb.main([script('import "lib.tb"\nlib.f()')]) == 1
-    assert capsys.readouterr().err.strip() == "Oops! On line 2 of lib.tb: You can't divide by zero."
+    # 3.0 adds a short call trace under uncaught errors
+    assert capsys.readouterr().err.strip() == "Oops! On line 2 of lib.tb: You can't divide by zero.\n  in f()"
 
 
 def test_real_process_library_errors_are_catchable(tmp_path):
@@ -91,14 +92,14 @@ def test_real_process_library_errors_are_catchable(tmp_path):
     prog = tmp_path / "p.tb"
     prog.write_text('import json\ntry { json.parse("{") } catch e { say("caught", e.kind) }\njson.parse("[")\n')
     done = subprocess.run([sys.executable, str(ROOT / "tb.py"), str(prog)], capture_output=True, text=True, timeout=60)
-    assert done.stdout == "caught error\n"
+    assert done.stdout == "caught parse_error\n"  # 3.0: typed errors
     assert done.returncode == 1 and done.stderr.startswith("Oops! On line 3: That text isn't valid JSON")
     assert "Traceback" not in done.stderr
 
 
 def test_real_process_version():
     done = subprocess.run([sys.executable, str(ROOT / "tb.py"), "--version"], capture_output=True, text=True, timeout=60)
-    assert done.stdout.strip() == "TB 2.0.1"
+    assert done.stdout.strip() == "TB 3.0.0"
 
 
 # -- tb doc -----------------------------------------------------------------------------
@@ -106,7 +107,7 @@ def test_real_process_version():
 def test_doc_lists_every_library(capsys):
     assert tb.main(["doc"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("TB 2.0.1 standard library.")
+    assert out.startswith("TB 3.0.0 standard library.")
     for name in STDLIB:
         assert f"\n  {name} " in out
     assert "Read and write CSV files." in out

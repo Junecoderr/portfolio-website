@@ -1,0 +1,10 @@
+import archive
+import fs
+
+fs.write("evidence.txt", "auth.log excerpt")
+say(archive.zip("evidence.zip", ["evidence.txt"]))
+for entry in archive.list("evidence.zip") {
+  say(entry.name, entry.size)
+}
+# unzip refuses entries that would land outside the target folder.
+say(archive.unzip("evidence.zip", "out"))

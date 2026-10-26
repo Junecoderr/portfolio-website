@@ -1,0 +1,208 @@
+# file-inspector: what is this file, really? Looks inside files without
+# running them: real type (from the bytes, not the name), hashes, entropy,
+# PE/ELF headers, sections, imports, suspicious indicators, YARA-style rule
+# matches (rules.yar) and the interesting strings (URLs, IPs, commands...).
+#
+#   tb apps/file-inspector/main.tb                     overview of apps/data
+#   tb apps/file-inspector/main.tb suspicious.exe      one file in detail
+#   tb apps/file-inspector/main.tb ~/Downloads         every file in a folder
+#   tb apps/file-inspector/main.tb x.bin --rules my.yar --strings --json out.json
+
+import os
+import fs
+import scan
+import report
+import json
+import "inspect.tb"
+
+let targets = []
+let rules_path = fs.join(fs.here(), "rules.yar")
+let show_strings = false
+let json_path = nil
+
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--rules" or arg == "--json" {
+    if i + 1 >= len(os.args) {
+      say(f"{arg} needs a file name.")
+      exit(2)
+    }
+    if arg == "--rules" {
+      rules_path = os.args[i + 1]
+    } else {
+      json_path = os.args[i + 1]
+    }
+    i += 2
+    continue
+  }
+  if arg == "--strings" {
+    show_strings = true
+  } else if arg == "--help" or arg == "-h" {
+    say("Usage: tb main.tb [file or folder ...] [--rules rules.yar] [--strings] [--json out.json]")
+    exit(0)
+  } else if arg.starts_with("--") {
+    say(f"Unknown option {arg}. Try --help.")
+    exit(2)
+  } else {
+    targets.push(arg)
+  }
+  i += 1
+}
+if targets.is_empty() {
+  targets.push(fs.join(fs.here(), "..", "data"))
+  say("No file given, so here is an overview of apps/data.")
+  say("")
+}
+
+let rules = nil
+try {
+  rules = scan.load(rules_path)
+} catch err {
+  say(err.message)
+  exit(1)
+}
+
+# Expand folders into the files inside them.
+let files = []
+for t in targets {
+  if fs.is_dir(t) {
+    for p in fs.walk(t) {
+      files.push(p)
+    }
+  } else if fs.exists(t) {
+    files.push(t)
+  } else {
+    say(f"I couldn't find '{t}'. Is the name spelled right?")
+    exit(1)
+  }
+}
+
+let results = []
+for path in files {
+  try {
+    results.push(inspect.inspect(path, rules))
+  } catch err {
+    say(f"Skipped {path}: {err.message}")
+  }
+}
+
+fn show_one(r) {
+  say(f"== {r.name}  ({r.description}, {inspect.human_size(r.size)}, entropy {r.entropy})")
+  say(f"   md5     {r.hashes.md5}")
+  say(f"   sha1    {r.hashes.sha1}")
+  say(f"   sha256  {r.hashes.sha256}")
+  if r.summary != nil {
+    say("   " + r.summary)
+  }
+  if r.problem != nil {
+    say("   !! " + r.problem)
+  }
+  let d = r.details
+  if d != nil {
+    say("")
+    if r.type == "pe" {
+      say(f"   compiled {d.compiled}   entry {d.entry_hex} in {d.entry_section}   subsystem {d.subsystem}   signed {d.is_signed}")
+      if d.pdb != nil {
+        say("   pdb path: " + d.pdb)
+      }
+    } else {
+      say(f"   {d.type} for {d.architecture}   entry {d.entry_hex} in {d.entry_section}   interpreter {d.interpreter}")
+      if not d.needed.is_empty() {
+        say("   needs: " + d.needed.join(", "))
+      }
+    }
+    say("")
+    let rows = []
+    for s in d.sections {
+      let perms = ""
+      if s.get("readable", true) {
+        perms += "r"
+      } else {
+        perms += "-"
+      }
+      if s.get("writable", false) {
+        perms += "w"
+      } else {
+        perms += "-"
+      }
+      if s.get("executable", false) {
+        perms += "x"
+      } else {
+        perms += "-"
+      }
+      rows.push({"section": s.name, "size": s.size, "entropy": s.entropy, "perms": perms})
+    }
+    say(report.table(rows, ["section", "size", "entropy", "perms"]))
+    say("")
+    if r.type == "pe" {
+      for dll in d.imports.keys() {
+        say(f"   imports {dll}: " + d.imports[dll].slice(0, 12).join(", "))
+      }
+    } else if not d.imports.is_empty() {
+      say("   imports: " + d.imports.slice(0, 20).join(", "))
+    }
+    if not d.exports.is_empty() {
+      say("   exports: " + d.exports.slice(0, 20).join(", "))
+    }
+  }
+  say("")
+  let found = inspect.findings(r)
+  if found.is_empty() {
+    say("Findings: none.")
+  } else {
+    say("Findings")
+    say(report.table(found, ["level", "what", "detail"], {"max_width": 90}))
+  }
+  let shown = false
+  for kind in ["urls", "ips", "emails", "paths", "registry", "dlls", "commands"] {
+    let items = r.interesting.get(kind, [])
+    if not items.is_empty() {
+      if not shown {
+        say("")
+        say("Interesting strings")
+        shown = true
+      }
+      say(f"   {kind}: " + items.slice(0, 8).join("  |  "))
+    }
+  }
+  if show_strings {
+    say("")
+    say(f"All strings ({len(r.strings)}, 5+ characters)")
+    for s in r.strings {
+      say(f"   {s.offset}  {s.encoding}  {s.text}")
+    }
+  }
+  say("")
+  say(f"Verdict: {r.verdict.upper()} (a hint for a human, not proof either way)")
+}
+
+if len(results) == 1 {
+  show_one(results[0])
+} else {
+  let rows = []
+  for r in results {
+    let names = r.matches.map(fn(m) { return m.rule })
+    let notes = r.indicators.filter(fn(x) { return x.level == "high" or x.level == "medium" }).map(fn(x) { return x.name })
+    rows.push({"file": r.name, "type": r.type, "size": inspect.human_size(r.size), "entropy": r.entropy,
+               "verdict": r.verdict, "why": (names + notes).join(", ")})
+  }
+  say(report.table(rows, ["file", "type", "size", "entropy", "verdict", "why"], {"max_width": 70}))
+  let odd = results.filter(fn(r) { return r.verdict != "nothing found" })
+  say("")
+  say(f"Done: {len(results)} file(s), {len(odd)} worth a closer look. Run with one file for the details.")
+}
+
+if json_path != nil {
+  let slim = results.map(fn(r) {
+    let copy = r.copy()
+    copy.strings = len(r.strings)
+    return copy
+  })
+  try {
+    fs.write(json_path, json.stringify(slim, true))
+    say(f"Wrote {len(slim)} result(s) to {json_path}")
+  } catch err {
+    say(err.message)
+  }
+}

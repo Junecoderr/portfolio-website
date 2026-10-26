@@ -1,0 +1,7 @@
+import dns
+
+for r in dns.lookup("example.com", "MX") {
+  say(r.priority, r.host)
+}
+say(dns.lookup("example.com", "TXT").map(fn(r) { return r.value }))
+say(dns.reverse("1.1.1.1", "1.1.1.1"))

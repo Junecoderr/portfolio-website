@@ -4,7 +4,7 @@ import tb
 from conftest import ROOT
 
 EXPECTED = [
-    "Hello, Alex! Welcome to TB.",
+    "Hello, Tanisha! Welcome to TB.",
     "This program is a quick tour of the language.",
     "",
     "A few programming languages:",
@@ -25,7 +25,7 @@ EXPECTED = [
     "Lift-off! You have seen the basics of TB.",
     "",
     "A note from TB:",
-    "♥ Alex, well done for showing up today.",
+    "♥ Tanisha, well done for showing up today.",
     "",
     "Have fun writing your own programs.",
 ]
@@ -48,7 +48,7 @@ def test_welcome_care_line_any_seed():
         lines = []
         tb.run(source(), interpreter=tb.Interpreter(output=lines.append, rng=random.Random(seed)))
         assert lines[:CARE_LINE] == EXPECTED[:CARE_LINE] and lines[CARE_LINE + 1:] == EXPECTED[CARE_LINE + 1:]
-        assert lines[CARE_LINE].startswith("♥ Alex, ")
+        assert lines[CARE_LINE].startswith("♥ Tanisha, ")
 
 
 def test_welcome_via_cli(capsys, monkeypatch):

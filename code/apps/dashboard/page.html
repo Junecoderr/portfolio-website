@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alerts dashboard</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header>
+  <h1>Alerts dashboard</h1>
+  <p class="who">Analyst: {{analyst}} · {{summary.open}} open of {{summary.total}} alerts</p>
+</header>
+<section class="cards">
+  {{#cards}}
+  <a class="card {{level}}" href="/?level={{level}}"><span class="n">{{count}}</span><span class="label">{{level|capitalize}}</span></a>
+  {{/cards}}
+  <a class="card all" href="/"><span class="n">{{summary.total}}</span><span class="label">All</span></a>
+</section>
+{{#filter}}<p class="filter">Showing {{filter}} alerts only. <a href="/">Show all</a></p>{{/filter}}
+<table>
+  <thead><tr><th>Level</th><th>Rule</th><th>Source</th><th>Count</th><th>First seen</th><th>Log</th><th>Status</th></tr></thead>
+  <tbody>
+  {{#alerts}}
+  <tr class="{{level}}{{#acked_by}} done{{/acked_by}}">
+    <td><span class="badge {{level}}">{{level}}</span></td>
+    <td><strong>{{rule}}</strong><br><small>{{description}}</small></td>
+    <td><code>{{source}}</code></td>
+    <td>{{count}}</td>
+    <td>{{first_when}}</td>
+    <td>{{file}}</td>
+    <td>{{#acked_by}}Handled by {{acked_by}}{{/acked_by}}{{^acked_by}}<form method="post" action="/alerts/{{id}}/ack"><button>Mark handled</button></form>{{/acked_by}}</td>
+  </tr>
+  {{/alerts}}
+  {{^alerts}}
+  <tr><td colspan="7" class="empty">No alerts. Nothing matched the rules.</td></tr>
+  {{/alerts}}
+  </tbody>
+</table>
+<footer>JSON: <a href="/api/alerts">/api/alerts</a> · <a href="/api/summary">/api/summary</a></footer>
+</body>
+</html>

@@ -3,7 +3,7 @@
 # Run it with:  tb welcome.tb
 
 # Variables and f-strings
-let name = "Alex"
+let name = "Tanisha"
 say(f"Hello, {name}! Welcome to TB.")
 say("This program is a quick tour of the language.")
 say("")

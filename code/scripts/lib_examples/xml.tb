@@ -1,0 +1,8 @@
+import xml
+
+let doc = xml.parse("<scan host=\"192.0.2.5\"><port id=\"22\" state=\"open\"/><port id=\"80\" state=\"closed\"/></scan>")
+say(doc.tag, doc.attrs.host)
+for p in doc.find_all("port") {
+  say(p.attrs.id, p.attrs.state)
+}
+say(xml.stringify(xml.node("note", {"by": "Tanisha"}, ["checked"])))

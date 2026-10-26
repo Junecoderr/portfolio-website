@@ -1,0 +1,170 @@
+# ioc-feed: pull threat intel (a STIX 2.1 file or a TAXII 2.1 server), turn the indicators into
+# detection rules, and run them on your logs.
+#
+#   tb apps/ioc-feed/main.tb                                   sample feed on the sample logs
+#   tb apps/ioc-feed/main.tb feed.json auth.log access.log     a STIX bundle on your logs
+#   tb apps/ioc-feed/main.tb --taxii https://intel.example/taxii2/ --collection ID auth.log
+#       (credentials come from the environment: TAXII_TOKEN, or TAXII_USER + TAXII_PASSWORD)
+#   options: --added-after 2026-03-01T00:00:00Z  --by-type  --query splunk|elastic|kql
+
+import os
+import fs
+import logs
+import detect
+import stix
+import attack
+import report
+
+let USAGE = "Usage: tb main.tb [feed.json | --taxii URL --collection ID] [--added-after TIME] [--by-type] [--query BACKEND] [log ...]"
+let data = fs.join(fs.here(), "..", "data")
+
+fn usage_error(message) {
+  say(message)
+  say(USAGE)
+  exit(2)
+}
+
+let feed = fs.join(data, "intel", "sample-feed.stix.json")
+let taxii_url = nil
+let collection = nil
+let added_after = nil
+let group = "indicator"
+let backend = nil
+let files = []
+let positional = []
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--help" or arg == "-h" {
+    say(USAGE)
+    exit(0)
+  } else if ["--taxii", "--collection", "--added-after", "--query"].contains(arg) {
+    if i + 1 >= len(os.args) {
+      usage_error(f"{arg} needs a value.")
+    }
+    let value = os.args[i + 1]
+    if arg == "--taxii" {
+      taxii_url = value
+    } else if arg == "--collection" {
+      collection = value
+    } else if arg == "--added-after" {
+      added_after = value
+    } else {
+      backend = value.lower()
+    }
+    i += 1
+  } else if arg == "--by-type" {
+    group = "type"
+  } else if arg.starts_with("--") {
+    usage_error(f"Unknown option {arg}.")
+  } else {
+    positional.push(arg)
+  }
+  i += 1
+}
+if backend != nil and not detect.backends.contains(backend) {
+  usage_error(f"I don't know the query language '{backend}'. Use splunk, elastic or kql.")
+}
+if taxii_url != nil and collection == nil {
+  usage_error("--taxii needs --collection ID too (run with --collection list to see them).")
+}
+if taxii_url == nil and not positional.is_empty() and (positional[0].ends_with(".json") or positional[0].ends_with(".stix")) {
+  feed = positional[0]
+  positional = positional.slice(1)
+}
+files = positional
+if files.is_empty() {
+  files = ["auth.log", "access.log", "firewall.log"].map(fn(n) { return fs.join(data, n) })
+}
+
+# -- 1. get the intel -----------------------------------------------------------------
+let bundle = nil
+try {
+  if taxii_url != nil {
+    let auth = nil
+    let token = os.env("TAXII_TOKEN")
+    if token != nil {
+      auth = token
+    } else if os.env("TAXII_USER") != nil {
+      auth = {"user": os.env("TAXII_USER"), "password": os.env("TAXII_PASSWORD", "")}
+    }
+    let server = stix.taxii(taxii_url, auth)
+    if collection == "list" {
+      say(report.table(server.collections(), ["id", "title", "can_read"]))
+      exit(0)
+    }
+    say(f"Downloading collection {collection} from {taxii_url} ...")
+    bundle = server.objects(collection, added_after)
+  } else {
+    bundle = stix.read(feed)
+  }
+} catch err {
+  say(f"I couldn't get the intel: {err.message}")
+  exit(1)
+}
+
+let active = stix.indicators(bundle)
+let everything = stix.indicators(bundle, {"expired": true})
+say(f"== Intel: {len(bundle.objects)} STIX objects, {len(active)} active indicator(s), {len(everything) - len(active)} expired (ignored)")
+let rows = active.map(fn(ind) {
+  let values = ind.iocs.map(fn(x) { return x.value })
+  let shown = values.join(", ")
+  if values.is_empty() {
+    shown = "(no exact IOC: " + ind.skipped.join(" ") + ")"
+  }
+  return {"indicator": ind.name, "iocs": shown, "confidence": ind.confidence}
+})
+say(report.table(rows, ["indicator", "iocs", "confidence"], {"max_width": 50}))
+let counts = stix.iocs(bundle)
+say(f"IOCs: {len(counts.ips)} IP(s), {len(counts.cidrs)} range(s), {len(counts.domains)} domain(s), {len(counts.urls)} URL(s), {len(counts.sha256) + len(counts.sha1) + len(counts.md5)} hash(es)")
+
+# -- 2. rules ---------------------------------------------------------------------------
+let rules = stix.to_detect_rules(bundle, {"group": group})
+say("")
+say(f"== {len(rules)} detection rule(s) made from the feed")
+if backend != nil {
+  for r in rules {
+    say(f"# {r.name}")
+    try {
+      say(detect.sigma_to_query(r, backend))
+    } catch err {
+      say(f"(not converted: {err.message})")
+    }
+  }
+}
+
+# -- 3. run them on the logs ---------------------------------------------------------------
+let records = []
+for file in files {
+  try {
+    let got = logs.read(file)
+    records = records + got
+    say(f"Read {len(got)} record(s) from {fs.name(file)}")
+  } catch err {
+    say(f"Skipping {file}: {err.message}")
+  }
+}
+if records.is_empty() {
+  say("No log records to check.")
+  exit(1)
+}
+let alerts = detect.run(rules, records)
+say("")
+if alerts.is_empty() {
+  say(f"No IOC from the feed appears in {len(records)} record(s).")
+  exit(0)
+}
+say(f"== {len(alerts)} hit(s) in {len(records)} record(s)")
+say(report.table(alerts, ["level", "rule", "count", "first_when", "last_when"], {"max_width": 50}))
+for a in alerts {
+  let example = a.records[0]
+  say(f"   e.g. [{example.get('format', '?')}] {example.get('raw', example.get('message', '')).slice(0, 110)}")
+}
+let mapped = attack.map(alerts)
+if not mapped.techniques.is_empty() {
+  say("")
+  say("ATT&CK techniques named by the feed:")
+  for t in mapped.techniques {
+    say(f"   {t.id} {t.name} ({t.count} alert(s))")
+  }
+}

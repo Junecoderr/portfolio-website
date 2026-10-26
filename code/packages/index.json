@@ -1,0 +1,17 @@
+{
+  "tb-colors": {
+    "description": "ANSI colour and style helpers for terminal output (honours NO_COLOR).",
+    "version": "1.0.0",
+    "zip": "https://code.tanisha.ceo/packages/tb-colors.zip"
+  },
+  "tb-tables": {
+    "description": "Pretty text tables, Markdown tables and CSV from lists of maps or lists.",
+    "version": "1.0.0",
+    "zip": "https://code.tanisha.ceo/packages/tb-tables.zip"
+  },
+  "tb-progress": {
+    "description": "Progress bars, spinners, step counters and ETA text for command-line programs.",
+    "version": "1.0.0",
+    "zip": "https://code.tanisha.ceo/packages/tb-progress.zip"
+  }
+}

@@ -80,7 +80,9 @@ def test_type_errors_in_arithmetic():
     assert "can only subtract numbers, not text and number" in str(tb_error('say("a" - 1)'))
     assert "can't add list and number" in str(tb_error("say([1] + 1)"))
     assert "can only make numbers negative" in str(tb_error('say(-"a")'))
-    assert "can only multiply numbers" in str(tb_error("say([1] * 2)"))
+    # 3.0: list * n repeats the list, so a list times a list explains that instead.
+    assert "can only be repeated a whole number of times" in str(tb_error("say([1] * [2])"))
+    assert "can only multiply numbers" in str(tb_error('say({"a": 1} * 2)'))
 
 
 def test_calling_non_function():

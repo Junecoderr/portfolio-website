@@ -52,7 +52,7 @@ def load(api):
     return m
 ```
 
-Then in TB: `import greet` and `say(greet.hello("Alex"))`.
+Then in TB: `import greet` and `say(greet.hello("Tanisha"))`.
 
 The rules:
 

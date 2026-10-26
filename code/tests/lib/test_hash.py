@@ -53,11 +53,11 @@ say(hash.compare("secret", "secret"), hash.compare("secret", "Secret"), hash.com
 
 
 @pytest.mark.parametrize("src,message", [
-    ("hash.md5(5)", "hash.md5() needs text to be text, not a number."),
+    ("hash.md5(5)", "hash.md5() needs text to be text or bytes, not a number."),
     ('hash.file_sha256("missing.bin")', "I couldn't find 'missing.bin'"),
     ('hash.file_md5("")', "hash.file_md5() needs a path, but got empty text."),
     ('hash.file(".")', "is a folder, not a file."),
-    ('hash.hmac_sha256(nil, "x")', "hash.hmac_sha256() needs key to be text, not nil."),
+    ('hash.hmac_sha256(nil, "x")', "hash.hmac_sha256() needs key to be text or bytes, not nil."),
     ('hash.compare("a", 1)', "hash.compare() needs b to be text"),
 ])
 def test_hash_errors(src, message):

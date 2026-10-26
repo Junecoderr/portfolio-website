@@ -11,6 +11,7 @@ import fs
 import os
 import re
 import encode
+import time
 import "../log-triage/rules.tb" as rules
 
 let DATA = fs.join(fs.here(), "..", "data")
@@ -44,29 +45,42 @@ let bar = win.row()
 bar.button("Open log…", fn() { open_log() }, {"primary": true})
 bar.label("or try a sample:", {"style": "muted"})
 let sample = bar.select(SAMPLES, {"on_change": fn(name) { load(fs.join(DATA, name)) }, "width": 22})
-bar.button("Export HTML report…", fn() { export() })
+bar.button("Export HTML report…", fn() { export_report() })
 
 let counts = win.label(" ", {"style": "heading"})
 
-let table = win.table(["Level", "Rule", "By", "Count", "First seen", "Last seen"], {
+# Two pages: the alerts themselves, and charts that sum them up.
+let tabs = win.tabs(["Alerts", "Overview"], {"expand": true})
+let page = tabs.page("Alerts")
+
+let table = page.table(["Level", "Rule", "By", "Count", "First seen", "Last seen"], {
   "widths": [100, 330, 140, 70, 180, 180], "height": 6,
   "on_select": fn(row, i) { show_details(i) },
 })
 
-win.label("Details", {"style": "heading"})
-let details = win.textarea({"readonly": true, "mono": true, "height": 10})
+page.label("Details", {"style": "heading"})
+let details = page.textarea({"readonly": true, "mono": true, "height": 10})
+
+let LEVELS = ["critical", "high", "medium", "low", "informational"]
+let overview = tabs.page("Overview")
+let charts = overview.row({"expand": true})
+let level_chart = charts.chart({"type": "bar", "title": "Alerts by level", "labels": LEVELS,
+                                "data": [0, 0, 0, 0, 0], "expand": true})
+let rule_chart = charts.chart({"type": "pie", "title": "Alerts by rule", "empty": "No alerts", "expand": true})
+let timeline = overview.chart({"type": "line", "title": "Log records per hour", "empty": "No timestamps",
+                               "expand": true})
 let status = win.status("")
 
 win.menu({
   "File": {
     "Open log…": fn() { open_log() },
-    "Export HTML report…": fn() { export() },
+    "Export HTML report…": fn() { export_report() },
     "-": nil,
     "Quit": win.close,
   },
 })
 win.key("Mod+O", fn() { open_log() })
-win.key("Mod+E", fn() { export() })
+win.key("Mod+E", fn() { export_report() })
 
 let ICON = {"critical": "●●●●", "high": "●●●", "medium": "●●", "low": "●", "informational": "·"}
 
@@ -118,8 +132,56 @@ fn load(path) {
     table.select(0)
     show_details(0)
   }
+  update_charts(c)
   status.set(f"{len(records)} records  ·  {time_span()}  ·  {len(alerts)} alerts")
   win.title(f"{fs.name(current)} - TB Log Triage")
+}
+
+# Redraw the Overview page from the current alerts and records.
+fn update_charts(c) {
+  level_chart.update({"data": LEVELS.map(fn(level) { return c[level] })})
+  let by_rule = {}
+  for a in alerts {
+    by_rule[a.rule] = by_rule.get(a.rule, 0) + 1
+  }
+  rule_chart.update({"labels": by_rule.keys(), "data": by_rule.values()})
+  let per_hour = {}
+  for r in records {
+    if r.time != nil {
+      let hour = hour_start(r.time)
+      per_hour[hour] = per_hour.get(hour, 0) + 1
+    }
+  }
+  let hours = hour_range(per_hour, 24)
+  timeline.update({"labels": hours.map(fn(h) { return time.format(h, "%d %b %H:00") }),
+                   "data": hours.map(fn(h) { return per_hour.get(h, 0) })})
+}
+
+# The start of the local hour t falls in (so 06:25 counts as 06:00 even in
+# time zones that are not a whole number of hours from UTC).
+fn hour_start(t) {
+  let whole = int(t)
+  return whole - int(time.format(whole, "%M")) * 60 - int(time.format(whole, "%S"))
+}
+
+# Every hour from the first to the last key of counts (at most `most`, the
+# latest ones), so quiet hours show as 0 instead of being skipped.
+fn hour_range(counts, most) {
+  let keys = counts.keys().sort()
+  if keys.is_empty() {
+    return []
+  }
+  let last = keys.last()
+  let h = keys.first()
+  if h < last - (most - 1) * 3600 {
+    h = hour_start(last - (most - 1) * 3600)
+  }
+  let hours = []
+  while h <= last {
+    hours.push(h)
+    h = hour_start(h + 3600 + 1800)   # half an hour of slack keeps DST changes in step
+  }
+  return hours
 }
 
 fn time_span() {
@@ -178,7 +240,7 @@ fn open_log() {
   }
 }
 
-fn export() {
+fn export_report() {
   if current == nil {
     gui.alert("Open a log first.")
     return

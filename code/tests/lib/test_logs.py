@@ -362,7 +362,7 @@ say(logs.formats)'''
     out = run_tb(src)
     assert out[:5] == ["auth invalid_user bob 203.0.113.42", "3 x", "10", "300", "300 192.0.2.0"]
     assert out[5] == '[{"value": "192.0.2.0", "count": 100}, {"value": "192.0.2.1", "count": 100}]'
-    assert out[6] == '["auto", "syslog", "auth", "apache", "nginx", "json", "csv", "windows", "text"]'
+    assert out[6] == '["auto", "syslog", "auth", "apache", "nginx", "json", "csv", "windows", "text", "evtx"]'
 
 
 def test_each_stops_when_fn_gives_false(tmp_path):

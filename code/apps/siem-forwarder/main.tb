@@ -1,0 +1,248 @@
+# siem-forwarder: read (or tail) a log and forward its records - or the alerts found in it - to a SIEM.
+# Dry run is the default: it prints exactly what would be sent. Add --send to really send.
+#
+#   tb apps/siem-forwarder/main.tb                                   sample auth.log as CEF, dry run
+#   tb apps/siem-forwarder/main.tb auth.log --format leef --alerts   only the alerts, as LEEF
+#   tb apps/siem-forwarder/main.tb auth.log --format syslog --send --to 127.0.0.1:5514
+#   tb apps/siem-forwarder/main.tb auth.log --format hec --url https://splunk.example:8088 --send
+#   tb apps/siem-forwarder/main.tb /var/log/auth.log --follow        keep watching for new lines
+#
+# Secrets come from the environment only and are never printed:
+#   SPLUNK_HEC_TOKEN (hec), ELASTIC_API_KEY (elastic), SENTINEL_WORKSPACE_ID + SENTINEL_KEY (sentinel).
+
+import os
+import fs
+import logs
+import detect
+import siem
+import time
+
+let USAGE = "Usage: tb main.tb [log] [--format cef|leef|syslog|hec|elastic|sentinel] [--alerts] [--send] [--to host:port] [--tcp] [--url URL] [--index NAME] [--limit N] [--follow] [--polls N]"
+let FORMATS = ["cef", "leef", "syslog", "hec", "elastic", "sentinel"]
+let data = fs.join(fs.here(), "..", "data")
+
+fn usage_error(message) {
+  say(message)
+  say(USAGE)
+  exit(2)
+}
+
+fn whole_number(option, text) {
+  try {
+    let n = int(text)
+    if n >= 0 {
+      return n
+    }
+  } catch err {
+  }
+  usage_error(f"{option} needs a whole number, not '{text}'.")
+}
+
+let path = fs.join(data, "auth.log")
+let format = "cef"
+let only_alerts = false
+let really_send = false
+let target = nil
+let proto = "udp"
+let url = nil
+let index = "tb-events"
+let limit = 20
+let follow = false
+let polls = -1
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--help" or arg == "-h" {
+    say(USAGE)
+    exit(0)
+  } else if ["--format", "--to", "--url", "--index", "--limit", "--polls"].contains(arg) {
+    if i + 1 >= len(os.args) {
+      usage_error(f"{arg} needs a value.")
+    }
+    let value = os.args[i + 1]
+    if arg == "--format" {
+      format = value.lower()
+    } else if arg == "--to" {
+      target = value
+    } else if arg == "--url" {
+      url = value
+    } else if arg == "--index" {
+      index = value
+    } else if arg == "--limit" {
+      limit = whole_number(arg, value)
+    } else {
+      polls = whole_number(arg, value)
+    }
+    i += 1
+  } else if arg == "--alerts" {
+    only_alerts = true
+  } else if arg == "--send" {
+    really_send = true
+  } else if arg == "--tcp" {
+    proto = "tcp"
+  } else if arg == "--follow" {
+    follow = true
+  } else if arg.starts_with("--") {
+    usage_error(f"Unknown option {arg}.")
+  } else {
+    path = arg
+  }
+  i += 1
+}
+if not FORMATS.contains(format) {
+  usage_error(f"I don't know the format '{format}'. Formats: {FORMATS.join(', ')}.")
+}
+if not fs.exists(path) {
+  say(f"I couldn't find '{path}'.")
+  exit(1)
+}
+
+# -- where events go ------------------------------------------------------------------------
+let host = nil
+let port = nil
+if format == "cef" or format == "leef" or format == "syslog" {
+  if really_send {
+    if target == nil or not target.contains(":") {
+      usage_error("--send with cef, leef or syslog needs --to host:port (your syslog collector).")
+    }
+    let parts = target.split(":")
+    host = parts[0]
+    port = whole_number("--to", parts[1])
+  }
+}
+
+let sender = nil
+let dry = not really_send
+try {
+  if format == "hec" {
+    let token = os.env("SPLUNK_HEC_TOKEN")
+    if really_send and (url == nil or token == nil) {
+      usage_error("--format hec --send needs --url and the SPLUNK_HEC_TOKEN environment variable.")
+    }
+    sender = siem.splunk(url or "https://splunk.example:8088", token or "not-set", {"dry_run": dry})
+  } else if format == "elastic" {
+    if really_send and url == nil {
+      usage_error("--format elastic --send needs --url.")
+    }
+    let key = os.env("ELASTIC_API_KEY")
+    let auth = nil
+    if key != nil {
+      auth = {"api_key": key}
+    }
+    sender = siem.elastic(url or "https://elastic.example:9200", auth, {"dry_run": dry})
+  } else if format == "sentinel" {
+    let workspace = os.env("SENTINEL_WORKSPACE_ID")
+    let key = os.env("SENTINEL_KEY")
+    if really_send and (workspace == nil or key == nil) {
+      usage_error("--format sentinel --send needs SENTINEL_WORKSPACE_ID and SENTINEL_KEY in the environment.")
+    }
+    sender = siem.sentinel(workspace or "workspace-id", key or "ZHJ5LXJ1bi1vbmx5", {"dry_run": dry})
+  }
+} catch err {
+  say(f"I couldn't set up the {format} sender: {err.message}")
+  exit(1)
+}
+
+fn as_line(event) {
+  if format == "cef" {
+    return siem.cef(event)
+  } else if format == "leef" {
+    return siem.leef(event)
+  }
+  return siem.syslog_line(event, {"app": "tb-forwarder"})
+}
+
+let sent = {"events": 0}
+
+# Forward a batch of events (records or alerts).
+fn forward(events) {
+  if events.is_empty() {
+    return nil
+  }
+  if sender == nil {
+    let lines = events.map(as_line)
+    if really_send {
+      let r = siem.send_syslog(host, port, lines, proto)
+      say(f"Sent {r.sent} {format} line(s) to {host}:{port} over {proto}.")
+    } else {
+      for l in lines {
+        say(l)
+      }
+    }
+  } else {
+    let r = nil
+    if format == "elastic" {
+      r = sender.index(index, events)
+    } else if format == "sentinel" {
+      r = sender.send("TBEvents", events)
+    } else {
+      r = sender.send(events)
+    }
+    if r.get("dry_run", false) {
+      say(f"POST {r.url}")
+      say(r.body)
+    } else {
+      say(f"Sent {r.sent} event(s) to {format}.")
+    }
+  }
+  sent.events += len(events)
+}
+
+# Records -> what to forward: the records themselves, or the alerts found in them.
+fn pick(records) {
+  if not only_alerts {
+    # Give each record a short event name for the CEF/LEEF header (the action, or the program).
+    return records.map(fn(r) {
+      let e = {"name": r.get("action", nil) or r.get("program", nil) or f"{r.format} line", "id": r.get("action", "log_line")}
+      for key in r.keys() {
+        if not ["raw", "when", "when_utc", "zone"].contains(key) {
+          e[key] = r[key]
+        }
+      }
+      return e
+    })
+  }
+  let rules = []
+  for p in fs.walk(fs.join(data, "sigma")) {
+    if p.ends_with(".yml") {
+      rules.push(detect.sigma(p))
+    }
+  }
+  return detect.run(rules, records) + detect.brute_force(records)
+}
+
+say(f"# siem-forwarder: {fs.name(path)} as {format}" + (really_send and "" or " (dry run: nothing is sent; add --send)"))
+let records = []
+try {
+  records = logs.read(path)
+} catch err {
+  say(f"I couldn't read {path}: {err.message}")
+  exit(1)
+}
+let events = pick(records)
+if limit > 0 and len(events) > limit {
+  say(f"# {len(events)} event(s); forwarding the first {limit} (use --limit 0 for all)")
+  events = events.slice(0, limit)
+}
+forward(events)
+
+# Tail: keep checking the file for new lines.
+if follow {
+  say(f"# following {path} for new lines (Ctrl+C to stop)")
+  let seen = len(fs.lines(path))
+  let rounds = 0
+  while polls < 0 or rounds < polls {
+    time.sleep(1)
+    rounds += 1
+    let lines = fs.lines(path)
+    if len(lines) < seen {
+      seen = 0
+    }
+    if len(lines) > seen {
+      let fresh = lines.slice(seen).filter(fn(l) { return l.trim() != "" }).map(fn(l) { return logs.parse_line(l) })
+      seen = len(lines)
+      forward(pick(fresh))
+    }
+  }
+}
+say(f"# {sent.events} event(s) " + (really_send and "forwarded" or "shown"))

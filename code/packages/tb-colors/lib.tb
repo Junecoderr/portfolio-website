@@ -1,0 +1,203 @@
+# tb-colors: ANSI colour helpers for terminal output.
+#
+# Every function takes text and gives it back wrapped in the right escape
+# codes. Colours are turned off automatically when NO_COLOR is set
+# (https://no-color.org) or when TB_COLOR is "0"; force them with
+# colors.force(true). Use colors.strip(text) to measure or log coloured text.
+
+import encode
+import os
+import text
+
+let ESC = encode.unhex("1b")
+let RESET = ESC + "[0m"
+
+# Colour names -> the number used by the 4-bit SGR codes.
+let NAMES = {
+  "black": 30, "red": 31, "green": 32, "yellow": 33,
+  "blue": 34, "magenta": 35, "cyan": 36, "white": 37,
+  "gray": 90, "grey": 90,
+  "bright_red": 91, "bright_green": 92, "bright_yellow": 93,
+  "bright_blue": 94, "bright_magenta": 95, "bright_cyan": 96, "bright_white": 97,
+}
+
+let STYLES = {"bold": 1, "dim": 2, "italic": 3, "underline": 4, "blink": 5, "inverse": 7, "strike": 9}
+
+let _forced = nil
+
+# Decide whether to colour at all.
+fn enabled() {
+  if _forced != nil {
+    return _forced
+  }
+  if os.env("NO_COLOR") != nil {
+    return false
+  }
+  if os.env("TB_COLOR") == "0" {
+    return false
+  }
+  return true
+}
+
+# Force colours on (true) or off (false); nil goes back to automatic.
+fn force(on) {
+  _forced = on
+  return enabled()
+}
+
+# Wrap text in an SGR code: code is a number or a list of numbers.
+fn sgr(value, code) {
+  if not enabled() {
+    return str(value)
+  }
+  let codes = code
+  if type(code) != "list" {
+    codes = [code]
+  }
+  return ESC + "[" + codes.map(fn(c) { return str(c) }).join(";") + "m" + str(value) + RESET
+}
+
+# Colour text by name: paint("ok", "green"). Unknown names stop with an error.
+fn paint(value, name) {
+  if not NAMES.has(name) {
+    throw "tb-colors doesn't know the colour '" + name + "'. Pick one of: " + NAMES.keys().join(", ")
+  }
+  return sgr(value, NAMES[name])
+}
+
+# Background colour by name: on("warning", "yellow").
+fn on(value, name) {
+  if not NAMES.has(name) {
+    throw "tb-colors doesn't know the colour '" + name + "'. Pick one of: " + NAMES.keys().join(", ")
+  }
+  return sgr(value, NAMES[name] + 10)
+}
+
+# A style by name: style("title", "bold").
+fn style(value, name) {
+  if not STYLES.has(name) {
+    throw "tb-colors doesn't know the style '" + name + "'. Pick one of: " + STYLES.keys().join(", ")
+  }
+  return sgr(value, STYLES[name])
+}
+
+fn black(value) { return paint(value, "black") }
+fn red(value) { return paint(value, "red") }
+fn green(value) { return paint(value, "green") }
+fn yellow(value) { return paint(value, "yellow") }
+fn blue(value) { return paint(value, "blue") }
+fn magenta(value) { return paint(value, "magenta") }
+fn cyan(value) { return paint(value, "cyan") }
+fn white(value) { return paint(value, "white") }
+fn gray(value) { return paint(value, "gray") }
+
+fn bold(value) { return style(value, "bold") }
+fn dim(value) { return style(value, "dim") }
+fn italic(value) { return style(value, "italic") }
+fn underline(value) { return style(value, "underline") }
+fn inverse(value) { return style(value, "inverse") }
+fn strike(value) { return style(value, "strike") }
+
+# A 24-bit colour: rgb("hi", 255, 128, 0). Each part is 0..255.
+fn rgb(value, r, g, b) {
+  return sgr(value, [38, 2, _byte(r), _byte(g), _byte(b)])
+}
+
+# A 24-bit background colour.
+fn on_rgb(value, r, g, b) {
+  return sgr(value, [48, 2, _byte(r), _byte(g), _byte(b)])
+}
+
+# A colour from a hex code like "#ff8800" or "f80".
+fn hex(value, code) {
+  let parts = hex_to_rgb(code)
+  return rgb(value, parts[0], parts[1], parts[2])
+}
+
+# "#ff8800" -> [255, 136, 0]. Short codes like "f80" work too.
+fn hex_to_rgb(code) {
+  let digits = code.replace("#", "").lower()
+  if len(digits) == 3 {
+    let c = digits.chars()
+    digits = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
+  }
+  if len(digits) != 6 {
+    throw "A hex colour needs 6 digits, like #ff8800 (got '" + code + "')."
+  }
+  return [_hex_pair(digits.slice(0, 2)), _hex_pair(digits.slice(2, 4)), _hex_pair(digits.slice(4, 6))]
+}
+
+# Remove every ANSI escape code from text.
+fn strip(value) {
+  let s = str(value)
+  let out = ""
+  let i = 0
+  while i < len(s) {
+    if s[i] == ESC and i + 1 < len(s) and s[i + 1] == "[" {
+      i = i + 2
+      while i < len(s) and not _is_final(s[i]) {
+        i = i + 1
+      }
+      i = i + 1
+    } else {
+      out = out + s[i]
+      i = i + 1
+    }
+  }
+  return out
+}
+
+# How many characters text takes up on screen (escape codes don't count).
+fn width(value) {
+  return len(strip(value))
+}
+
+# Colour a status word the usual way: ok/pass -> green, warn -> yellow, fail/error -> red.
+fn status(word) {
+  let w = str(word).lower()
+  if w == "ok" or w == "pass" or w == "passed" or w == "done" or w == "success" {
+    return green(word)
+  }
+  if w == "warn" or w == "warning" or w == "skip" or w == "skipped" {
+    return yellow(word)
+  }
+  if w == "fail" or w == "failed" or w == "error" or w == "critical" {
+    return red(word)
+  }
+  return str(word)
+}
+
+# A small demo table of every colour, for `tb packages/tb-colors/lib.tb`.
+fn demo() {
+  for name in NAMES.keys() {
+    if name != "grey" {
+      say(text.pad_right(name, 15), paint("the quick brown fox", name), on(" ", name))
+    }
+  }
+  for name in STYLES.keys() {
+    say(text.pad_right(name, 15), style("the quick brown fox", name))
+  }
+  say(rgb("24-bit orange", 255, 136, 0), hex("hex teal", "#008080"))
+}
+
+fn _byte(n) {
+  if type(n) != "number" or n < 0 or n > 255 {
+    throw "Colour parts must be numbers from 0 to 255 (got " + str(n) + ")."
+  }
+  return int(n)
+}
+
+fn _hex_pair(pair) {
+  let digits = "0123456789abcdef"
+  let hi = digits.find(pair[0])
+  let lo = digits.find(pair[1])
+  if hi < 0 or lo < 0 {
+    throw "'" + pair + "' isn't a hex number."
+  }
+  return hi * 16 + lo
+}
+
+fn _is_final(ch) {
+  # SGR sequences end with a letter.
+  return (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z")
+}

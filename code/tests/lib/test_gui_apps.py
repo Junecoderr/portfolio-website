@@ -36,7 +36,8 @@ def run_app(name, tmp_path, args=None):
 
 
 def test_every_app_has_a_readme():
-    for name in ("todo", "care", "notes", "calculator", "hash-checker", "log-triage-gui", "ioc-workbench"):
+    for name in ("todo", "care", "notes", "calculator", "hash-checker", "log-triage-gui", "ioc-workbench",
+                 "alerts-dashboard-gui", "network-monitor"):
         readme = (ROOT / "apps" / name / "README.md").read_text(encoding="utf-8")
         assert f"tb apps/{name}/main.tb" in readme
 
@@ -111,7 +112,7 @@ def test_todo_survives_a_broken_file(fake, tmp_path):
 def test_care_check_in(fake, tmp_path):
     folder, lines = run_app("care", tmp_path)
     win = fake.window_
-    assert win.find("label", "How are you today?")
+    assert win.find("label", "How are you today, Tanisha?")
     assert win.status_text == "0 check-ins in your journal"
     # Saving before picking a mood asks gently.
     win.find("button", "Save today's check-in").click()
@@ -156,14 +157,14 @@ def test_notes_type_count_save_open(fake, tmp_path):
     assert [m[0] for m in win.menu] == ["File", "Help"]
     assert win.status_text == "0 words, 0 characters"
     editor = win.find("textarea")
-    editor.type("Hello there Alex")
-    assert win.status_text == "3 words, 16 characters"
+    editor.type("Hello there Tanisha")
+    assert win.status_text == "3 words, 19 characters"
     assert win.title == "Untitled • - Notes"
 
     target = str(tmp_path / "hello.txt")
     fake.answers = [target]
     win.press("Mod+S")
-    assert open(target).read() == "Hello there Alex"
+    assert open(target).read() == "Hello there Tanisha"
     assert fake.dialogs[-1]["kind"] == "save_file" and fake.dialogs[-1]["name"] == "Untitled.txt"
     assert win.title == "hello.txt - Notes"
 
@@ -341,6 +342,14 @@ def test_log_triage_gui_auth_log(fake, tmp_path):
     assert "4 alerts:  1 critical,  2 high,  1 medium,  0 low" in [w.text for w in win.widgets("label")]
     assert win.status_text.startswith("101 records")
     assert win.title == "auth.log - TB Log Triage"
+    tabs = win.widgets("tabs")[0]
+    assert list(tabs.pages) == ["Alerts", "Overview"]
+    by_level, by_rule, timeline = win.widgets("chart")
+    assert by_level.data["data"] == [1, 2, 1, 0, 0]
+    assert sorted(by_rule.data["labels"]) == sorted(r[1] for r in table.rows)
+    assert timeline.data["type"] == "line" and sum(timeline.data["data"]) == 101
+    hours = [label[-5:-3] for label in timeline.data["labels"]]  # one point per hour, quiet ones too
+    assert hours == [f"{(int(hours[0]) + i) % 24:02d}" for i in range(len(hours))]
     assert lines == []
 
 
@@ -432,3 +441,197 @@ def test_ioc_workbench_empty(fake, tmp_path):
     fake.clipboard = "see 8.8.8.8"
     win.find("button", "Paste").click()
     assert win.find("table").rows == [["IP", "8.8.8.8", "8[.]8[.]8[.]8"]]
+
+
+# -- alerts-dashboard-gui ---------------------------------------------------------
+
+
+def test_alerts_dashboard(fake, tmp_path):
+    folder, lines = run_app_with_data("alerts-dashboard-gui", tmp_path)
+    win = fake.window_
+    assert win.title == "TB Alerts Dashboard" and win.theme == "dark"
+    assert win.status_text.startswith("Reading auth.log")
+    fake.advance(0)  # the background read finishes
+    assert win.status_text == "auth.log: 101 records, 4 alerts"
+    labels = [w.text for w in win.widgets("label")]
+    assert "Analyst: Tanisha  ·  1 log  ·  101 records  ·  4 alerts" in labels
+    cards = win.widgets("card")
+    assert [c.spec["title"] for c in cards] == ["Records", "Alerts", "Critical", "High", "Logs open"]
+    assert [c.children[0].text for c in cards] == ["101", "4", "1", "2", "1"]
+    assert [b.text for b in win.widgets("badge")] == ["1 critical", "2 high", "1 medium"]
+    assert [b.spec["style"] for b in win.widgets("badge")] == ["danger", "warning", "accent"]
+
+    level_chart, rule_chart, actor_chart, timeline = win.widgets("chart")
+    assert level_chart.data["data"] == [1, 2, 1, 0, 0]
+    assert "Brute force" in rule_chart.data["labels"] and sum(rule_chart.data["data"]) == 4
+    assert actor_chart.data["labels"][0] == "203.0.113.42"
+    assert set(timeline.data["data"]) == {"records", "alerts"} and sum(timeline.data["data"]["records"]) == 101
+
+    tree = win.find("tree")
+    roots = [tree.nodes[n]["values"][0] for n in tree.order if tree.nodes[n]["parent"] is None]
+    assert roots == ["CRITICAL (1)", "HIGH (2)", "MEDIUM (1)"]
+    leaf = [n for n in tree.order if tree.nodes[n]["values"][0] == "203.0.113.42"][0]
+    tree.choose(leaf)
+    details = win.find("textarea")
+    assert details.text.startswith("CRITICAL  Brute force") and "then logged in as" in details.text
+    tree.choose(tree.order[0])  # a group row: details stay as they were
+    assert details.text.startswith("CRITICAL  Brute force")
+
+    win.find("select").choose("firewall.log")
+    fake.advance(0)
+    assert "2 logs" in [w.text for w in win.widgets("label")][1]
+    sources = win.widgets("table")[1]
+    assert [r[0] for r in sources.rows] == ["auth.log", "firewall.log"]
+    assert win.find("select").text == "(choose)"
+    win.find("select").choose("firewall.log")  # already open
+    fake.advance(0)
+    assert win.status_text == "firewall.log is already open."
+    sources.open(0)  # close auth.log
+    assert [r[0] for r in sources.rows] == ["firewall.log"]
+    assert level_chart.data["data"] == [0, 0, 1, 0, 0]
+
+    out = tmp_path / "dash.html"
+    fake.answers = [str(out)]
+    win.choose_menu("File", "Export HTML report…")
+    page = out.read_text()
+    assert "Prepared by Tanisha" in page and "Port scan" in page
+    win.choose_menu("View", "Timeline")
+    assert win.widgets("tabs")[0].selected() == "Timeline"
+    assert not any(d["kind"] == "error" for d in fake.dialogs)
+    assert lines == []
+
+
+def test_alerts_dashboard_bad_file_and_drop(fake, tmp_path):
+    folder, lines = run_app_with_data("alerts-dashboard-gui", tmp_path, args=[str(tmp_path / "missing.log"), "--light", "--analyst", "Sam"])
+    win = fake.window_
+    assert win.theme == "light"
+    fake.advance(0)
+    assert fake.dialogs[-1]["title"] == "Couldn't read the log" and "I couldn't find" in fake.dialogs[-1]["message"]
+    assert win.status_text == "Ready"
+    win.find("button", "Export HTML report…").click()
+    assert fake.dialogs[-1]["message"] == "Open a log first."
+    win.drop([str(tmp_path / "data" / "access.log")])
+    fake.advance(0)
+    assert "Analyst: Sam  ·  1 log" in [w.text for w in win.widgets("label")][1]
+    win.find("button", "Clear").click()
+    assert [w.text for w in win.widgets("label")][1] == "Analyst: Sam  ·  no logs open yet"
+    assert not any(d["kind"] == "error" for d in fake.dialogs)
+
+
+# -- network-monitor ------------------------------------------------------------------
+
+
+@pytest.fixture
+def listener():
+    import socket
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    sock.listen(5)
+    yield sock.getsockname()[1]
+    sock.close()
+
+
+def closed_port():
+    import socket
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
+
+
+def test_network_monitor(fake, tmp_path, listener):
+    down = closed_port()
+    targets = tmp_path / "targets.json"
+    targets.write_text(json.dumps({"interval": 2, "timeout": 1, "targets": [
+        {"name": "Web", "host": "127.0.0.1", "port": listener},
+        {"name": "Gone", "host": "127.0.0.1", "port": down},
+    ]}))
+    folder, lines = run_app("network-monitor", tmp_path, args=[str(targets)])
+    win = fake.window_
+    assert win.title == "TB Network Monitor"
+    assert win.status_text.startswith("Checking 2 targets")
+    table = win.find("table")
+    assert [r[3] for r in table.rows] == ["waiting", "waiting"]
+    fake.advance(0)  # the first background check lands
+    assert [r[:4] for r in table.rows] == [["Web", "127.0.0.1", str(listener), "up"], ["Gone", "127.0.0.1", str(down), "DOWN"]]
+    assert table.rows[0][4].endswith(" ms") and table.rows[0][6] == "100%"
+    cards = win.widgets("card")
+    assert [c.children[0].text for c in cards[:2]] == ["1", "1"]
+    chart = win.find("chart")
+    assert set(chart.data["data"]) == {"Web"} and len(chart.data["labels"]) == 1  # Gone never answered
+    assert table.rows[1][4] == "-"  # down: no latency
+    assert win.status_text.startswith("Last check") and win.status_text.endswith("1 of 2 up")
+    assert fake.notifications == []  # the first check is not a change
+
+    fake.advance(2000)  # the timer fires a second check
+    fake.advance(0)
+    assert len(chart.data["labels"]) == 2 and table.rows[0][5] == "2"
+
+    win.find("slider").slide(10)
+    assert cards[3].children[0].text == "10 s"
+    win.find("button", "Pause").click()
+    assert win.status_text == "Paused" and win.find("button", "Resume")
+    fake.advance(10000)
+    assert len(chart.data["labels"]) == 2  # paused: nothing ran
+    win.find("button", "Resume").click()
+    fake.advance(0)
+    assert len(chart.data["labels"]) == 3
+
+    box = win.find("input")
+    box.type("nonsense")
+    box.enter()
+    assert fake.dialogs[-1]["title"] == "Add a target"
+    box.type(f"127.0.0.1:{listener}")
+    box.enter()
+    fake.advance(0)
+    assert table.rows[2][0] == f"127.0.0.1:{listener}" and table.rows[2][3] == "up"
+    table.select(2)
+    win.find("button", "Remove selected").click()
+    assert len(table.rows) == 2
+    win.find("button", "Remove selected").click()
+    assert fake.dialogs[-1]["message"] == "Pick a target in the table first."
+
+    tray = win.tray_widget
+    win.find("button", "Minimize to tray").click()
+    assert win.hidden and tray.shown
+    tray.choose("Show")
+    assert not win.hidden
+    assert win.request_close() is True
+    assert not any(d["kind"] == "error" for d in fake.dialogs)
+    assert lines == []
+
+
+def test_network_monitor_notifies_on_change(fake, tmp_path):
+    import socket
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    sock.listen(5)
+    port = sock.getsockname()[1]
+    targets = tmp_path / "targets.json"
+    targets.write_text(json.dumps({"interval": 1, "targets": [{"name": "Web", "host": "127.0.0.1", "port": port}]}))
+    run_app("network-monitor", tmp_path, args=[str(targets), "--light"])
+    win = fake.window_
+    assert win.theme == "light"
+    fake.advance(0)
+    assert win.find("table").rows[0][3] == "up"
+    sock.close()  # the service goes away...
+    fake.advance(1000)
+    fake.advance(0)
+    assert win.find("table").rows[0][3] == "DOWN"
+    assert win.find("chart").data["data"]["Web"][-1] is None  # a gap in the line while it is down
+    assert fake.notifications == [{"title": "Web is down", "text": f"127.0.0.1:{port} stopped answering."}]
+    win.find("checkbox").toggle()  # notifications off
+    fake.advance(1000)
+    fake.advance(0)
+    assert len(fake.notifications) == 1
+    assert not any(d["kind"] == "error" for d in fake.dialogs)
+
+
+def test_network_monitor_missing_config(fake, tmp_path):
+    folder, lines = run_app("network-monitor", tmp_path, args=[str(tmp_path / "nope.json")])
+    assert lines and lines[0].startswith("I couldn't read")
+    win = fake.window_
+    assert win.find("table").rows == []
+    assert win.status_text == "Starting…"
+    assert "0 targets from nope.json" in [w.text for w in win.widgets("label")]

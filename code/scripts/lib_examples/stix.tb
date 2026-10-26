@@ -1,0 +1,12 @@
+import stix
+
+# Write IOCs as a STIX 2.1 bundle, then read the indicators back.
+let bundle = stix.bundle(["203.0.113.42", "login-verify.example.net"])
+for ind in stix.indicators(bundle) {
+  say(f"{ind.pattern} -> {ind.iocs}")
+}
+
+# Indicators become detect rules you can run on logs.
+let rules = stix.to_detect_rules(bundle)
+say(f"{len(rules)} rules, the first looks at: {rules[0].detection.ioc.map(fn(m) { return m.keys()[0] }).slice(0, 3)}")
+say(stix.pattern("[ipv4-addr:value IN ('192.0.2.1', '192.0.2.2')]"))

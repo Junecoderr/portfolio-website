@@ -1,0 +1,7 @@
+import decimal
+
+say(0.1 + 0.2)
+say(decimal.of("0.1").add("0.2").text)
+let price = decimal.of("19.99")
+say(price.mul(3).text, price.mul("1.18").round(2).text)
+say(decimal.sum(["1.10", "2.20", "3.30"]).text)

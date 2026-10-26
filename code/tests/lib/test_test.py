@@ -11,8 +11,8 @@ def run_with_state(src):
 
 def test_passing_checks_are_quiet_and_counted():
     lines, state = run_with_state('import test\ntest.equal(1 + 1, 2)\ntest.equal({"a": [1]}, {"a": [1]})\ntest.not_equal(1, 2)\ntest.true(1)\ntest.false(nil)\nsay(test.results())')
-    assert lines == ['{"passed": 5, "failed": 0}']
-    assert state == {"passed": 5, "failed": 0}
+    assert lines == ['{"passed": 5, "failed": 0, "skipped": 0}']
+    assert state == {"passed": 5, "failed": 0, "skipped": 0}
 
 
 def test_failures_are_reported_with_line_and_message():
@@ -25,7 +25,7 @@ def test_failures_are_reported_with_line_and_message():
         "  FAIL on line 6: expected 2, but got 1",
         "false",
     ]
-    assert state == {"passed": 0, "failed": 5}
+    assert state == {"passed": 0, "failed": 5, "skipped": 0}
 
 
 def test_raises():
@@ -40,7 +40,7 @@ def test_raises():
         "  FAIL on line 4: expected an error, but there wasn't one",
         '  FAIL on line 6: expected an error about "something else", but got: You can\'t divide by zero.',
     ]
-    assert state == {"passed": 2, "failed": 2}
+    assert state == {"passed": 2, "failed": 2, "skipped": 0}
 
 
 def test_case_runs_each_and_keeps_going():
@@ -57,7 +57,7 @@ def test_case_runs_each_and_keeps_going():
         "  FAIL fails",
         "after",
     ]
-    assert state == {"passed": 1, "failed": 2}
+    assert state == {"passed": 1, "failed": 2, "skipped": 0}
 
 
 def test_argument_errors():

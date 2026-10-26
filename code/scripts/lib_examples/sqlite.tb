@@ -1,0 +1,14 @@
+import sqlite
+
+let db = sqlite.open(":memory:")
+db.run("CREATE TABLE logins (user TEXT, ip TEXT, ok INTEGER)")
+db.execute_many("INSERT INTO logins VALUES (?, ?, ?)", [
+  ["tanisha", "192.0.2.10", 1],
+  ["root", "203.0.113.42", 0],
+  ["admin", "203.0.113.42", 0],
+])
+for row in db.all("SELECT ip, COUNT(*) AS failures FROM logins WHERE ok = 0 GROUP BY ip") {
+  say(f"{row.ip}: {row.failures} failed logins")
+}
+say(db.value("SELECT COUNT(*) FROM logins"), db.tables())
+db.close()

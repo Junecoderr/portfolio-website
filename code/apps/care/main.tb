@@ -46,7 +46,7 @@ let mood = nil
 let now = time.now()
 
 let win = gui.window("How are you today?", {"width": 580, "height": 720})
-win.label("How are you today?", {"style": "title"})
+win.label("How are you today, Tanisha?", {"style": "title"})
 win.label(f"{now.weekday}, {now.day} {now.month_name}", {"style": "muted"})
 
 # A button needs a function; this makes one that remembers its mood.

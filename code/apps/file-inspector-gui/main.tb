@@ -1,0 +1,268 @@
+# TB File Inspector: open (or drop) a file and see what it really is,
+# without running it: type from its bytes, hashes, entropy, PE/ELF sections
+# and imports, suspicious indicators, YARA-style rule matches and the
+# interesting strings inside. Shares its engine with apps/file-inspector.
+# Run: tb apps/file-inspector-gui/main.tb [file] [--light]
+
+import gui
+import fs
+import os
+import scan
+import json
+import "../file-inspector/inspect.tb"
+
+let RULES_PATH = fs.join(fs.here(), "..", "file-inspector", "rules.yar")
+let DATA = fs.join(fs.here(), "..", "data")
+
+let theme = "dark"
+let start = nil
+for arg in os.args {
+  if arg == "--light" {
+    theme = "light"
+  } else if arg == "--dark" {
+    theme = "dark"
+  } else {
+    start = arg
+  }
+}
+
+let rules = nil
+let rules_problem = nil
+try {
+  rules = scan.load(RULES_PATH)
+} catch err {
+  rules_problem = err.message
+}
+
+let result = nil   # the map inspect.inspect() gave for the open file
+
+let win = gui.window("TB File Inspector", {"width": 1040, "height": 760, "theme": theme})
+win.label("TB File Inspector", {"style": "title"})
+let subtitle = win.label("Open a file to look inside it. Nothing is ever run.", {"style": "muted"})
+
+let bar = win.row()
+bar.button("Open file…", fn() { choose() }, {"primary": true})
+bar.label("or try a sample:", {"style": "muted"})
+let sample = bar.select(["(choose)", "sample.pcap", "sample.evtx", "windows_security.json", "phishing_email.txt"], {
+  "on_change": fn(name) {
+    if name != "(choose)" {
+      open_path(fs.join(DATA, name))
+      sample.set("(choose)")
+    }
+  }, "width": 22})
+bar.button("Copy SHA-256", fn() { copy_hash() })
+bar.button("Save JSON report…", fn() { save_report() })
+
+let verdict = win.label(" ", {"style": "heading"})
+let badges = win.row()
+
+let tabs = win.tabs(["Overview", "Findings", "Sections", "Imports", "Strings"], {"expand": true})
+
+let overview = tabs.page("Overview")
+let facts = overview.table(["Property", "Value"], {"widths": [160, 760], "expand": true})
+
+let findings_page = tabs.page("Findings")
+let findings = findings_page.table(["Level", "What", "Detail"], {"widths": [80, 260, 600], "height": 8,
+                                                                "on_select": fn(row, i) { show_finding(i) }})
+let finding_text = findings_page.textarea({"readonly": true, "mono": true, "height": 6})
+
+let sections_page = tabs.page("Sections")
+let sections = sections_page.table(["Name", "Size", "Entropy", "Perms"], {"widths": [200, 120, 120, 100], "expand": true})
+sections_page.label("Entropy near 8 means packed or encrypted bytes; rwx sections can rewrite their own code.", {"style": "muted"})
+
+let imports_page = tabs.page("Imports")
+let imports = imports_page.table(["Library", "Function"], {"widths": [260, 500], "expand": true})
+
+let strings_page = tabs.page("Strings")
+let filter = strings_page.input({"placeholder": "Filter strings (for example http, .dll, powershell)",
+                                 "on_change": fn(text) { show_strings(text) }})
+let strings = strings_page.table(["Offset", "Encoding", "Text"], {"widths": [90, 80, 760], "expand": true})
+
+let status = win.status("Ready")
+if rules_problem != nil {
+  status.set("Rules not loaded: " + rules_problem)
+}
+
+win.menu({
+  "File": {
+    "Open file…": fn() { choose() },
+    "Save JSON report…": fn() { save_report() },
+    "-": nil,
+    "Quit": win.close,
+  },
+})
+win.key("Mod+O", fn() { choose() })
+win.on_drop(fn(paths) {
+  if not paths.is_empty() {
+    open_path(paths[0])
+  }
+})
+
+let BADGE = {"suspicious": "danger", "worth a look": "warning", "nothing found": "success"}
+
+fn choose() {
+  let path = gui.open_file()
+  if path != nil {
+    open_path(path)
+  }
+}
+
+fn open_path(path) {
+  if not fs.is_file(path) {
+    gui.alert(f"I couldn't find a file at '{path}'.", "No such file")
+    return
+  }
+  try {
+    result = inspect.inspect(path, rules)
+  } catch err {
+    gui.alert(err.message, "Couldn't inspect the file")
+    return
+  }
+  show()
+}
+
+fn show() {
+  let r = result
+  win.title(f"{r.name} - TB File Inspector")
+  subtitle.set(f"{r.name}  ·  {r.description}  ·  {inspect.human_size(r.size)}")
+  verdict.set(f"Verdict: {r.verdict} (a hint for a human, not proof either way)")
+  badges.clear()
+  badges.badge(r.verdict, {"style": BADGE[r.verdict]})
+  let found = inspect.findings(r)
+  let counts = {"high": 0, "medium": 0, "low": 0}
+  for f in found {
+    counts[f.level] = counts.get(f.level, 0) + 1
+  }
+  for level in ["high", "medium", "low"] {
+    if counts[level] > 0 {
+      badges.badge(f"{counts[level]} {level}", {"style": {"high": "danger", "medium": "warning", "low": "accent"}[level]})
+    }
+  }
+
+  let rows = [
+    ["File", r.path], ["Type", r.description], ["Size", f"{inspect.human_size(r.size)} ({r.size} bytes)"],
+    ["Entropy", str(r.entropy)], ["MD5", r.hashes.md5], ["SHA-1", r.hashes.sha1], ["SHA-256", r.hashes.sha256],
+  ]
+  let d = r.details
+  if r.summary != nil {
+    rows.push(["Summary", r.summary])
+  }
+  if r.problem != nil {
+    rows.push(["Problem", r.problem])
+  }
+  if d != nil {
+    rows.push(["Architecture", d.architecture])
+    rows.push(["Entry point", f"{d.entry_hex} in {d.entry_section}"])
+    if r.type == "pe" {
+      rows.push(["Compiled", str(d.compiled)])
+      rows.push(["Subsystem", d.subsystem])
+      rows.push(["Signed", str(d.is_signed)])
+      if d.pdb != nil {
+        rows.push(["PDB path", d.pdb])
+      }
+    } else {
+      rows.push(["Kind", d.type])
+      rows.push(["Interpreter", str(d.interpreter)])
+      rows.push(["Needs", d.needed.join(", ")])
+    }
+  }
+  facts.set_rows(rows)
+
+  findings.set_rows(found.map(fn(f) { return [f.level.upper(), f.what, f.detail] }))
+  if found.is_empty() {
+    finding_text.set("Nothing stood out. That is not a guarantee the file is safe.")
+  } else {
+    findings.select(0)
+    show_finding(0)
+  }
+
+  let srows = []
+  let irows = []
+  if d != nil {
+    for s in d.sections {
+      let perms = ""
+      for pair in [["readable", "r"], ["writable", "w"], ["executable", "x"]] {
+        if s.get(pair[0], false) {
+          perms += pair[1]
+        } else {
+          perms += "-"
+        }
+      }
+      srows.push([s.name, s.size, s.entropy, perms])
+    }
+    if r.type == "pe" {
+      for dll in d.imports.keys() {
+        for name in d.imports[dll] {
+          irows.push([dll, name])
+        }
+      }
+    } else {
+      for name in d.imports {
+        irows.push(["(shared libraries)", name])
+      }
+    }
+  }
+  sections.set_rows(srows)
+  imports.set_rows(irows)
+  filter.set("")
+  show_strings("")
+  status.set(f"{len(found)} finding(s)  ·  {len(r.matches)} rule match(es)  ·  {len(r.strings)} strings")
+}
+
+fn show_finding(i) {
+  if i == nil or result == nil {
+    return
+  }
+  let f = inspect.findings(result)[i]
+  finding_text.set(f"{f.level.upper()}  {f.what}\n\n{f.detail}")
+}
+
+fn show_strings(text) {
+  if result == nil {
+    return
+  }
+  let needle = text.lower().trim()
+  let rows = []
+  for s in result.strings {
+    if needle == "" or s.text.lower().contains(needle) {
+      rows.push([s.offset, s.encoding, s.text])
+      if len(rows) >= 2000 {
+        break
+      }
+    }
+  }
+  strings.set_rows(rows)
+}
+
+fn copy_hash() {
+  if result == nil {
+    gui.alert("Open a file first.")
+    return
+  }
+  gui.copy(result.hashes.sha256)
+  status.set("SHA-256 copied to the clipboard.")
+}
+
+fn save_report() {
+  if result == nil {
+    gui.alert("Open a file first.")
+    return
+  }
+  let path = gui.save_file(result.name + ".inspect.json")
+  if path == nil {
+    return
+  }
+  let slim = result.copy()
+  slim.strings = len(result.strings)
+  try {
+    fs.write(path, json.stringify(slim, true))
+    status.set("Saved " + path)
+  } catch err {
+    gui.alert(err.message, "Couldn't save the report")
+  }
+}
+
+if start != nil {
+  open_path(start)
+}
+win.run()

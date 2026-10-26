@@ -12,6 +12,9 @@ CHUNK = 1024 * 1024  # files are hashed a megabyte at a time
 
 
 def text_bytes(value) -> bytes:
+    """Text as UTF-8; bytes (TB 3.0) pass through unchanged."""
+    if isinstance(value, bytes):
+        return value
     return value.encode("utf-8", "surrogatepass")
 
 
@@ -47,16 +50,16 @@ def load(api):
 
     def text_hash(name):
         def run(line, text):
-            check_type(line, text, "text", f"hash.{name}", "text")
+            check_type(line, text, "text|bytes", f"hash.{name}", "text")
             return hashlib.new(name, text_bytes(text)).hexdigest()
         return run
 
-    m.fn("md5", 1, doc="md5(text) -> text\nThe MD5 hash of the text (UTF-8), as 32 hex characters. "
+    m.fn("md5", 1, doc="md5(text) -> text\nText or bytes. The MD5 hash of the text (UTF-8), as 32 hex characters. "
                        "MD5 is broken for security, but threat feeds still use it to name files.")(text_hash("md5"))
-    m.fn("sha1", 1, doc="sha1(text) -> text\nThe SHA-1 hash of the text (UTF-8), as 40 hex characters.")(text_hash("sha1"))
-    m.fn("sha256", 1, doc="sha256(text) -> text\nThe SHA-256 hash of the text (UTF-8), as 64 hex characters. "
+    m.fn("sha1", 1, doc="sha1(text) -> text\nText or bytes. The SHA-1 hash of the text (UTF-8), as 40 hex characters.")(text_hash("sha1"))
+    m.fn("sha256", 1, doc="sha256(text) -> text\nText or bytes. The SHA-256 hash of the text (UTF-8), as 64 hex characters. "
                           "This is the one to use today.")(text_hash("sha256"))
-    m.fn("sha512", 1, doc="sha512(text) -> text\nThe SHA-512 hash of the text (UTF-8), as 128 hex characters.")(text_hash("sha512"))
+    m.fn("sha512", 1, doc="sha512(text) -> text\nText or bytes. The SHA-512 hash of the text (UTF-8), as 128 hex characters.")(text_hash("sha512"))
 
     def file_hash(name):
         def run(line, path):
@@ -80,15 +83,15 @@ def load(api):
     @m.fn("hmac_sha256", 2, doc="hmac_sha256(key, text) -> text\nA signature of text made with a secret key (HMAC-SHA256), as hex. "
                                 "Webhooks use this to prove a message really came from the sender.")
     def hmac_sha256(line, key, text):
-        check_type(line, key, "text", "hash.hmac_sha256", "key")
-        check_type(line, text, "text", "hash.hmac_sha256", "text")
+        check_type(line, key, "text|bytes", "hash.hmac_sha256", "key")
+        check_type(line, text, "text|bytes", "hash.hmac_sha256", "text")
         return _hmac.new(text_bytes(key), text_bytes(text), hashlib.sha256).hexdigest()
 
     @m.fn("compare", 2, doc="compare(a, b) -> bool\nTrue if two texts are the same, checked in constant time, so an attacker "
                             "can't learn a secret by timing the answer. Use it for passwords, tokens and signatures.")
     def compare(line, a, b):
-        check_type(line, a, "text", "hash.compare", "a")
-        check_type(line, b, "text", "hash.compare", "b")
+        check_type(line, a, "text|bytes", "hash.compare", "a")
+        check_type(line, b, "text|bytes", "hash.compare", "b")
         return _hmac.compare_digest(text_bytes(a), text_bytes(b))
 
     return m

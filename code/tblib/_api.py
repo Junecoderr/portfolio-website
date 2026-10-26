@@ -39,6 +39,25 @@ Rules of the road
   TB programs can catch with try/catch, and it prints as
   "Oops! On line N: message" when uncaught. Never let a Python exception
   escape; `fail_os(line, err, path)` turns OSError into a friendly message.
+* Typed errors (TB 3.0): pass the TB error class so programs can write
+  `catch err: ParseError { }`: `fail(line, msg, cls="ParseError")`, or use
+  the shortcuts `fail_type`, `fail_value`, `fail_file`, `fail_parse`,
+  `fail_network`, `fail_permission`, `fail_not_found`, `fail_timeout`
+  (same arguments as fail). `fail_os` already picks FileError /
+  NotFoundError / PermissionError. Classes: Error, TypeError, ValueError,
+  FileError, ParseError, NetworkError, PermissionError, NotFoundError,
+  TimeoutError, StopIteration, AssertionError.
+* Objects with methods and operators (TB 3.0): `cls = native_class("Money",
+  doc)`, then `@method(cls, "add", 1)` on `def add(line, me, other)` and
+  `make_object(cls, {"text": ...})` for each value. TB sees a class
+  instance: `type(x)` is "Money", fields by dot, and the special method
+  names work exactly as for TB classes: add sub mul div floor_div mod pow
+  (a + b calls a.add(b); radd ... when the object is on the right), negate
+  (-a), equals (==), compare (< > sort), text (say/str/f-strings), get/set
+  (indexing), len, contains (in), iter/next, call. Keep Python-only state in
+  fields whose name starts with "_" (shown nowhere except fields()).
+* Bytes cross the boundary as Python `bytes` (TB's bytes type); check them
+  with check_type(line, data, "bytes", ...) or "text|bytes".
 * `api.call(fn, args, line)` calls a TB function (callbacks).
   `api.wrap(fn, line)` gives a plain Python callable (for tkinter etc.).
 * `api.output(text)` prints through TB (tests and the playground capture it);
@@ -63,37 +82,92 @@ tb_type = _tb.tb_type
 is_number = _tb.is_number
 
 __all__ = [
-    "API", "MANY", "Module", "TBError", "check_type", "fail", "fail_os",
-    "is_number", "tb_type", "to_text", "type_name",
+    "API", "MANY", "Module", "TBError", "check_type", "error_class", "fail", "make_object",
+    "method", "native_class", "fail_file",
+    "fail_network", "fail_not_found", "fail_os", "fail_parse", "fail_permission",
+    "fail_timeout", "fail_type", "fail_value", "is_number", "tb_type", "to_text", "type_name",
 ]
 
 
-def fail(line, message: str, **fields):
+def native_class(name: str, doc: str = ""):
+    """A TB class whose methods are written in Python (see method()).
+    Instances come from make_object(cls, fields)."""
+    cls = _tb.TBClass(name)
+    cls.doc = doc
+    return cls
+
+
+def method(cls, name: str, min_args: int = 0, max_args: int | None = None, doc: str = ""):
+    """Decorator: add a Python method to a native_class. The function gets
+    (line, me, *args), where me is the instance (me.fields is its field map).
+    max_args None means "exactly min_args"; MANY means any number."""
+    hi = min_args if max_args is None else max_args
+
+    def register(func):
+        def call(interp, line, me, *args):
+            return func(line, me, *args)
+
+        cls.methods[name] = _tb.NativeMethod(name, call, (min_args, hi), doc)
+        return func
+
+    return register
+
+
+def make_object(cls, fields: dict | None = None):
+    """A new instance of cls (a native_class or any TB class) with these fields."""
+    return _tb.Instance(cls, dict(fields or {}))
+
+
+def error_class(cls):
+    """The TB error class for a name like "FileError" (or a class itself)."""
+    return _tb.error_class(cls)
+
+
+def fail(line, message: str, cls=None, **fields):
     """Stop with a friendly, catchable TB error. Extra keyword fields show up
-    in the caught error map: fail(line, "Not found", status=404) gives
-    err.status == 404 inside `catch err { }`."""
-    raise TBError(message, line, fields or None)
+    on the caught error: fail(line, "Not found", status=404) gives
+    err.status == 404 inside `catch err { }`. cls picks the TB error class
+    (a name such as "ParseError", or the class); default Error."""
+    raise TBError(message, line, fields or None, cls=None if cls is None else _tb.error_class(cls))
+
+
+def _typed(cls_name: str):
+    def raiser(line, message: str, **fields):
+        raise TBError(message, line, fields or None, cls=_tb.error_class(cls_name))
+    raiser.__name__ = "fail_" + _tb.snake_case(cls_name).replace("_error", "")
+    raiser.__doc__ = f"fail(), raising a {cls_name} (catch err: {cls_name} {{ }})."
+    return raiser
+
+
+fail_type = _typed("TypeError")
+fail_value = _typed("ValueError")
+fail_file = _typed("FileError")
+fail_parse = _typed("ParseError")
+fail_network = _typed("NetworkError")
+fail_permission = _typed("PermissionError")
+fail_not_found = _typed("NotFoundError")
+fail_timeout = _typed("TimeoutError")
 
 
 def fail_os(line, err: OSError, path: str, action: str = "open"):
     """Turn an OSError about `path` into a friendly TB error."""
     name = str(path)
     if isinstance(err, FileNotFoundError):
-        fail(line, f"I couldn't find '{name}'. Is the name spelled right?", path=name)
+        fail_not_found(line, f"I couldn't find '{name}'. Is the name spelled right?", path=name)
     if isinstance(err, IsADirectoryError):
-        fail(line, f"'{name}' is a folder, not a file.", path=name)
+        fail_file(line, f"'{name}' is a folder, not a file.", path=name)
     if isinstance(err, NotADirectoryError):
-        fail(line, f"'{name}' is not a folder.", path=name)
+        fail_file(line, f"'{name}' is not a folder.", path=name)
     if isinstance(err, PermissionError):
-        fail(line, f"I'm not allowed to {action} '{name}'.", path=name)
+        fail_permission(line, f"I'm not allowed to {action} '{name}'.", path=name)
     if isinstance(err, FileExistsError):
-        fail(line, f"'{name}' already exists.", path=name)
+        fail_file(line, f"'{name}' already exists.", path=name)
     reason = getattr(err, "strerror", None) or str(err)
-    fail(line, f"I couldn't {action} '{name}': {reason}.", path=name)
+    fail_file(line, f"I couldn't {action} '{name}': {reason}.", path=name)
 
 
 _KIND_WORDS = {
-    "text": "text", "number": "a number", "whole": "a whole number", "bool": "true or false",
+    "text": "text", "bytes": "bytes", "number": "a number", "whole": "a whole number", "bool": "true or false",
     "list": "a list", "map": "a map", "function": "a function", "nil": "nil",
     "any": "a value",
 }
@@ -112,6 +186,8 @@ def _matches(value, kind: str) -> bool:
         return _tb.is_whole(value)
     if kind == "text":
         return isinstance(value, str)
+    if kind == "bytes":
+        return isinstance(value, bytes)
     if kind == "list":
         return isinstance(value, list)
     if kind == "map":
@@ -126,7 +202,7 @@ def _matches(value, kind: str) -> bool:
 def check_type(line, value, kind: str, fn_name: str, arg_name: str):
     """Check an argument and return it (whole numbers come back as int).
 
-    kind: "text", "number", "whole", "bool", "list", "map", "function",
+    kind: "text", "bytes", "number", "whole", "bool", "list", "map", "function",
     "nil", "any", or several joined by "|", e.g. "text|nil" or "list|map".
 
         path = check_type(line, path, "text", "fs.read", "path")
@@ -138,7 +214,7 @@ def check_type(line, value, kind: str, fn_name: str, arg_name: str):
             return int(value) if k == "whole" else value
     wanted = " or ".join(_KIND_WORDS.get(k, k) for k in kinds)
     got = to_text(value, nested=True) if kind == "whole" and is_number(value) else _article(value)
-    fail(line, f"{fn_name}() needs {arg_name} to be {wanted}, not {got}.")
+    fail_type(line, f"{fn_name}() needs {arg_name} to be {wanted}, not {got}.")
 
 
 def _article(value) -> str:

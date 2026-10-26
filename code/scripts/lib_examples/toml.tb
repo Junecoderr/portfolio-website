@@ -1,0 +1,5 @@
+import toml
+
+let config = toml.parse("title = \"triage\"\n[alerts]\nlevel = \"high\"\nports = [22, 3389]\n")
+say(config.title, config.alerts.level, config.alerts.ports)
+say(toml.stringify({"owner": {"name": "Tanisha"}, "debug": false}))

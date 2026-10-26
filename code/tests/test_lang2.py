@@ -10,7 +10,7 @@ from conftest import run_tb, tb_error
 # -- maps ---------------------------------------------------------------------
 
 def test_map_literal_and_display():
-    assert run_tb('let m = {"name": "Alex", "age": 21}\nsay(m)') == ['{"name": "Alex", "age": 21}']
+    assert run_tb('let m = {"name": "Tanisha", "age": 21}\nsay(m)') == ['{"name": "Tanisha", "age": 21}']
     assert run_tb("say({})") == ["{}"]
     assert run_tb('say({1: "one", 2.5: [1, "a"], "n": nil, "b": true})') == [
         '{1: "one", 2.5: [1, "a"], "n": nil, "b": true}'
@@ -109,8 +109,8 @@ def test_old_index_errors_mention_maps_gently():
 # -- dot access -----------------------------------------------------------------
 
 def test_dot_reads_and_sets_map_fields():
-    src = 'let p = {"name": "T"}\np.name = "Alex"\np.age = 21\nsay(p.name, p.age, p)'
-    assert run_tb(src) == ['Alex 21 {"name": "Alex", "age": 21}']
+    src = 'let p = {"name": "T"}\np.name = "Tanisha"\np.age = 21\nsay(p.name, p.age, p)'
+    assert run_tb(src) == ['Tanisha 21 {"name": "Tanisha", "age": 21}']
 
 
 def test_dot_missing_field_error_with_hint():
@@ -137,7 +137,7 @@ def test_nested_dot_and_index():
 def test_dot_on_nil_and_bool_and_function():
     assert "I can't use '.name' on nil" in str(tb_error("let x = nil\nsay(x.name)"))
     assert "I can't use '.x' on true/false" in str(tb_error("say(true.x)"))
-    assert "I can't use '.x' on function" in str(tb_error("say(say.x)"))
+    assert "A function doesn't have a method called 'x'" in str(tb_error("say(say.x)"))  # 3.0: functions have .name/.call/.bind
 
 
 def test_setting_field_on_non_map():
@@ -276,7 +276,7 @@ def test_unknown_method_lists_methods_and_hints():
     err = tb_error("let xs = [1]\nxs.append(2)")
     assert err.line == 2
     assert "A list doesn't have a method called 'append'. Did you mean 'push'?" in str(err)
-    assert "List methods: contains, copy, each," in str(err)
+    assert "List methods: all, any, contains, copy, each," in str(err)
     assert "Did you mean 'upper'?" in str(tb_error('"a".uper()'))
     assert "Did you mean 'trim'?" in str(tb_error('"a".strip()'))
     assert "A number doesn't have a method called 'zap'." in str(tb_error("say(5.zap())"))
@@ -330,8 +330,8 @@ def test_methods_are_values():
 # -- f-text -------------------------------------------------------------------------
 
 def test_fstring_basics():
-    src = 'let name = "Alex"\nlet xs = [1, 2, 3]\nsay(f"Hello {name}, you have {len(xs)} items, {xs[0] + 10}.")'
-    assert run_tb(src) == ["Hello Alex, you have 3 items, 11."]
+    src = 'let name = "Tanisha"\nlet xs = [1, 2, 3]\nsay(f"Hello {name}, you have {len(xs)} items, {xs[0] + 10}.")'
+    assert run_tb(src) == ["Hello Tanisha, you have 3 items, 11."]
 
 
 def test_fstring_values_use_say_formatting():
@@ -572,7 +572,7 @@ def test_tb_written_library_docs(tmp_path):
 
 def test_catch_builtin_error_map():
     src = 'try {\n  say(1 / 0)\n} catch err {\n  say(err.message, err.line, err.kind, type(err))\n}'
-    assert run_tb(src) == ["You can't divide by zero. 2 error map"]
+    assert run_tb(src) == ["You can't divide by zero. 2 value_error ValueError"]  # 3.0: typed Error objects
 
 
 def test_catch_library_error():
@@ -655,7 +655,7 @@ def test_try_syntax_errors(src, message):
 def test_other_language_error_words_get_hints():
     assert "TB throws errors with 'throw'" in str(tb_error('raise "x"'))
     assert "try { ... } catch err" in str(tb_error("except ValueError"))
-    assert "import fs" in str(tb_error("from os import path"))
+    assert "has nothing called 'path'" in str(tb_error("from os import path"))  # 3.0: 'from ... import' is real syntax
 
 
 def test_python_exception_in_library_becomes_tb_error():

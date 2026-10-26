@@ -1,0 +1,135 @@
+# cert-check: check the TLS certificates of servers you run.
+#
+#   tb main.tb example.com
+#   tb main.tb example.com mail.example.com:465 https://intranet.local:8443
+#   tb main.tb --file hosts.txt --warn 21
+#   tb main.tb example.com --versions --json
+#
+# For each server it reports who issued the certificate, when it expires,
+# whether this computer trusts it and whether it is for that name, and
+# lists the issues (expired, expiring soon, untrusted, wrong name, old TLS).
+# The exit code is 1 when any server has an issue, so it fits in a
+# scheduled job. Only check servers you run or have permission to test.
+
+import os
+import fs
+import tls
+import json
+
+fn usage() {
+  say("Usage: tb main.tb HOST[:PORT] ... [--file hosts.txt] [--warn DAYS] [--versions] [--ca-file ca.pem] [--json]")
+}
+
+let targets = []
+let warn_days = 30
+let show_versions = false
+let as_json = false
+let ca_file = nil
+
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--help" or arg == "-h" {
+    usage()
+    exit(0)
+  } else if arg == "--versions" {
+    show_versions = true
+  } else if arg == "--json" {
+    as_json = true
+  } else if arg == "--warn" or arg == "--file" or arg == "--ca-file" {
+    if i + 1 >= len(os.args) {
+      say(f"{arg} needs a value.")
+      exit(2)
+    }
+    let value = os.args[i + 1]
+    if arg == "--warn" {
+      try {
+        warn_days = num(value)
+      } catch err {
+        say(f"--warn needs a number of days, not {value}.")
+        exit(2)
+      }
+    } else if arg == "--ca-file" {
+      ca_file = value
+    } else {
+      try {
+        for row in fs.read(value).split("\n") {
+          let host = row.trim()
+          if host != "" and not host.starts_with("#") {
+            targets.push(host)
+          }
+        }
+      } catch err {
+        say(err.message)
+        exit(2)
+      }
+    }
+    i += 1
+  } else if arg.starts_with("--") {
+    say(f"Unknown option {arg}.")
+    usage()
+    exit(2)
+  } else {
+    targets.push(arg)
+  }
+  i += 1
+}
+if targets.is_empty() {
+  usage()
+  exit(2)
+}
+
+let options = {"warn_days": warn_days}
+if ca_file != nil {
+  options.ca_file = ca_file
+}
+
+let results = []
+for target in targets {
+  try {
+    let r = tls.check(target, nil, options)
+    if show_versions {
+      r.versions = tls.versions(target, nil, {"timeout": 5})
+    }
+    results.push(r)
+  } catch err {
+    results.push({"host": target, "ok": false, "error": err.message, "issues": [err.message]})
+  }
+}
+
+if as_json {
+  say(json.stringify(results, true))
+} else {
+  for r in results {
+    if r.get("error") != nil {
+      say(f"{r.host}")
+      say(f"  could not check: {r.error}")
+      say("")
+      continue
+    }
+    let status = "OK"
+    if not r.ok {
+      status = "ISSUES"
+    }
+    say(f"{r.host}:{r.port}  {status}")
+    say(f"  subject   {r.subject.get("common_name") or "-"}")
+    say(f"  issuer    {r.issuer.get("common_name") or "-"}")
+    say(f"  expires   {r.expires} ({r.days_left} days left)")
+    say(f"  trusted   {r.verified}, name matches {r.hostname_matches}, self-signed {r.self_signed}")
+    say(f"  protocol  {r.version} {r.cipher}")
+    if r.get("versions") != nil {
+      let on = keys(r.versions).filter(fn(v) { return r.versions[v] == true })
+      say(f"  accepts   {on.join(", ")}")
+    }
+    for issue in r.issues {
+      say(f"  ! {issue}")
+    }
+    say("")
+  }
+  let bad = results.filter(fn(r) { return not r.ok })
+  say(f"{len(results) - len(bad)} of {len(results)} servers OK.")
+}
+
+if results.any(fn(r) { return not r.ok }) {
+  exit(1)
+}

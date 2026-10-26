@@ -1,0 +1,8 @@
+import yaml
+
+let config = yaml.parse("defaults: &d\n  level: high\n  notify: [soc]\nrules:\n  - name: brute force\n    <<: *d\n  - name: scan\n    level: low\n")
+for r in config.rules {
+  say(f"{r.name}: {r.level}")
+}
+say(yaml.stringify({"name": "Tanisha", "tags": ["a", "b"]}))
+say(len(yaml.parse_all("a: 1\n---\nb: 2\n")))

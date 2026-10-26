@@ -1,0 +1,6 @@
+import websocket
+
+let ws = websocket.connect("wss://echo.example.com/socket")
+ws.send({"hello": "Tanisha"})
+say(ws.receive(5))
+ws.close()

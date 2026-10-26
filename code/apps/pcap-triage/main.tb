@@ -1,0 +1,282 @@
+# pcap-triage: read a network capture and say what an analyst should look at.
+#
+#   tb apps/pcap-triage/main.tb                         triage the sample capture
+#   tb apps/pcap-triage/main.tb capture.pcap            your own pcap or pcapng
+#   tb apps/pcap-triage/main.tb capture.pcap --html report.html --save suspicious.pcap
+
+import os
+import fs
+import pcap
+import report
+import ioc
+
+let path = nil
+let html_path = nil
+let save_path = nil
+
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--html" or arg == "--save" {
+    if i + 1 >= len(os.args) {
+      say(f"{arg} needs a file name, like: {arg} out.html")
+      exit(2)
+    }
+    if arg == "--html" {
+      html_path = os.args[i + 1]
+    } else {
+      save_path = os.args[i + 1]
+    }
+    i += 2
+    continue
+  }
+  if arg == "--help" or arg == "-h" {
+    say("Usage: tb main.tb [capture.pcap] [--html report.html] [--save suspicious.pcap]")
+    exit(0)
+  }
+  if arg.starts_with("--") {
+    say(f"Unknown option {arg}. Try --help.")
+    exit(2)
+  }
+  path = arg
+  i += 1
+}
+if path == nil {
+  path = fs.join(fs.here(), "..", "data", "sample.pcap")
+  say("No capture given, so here is a triage of apps/data/sample.pcap.")
+  say("")
+}
+
+let packets = nil
+try {
+  packets = pcap.read(path)
+} catch err {
+  say(err.message)
+  exit(1)
+}
+let summary = pcap.summary(packets)
+let flows = pcap.flows(packets)
+let talkers = pcap.top_talkers(packets, 5)
+let queries = pcap.dns_queries(packets)
+let requests = pcap.http_requests(packets)
+let hellos = pcap.sni(packets)
+let scans = pcap.port_scans(packets, 10)
+
+say(f"== {fs.name(path)}  ({pcap.format(path)}, {summary.packets} packets, {summary.bytes} bytes, {summary.hosts} hosts, {len(flows)} flows)")
+say(f"   {summary.first_when} to {summary.last_when} UTC ({summary.duration} seconds)")
+let proto_parts = []
+for name in summary.protocols.keys() {
+  proto_parts.push(f"{name} {summary.protocols[name]}")
+}
+say("   protocols: " + proto_parts.join(", "))
+if not summary.apps.is_empty() {
+  let app_parts = []
+  for name in summary.apps.keys() {
+    app_parts.push(f"{name} {summary.apps[name]}")
+  }
+  say("   seen: " + app_parts.join(", "))
+}
+say("")
+
+say("Top talkers")
+say(report.table(talkers, ["ip", "packets", "bytes", "sent", "received", "peers"]))
+say("")
+
+# -- findings -------------------------------------------------------------------
+
+let findings = []
+
+fn add(level, title, by, detail, when) {
+  findings.push({"level": level, "finding": title, "by": by, "detail": detail, "when": when})
+}
+
+# Looks like a name a malware generator made up: long, consonant-heavy first label.
+fn looks_random(name) {
+  let label = name.split(".")[0]
+  if len(label) < 12 {
+    return false
+  }
+  let vowels = 0
+  let digits = 0
+  for ch in label.chars() {
+    if "aeiou".contains(ch) {
+      vowels += 1
+    }
+    if ch.is_number() {
+      digits += 1
+    }
+  }
+  return vowels * 4 < len(label) or digits * 3 > len(label)
+}
+
+let bad_hosts = {}
+
+for s in scans {
+  add("high", "Port scan", s.src, f"{s.count} ports on {s.dst} in {s.duration}s; open: {s.open_ports.join(", ")}", s.first_when)
+  bad_hosts[s.src] = true
+}
+
+for q in queries {
+  if q.rcode == "NXDOMAIN" and looks_random(q.name) {
+    add("medium", "DGA-looking DNS name (NXDOMAIN)", q.src, q.name, q.when)
+  } else if looks_random(q.name) {
+    add("low", "Random-looking DNS name", q.src, q.name, q.when)
+  }
+  let tld = q.name.split(".").last()
+  if ["top", "xyz", "zip", "mov", "tk", "ml", "ga", "cf", "gq", "icu", "buzz"].contains(tld) and not looks_random(q.name) {
+    add("low", "Lookup of a name on a frequently abused TLD", q.src, q.name + " -> " + q.answers.join(", "), q.when)
+  }
+  for answer in q.answers {
+    if ioc.is_ip(answer) {
+      bad_hosts[answer] = bad_hosts.get(answer, false)
+    }
+  }
+}
+
+for r in requests {
+  let host = r.host
+  if host == nil {
+    host = r.dst
+  }
+  let where = f"{r.method} {r.url} from {r.src}"
+  if ioc.is_ip(host) {
+    add("high", "HTTP request to a bare IP address", r.src, where, r.when)
+    bad_hosts[r.dst] = true
+  }
+  let lower = r.path.lower()
+  for ext in [".ps1", ".exe", ".dll", ".hta", ".vbs", ".bat", ".scr", ".jar", ".msi"] {
+    if lower.ends_with(ext) {
+      add("high", f"Download of a {ext} file over plain HTTP", r.src, where, r.when)
+      bad_hosts[r.dst] = true
+    }
+  }
+  if r.user_agent != nil and (r.user_agent.contains("MSIE 6.0") or r.user_agent.contains("Windows NT 5.1") or r.user_agent.lower().contains("python") or r.user_agent.lower().contains("curl")) {
+    add("medium", "Unusual browser (User-Agent)", r.src, r.user_agent, r.when)
+  }
+}
+
+# TLS to the same odd name again and again, evenly spaced: beaconing.
+let by_name = {}
+for h in hellos {
+  let name = h.sni
+  if name == nil {
+    name = f"(no SNI) {h.dst}"
+  }
+  if not by_name.has(name) {
+    by_name[name] = []
+  }
+  by_name[name].push(h)
+}
+for name in by_name.keys() {
+  let list = by_name[name]
+  if bad_hosts.get(list[0].dst, false) {
+    add("high", "TLS to a host already flagged", list[0].src, f"{name} ({list[0].dst}:{list[0].dport}, {len(list)} connections)", list[0].when)
+  }
+  if len(list) >= 3 {
+    let gaps = []
+    let k = 1
+    while k < len(list) {
+      gaps.push(round(list[k].time - list[k - 1].time, 1))
+      k += 1
+    }
+    if gaps.unique().len() == 1 {
+      add("medium", "Regular TLS beacon", list[0].src, f"{name} every {gaps[0]}s ({len(list)} times)", list[0].when)
+    }
+  }
+  if name.starts_with("(no SNI)") {
+    add("low", "TLS without a server name", list[0].src, f"{list[0].dst}:{list[0].dport}", list[0].when)
+  }
+}
+
+let refused = flows.filter(fn(f) { return f.protocol == "tcp" and f.get("state") == "refused" })
+if len(refused) >= 5 and scans.is_empty() {
+  add("medium", "Many refused TCP connections", refused[0].src, f"{len(refused)} connections were reset", refused[0].first_when)
+}
+
+let order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+findings = findings.sort_by(fn(f) { return order[f.level] })
+
+say("Findings")
+if findings.is_empty() {
+  say("  Nothing suspicious. This capture looks quiet.")
+} else {
+  say(report.table(findings, ["level", "finding", "by", "detail", "when"], {"max_width": 70}))
+}
+say("")
+
+say("DNS lookups")
+if queries.is_empty() {
+  say("  none")
+} else {
+  let rows = []
+  for q in queries {
+    let answer = q.answers.join(", ")
+    if q.rcode == "NXDOMAIN" {
+      answer = "NXDOMAIN"
+    }
+    rows.push({"when": q.when, "src": q.src, "name": q.name, "type": q.type, "answer": answer})
+  }
+  say(report.table(rows, ["when", "src", "name", "type", "answer"], {"max_width": 50}))
+}
+say("")
+
+say("HTTP requests")
+if requests.is_empty() {
+  say("  none")
+} else {
+  say(report.table(requests, ["when", "src", "method", "url", "user_agent"], {"max_width": 60}))
+}
+say("")
+
+say("TLS server names")
+if hellos.is_empty() {
+  say("  none")
+} else {
+  say(report.table(hellos, ["when", "src", "dst", "dport", "sni", "version"]))
+}
+say("")
+
+say("Longest conversations")
+let busiest = flows.sort_by(fn(f) { return 0 - f.bytes }).slice(0, 8)
+let flow_rows = []
+for f in busiest {
+  flow_rows.push({"protocol": f.protocol, "client": f"{f.src}:{f.sport}", "server": f"{f.dst}:{f.dport}", "packets": f.packets, "bytes": f.bytes, "app": f.app, "names": f.names.join(", ")})
+}
+say(report.table(flow_rows, ["protocol", "client", "server", "packets", "bytes", "app", "names"]))
+
+let high = findings.filter(fn(f) { return f.level == "high" or f.level == "critical" })
+say("")
+say(f"Done: {summary.packets} packets, {len(findings)} finding(s), {len(high)} high.")
+
+if save_path != nil {
+  let hosts = bad_hosts.keys().filter(fn(h) { return bad_hosts[h] })
+  let keep = packets.filter(fn(p) { return hosts.contains(p.src) or hosts.contains(p.dst) })
+  try {
+    let n = pcap.write(save_path, keep)
+    say(f"Saved {n} packets involving {hosts.join(", ")} to {save_path}")
+  } catch err {
+    say(err.message)
+  }
+}
+
+if html_path != nil {
+  let rows = []
+  for f in findings {
+    rows.push({"level": f.level, "finding": f.finding, "by": f.by, "detail": f.detail, "when": f.when})
+  }
+  let page = report.html(f"PCAP triage: {fs.name(path)}", rows, {
+    "intro": f"{summary.packets} packets from {summary.first_when} to {summary.last_when} UTC.",
+    "stats": {"Packets": summary.packets, "Hosts": summary.hosts, "Flows": len(flows), "Findings": len(findings)},
+    "sections": [
+      {"title": "DNS lookups", "rows": queries, "columns": ["when", "src", "name", "type", "rcode"]},
+      {"title": "HTTP requests", "rows": requests, "columns": ["when", "src", "method", "url", "user_agent"]},
+      {"title": "TLS server names", "rows": hellos, "columns": ["when", "src", "dst", "sni", "version"]},
+      {"title": "Top talkers", "rows": talkers, "columns": ["ip", "packets", "bytes", "peers"]},
+    ],
+  })
+  try {
+    say("HTML report saved to " + report.save(html_path, page))
+  } catch err {
+    say(err.message)
+  }
+}

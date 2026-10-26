@@ -13,7 +13,7 @@ from tblib._api import Module, check_type, fail, fail_os
 
 import tb as _tb
 
-FORMATS = ["auto", "syslog", "auth", "apache", "nginx", "json", "csv", "windows", "text"]
+FORMATS = ["auto", "syslog", "auth", "apache", "nginx", "json", "csv", "windows", "text", "evtx"]
 MAX_RECORDS = 5_000_000
 SNIFF_BYTES = 64 * 1024
 MONTHS = {m: i for i, m in enumerate(
@@ -31,13 +31,16 @@ SLASH_YMD = re.compile(r"(\d{4})/(\d{1,2})/(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d
 APACHE_TIME = re.compile(r"(\d{1,2})/([A-Za-z]{3})/(\d{4}):(\d{2}):(\d{2}):(\d{2})(?:\s*([+-]\d{4}))?")
 SYSLOG_TIME = re.compile(r"([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})(?:\s+(\d{4}))?")
 US_TIME = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([AaPp][Mm]))?")
+RFC2822_TIME = re.compile(
+    r"(?:[A-Za-z]{3},\s*)?(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(Z|GMT|UTC|[+-]\d{4})?",
+    re.IGNORECASE)
 DOTNET_DATE = re.compile(r"\\?/Date\((-?\d+)([+-]\d{4})?\)\\?/")
 
 
 def _offset(text):
     if not text:
         return None
-    if text.upper() == "Z":
+    if text.upper() in ("Z", "GMT", "UTC"):
         return _dt.timezone.utc
     sign = -1 if text[0] == "-" else 1
     digits = text[1:].replace(":", "")
@@ -49,12 +52,51 @@ def _offset(text):
 def _stamp(year, month, day, hour, minute, second, micro=0, tz=None):
     """(timestamp, "YYYY-MM-DD HH:MM:SS") or None. Times without a zone are
     the computer's local time, like the time library."""
+    when = _make(year, month, day, hour, minute, second, micro, tz)
+    return None if when is None else _pair(when)
+
+
+def _make(year, month, day, hour, minute, second, micro=0, tz=None):
+    """A datetime (zone-aware when the log said its zone, else naive local
+    time), or None when the numbers don't make a real date."""
     try:
         when = _dt.datetime(year, month, day, hour, minute, second, micro, tzinfo=tz)
-        ts = when.timestamp()
+        when.timestamp()  # too far from today? (OverflowError / OSError)
     except (ValueError, OverflowError, OSError):
         return None
-    return _tb.tidy_number(round(ts, 6)), when.strftime("%Y-%m-%d %H:%M:%S")
+    return when
+
+
+def _pair(when):
+    """(timestamp, display text) for a datetime from _make()."""
+    return _tb.tidy_number(round(when.timestamp(), 6)), when.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def zone_text(when) -> str | None:
+    """How a record shows its zone: "UTC", "+02:00", "-05:30"; None when the
+    log line carried no zone (the time was read as local time)."""
+    if when is None or when.tzinfo is None:
+        return None
+    offset = when.utcoffset()
+    if offset is None:
+        return None
+    total = int(offset.total_seconds())
+    if total == 0:
+        return "UTC"
+    sign = "-" if total < 0 else "+"
+    total = abs(total)
+    return f"{sign}{total // 3600:02d}:{total % 3600 // 60:02d}"
+
+
+def utc_text(ts) -> str | None:
+    """A timestamp as "YYYY-MM-DD HH:MM:SS" in UTC, so records from logs in
+    different zones sort and compare the same way. None for no timestamp."""
+    if ts is None or isinstance(ts, bool) or not _tb.is_number(ts):
+        return None
+    try:
+        return _dt.datetime.fromtimestamp(ts, _dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, OverflowError, OSError):
+        return None
 
 
 def guess_year(month, day, now=None):
@@ -72,47 +114,61 @@ def guess_year(month, day, now=None):
 
 def parse_time(value, year=None):
     """A timestamp (seconds since 1970) and display text from many log time
-    formats, or (None, None)."""
-    if value is None or isinstance(value, bool):
+    formats, or (None, None). The display text is the time as written in the
+    log (its own zone, or local time when the log gave none); use
+    utc_text(ts) / zone_text(parse_datetime(value)) for the zone-aware view."""
+    when = parse_datetime(value, year)
+    if when is None:
         return None, None
+    return _pair(when)
+
+
+def parse_datetime(value, year=None):
+    """A datetime for a log time written in many ways, or None. It is
+    zone-aware when the text carried a zone ("Z", "+02:00", "+0000") or was
+    a numeric timestamp (UTC); otherwise it is naive local time. The
+    datetime library reuses this so both read the same formats."""
+    if value is None or isinstance(value, bool):
+        return None
     if _tb.is_number(value):
         ts = value / 1000 if abs(value) > 1e11 else value
         try:
-            shown = _dt.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+            return _dt.datetime.fromtimestamp(ts, _dt.timezone.utc).astimezone()
         except (ValueError, OverflowError, OSError):
-            return None, None
-        return _tb.tidy_number(ts), shown
+            return None
     if isinstance(value, dict):
         for key in ("SystemTime", "systemtime", "#text", "value", "DateTime"):
             if key in value:
-                return parse_time(value[key], year)
-        return None, None
+                return parse_datetime(value[key], year)
+        return None
     if not isinstance(value, str):
-        return None, None
+        return None
     text = value.strip()
     if not text:
-        return None, None
+        return None
     if re.fullmatch(r"\d{9,13}(\.\d+)?", text):
-        return parse_time(float(text), year)
+        return parse_datetime(float(text), year)
     m = DOTNET_DATE.search(text)
     if m:
         ms = int(m.group(1))
         tz = _offset(m.group(2)) or _dt.timezone.utc
-        when = _dt.datetime.fromtimestamp(ms / 1000, tz)
-        return _tb.tidy_number(ms / 1000), when.strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            return _dt.datetime.fromtimestamp(ms / 1000, tz)
+        except (ValueError, OverflowError, OSError):
+            return None
     m = ISO_TIME.match(text)
     if m:
         y, mo, d, h, mi, s, frac, tz = m.groups()
         micro = int((frac or "0")[:6].ljust(6, "0"))
-        return _stamp(int(y), int(mo), int(d), int(h), int(mi), int(s or 0), micro, _offset(tz)) or (None, None)
+        return _make(int(y), int(mo), int(d), int(h), int(mi), int(s or 0), micro, _offset(tz))
     m = SLASH_YMD.match(text)
     if m:
         y, mo, d, h, mi, s = m.groups()
-        return _stamp(int(y), int(mo), int(d), int(h), int(mi), int(s or 0)) or (None, None)
+        return _make(int(y), int(mo), int(d), int(h), int(mi), int(s or 0))
     m = APACHE_TIME.match(text)
     if m and m.group(2).lower() in MONTHS:
         d, mon, y, h, mi, s, tz = m.groups()
-        return _stamp(int(y), MONTHS[mon.lower()], int(d), int(h), int(mi), int(s), 0, _offset(tz)) or (None, None)
+        return _make(int(y), MONTHS[mon.lower()], int(d), int(h), int(mi), int(s), 0, _offset(tz))
     m = US_TIME.match(text)
     if m:
         a, b, y, h, mi, s, ampm = m.groups()
@@ -122,14 +178,19 @@ def parse_time(value, year=None):
         hour = int(h)
         if ampm:
             hour = hour % 12 + (12 if ampm.lower() == "pm" else 0)
-        return _stamp(int(y), month, day, hour, int(mi), int(s or 0)) or (None, None)
+        return _make(int(y), month, day, hour, int(mi), int(s or 0))
     m = SYSLOG_TIME.match(text)
     if m and m.group(1).lower() in MONTHS:
         mon, d, h, mi, s, y = m.groups()
         month, day = MONTHS[mon.lower()], int(d)
         yr = int(y) if y else (year or guess_year(month, day))
-        return _stamp(yr, month, day, int(h), int(mi), int(s)) or (None, None)
-    return None, None
+        return _make(yr, month, day, int(h), int(mi), int(s))
+    m = RFC2822_TIME.match(text)
+    if m:
+        d, mon, y, h, mi, s, tz = m.groups()
+        if mon.lower() in MONTHS:
+            return _make(int(y), MONTHS[mon.lower()], int(d), int(h), int(mi), int(s or 0), 0, _offset(tz))
+    return None
 
 
 class YearTracker:
@@ -154,14 +215,32 @@ class YearTracker:
 # =============================================================================
 
 def make_record(fmt, raw, time_value=None, when=None, message=None, fields=None):
-    record = {"time": time_value, "when": when, "format": fmt,
+    """A log record map. "time" is the UTC timestamp, "when" the time as the
+    log wrote it, "when_utc" the same instant as UTC text (compare and sort
+    records from different zones by this), and "zone" the zone the line
+    carried ("UTC", "+02:00") or the local zone it was read in."""
+    record = {"time": time_value, "when": when, "when_utc": utc_text(time_value),
+              "zone": _zone_of(time_value, when), "format": fmt,
               "message": raw if message is None else message}
     if fields:
         for key, value in fields.items():
-            if key not in ("time", "when", "format", "message", "raw"):
+            if key not in ("time", "when", "when_utc", "zone", "format", "message", "raw"):
                 record[key] = value
     record["raw"] = raw
     return record
+
+
+def _zone_of(ts, when):
+    """The zone a record's "when" text is in, worked out from the gap between
+    that wall-clock text and the UTC timestamp."""
+    if ts is None or not isinstance(when, str) or isinstance(ts, bool) or not _tb.is_number(ts):
+        return None
+    try:
+        wall = _dt.datetime.strptime(when, "%Y-%m-%d %H:%M:%S").replace(tzinfo=_dt.timezone.utc)
+        gap = round((wall.timestamp() - ts) / 60) * 60
+        return zone_text(_dt.datetime.fromtimestamp(0, _dt.timezone(_dt.timedelta(seconds=gap))))
+    except (ValueError, OverflowError, OSError):
+        return None
 
 
 def text_record(line, fmt="text"):
@@ -862,6 +941,8 @@ def check_format(line, fmt, fn):
     fmt = fmt.lower()
     if fmt not in FORMATS:
         fail(line, f"logs.{fn}() doesn't know the format \"{fmt}\". Formats: {', '.join(FORMATS)}.")
+    if fmt == "evtx" and fn not in ("read", "each"):
+        fail(line, f"logs.{fn}() works on text, but \"evtx\" logs are binary files. Use logs.read(path) or evtx.read(path).")
     return fmt
 
 
@@ -936,6 +1017,17 @@ def first_line_is_json(text):
 
 def iter_file(path, fmt, line, year=None):
     """Records from a file, read a line at a time where the format allows."""
+    if fmt in ("auto", "evtx"):
+        # Binary Windows event logs (.evtx, magic "ElfFile") go to the evtx library.
+        try:
+            with open(path, "rb") as fb:
+                head = fb.read(8)
+        except OSError as err:
+            fail_os(line, err, path, "read")
+        if head == b"ElfFile\x00" or fmt == "evtx":
+            from tblib import evtx as _evtx
+            yield from _evtx.iter_path(line, path, "logs.read")
+            return
     try:
         with open_text(path) as f:
             sample = f.read(SNIFF_BYTES)
@@ -993,10 +1085,12 @@ def load(api):
         "logs",
         "Read log files into records (maps) you can search and count: syslog, Linux auth.log (SSH and sudo), "
         "Apache/nginx access logs, JSON lines, CSV and Windows Security event exports. Every record has "
-        "\"time\" (a timestamp or nil), \"when\" (the time as text), \"format\", \"message\" and \"raw\" "
+        "\"time\" (a UTC timestamp or nil), \"when\" (the time as the log wrote it), \"when_utc\" (the same "
+        "instant as UTC text, safe to sort and compare across zones), \"zone\" (\"UTC\", \"+02:00\"), "
+        "\"format\", \"message\" and \"raw\" "
         "(the original line), plus the fields of its format.",
     )
-    m.value("formats", list(FORMATS), doc="The formats logs knows: auto, syslog, auth, apache, nginx, json, csv, windows, text.")
+    m.value("formats", list(FORMATS), doc="The formats logs knows: auto, syslog, auth, apache, nginx, json, csv, windows, text, evtx (binary .evtx files, read by the evtx library).")
 
     def path_arg(line, path, fn):
         check_type(line, path, "text", f"logs.{fn}", "path")

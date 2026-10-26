@@ -1,0 +1,12 @@
+import binary
+
+# A tiny file header: magic, version (16-bit), record count (32-bit), little-endian
+let header = binary.pack("<4sHI", b"TBDB", 3, 1200)
+say(header.hex())
+let [magic, version, count] = binary.unpack("<4sHI", header)
+say(magic, version, count)
+
+say(binary.read_u16be(b"\x01\xbb"))          # 443, as a network protocol stores it
+say(binary.hexdump(b"MZ\x90\x00 tiny header"))
+say(binary.entropy(b"aaaaaaaa"), binary.entropy(binary.from_list(range(256))))
+say(binary.sniff(b"%PDF-1.7\n").type)

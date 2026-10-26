@@ -1,0 +1,99 @@
+# Tests for tb-tables. Run with:  tb test packages/tb-tables
+
+import test
+import encode
+import "lib.tb" as tables
+
+let rows = [
+  {"host": "web01", "alerts": 12, "status": "ok"},
+  {"host": "db-primary", "alerts": 3, "status": "warn"},
+]
+
+test.case("columns come from the keys in order", fn() {
+  test.equal(tables.columns_of(rows), ["host", "alerts", "status"])
+  test.equal(tables.columns_of([{"a": 1}, {"b": 2, "a": 3}]), ["a", "b"])
+  test.equal(tables.columns_of([[1, 2], [3]]), ["0", "1"])
+})
+
+test.case("a rounded table lines up and right-aligns numbers", fn() {
+  let out = tables.table(rows)
+  test.equal(out.lines(), [
+    "╭────────────┬────────┬────────╮",
+    "│ host       │ alerts │ status │",
+    "├────────────┼────────┼────────┤",
+    "│ web01      │     12 │ ok     │",
+    "│ db-primary │      3 │ warn   │",
+    "╰────────────┴────────┴────────╯",
+  ])
+})
+
+test.case("ascii style, custom headers, title and footer", fn() {
+  let out = tables.render(rows, {
+    "style": "ascii",
+    "columns": ["host", "alerts"],
+    "headers": {"host": "Host", "alerts": "Alerts"},
+    "title": "Hosts",
+    "footer": {"host": "total", "alerts": 15},
+  })
+  test.equal(out.lines(), [
+    "Hosts",
+    "+------------+--------+",
+    "| Host       | Alerts |",
+    "+------------+--------+",
+    "| web01      |     12 |",
+    "| db-primary |      3 |",
+    "+------------+--------+",
+    "| total      |     15 |",
+    "+------------+--------+",
+  ])
+})
+
+test.case("plain style has no borders", fn() {
+  let out = tables.render([["Tanisha", 91]], {"style": "plain", "headers": ["name", "score"]})
+  test.equal(out.lines(), ["name     score", "-------  -----", "Tanisha     91"])
+})
+
+test.case("list rows, alignment overrides and max_width", fn() {
+  let out = tables.render([["abcdefghij", 1], ["ab", 12345]], {"headers": ["text", "n"], "max_width": 6, "align": {"0": "center"}})
+  test.equal(out.lines()[3], "│ abcde… │     1 │")
+  test.equal(out.lines()[4], "│   ab   │ 12345 │")
+})
+
+test.case("nil and bools show nicely", fn() {
+  let out = tables.render([{"a": nil, "b": true}, {"a": "x", "b": false}], {"style": "ascii"})
+  test.equal(out.lines()[3], "|   | yes |")
+  test.equal(out.lines()[4], "| x | no  |")
+})
+
+test.case("coloured cells are measured without their escape codes", fn() {
+  let esc = encode.unhex("1b")
+  let red = esc + "[31m" + "ok" + esc + "[0m"
+  let out = tables.render([{"s": red}, {"s": "longer"}], {"style": "ascii"})
+  test.equal(out.lines()[3], "| " + red + "     |")
+  test.equal(tables.strip_codes(red), "ok")
+})
+
+test.case("markdown tables", fn() {
+  test.equal(tables.md(rows).lines(), [
+    "| host       | alerts | status |",
+    "| ---------- | -----: | ------ |",
+    "| web01      |     12 | ok     |",
+    "| db-primary |      3 | warn   |",
+  ])
+  test.equal(tables.markdown([{"x": "a|b"}], {}).lines()[2], "| a\\|b |")
+})
+
+test.case("csv quotes what it must", fn() {
+  test.equal(tables.to_csv([{"name": "Tanisha, Lead", "note": "said \"hi\""}]),
+    "name,note\n\"Tanisha, Lead\",\"said \"\"hi\"\"\"")
+})
+
+test.case("record shows a map as two columns", fn() {
+  let out = tables.record_of({"name": "Tanisha", "alerts": 3})
+  test.equal(out.lines()[1], "│ Field  │ Value   │")
+  test.equal(out.lines()[3], "│ name   │ Tanisha │")
+})
+
+test.case("unknown style is a friendly error", fn() {
+  test.raises(fn() { tables.render(rows, {"style": "fancy"}) }, "doesn't know the style 'fancy'")
+})

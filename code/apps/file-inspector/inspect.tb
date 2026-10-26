@@ -1,0 +1,107 @@
+# inspect.tb: look inside one file without running it.
+# Shared by the file-inspector command line app and its GUI variant.
+# Uses scan (file type, entropy, strings, YARA-style rules), pe and elf
+# (headers, sections, imports, suspicious indicators) and hash.
+
+import fs
+import hash
+import pe
+import elf
+import scan
+
+let LEVELS = {"high": 0, "medium": 1, "low": 2, "info": 3}
+
+# The rules that ship with the app (rules.yar next to this file's app).
+fn default_rules(folder) {
+  return scan.load(fs.join(folder, "rules.yar"))
+}
+
+# Everything we can learn about one file, as a map.
+fn inspect(path, rules) {
+  let kind = scan.file_type(path)
+  let result = {
+    "path": path, "name": fs.name(path), "type": kind.type, "description": kind.description,
+    "size": kind.size, "executable": kind.get("executable", false),
+    "hashes": hash.file(path), "entropy": scan.entropy(path),
+    "format": nil, "summary": nil, "details": nil, "indicators": [], "matches": [],
+    "strings": [], "interesting": {}, "problem": nil,
+  }
+  try {
+    if kind.type == "pe" {
+      result.details = pe.parse(path)
+      result.summary = pe.summary(path)
+    } else if kind.type == "elf" {
+      result.details = elf.parse(path)
+      result.summary = elf.summary(path)
+    }
+  } catch err {
+    result.problem = err.message
+  }
+  if result.details != nil {
+    result.format = result.details.format
+    result.indicators = result.details.indicators
+  }
+  if rules != nil {
+    result.matches = scan.file(path, rules)
+  }
+  result.strings = scan.strings(path, 5, 20000)
+  result.interesting = scan.interesting(result.strings)
+  result.verdict = verdict_of(result)
+  return result
+}
+
+# A one-word verdict: "suspicious", "worth a look" or "nothing found".
+# It is a hint for a human, never proof either way.
+fn verdict_of(result) {
+  let high = 0
+  let medium = 0
+  for i in result.indicators {
+    if i.level == "high" {
+      high += 1
+    } else if i.level == "medium" {
+      medium += 1
+    }
+  }
+  for m in result.matches {
+    let sev = m.meta.get("severity", "medium")
+    if sev == "high" or sev == "critical" {
+      high += 1
+    } else {
+      medium += 1
+    }
+  }
+  if high > 0 {
+    return "suspicious"
+  }
+  if medium > 0 {
+    return "worth a look"
+  }
+  return "nothing found"
+}
+
+# Indicators and rule matches together, most serious first, as rows.
+fn findings(result) {
+  let rows = []
+  for i in result.indicators {
+    if i.level != "info" {
+      rows.push({"level": i.level, "what": i.name, "detail": i.detail})
+    }
+  }
+  for m in result.matches {
+    let where = m.strings.map(fn(s) { return f"{s.name}@{s.offset}" }).slice(0, 4).join(" ")
+    rows.push({"level": m.meta.get("severity", "medium"), "what": "rule " + m.rule,
+               "detail": m.meta.get("description", "") + "  [" + where + "]"})
+  }
+  return rows.sort_by(fn(r) { return LEVELS.get(r.level, 9) })
+}
+
+# File sizes people can read: 812 B, 14.2 KB, 3.1 MB.
+fn human_size(n) {
+  if n < 1024 {
+    return f"{n} B"
+  }
+  if n < 1024 * 1024 {
+    return f"{round(n / 1024, 1)} KB"
+  }
+  return f"{round(n / 1024 / 1024, 1)} MB"
+}

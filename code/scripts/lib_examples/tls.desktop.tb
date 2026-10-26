@@ -1,0 +1,8 @@
+import tls
+
+# Only check servers you run or are allowed to test.
+let c = tls.check("example.com")
+say(c.ok, c.days_left, c.issuer.common_name)
+for issue in c.issues {
+  say("issue:", issue)
+}

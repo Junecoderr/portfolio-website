@@ -16,19 +16,19 @@ def to_plain(value, line, path="the value", depth=0):
     """Check that a TB value can become JSON (and copy it). Raises a friendly
     TBError naming the part that can't. Other tblib modules may reuse this."""
     if depth > MAX_DEPTH:
-        fail(line, "That value is nested too deeply (or contains itself) to turn into JSON.")
+        fail(line, "That value is nested too deeply (or contains itself) to turn into JSON.", cls="ValueError")
     if value is None or isinstance(value, (bool, str, int)):
         return value
     if isinstance(value, float):
         if not math.isfinite(value):
-            fail(line, f"JSON can't hold {value} in {path}.")
+            fail(line, f"JSON can't hold {value} in {path}.", cls="ValueError")
         return value
     if isinstance(value, list):
         return [to_plain(v, line, path, depth + 1) for v in value]
     if isinstance(value, dict):
         return {(k if isinstance(k, str) else _tb.to_text(k)): to_plain(v, line, path, depth + 1)
                 for k, v in value.items()}
-    fail(line, f"JSON can't hold a {_tb.type_name(value)} (found in {path}).")
+    fail(line, f"JSON can't hold a {_tb.type_name(value)} (found in {path}).", cls="TypeError")
 
 
 def from_json(value):
@@ -47,11 +47,11 @@ def parse_text(text: str, line, where: str = "That text"):
         return from_json(_json.loads(text, parse_constant=_reject_constant))
     except _json.JSONDecodeError as err:
         fail(line, f"{where} isn't valid JSON: {err.msg} (line {err.lineno}, column {err.colno} of the JSON).",
-             json_line=err.lineno, json_column=err.colno)
+             json_line=err.lineno, json_column=err.colno, cls="ParseError")
     except ValueError as err:
-        fail(line, f"{where} isn't valid JSON: {err}.")
+        fail(line, f"{where} isn't valid JSON: {err}.", cls="ParseError")
     except RecursionError:
-        fail(line, f"{where} is nested too deeply to read.")
+        fail(line, f"{where} is nested too deeply to read.", cls="ParseError")
 
 
 def _reject_constant(name):

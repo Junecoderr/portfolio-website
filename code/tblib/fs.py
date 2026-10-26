@@ -70,6 +70,130 @@ def load(api):
     def append(line, path, content):
         return put(line, path, content, "append", "a")
 
+    @m.fn("read_bytes", 1, doc="read_bytes(path) -> bytes\nThe whole file as bytes (for binary files: images, executables, captures).")
+    def read_bytes(line, path):
+        path = path_arg(line, path, "read_bytes")
+        need_file(line, path, "read_bytes")
+        try:
+            with open(path, "rb") as f:
+                return f.read()
+        except OSError as err:
+            fail_os(line, err, path, "read")
+
+    @m.fn("write_bytes", 2, doc="write_bytes(path, data)\nSave bytes in a file, replacing what was there (makes the file if needed).")
+    def write_bytes(line, path, data):
+        path = path_arg(line, path, "write_bytes")
+        need_file(line, path, "write_bytes")
+        check_type(line, data, "bytes", "fs.write_bytes", "data")
+        try:
+            with open(path, "wb") as f:
+                f.write(data)
+        except OSError as err:
+            fail_os(line, err, path, "write to")
+        return None
+
+    modes = {"r": "r", "w": "w", "a": "a", "rb": "rb", "wb": "wb", "ab": "ab",
+             "r+": "r+", "r+b": "r+b", "rb+": "r+b"}
+
+    def make_stream(line, path, mode):
+        binary = "b" in mode
+        try:
+            if binary:
+                handle = open(path, modes[mode])
+            else:
+                handle = open(path, modes[mode], encoding="utf-8", newline="")
+        except OSError as err:
+            fail_os(line, err, path, "open")
+        stream = {"path": path, "mode": mode}
+
+        def need_open(line, fn):
+            if handle.closed:
+                fail(line, f"file.{fn}() can't run: the file '{path}' was closed.", cls="FileError")
+
+        def add(name, lo, hi, func, doc):
+            stream[name] = _tb.Builtin(f"file.{name}", func, (lo, hi), doc)
+
+        def io(line, fn, work):
+            need_open(line, fn)
+            try:
+                return work()
+            except OSError as err:
+                fail_os(line, err, path, fn)
+            except UnicodeDecodeError:
+                fail(line, f"'{path}' isn't UTF-8 text; open it with mode \"rb\" for bytes.",
+                     cls="ValueError")
+            except Exception as err:  # io.UnsupportedOperation and friends
+                fail(line, f"file.{fn}() isn't possible in mode \"{mode}\" ({err}).", cls="FileError")
+
+        def read_(line, n=None):
+            if n is not None:
+                n = check_type(line, n, "whole", "file.read", "n")
+            data = io(line, "read", lambda: handle.read() if n is None else handle.read(n))
+            return data.replace("\r\n", "\n") if isinstance(data, str) else data
+
+        def read_line(line):
+            data = io(line, "read_line", handle.readline)
+            if data in ("", b""):
+                return None
+            if isinstance(data, str):
+                return data.rstrip("\r\n")
+            return data.rstrip(b"\r\n")
+
+        def write_(line, value):
+            if binary:
+                check_type(line, value, "bytes", "file.write", "data")
+            elif not isinstance(value, str):
+                value = _tb.to_text(value)
+            io(line, "write", lambda: handle.write(value))
+            return None
+
+        def seek(line, pos):
+            pos = check_type(line, pos, "whole", "file.seek", "pos")
+            return io(line, "seek", lambda: handle.seek(pos))
+
+        def tell(line):
+            return io(line, "tell", handle.tell)
+
+        def close(line):
+            if not handle.closed:
+                handle.close()
+            return None
+
+        add("read", 0, 1, read_, "read(n?) -> text or bytes\nRead n characters (bytes in \"rb\" mode), or everything that's left.")
+        add("read_line", 0, 0, read_line, "read_line() -> text or nil\nThe next line without its line ending, or nil at the end of the file.")
+        add("write", 1, 1, write_, "write(value)\nWrite text (bytes in a \"b\" mode) at the current position.")
+        add("seek", 1, 1, seek, "seek(pos)\nMove to byte position pos (0 is the start).")
+        add("tell", 0, 0, tell, "tell() -> number\nThe current position.")
+        add("close", 0, 0, close, "close()\nClose the file (safe to call twice).")
+        add("closed", 0, 0, lambda line: handle.closed, "closed() -> bool\nTrue once the file is closed.")
+        return stream, handle
+
+    def mode_arg(line, mode, fn):
+        check_type(line, mode, "text", f"fs.{fn}", "mode")
+        if mode not in modes:
+            fail(line, f"fs.{fn}() doesn't know the mode \"{mode}\". Use \"r\" (read), \"w\" (write), "
+                       "\"a\" (append), or add b for bytes: \"rb\", \"wb\", \"ab\".", cls="ValueError")
+        return mode
+
+    @m.fn("open", 1, 2, doc="open(path, mode?) -> file\nOpen a file to read or write it a piece at a time. mode: \"r\" (default), \"w\", \"a\", or with b for bytes (\"rb\", \"wb\", \"ab\"). The file has read(n?), read_line(), write(x), seek(pos), tell() and close(). See fs.with_file to have it closed for you.")
+    def open_(line, path, mode="r"):
+        path = path_arg(line, path, "open")
+        mode = mode_arg(line, mode, "open")
+        need_file(line, path, "open")
+        return make_stream(line, path, mode)[0]
+
+    @m.fn("with_file", 3, doc="with_file(path, mode, fn) -> value\nOpen the file, call fn(file), and close it again even if fn stops with an error. Gives back what fn gave back.")
+    def with_file(line, path, mode, fn):
+        path = path_arg(line, path, "with_file")
+        mode = mode_arg(line, mode, "with_file")
+        check_type(line, fn, "function", "fs.with_file", "fn")
+        need_file(line, path, "with_file")
+        stream, handle = make_stream(line, path, mode)
+        try:
+            return api.call(fn, [stream], line)
+        finally:
+            handle.close()
+
     @m.fn("exists", 1, doc="exists(path) -> bool\nTrue if there is a file or folder there.")
     def exists(line, path):
         return os.path.exists(path_arg(line, path, "exists"))
@@ -198,4 +322,7 @@ def load(api):
         check_type(line, path, "text", "fs.parent", "path")
         return os.path.dirname(path.rstrip("/\\"))
 
+    from tblib._watch import install as _install_watch  # fs.watch / fs.watch_stop
+
+    _install_watch(m, api)
     return m

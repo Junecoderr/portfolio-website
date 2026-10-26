@@ -1,0 +1,83 @@
+# The dashboard's alert store: a small SQLite database of alerts.
+# Every function takes the db from sqlite.open() as its first argument.
+
+import sqlite
+
+let LEVELS = ["critical", "high", "medium", "low", "informational"]
+
+# Create the tables if they are not there yet.
+fn setup(db) {
+  db.run("CREATE TABLE IF NOT EXISTS alerts (" +
+    "id INTEGER PRIMARY KEY, file TEXT NOT NULL, rule TEXT NOT NULL, level TEXT NOT NULL, " +
+    "source TEXT, count INTEGER, first_when TEXT, last_when TEXT, first_time REAL, " +
+    "description TEXT, acked_by TEXT, UNIQUE (file, rule, source, first_time))")
+  db.run("CREATE INDEX IF NOT EXISTS alerts_level ON alerts(level)")
+}
+
+# Save the alerts found in one log file. Alerts already stored (same file,
+# rule, source and start time) are skipped, so loading a log twice is safe.
+# Gives back how many new alerts were saved.
+fn save(db, file, alerts) {
+  let rows = []
+  for a in alerts {
+    rows.push({
+      "file": file, "rule": a.rule, "level": a.level, "source": str(a.by),
+      "count": a.count, "first_when": a.first_when, "last_when": a.last_when,
+      "first_time": a.first, "description": a.description or "",
+    })
+  }
+  let before = db.value("SELECT COUNT(*) FROM alerts")
+  db.execute_many("INSERT OR IGNORE INTO alerts (file, rule, level, source, count, first_when, last_when, first_time, description) VALUES (:file, :rule, :level, :source, :count, :first_when, :last_when, :first_time, :description)", rows)
+  return db.value("SELECT COUNT(*) FROM alerts") - before
+}
+
+# The alerts, most serious first. filters may have "level", "file" and
+# "open" (true: only alerts nobody has acknowledged).
+fn find(db, filters) {
+  let where = []
+  let params = {}
+  if filters.get("level") != nil {
+    where.push("level = :level")
+    params.level = filters.level
+  }
+  if filters.get("file") != nil {
+    where.push("file = :file")
+    params.file = filters.file
+  }
+  if filters.get("open") == true {
+    where.push("acked_by IS NULL")
+  }
+  let sql = "SELECT * FROM alerts"
+  if len(where) > 0 {
+    sql = sql + " WHERE " + where.join(" AND ")
+  }
+  sql = sql + " ORDER BY CASE level WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, first_time"
+  return db.all(sql, params)
+}
+
+# One alert by id, or nil.
+fn get(db, id) {
+  return db.one("SELECT * FROM alerts WHERE id = ?", [id])
+}
+
+# Mark an alert as handled by someone. Gives back true if the alert exists.
+fn ack(db, id, who) {
+  return db.run("UPDATE alerts SET acked_by = ? WHERE id = ?", [who, id]).changes > 0
+}
+
+# Counts for the summary cards: total, open, and one entry per level.
+fn summary(db) {
+  let by_level = {}
+  for level in LEVELS {
+    by_level[level] = 0
+  }
+  for row in db.all("SELECT level, COUNT(*) AS n FROM alerts GROUP BY level") {
+    by_level[row.level] = row.n
+  }
+  return {
+    "total": db.value("SELECT COUNT(*) FROM alerts"),
+    "open": db.value("SELECT COUNT(*) FROM alerts WHERE acked_by IS NULL"),
+    "levels": by_level,
+    "files": db.all("SELECT file, COUNT(*) AS n FROM alerts GROUP BY file ORDER BY file"),
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "type": "bundle",
+  "id": "bundle--5d0092c5-5f74-4287-9642-33f4c354e56d",
+  "objects": [
+    {
+      "type": "identity",
+      "spec_version": "2.1",
+      "id": "identity--7b0b4f5e-6a0b-4c55-9d43-9a2b2b9e1c01",
+      "created": "2026-03-01T00:00:00.000Z",
+      "modified": "2026-03-01T00:00:00.000Z",
+      "name": "TB sample intel feed",
+      "identity_class": "organization"
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--a1d3a1e2-0c1e-4f7d-8c2b-1b7b4b0e2f01",
+      "created_by_ref": "identity--7b0b4f5e-6a0b-4c55-9d43-9a2b2b9e1c01",
+      "created": "2026-03-01T00:00:00.000Z",
+      "modified": "2026-03-01T00:00:00.000Z",
+      "name": "SSH password guessing source",
+      "description": "Address seen guessing SSH passwords across many networks.",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[ipv4-addr:value = '203.0.113.42']",
+      "pattern_type": "stix",
+      "valid_from": "2026-03-01T00:00:00Z",
+      "valid_until": "2099-01-01T00:00:00Z",
+      "confidence": 80,
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}],
+      "external_references": [{"source_name": "mitre-attack", "external_id": "T1110.001"}]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--a1d3a1e2-0c1e-4f7d-8c2b-1b7b4b0e2f02",
+      "created": "2026-03-01T00:00:00.000Z",
+      "modified": "2026-03-01T00:00:00.000Z",
+      "name": "Web vulnerability scanner",
+      "description": "Scanner probing web servers for path traversal and SQL injection.",
+      "indicator_types": ["anomalous-activity"],
+      "pattern": "[ipv4-addr:value = '198.51.100.77']",
+      "pattern_type": "stix",
+      "valid_from": "2026-03-01T00:00:00Z",
+      "confidence": 50,
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "reconnaissance"}],
+      "external_references": [{"source_name": "mitre-attack", "external_id": "T1595.002"}]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--a1d3a1e2-0c1e-4f7d-8c2b-1b7b4b0e2f03",
+      "created": "2026-03-01T00:00:00.000Z",
+      "modified": "2026-03-01T00:00:00.000Z",
+      "name": "Telnet scanning range",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[ipv4-addr:value = '198.51.100.0/28']",
+      "pattern_type": "stix",
+      "valid_from": "2026-03-01T00:00:00Z",
+      "confidence": 40
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--a1d3a1e2-0c1e-4f7d-8c2b-1b7b4b0e2f04",
+      "created": "2026-03-01T00:00:00.000Z",
+      "modified": "2026-03-01T00:00:00.000Z",
+      "name": "Phishing infrastructure",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[domain-name:value = 'login-verify.example.net' OR url:value = 'http://login-verify.example.net/reset'] OR [file:hashes.'SHA-256' = '9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08']",
+      "pattern_type": "stix",
+      "valid_from": "2026-03-01T00:00:00Z",
+      "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "initial-access"}],
+      "external_references": [{"source_name": "mitre-attack", "external_id": "T1566.002"}]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--a1d3a1e2-0c1e-4f7d-8c2b-1b7b4b0e2f05",
+      "created": "2025-01-01T00:00:00.000Z",
+      "modified": "2025-01-01T00:00:00.000Z",
+      "name": "Old botnet node (expired)",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[ipv4-addr:value = '192.0.2.44']",
+      "pattern_type": "stix",
+      "valid_from": "2025-01-01T00:00:00Z",
+      "valid_until": "2025-06-01T00:00:00Z"
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--a1d3a1e2-0c1e-4f7d-8c2b-1b7b4b0e2f06",
+      "created": "2026-03-01T00:00:00.000Z",
+      "modified": "2026-03-01T00:00:00.000Z",
+      "name": "Suspicious user agent family",
+      "indicator_types": ["anomalous-activity"],
+      "pattern": "[network-traffic:extensions.'http-request-ext'.request_header.'User-Agent' LIKE 'sqlmap%']",
+      "pattern_type": "stix",
+      "valid_from": "2026-03-01T00:00:00Z"
+    },
+    {
+      "type": "ipv4-addr",
+      "spec_version": "2.1",
+      "id": "ipv4-addr--ff26c055-6336-5bc5-b98d-13d6226742dd",
+      "value": "198.51.100.23"
+    }
+  ]
+}

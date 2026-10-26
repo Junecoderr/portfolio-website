@@ -87,4 +87,4 @@ def test_fs_errors(tmp_path, src, message):
 
 
 def test_fs_error_map_has_path(tmp_path):
-    assert run_tb('import fs\ntry { fs.read("gone.txt") } catch e { say(e.path, e.kind) }') == ["gone.txt error"]
+    assert run_tb('import fs\ntry { fs.read("gone.txt") } catch e { say(e.path, e.kind) }') == ["gone.txt not_found_error"]  # 3.0: typed errors

@@ -194,14 +194,16 @@ def load(api):
             resp = err
         except (urllib.error.URLError, OSError, ssl.SSLError) as err:
             problem = describe_error(err, request.full_url)
-            fail(line, problem.message, reason=problem.reason, url=request.full_url)
+            fail(line, problem.message, reason=problem.reason, url=request.full_url,
+                 cls="TimeoutError" if problem.reason == "timeout" else "NetworkError")
         except ValueError as err:
             fail(line, f"{fn}() couldn't use the address '{request.full_url}': {err}.", reason="invalid_url")
         try:
             raw = resp.read(max_bytes + 1) if request.get_method() != "HEAD" else b""
         except (OSError, ssl.SSLError) as err:
             problem = describe_error(err, request.full_url)
-            fail(line, problem.message, reason=problem.reason, url=request.full_url)
+            fail(line, problem.message, reason=problem.reason, url=request.full_url,
+                 cls="TimeoutError" if problem.reason == "timeout" else "NetworkError")
         finally:
             resp.close()
         if len(raw) > max_bytes:
@@ -286,7 +288,8 @@ def load(api):
                        f"{err.reason}.", reason="status", status=err.code, url=req.full_url)
         except (urllib.error.URLError, OSError, ssl.SSLError) as err:
             problem = describe_error(err, req.full_url)
-            fail(line, problem.message, reason=problem.reason, url=req.full_url)
+            fail(line, problem.message, reason=problem.reason, url=req.full_url,
+                 cls="TimeoutError" if problem.reason == "timeout" else "NetworkError")
         partial = path + ".part"
         total = 0
         try:
@@ -307,7 +310,8 @@ def load(api):
         except (urllib.error.URLError, ssl.SSLError, socket.timeout, TimeoutError, ConnectionError) as err:
             _remove(partial)
             problem = describe_error(err, req.full_url)
-            fail(line, problem.message, reason=problem.reason, url=req.full_url)
+            fail(line, problem.message, reason=problem.reason, url=req.full_url,
+                 cls="TimeoutError" if problem.reason == "timeout" else "NetworkError")
         except OSError as err:
             _remove(partial)
             fail_os(line, err, path, "write to")

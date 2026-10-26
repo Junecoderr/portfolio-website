@@ -63,7 +63,7 @@ def load(api):
         except ValueError as err:
             fail(line, f"time.format() can't use that pattern: {err}.")
 
-    @m.fn("parse", 1, 2, doc="parse(text, pattern?) -> number\nRead a date/time written as text and give its timestamp. Without a pattern it reads forms like \"2026-10-26\" and \"2026-10-26 14:30:00\".")
+    @m.fn("parse", 1, 2, doc="parse(text, pattern?) -> number\nRead a date/time written as text and give its timestamp. Without a pattern it reads forms like \"2026-10-26\", \"2026-10-26 14:30:00\", \"2026-10-26T14:30:00Z\" and common log forms (\"Oct 26 14:30:00\"). See the datetime library for zones.")
     def parse(line, text, pattern=None):
         check_type(line, text, "text", "time.parse", "text")
         try:
@@ -73,8 +73,16 @@ def load(api):
                 check_type(line, pattern, "text", "time.parse", "pattern")
                 when = _dt.datetime.strptime(text.strip(), pattern)
         except ValueError:
-            how = f' with the pattern "{pattern}"' if pattern else ' (try a pattern, or a form like "2026-10-26 14:30:00")'
-            fail(line, f'time.parse() couldn\'t read "{text}" as a date{how}.')
+            when = None
+            if pattern is None:  # the log forms the logs/datetime libraries read
+                try:
+                    from tblib import logs as _logs
+                    when = _logs.parse_datetime(text)
+                except Exception:
+                    when = None
+            if when is None:
+                how = f' with the pattern "{pattern}"' if pattern else ' (try a pattern, or a form like "2026-10-26 14:30:00")'
+                fail(line, f'time.parse() couldn\'t read "{text}" as a date{how}.')
         try:
             return _tb.tidy_number(when.timestamp())
         except (OverflowError, OSError, ValueError):

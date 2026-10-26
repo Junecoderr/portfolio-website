@@ -8,9 +8,11 @@ runs the detection rules from `apps/log-triage/rules.tb` (brute force with
 accounts and group changes, cleared logs, encoded PowerShell...) and lists the
 alerts, most serious first.
 
-Click an alert to see its details: who, how many, when, the accounts tried or
-ports probed, decoded PowerShell, and sample raw log lines. The status bar
-shows how many records and what time span the log covers.
+The **Alerts** tab lists them: click an alert to see its details: who, how
+many, when, the accounts tried or ports probed, decoded PowerShell, and sample
+raw log lines. The **Overview** tab draws the alerts by level and by rule and
+the log's records per hour (hover a bar or point for the number). The status
+bar shows how many records and what time span the log covers.
 **Export HTML report…** saves a self-contained HTML page (`report.html`) to
 share with your team.
 
@@ -23,6 +25,7 @@ tb apps/log-triage-gui/main.tb --light            # light theme
 Keyboard: Ctrl+O open, Ctrl+E export (Cmd on a Mac).
 
 Shows: `logs.sniff` / `logs.read`, `detect` rules imported from another TB
-file (`import "../log-triage/rules.tb" as rules`), a `table` with
-`on_select`, a read-only `textarea`, `report.html` + `report.save`,
-`gui.save_file`, menus and shortcuts, and the dark theme.
+file (`import "../log-triage/rules.tb" as rules`), `tabs`, bar/pie/line
+`chart`s with `.update()`, a `table` with `on_select`, a read-only `textarea`,
+`report.html` + `report.save`, `gui.save_file`, menus and shortcuts, and the
+dark theme.

@@ -1,0 +1,184 @@
+# tb-progress: progress bars, spinners and step counters for command-line
+# programs.
+#
+#   import "tb_packages/tb-progress/lib.tb" as progress
+#   say(progress.bar(3, 10, 20))        # [██████              ]  30%
+#
+# The rendering functions are pure: they give back text and you decide when
+# to say() it. `tracker(total, label)` keeps the state for a long loop and
+# prints a line every so often (TB's say() always ends the line, so a
+# tracker prints a new line each time rather than redrawing one).
+
+import text
+import time
+
+let FRAMES = {
+  "dots": ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+  "line": ["-", "\\", "|", "/"],
+  "arrow": ["←", "↖", "↑", "↗", "→", "↘", "↓", "↙"],
+  "bounce": ["⠁", "⠂", "⠄", "⠂"],
+  "clock": ["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"],
+}
+
+# The fraction done, clamped to 0..1 (an empty total counts as finished).
+fn fraction(done, total) {
+  if total <= 0 {
+    return 1
+  }
+  let f = done / total
+  if f < 0 { return 0 }
+  if f > 1 { return 1 }
+  return f
+}
+
+# The percentage done as a whole number, 0..100.
+fn percent(done, total) {
+  return int(fraction(done, total) * 100 + 0.5)
+}
+
+# A bar of width characters: render_bar(3, 10, 20, "█", " ") -> "██████              ".
+fn render_bar(done, total, width, fill, empty) {
+  let filled = int(fraction(done, total) * width + 0.5)
+  return fill.repeat(filled) + empty.repeat(width - filled)
+}
+
+# A complete bar with brackets and a percentage: "[██████              ]  30%".
+fn bar(done, total, width) {
+  return "[" + render_bar(done, total, width, "█", " ") + "] " + text.pad_left(str(percent(done, total)) + "%", 4)
+}
+
+# A bar with every option:
+#   {"width": 30, "fill": "#", "empty": "-", "left": "[", "right": "]",
+#    "label": "Copying", "show_count": true, "show_percent": true}
+fn bar_with(done, total, options) {
+  let width = options.get("width", 30)
+  let out = ""
+  if options.has("label") {
+    out = str(options["label"]) + " "
+  }
+  out = out + options.get("left", "[") + render_bar(done, total, width, options.get("fill", "█"), options.get("empty", " ")) + options.get("right", "]")
+  if options.get("show_percent", true) {
+    out = out + " " + text.pad_left(str(percent(done, total)) + "%", 4)
+  }
+  if options.get("show_count", false) {
+    out = out + " (" + str(done) + "/" + str(total) + ")"
+  }
+  return out
+}
+
+# An ASCII-only bar for logs and plain terminals: "[######--------------]  30%".
+fn ascii_bar(done, total, width) {
+  return bar_with(done, total, {"width": width, "fill": "#", "empty": "-"})
+}
+
+# One spinner frame. step counts up (0, 1, 2, ...); style is a key of FRAMES.
+fn spinner(step, style) {
+  if not FRAMES.has(style) {
+    throw "tb-progress doesn't know the spinner '" + style + "'. Pick one of: " + FRAMES.keys().join(", ")
+  }
+  let frames = FRAMES[style]
+  return frames[int(step) % len(frames)]
+}
+
+# Seconds as "1m 05s" / "2h 03m" / "12s".
+fn duration(seconds) {
+  let s = int(seconds + 0.5)
+  if s < 0 { s = 0 }
+  if s < 60 {
+    return str(s) + "s"
+  }
+  if s < 3600 {
+    return str(int(s / 60)) + "m " + text.pad_left(str(s % 60), 2, "0") + "s"
+  }
+  return str(int(s / 3600)) + "h " + text.pad_left(str(int(s / 60) % 60), 2, "0") + "m"
+}
+
+# Estimated seconds left, given how long `done` steps took so far (nil until
+# something is done).
+fn eta(done, total, elapsed) {
+  if done <= 0 or total <= 0 {
+    return nil
+  }
+  let left = total - done
+  if left <= 0 {
+    return 0
+  }
+  return elapsed / done * left
+}
+
+# "3 of 10" counters: step(3, 10) -> "[ 3/10]".
+fn step(done, total) {
+  let w = len(str(total))
+  return "[" + text.pad_left(str(done), w) + "/" + str(total) + "]"
+}
+
+# A tracker for a long loop. It prints a bar line every `every` steps (and
+# at the end), with the elapsed time and an estimate of what's left.
+#   let t = progress.tracker(files.len(), "Hashing")
+#   for f in files { work(f); t.tick() }
+#   t.finish()
+fn tracker(total, label) {
+  let state = {"done": 0, "total": total, "label": label, "started": time.timestamp(), "every": 1, "width": 30, "printed": 0, "quiet": false}
+
+  fn line() {
+    let elapsed = time.timestamp() - state["started"]
+    let out = bar_with(state["done"], state["total"], {"width": state["width"], "label": state["label"], "show_count": true})
+    out = out + " " + duration(elapsed)
+    let left = eta(state["done"], state["total"], elapsed)
+    if left != nil and state["done"] < state["total"] {
+      out = out + " (about " + duration(left) + " left)"
+    }
+    return out
+  }
+
+  fn show() {
+    state["printed"] = state["done"]
+    if not state["quiet"] {
+      say(line())
+    }
+  }
+
+  fn tick() {
+    state["done"] = state["done"] + 1
+    if state["done"] - state["printed"] >= state["every"] or state["done"] >= state["total"] {
+      show()
+    }
+    return state["done"]
+  }
+
+  fn set(done) {
+    state["done"] = done
+    show()
+    return done
+  }
+
+  fn finish() {
+    if state["done"] < state["total"] {
+      state["done"] = state["total"]
+    }
+    if state["printed"] != state["done"] {
+      show()
+    }
+    return time.timestamp() - state["started"]
+  }
+
+  # Print only every n ticks (for loops with thousands of steps).
+  fn every(n) {
+    state["every"] = n
+    return state
+  }
+
+  # Don't print at all (tests, or when you call line() yourself).
+  fn quiet() {
+    state["quiet"] = true
+    return state
+  }
+
+  state["tick"] = tick
+  state["set"] = set
+  state["finish"] = finish
+  state["line"] = line
+  state["every_n"] = every
+  state["quiet_mode"] = quiet
+  return state
+}

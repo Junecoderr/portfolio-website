@@ -159,10 +159,10 @@ def test_sigma_runner_skips_broken_rules(tmp_path):
     rules = tmp_path / "rules"
     rules.mkdir()
     (rules / "good.yml").write_text("title: Root login\nlevel: low\ndetection:\n  s:\n    action: login\n    user: deploy\n  condition: s\n")
-    (rules / "bad.yml").write_text("title: Broken\ndetection:\n  s:\n    a|base64: x\n  condition: s\n")
+    (rules / "bad.yml").write_text("title: Broken\ndetection:\n  s:\n    a|sparkle: x\n  condition: s\n")
     (rules / "notes.txt").write_text("not a rule")
     out = run_app("sigma-runner", str(rules), str(DATA / "auth.log"))
-    assert "Skipping bad.yml: The rule \"Broken\", selection \"s\", field \"a|base64\": the |base64 modifier isn't supported yet." in out
+    assert "Skipping bad.yml: The rule \"Broken\", selection \"s\", field \"a|sparkle\": I don't know the modifier |sparkle." in out
     assert "Loaded 1 Sigma rule(s) (1 skipped):" in out
     assert "low    Root login" in out and "1 alert(s) from 1 rule(s) over 1 log(s)." in out
 

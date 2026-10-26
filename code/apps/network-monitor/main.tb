@@ -1,0 +1,283 @@
+# TB Network Monitor: is everything up? Checks a list of host:port targets
+# every few seconds (in the background), shows their state in a table and
+# draws their latency on a live chart. Notifies you when something changes.
+# Run: tb apps/network-monitor/main.tb [targets.json]
+
+import gui
+import net
+import fs
+import json
+import os
+import time
+
+let config_path = fs.join(fs.here(), "targets.json")
+let theme = "dark"
+for arg in os.args {
+  if arg == "--light" {
+    theme = "light"
+  } else if arg != "--dark" {
+    config_path = arg
+  }
+}
+
+let HISTORY = 30     # samples kept per target for the chart
+
+let targets = []     # [{"name", "host", "port", "up", "ms", "checks", "ups", "history": [ms or nil...]}]
+let labels = []      # the chart's time labels
+let paused = false
+let checking = false
+let timer = nil
+
+fn add_target(name, host, port) {
+  targets.push({"name": name, "host": host, "port": port, "up": nil, "ms": nil, "checks": 0, "ups": 0, "history": []})
+}
+
+let config = {"interval": 5, "timeout": 2, "targets": []}
+try {
+  let data = json.read(config_path)
+  config.interval = data.get("interval", 5)
+  config.timeout = data.get("timeout", 2)
+  for t in data.get("targets", []) {
+    add_target(t.get("name", f"{t.host}:{t.port}"), t.host, t.port)
+  }
+} catch err {
+  say(f"I couldn't read {config_path}: {err.message}")
+}
+
+let win = gui.window("TB Network Monitor", {"width": 1000, "height": 860, "theme": theme})
+
+let head = win.row()
+let titles = head.column({"expand": true})
+titles.label("TB Network Monitor", {"style": "title"})
+let subtitle = titles.label(f"{len(targets)} targets from {fs.name(config_path)}", {"style": "muted"})
+
+let cards = win.row()
+let up_card = cards.card({"title": "Up", "expand": true})
+let up_stat = up_card.label("0", {"style": "display"})
+let down_card = cards.card({"title": "Down", "expand": true})
+let down_stat = down_card.label("0", {"style": "display"})
+let slow_card = cards.card({"title": "Slowest", "expand": true})
+let slow_stat = slow_card.label("-", {"style": "display"})
+let next_card = cards.card({"title": "Checks every", "expand": true})
+let next_stat = next_card.label(f"{config.interval} s", {"style": "display"})
+
+let controls = win.row()
+controls.label("Every", {"style": "muted"})
+let interval = controls.slider(1, 60, {"value": config.interval, "step": 1, "show_value": true,
+                                      "on_change": fn(v) { set_interval(v) }})
+controls.label("seconds", {"style": "muted"})
+let pause = controls.button("Pause", fn() { toggle_pause() })
+controls.button("Check now", fn() { check_all() }, {"primary": true})
+controls.button("Minimize to tray", fn() { tray.minimize() })
+
+let adder = win.row()
+let new_target = adder.input({"placeholder": "host:port to watch, like 127.0.0.1:8080", "on_enter": fn(text) { add_from_text(text) }})
+adder.button("Add", fn() { add_from_text(new_target.value()) })
+adder.button("Remove selected", fn() { remove_selected() })
+let notify = adder.checkbox("Notify me when a target changes", {"checked": true})
+
+let table = win.table(["Target", "Host", "Port", "State", "Latency", "Checks", "Uptime"],
+                      {"widths": [220, 160, 70, 90, 100, 80, 90], "height": 5, "expand": false})
+let chart = win.chart({"type": "line", "title": "Latency (ms) over the last checks", "empty": "No checks yet",
+                       "height": 260, "expand": true})
+let status = win.status("Starting…")
+
+let tray = win.tray({
+  "Show": fn() { tray.restore() },
+  "Check now": fn() { check_all() },
+  "-": nil,
+  "Quit": win.close,
+}, {"title": "Monitor"})
+
+win.on_close(fn() {
+  if checking {
+    return gui.confirm("A check is still running. Quit anyway?")
+  }
+  return true
+})
+
+win.menu({"File": {"Check now": fn() { check_all() }, "Quit": win.close}})
+win.key("F5", fn() { check_all() })
+
+# -- the checks (run on another thread; the window updates in on_done) -------------
+
+fn check_one(t) {
+  let started = time.timestamp()
+  let up = false
+  try {
+    up = net.tcp_check(t.host, t.port, config.timeout)
+  } catch err {
+    up = false
+  }
+  let ms = round((time.timestamp() - started) * 1000)
+  return {"up": up, "ms": ms}
+}
+
+fn check_all() {
+  if checking or targets.is_empty() {
+    return
+  }
+  checking = true
+  status.set(f"Checking {len(targets)} targets…")
+  let snapshot = targets.copy()
+  win.run_in_background(fn() {
+    return snapshot.map(fn(t) { return check_one(t) })
+  }, fn(results) {
+    checking = false
+    apply(snapshot, results)
+  }, fn(message) {
+    checking = false
+    status.set(f"Check failed: {message}")
+  })
+}
+
+fn apply(snapshot, results) {
+  let changes = []
+  let i = 0
+  while i < len(results) {
+    let t = snapshot[i]
+    let r = results[i]
+    if targets.contains(t) {
+      if t.up != nil and t.up != r.up {
+        changes.push(t)
+      }
+      t.checks += 1
+      if r.up {
+        t.ups += 1
+      }
+      t.up = r.up
+      t.ms = r.ms
+      if r.up {
+        t.history.push(r.ms)
+      } else {
+        t.history.push(nil)    # a gap in the chart: no answer, so no latency
+      }
+      if len(t.history) > HISTORY {
+        t.history.remove_at(0)
+      }
+    }
+    i += 1
+  }
+  labels.push(time.format(time.timestamp(), "%H:%M:%S"))
+  if len(labels) > HISTORY {
+    labels.remove_at(0)
+  }
+  refresh()
+  for t in changes {
+    if notify.value() {
+      if t.up {
+        gui.notify(f"{t.name} is back", f"{t.host}:{t.port} answers again ({t.ms} ms).")
+      } else {
+        gui.notify(f"{t.name} is down", f"{t.host}:{t.port} stopped answering.")
+      }
+    }
+  }
+  status.set(f"Last check {labels.last()}  ·  {up_count()} of {len(targets)} up")
+}
+
+fn up_count() {
+  return targets.filter(fn(t) { return t.up == true }).len()
+}
+
+fn refresh() {
+  let rows = []
+  for t in targets {
+    let state = "waiting"
+    if t.up == true {
+      state = "up"
+    } else if t.up == false {
+      state = "DOWN"
+    }
+    let latency = "-"
+    if t.up == true and t.ms != nil {
+      latency = f"{t.ms} ms"
+    }
+    let uptime = "-"
+    if t.checks > 0 {
+      uptime = f"{round(t.ups * 100 / t.checks)}%"
+    }
+    rows.push([t.name, t.host, t.port, state, latency, t.checks, uptime])
+  }
+  table.set_rows(rows)
+  let ups = up_count()
+  let checked = targets.filter(fn(t) { return t.up != nil })
+  up_stat.set(ups)
+  down_stat.set(len(checked) - ups)
+  let slow = checked.filter(fn(t) { return t.up == true }).sort_by(fn(t) { return 0 - t.ms })
+  if slow.is_empty() {
+    slow_stat.set("-")
+  } else {
+    slow_stat.set(f"{slow.first().ms} ms")
+  }
+  let series = {}
+  for t in targets {
+    if not t.history.filter(fn(ms) { return ms != nil }).is_empty() {   # skip targets that never answered
+      series[t.name] = t.history
+    }
+  }
+  chart.update({"labels": labels, "data": series})
+  subtitle.set(f"{len(targets)} targets from {fs.name(config_path)}")
+}
+
+# -- controls ----------------------------------------------------------------------
+
+fn schedule() {
+  if timer != nil {
+    timer.stop()
+  }
+  timer = win.every(config.interval * 1000, fn() {
+    if not paused {
+      check_all()
+    }
+  })
+}
+
+fn set_interval(seconds) {
+  config.interval = int(seconds)
+  next_stat.set(f"{config.interval} s")
+  schedule()
+}
+
+fn toggle_pause() {
+  paused = not paused
+  if paused {
+    pause.set("Resume")
+    status.set("Paused")
+  } else {
+    pause.set("Pause")
+    check_all()
+  }
+}
+
+fn add_from_text(text) {
+  let parts = text.trim().split(":")
+  if len(parts) != 2 or not parts[1].trim().is_number() {
+    gui.alert("Type a host and a port like 127.0.0.1:8080.", "Add a target")
+    return
+  }
+  let host = parts[0].trim()
+  let port = int(parts[1].trim().to_number())
+  if port < 1 or port > 65535 {
+    gui.alert("Ports go from 1 to 65535.", "Add a target")
+    return
+  }
+  add_target(f"{host}:{port}", host, port)
+  new_target.clear()
+  refresh()
+  check_all()
+}
+
+fn remove_selected() {
+  let i = table.selected_index()
+  if i == nil {
+    gui.alert("Pick a target in the table first.")
+    return
+  }
+  targets.remove_at(i)
+  refresh()
+}
+
+refresh()
+schedule()
+check_all()
+win.run()

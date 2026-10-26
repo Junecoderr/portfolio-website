@@ -1,0 +1,235 @@
+# sigma-studio: check Sigma rules, turn them into SIEM queries, and run them on logs.
+#
+#   tb apps/sigma-studio/main.tb                                demo on the sample rules and logs
+#   tb apps/sigma-studio/main.tb validate rules/                check every rule in a folder (or one file)
+#   tb apps/sigma-studio/main.tb convert rule.yml --to kql      write queries (splunk, elastic, kql or all)
+#   tb apps/sigma-studio/main.tb run rules/ auth.log access.log run the rules on logs
+
+import os
+import fs
+import logs
+import detect
+import attack
+import report
+
+let USAGE = "Usage: tb main.tb [validate|convert|run] [rules-folder-or-file] [--to splunk|elastic|kql|all] [log ...]"
+let data = fs.join(fs.here(), "..", "data")
+let BACKENDS = ["splunk", "elastic", "kql"]
+
+fn usage_error(message) {
+  say(message)
+  say(USAGE)
+  exit(2)
+}
+
+# -- reading the command line --------------------------------------------------------
+let command = "demo"
+let rest = []
+let target = "all"
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--help" or arg == "-h" {
+    say(USAGE)
+    exit(0)
+  } else if arg == "--to" {
+    if i + 1 >= len(os.args) {
+      usage_error("--to needs a backend: splunk, elastic, kql or all.")
+    }
+    target = os.args[i + 1].lower()
+    i += 1
+  } else if arg.starts_with("--") {
+    usage_error(f"Unknown option {arg}.")
+  } else {
+    rest.push(arg)
+  }
+  i += 1
+}
+if not rest.is_empty() and ["validate", "convert", "run", "demo"].contains(rest[0]) {
+  command = rest[0]
+  rest = rest.slice(1)
+}
+if target != "all" and not BACKENDS.contains(target) {
+  usage_error(f"I don't know the backend '{target}'. Use splunk, elastic, kql or all.")
+}
+let rules_path = fs.join(data, "sigma")
+if not rest.is_empty() {
+  rules_path = rest[0]
+  rest = rest.slice(1)
+}
+if not fs.exists(rules_path) {
+  say(f"I couldn't find '{rules_path}'.")
+  exit(1)
+}
+
+# -- loading ------------------------------------------------------------------------------
+fn rule_files(path) {
+  if fs.is_dir(path) {
+    return fs.walk(path).filter(fn(p) { return p.ends_with(".yml") or p.ends_with(".yaml") })
+  }
+  return [path]
+}
+
+# Load every file on its own so one broken rule doesn't hide the rest.
+fn load_rules(path) {
+  let loaded = []
+  let problems = []
+  for file in rule_files(path) {
+    try {
+      for r in detect.sigma_all(file) {
+        loaded.push({"file": fs.name(file), "rule": r})
+      }
+    } catch err {
+      problems.push({"file": fs.name(file), "problem": err.message})
+    }
+  }
+  return {"loaded": loaded, "problems": problems}
+}
+
+fn techniques_of(rule) {
+  let names = []
+  for id in attack.tags(rule) {
+    let t = attack.technique(id)
+    if t != nil {
+      names.push(f"{t.id} {t.full_name}")
+    } else {
+      names.push(id)
+    }
+  }
+  return names
+}
+
+fn kind_of(rule) {
+  if rule.has("correlation") {
+    return "correlation (" + rule.correlation.type + ")"
+  }
+  if rule.has("aggregation") and rule.aggregation != nil {
+    return "aggregation"
+  }
+  if rule.count > 1 {
+    return "threshold"
+  }
+  return "match"
+}
+
+fn validate(path) {
+  let result = load_rules(path)
+  say(f"== Validating {path}")
+  let rows = []
+  for item in result.loaded {
+    let r = item.rule
+    let source = detect.logsource(r.logsource)
+    let formats = "any"
+    if source != nil {
+      formats = source.formats.join(", ")
+    }
+    rows.push({"ok": "yes", "file": item.file, "title": r.name, "level": r.level, "kind": kind_of(r), "reads": formats})
+  }
+  if not rows.is_empty() {
+    say(report.table(rows, ["ok", "file", "title", "level", "kind", "reads"], {"max_width": 40}))
+  }
+  for item in result.loaded {
+    let names = techniques_of(item.rule)
+    if not names.is_empty() {
+      say(f"   {item.rule.name}: ATT&CK {names.join('; ')}")
+    }
+  }
+  for p in result.problems {
+    say(f"   BROKEN {p.file}: {p.problem}")
+  }
+  say(f"{len(result.loaded)} rule(s) OK, {len(result.problems)} file(s) with problems.")
+  return result
+}
+
+fn convert(path, wanted) {
+  let result = load_rules(path)
+  let backends = BACKENDS
+  if wanted != "all" {
+    backends = [wanted]
+  }
+  say(f"== Converting {path} to {backends.join(', ')}")
+  let written = 0
+  for item in result.loaded {
+    let r = item.rule
+    if r.get("hidden", false) {
+      continue
+    }
+    say("")
+    say(f"# {r.name}  ({item.file}, level {r.level})")
+    for b in backends {
+      try {
+        let q = detect.sigma_to_query(r, b)
+        say(f"[{b}]")
+        say(q)
+        written += 1
+      } catch err {
+        say(f"[{b}] not converted: {err.message}")
+      }
+    }
+  }
+  for p in result.problems {
+    say(f"BROKEN {p.file}: {p.problem}")
+  }
+  say("")
+  say(f"Queries written: {written}.")
+  return result
+}
+
+fn run_rules(path, files) {
+  let result = load_rules(path)
+  let rules = result.loaded.map(fn(item) { return item.rule })
+  if rules.is_empty() {
+    say("No rules loaded, so there is nothing to run.")
+    exit(1)
+  }
+  let records = []
+  for file in files {
+    try {
+      records = records + logs.read(file)
+    } catch err {
+      say(f"Skipping {file}: {err.message}")
+    }
+  }
+  say(f"== Running {len(rules)} rule(s) on {len(records)} record(s) from {len(files)} log(s)")
+  let alerts = detect.run(rules, records)
+  if alerts.is_empty() {
+    say("No alerts.")
+    return alerts
+  }
+  say(report.table(alerts, ["level", "rule", "by", "count", "first_when"], {"max_width": 44}))
+  let mapped = attack.map(alerts)
+  if not mapped.tactics.is_empty() {
+    say("ATT&CK coverage of these alerts:")
+    for t in mapped.tactics {
+      say(f"   {t.name} ({t.id}): {t.techniques.join(', ')}")
+    }
+  }
+  return alerts
+}
+
+fn sample_logs() {
+  return ["auth.log", "access.log", "windows_security.json"].map(fn(n) { return fs.join(data, n) })
+}
+
+if command == "validate" {
+  let r = validate(rules_path)
+  if r.loaded.is_empty() {
+    exit(1)
+  }
+} else if command == "convert" {
+  convert(rules_path, target)
+} else if command == "run" {
+  let files = rest
+  if files.is_empty() {
+    files = sample_logs()
+  }
+  run_rules(rules_path, files)
+} else {
+  say("No command given, so here is a tour on the sample rules.")
+  say("")
+  validate(rules_path)
+  say("")
+  convert(rules_path, target)
+  say("")
+  run_rules(rules_path, sample_logs())
+}

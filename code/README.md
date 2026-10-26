@@ -55,7 +55,7 @@ numbers, text, `true` / `false` / `nil`, lists, `and or not`, `#` comments,
 and the built-ins `say len str num range push ask care`. 2.0 adds:
 
 ```tb
-let me = {"name": "Alex", "plants": 4}             # maps
+let me = {"name": "Tanisha", "plants": 4}             # maps
 me.city = "Lisbon"                                 # dot access on maps
 say(f"{me.name} has {me.plants} plants")           # f-strings
 say("a,b".split(","), [3, 1, 2].sort(), me.keys()) # methods on text, lists, maps, numbers
@@ -80,6 +80,67 @@ say(2 in [1, 2], "x" not in "TB")                  # membership
 
 New built-ins: `type keys int round min max sum sorted exit`. The design
 contract is in [`DESIGN-2.0.md`](DESIGN-2.0.md).
+
+### New in 3.0
+
+```tb
+class Animal {                                     # classes, inheritance, statics
+  let sound = "..."
+  static let count = 0
+  fn init(name) { self.name = name; Animal.count += 1 }
+  fn speak() { return f"{self.name} says {self.sound}" }
+}
+class Dog extends Animal {
+  let sound = "woof"
+  fn speak() { return super.speak() + "!" }
+}
+say(Dog("Rex").speak(), Dog("Rex") is Animal)      # Rex says woof! true
+enum Level { low, medium, high }                   # enums: Level.high.index is 2
+
+let label = match score {                          # pattern matching
+  0 => "none"
+  1..=5 => "low"
+  n if n > 90 => "top"
+  [first, ...rest] => f"a list starting {first}"
+  {"kind": "alert", "level": lv} => lv
+  _ => "other"
+}
+let size = if n > 100 then "big" else "small"      # if as an expression
+
+let [a, b, ...rest] = [1, 2, 3, 4]                 # destructuring and spread
+let {name, port = 22} = host
+say(max(...nums), [...xs, ...ys], {...defaults, "debug": true})
+fn connect(host, port = 22, ...extra) { }          # defaults, varargs, keyword args
+connect("192.0.2.1", port = 2222)
+let double = x => x * 2                            # lambdas
+const LIMIT = 100                                  # constants
+
+say(7 / 2, 7 // 2, 2 ** 10, 0xff & 0b1010, 1_000_000)   # 3.5 3 1024 10 1000000
+say(f"{price:.2f} {count:>6} {ratio:.1%} {n:,} {n:x}")    # format specs
+let header = b"MZ\x90\x00"                        # bytes (and the binary library)
+say(xs[1:3], xs[::-1], text[-3:], (0..10).step(2).to_list())   # slices, ranges
+
+fn numbers() { let i = 0; while true { i += 1; yield i } }     # generators
+say(numbers().filter(x => x % 2 == 0).take(3).to_list())      # [2, 4, 6]
+
+try { fs.read("missing.txt") }                     # typed errors
+catch err: NotFoundError { say("no file") }
+catch err: FileError or ParseError { say(err.kind) }
+finally { say("done") }
+class QuotaError extends Error {}
+throw QuotaError("too many requests", {"limit": 100})
+
+from "helpers.tb" import parse_line, VERSION as v  # from-import, export
+import "tb-colors"                                 # packages in tb_packages/ (tb add)
+assert len(rows) > 0, "no rows"
+fn work() { let f = fs.open("out.txt", "w"); defer { f.close() } ... }
+```
+
+Breaking changes from 2.x are listed in [`MIGRATION-3.0.md`](MIGRATION-3.0.md)
+and the 3.0 contract is [`DESIGN-3.0.md`](DESIGN-3.0.md). The implementation
+is `tb.py` (entry point, public API, CLI) plus the `tbcore/` package (lexer,
+parser, ast, runtime, interp); tools such as `tb fmt`, `tb check` and `tb add`
+live in `tbtools/`.
 
 ## Standard library
 

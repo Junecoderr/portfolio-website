@@ -1,0 +1,9 @@
+import datetime
+
+let t = datetime.parse("2026-03-12T09:14:05Z")
+say(t.format("%Y-%m-%d %H:%M"), t.weekday)
+let india = t.to_zone("Asia/Kolkata")
+say(india.format("%H:%M %Z"))
+let later = t.add({"days": 1, "hours": 2})
+say(later.diff(t))
+say(datetime.parse("12/Mar/2026:09:14:05 +0100").to_utc().format("%H:%M"))

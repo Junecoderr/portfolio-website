@@ -1,0 +1,175 @@
+# dashboard: a local web dashboard of the alerts log-triage finds.
+#
+#   tb main.tb                         sample logs, http://127.0.0.1:8000
+#   tb main.tb /var/log/auth.log       your own logs
+#   tb main.tb --port 9000 --db alerts.db
+#
+# It reads the logs, runs log-triage's rules on them, keeps the alerts in a
+# SQLite database and serves a page plus a small JSON API:
+#   GET  /                      the dashboard (?level=high to filter)
+#   GET  /api/alerts            every alert (?level=, ?file=, ?open=true)
+#   GET  /api/alerts/{id}       one alert
+#   POST /api/alerts/{id}/ack   mark it handled ({"by": "name"})
+#   GET  /api/summary           counts per level
+# The server only listens on this computer (127.0.0.1) unless --host says otherwise.
+
+import os
+import fs
+import logs
+import sqlite
+import server
+import template
+import "store.tb"
+import "../log-triage/rules.tb"
+
+let ANALYST = "Tanisha"
+let data = fs.join(fs.here(), "..", "data")
+let port = 8000
+let host = "127.0.0.1"
+let db_path = ":memory:"
+let files = []
+
+fn usage() {
+  say("Usage: tb main.tb [log ...] [--port 8000] [--host 127.0.0.1] [--db alerts.db]")
+}
+
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--help" or arg == "-h" {
+    usage()
+    exit(0)
+  }
+  if arg == "--port" or arg == "--host" or arg == "--db" {
+    if i + 1 >= len(os.args) {
+      say(f"{arg} needs a value.")
+      usage()
+      exit(2)
+    }
+    let value = os.args[i + 1]
+    if arg == "--port" {
+      try {
+        port = num(value)
+      } catch err {
+        say(f"--port needs a number, not {value}.")
+        exit(2)
+      }
+    } else if arg == "--host" {
+      host = value
+    } else {
+      db_path = value
+    }
+    i += 2
+    continue
+  }
+  if arg.starts_with("--") {
+    say(f"Unknown option {arg}.")
+    usage()
+    exit(2)
+  }
+  files.push(arg)
+  i += 1
+}
+if files.is_empty() {
+  for name in ["auth.log", "access.log", "firewall.log", "windows_security.json"] {
+    files.push(fs.join(data, name))
+  }
+}
+
+# -- load the alerts ----------------------------------------------------------
+
+let db = sqlite.open(db_path)
+store.setup(db)
+for path in files {
+  try {
+    let records = logs.read(path)
+    let added = store.save(db, fs.name(path), rules.triage(records))
+    say(f"{fs.name(path)}: {len(records)} records, {added} new alerts")
+  } catch err {
+    say(f"Skipped {path}: {err.message}")
+  }
+}
+
+let page = fs.read(fs.join(fs.here(), "page.html"))
+
+# Query-string filters shared by the page and the API.
+fn filters_of(req) {
+  let f = {}
+  if req.query.has("level") {
+    f.level = req.query.level
+  }
+  if req.query.has("file") {
+    f.file = req.query.file
+  }
+  if req.query.has("open") {
+    f.open = req.query.open == "true"
+  }
+  return f
+}
+
+# The {id} in the path as a number (-1 when it isn't one, which matches nothing).
+fn alert_id(req) {
+  try {
+    return num(req.params.id)
+  } catch err {
+    return -1
+  }
+}
+
+# -- the web app --------------------------------------------------------------
+
+let app = server.create({"name": "Alerts dashboard"})
+app.static("/assets", fs.join(fs.here(), "assets"))
+
+app.get("/", fn(req) {
+  let f = filters_of(req)
+  let summary = store.summary(db)
+  let cards = []
+  for level in store.LEVELS {
+    if summary.levels[level] > 0 {
+      cards.push({"level": level, "count": summary.levels[level]})
+    }
+  }
+  return server.html(template.render(page, {
+    "analyst": ANALYST,
+    "summary": summary,
+    "cards": cards,
+    "filter": f.get("level"),
+    "alerts": store.find(db, f),
+  }))
+})
+
+app.get("/api/alerts", fn(req) {
+  return store.find(db, filters_of(req))
+})
+
+app.get("/api/alerts/{id}", fn(req) {
+  let alert = store.get(db, alert_id(req))
+  if alert == nil {
+    return server.error(404, f"There is no alert {req.params.id}.")
+  }
+  return alert
+})
+
+app.post("/api/alerts/{id}/ack", fn(req) {
+  let who = ANALYST
+  if type(req.json) == "map" and req.json.has("by") {
+    who = str(req.json.by)
+  }
+  if not store.ack(db, alert_id(req), who) {
+    return server.error(404, f"There is no alert {req.params.id}.")
+  }
+  return store.get(db, alert_id(req))
+})
+
+# The page's "Mark handled" button posts a form here, then goes back.
+app.post("/alerts/{id}/ack", fn(req) {
+  store.ack(db, alert_id(req), ANALYST)
+  return server.redirect("/", 303)
+})
+
+app.get("/api/summary", fn(req) {
+  return store.summary(db)
+})
+
+app.listen(port, host)

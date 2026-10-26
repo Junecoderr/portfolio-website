@@ -1,0 +1,12 @@
+import crypto
+
+let key = crypto.random_bytes(32)
+let sealed = crypto.aes_gcm_encrypt(key, "meet at noon")
+say(crypto.aes_gcm_decrypt(key, sealed))
+
+let token = crypto.jwt_sign({"sub": "tanisha", "role": "analyst"}, "demo-secret")
+say(crypto.jwt_verify(token, "demo-secret").sub)
+
+let stored = crypto.password_hash("correct horse")
+say(crypto.password_verify("correct horse", stored), crypto.password_verify("wrong", stored))
+say(crypto.totp("JBSWY3DPEHPK3PXP", 59))

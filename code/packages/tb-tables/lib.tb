@@ -1,0 +1,338 @@
+# tb-tables: pretty text tables and Markdown tables for terminal output.
+#
+#   import "tb_packages/tb-tables/lib.tb" as tables
+#   say(tables.table([{"name": "Tanisha", "score": 91}, {"name": "web01", "score": 7}]))
+#   say(tables.render(rows, {"style": "ascii", "title": "Hosts"}))
+#
+# TB 2.x has no optional inputs, so every function that takes options has a
+# one-input shorthand: table(rows) = render(rows, {}), md(rows) = markdown(rows, {}).
+#
+# Rows can be maps (columns come from the keys, in order of first appearance)
+# or lists (then give the column names yourself). Numbers are right-aligned.
+# Text with ANSI colour codes is measured without the codes, so coloured
+# cells still line up.
+
+import encode
+import text
+
+let ESC = encode.unhex("1b")
+
+# Box-drawing styles. Each has: top, middle (header separator), bottom
+# as [left, fill, join, right], plus the vertical bar.
+let STYLES = {
+  "rounded": {"top": ["╭", "─", "┬", "╮"], "mid": ["├", "─", "┼", "┤"], "bottom": ["╰", "─", "┴", "╯"], "bar": "│"},
+  "box":     {"top": ["┌", "─", "┬", "┐"], "mid": ["├", "─", "┼", "┤"], "bottom": ["└", "─", "┴", "┘"], "bar": "│"},
+  "ascii":   {"top": ["+", "-", "+", "+"], "mid": ["+", "-", "+", "+"], "bottom": ["+", "-", "+", "+"], "bar": "|"},
+  "plain":   {"top": nil, "mid": ["", "-", "  ", ""], "bottom": nil, "bar": " "},
+}
+
+# The column names of a list of rows: the keys of map rows in order of first
+# appearance, or 0.. for list rows.
+fn columns_of(rows) {
+  let names = []
+  for row in rows {
+    if type(row) == "map" {
+      for key in row.keys() {
+        if not names.contains(key) {
+          names.push(key)
+        }
+      }
+    } else {
+      let i = 0
+      while i < len(row) {
+        if not names.contains(str(i)) {
+          names.push(str(i))
+        }
+        i = i + 1
+      }
+    }
+  }
+  return names
+}
+
+# One row as a list of cell texts in column order.
+fn cells_of(row, columns) {
+  let out = []
+  let i = 0
+  for col in columns {
+    let value = nil
+    if type(row) == "map" {
+      value = row.get(col)
+    } else if i < len(row) {
+      value = row[i]
+    }
+    out.push(value)
+    i = i + 1
+  }
+  return out
+}
+
+# The visible length of a cell (ANSI codes and nil don't count).
+fn width_of(value) {
+  return len(strip_codes(cell_text(value)))
+}
+
+fn cell_text(value) {
+  if value == nil {
+    return ""
+  }
+  if type(value) == "bool" {
+    if value { return "yes" } else { return "no" }
+  }
+  return str(value)
+}
+
+fn strip_codes(s) {
+  if not s.contains(ESC) {
+    return s
+  }
+  let out = ""
+  let i = 0
+  while i < len(s) {
+    if s[i] == ESC and i + 1 < len(s) and s[i + 1] == "[" {
+      i = i + 2
+      while i < len(s) and not ((s[i] >= "a" and s[i] <= "z") or (s[i] >= "A" and s[i] <= "Z")) {
+        i = i + 1
+      }
+      i = i + 1
+    } else {
+      out = out + s[i]
+      i = i + 1
+    }
+  }
+  return out
+}
+
+fn _pad(value, width, align) {
+  let s = cell_text(value)
+  let gap = width - width_of(value)
+  if gap <= 0 {
+    return s
+  }
+  if align == "right" {
+    return " ".repeat(gap) + s
+  }
+  if align == "center" {
+    let left = int(gap / 2)
+    return " ".repeat(left) + s + " ".repeat(gap - left)
+  }
+  return s + " ".repeat(gap)
+}
+
+fn _alignment(rows, columns, options) {
+  let aligns = options.get("align", {})
+  let result = []
+  let i = 0
+  for col in columns {
+    if aligns.has(col) {
+      result.push(aligns[col])
+    } else {
+      # Right-align a column when every non-empty value in it is a number.
+      let numeric = true
+      let seen = false
+      for row in rows {
+        let v = cells_of(row, columns)[i]
+        if v != nil {
+          seen = true
+          if type(v) != "number" {
+            numeric = false
+          }
+        }
+      }
+      if numeric and seen { result.push("right") } else { result.push("left") }
+    }
+    i = i + 1
+  }
+  return result
+}
+
+fn _widths(rows, columns, headers, options) {
+  let widths = headers.map(fn(h) { return width_of(h) })
+  for row in rows {
+    let cells = cells_of(row, columns)
+    let i = 0
+    while i < len(cells) {
+      let w = width_of(cells[i])
+      if w > widths[i] {
+        widths[i] = w
+      }
+      i = i + 1
+    }
+  }
+  let max_width = options.get("max_width")
+  if max_width != nil {
+    widths = widths.map(fn(w) { return min(w, max_width) })
+  }
+  return widths
+}
+
+fn _truncate(value, width) {
+  let s = cell_text(value)
+  if width_of(s) <= width or s.contains(ESC) {
+    return s
+  }
+  if width <= 1 {
+    return s.slice(0, width)
+  }
+  return s.slice(0, width - 1) + "…"
+}
+
+fn _line(parts, widths, pad) {
+  if parts == nil {
+    return nil
+  }
+  let segments = widths.map(fn(w) { return parts[1].repeat(w + pad) })
+  return parts[0] + segments.join(parts[2]) + parts[3]
+}
+
+# Render rows as a text table.
+#   options: {"columns": [...], "headers": {"col": "Title"} or [...],
+#             "style": "rounded"|"box"|"ascii"|"plain", "align": {"col": "left|right|center"},
+#             "max_width": n, "title": "text", "footer": row}
+fn render(rows, options) {
+  if options == nil { options = {} }
+  if type(options) == "list" { options = {"columns": options} }
+  let columns = options.get("columns", columns_of(rows))
+  let headers = _headers(columns, options)
+  let style_name = options.get("style", "rounded")
+  if not STYLES.has(style_name) {
+    throw "tb-tables doesn't know the style '" + style_name + "'. Pick one of: " + STYLES.keys().join(", ")
+  }
+  let style = STYLES[style_name]
+  let all_rows = rows.copy()
+  if options.has("footer") {
+    all_rows.push(options["footer"])
+  }
+  let widths = _widths(all_rows, columns, headers, options)
+  let aligns = _alignment(rows, columns, options)
+  let bar = style["bar"]
+  let pad = 2
+  if style_name == "plain" { pad = 0 }
+  let lines = []
+
+  fn row_line(cells) {
+    let out = []
+    let i = 0
+    while i < len(cells) {
+      out.push(_pad(_truncate(cells[i], widths[i]), widths[i], aligns[i]))
+      i = i + 1
+    }
+    if style_name == "plain" {
+      return out.join("  ").trim()
+    }
+    return bar + " " + out.join(" " + bar + " ") + " " + bar
+  }
+
+  if options.has("title") {
+    let total = widths.sum() + 3 * len(widths) + 1
+    lines.push(text.center(str(options["title"]), total).trim())
+  }
+  let top = _line(style["top"], widths, pad)
+  if top != nil { lines.push(top) }
+  lines.push(row_line(headers))
+  lines.push(_line(style["mid"], widths, pad))
+  for row in rows {
+    lines.push(row_line(cells_of(row, columns)))
+  }
+  if options.has("footer") {
+    lines.push(_line(style["mid"], widths, pad))
+    lines.push(row_line(cells_of(options["footer"], columns)))
+  }
+  let bottom = _line(style["bottom"], widths, pad)
+  if bottom != nil { lines.push(bottom) }
+  return lines.join("\n")
+}
+
+# Render rows as a GitHub-flavoured Markdown table.
+fn markdown(rows, options) {
+  if options == nil { options = {} }
+  if type(options) == "list" { options = {"columns": options} }
+  let columns = options.get("columns", columns_of(rows))
+  let headers = _headers(columns, options)
+  let widths = _widths(rows, columns, headers, {})
+  let aligns = _alignment(rows, columns, options)
+  let lines = []
+
+  fn md_row(cells) {
+    let out = []
+    let i = 0
+    while i < len(cells) {
+      out.push(_pad(cell_text(cells[i]).replace("|", "\\|"), widths[i], aligns[i]))
+      i = i + 1
+    }
+    return "| " + out.join(" | ") + " |"
+  }
+
+  lines.push(md_row(headers))
+  let seps = []
+  let i = 0
+  while i < len(widths) {
+    let w = max(widths[i], 3)
+    if aligns[i] == "right" {
+      seps.push("-".repeat(w - 1) + ":")
+    } else if aligns[i] == "center" {
+      seps.push(":" + "-".repeat(w - 2) + ":")
+    } else {
+      seps.push("-".repeat(w))
+    }
+    i = i + 1
+  }
+  lines.push("| " + seps.join(" | ") + " |")
+  for row in rows {
+    lines.push(md_row(cells_of(row, columns)))
+  }
+  return lines.join("\n")
+}
+
+# Render rows as CSV text (quotes cells that need it).
+fn csv(rows, options) {
+  if options == nil { options = {} }
+  if type(options) == "list" { options = {"columns": options} }
+  let columns = options.get("columns", columns_of(rows))
+  let headers = _headers(columns, options)
+  let lines = [headers.map(_csv_cell).join(",")]
+  for row in rows {
+    lines.push(cells_of(row, columns).map(_csv_cell).join(","))
+  }
+  return lines.join("\n")
+}
+
+fn _csv_cell(value) {
+  let s = cell_text(value)
+  if s.contains(",") or s.contains("\"") or s.contains("\n") {
+    return "\"" + s.replace("\"", "\"\"") + "\""
+  }
+  return s
+}
+
+# A two-column key/value table from a map: good for showing a record.
+fn record(m, options) {
+  if options == nil { options = {} }
+  let rows = m.items().map(fn(pair) { return {"field": pair[0], "value": pair[1]} })
+  let merged = {"headers": {"field": options.get("key_title", "Field"), "value": options.get("value_title", "Value")}}
+  return render(rows, merged.merge(options))
+}
+
+# Shorthands with default options.
+fn table(rows) { return render(rows, {}) }
+fn md(rows) { return markdown(rows, {}) }
+fn to_csv(rows) { return csv(rows, {}) }
+fn record_of(m) { return record(m, {}) }
+
+# Print a table (same options as render).
+fn show(rows, options) {
+  say(render(rows, options))
+}
+
+fn _headers(columns, options) {
+  let given = options.get("headers")
+  if type(given) == "list" {
+    return given.map(cell_text)
+  }
+  return columns.map(fn(col) {
+    if type(given) == "map" and given.has(col) {
+      return cell_text(given[col])
+    }
+    return cell_text(col)
+  })
+}

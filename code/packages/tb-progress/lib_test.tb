@@ -1,0 +1,71 @@
+# Tests for tb-progress. Run with:  tb test packages/tb-progress
+
+import test
+import "lib.tb" as progress
+
+test.case("fractions and percentages are clamped", fn() {
+  test.equal(progress.fraction(3, 10), 0.3)
+  test.equal(progress.fraction(15, 10), 1)
+  test.equal(progress.fraction(-2, 10), 0)
+  test.equal(progress.fraction(0, 0), 1)
+  test.equal(progress.percent(1, 3), 33)
+  test.equal(progress.percent(2, 3), 67)
+})
+
+test.case("bars have the right width", fn() {
+  test.equal(progress.bar(3, 10, 20), "[██████              ]  30%")
+  test.equal(progress.bar(10, 10, 10), "[██████████] 100%")
+  test.equal(progress.bar(0, 10, 5), "[     ]   0%")
+  test.equal(progress.ascii_bar(5, 10, 10), "[#####-----]  50%")
+  test.equal(len(progress.render_bar(7, 9, 33, "=", ".")), 33)
+})
+
+test.case("bar_with options", fn() {
+  let out = progress.bar_with(2, 4, {"width": 4, "label": "Copying", "left": "<", "right": ">", "show_count": true, "show_percent": false})
+  test.equal(out, "Copying <██  > (2/4)")
+})
+
+test.case("spinners cycle through their frames", fn() {
+  test.equal(progress.spinner(0, "line"), "-")
+  test.equal(progress.spinner(5, "line"), "\\")
+  test.equal(progress.spinner(10, "dots"), "⠋")
+  test.raises(fn() { progress.spinner(0, "wobble") }, "doesn't know the spinner 'wobble'")
+})
+
+test.case("durations read well", fn() {
+  test.equal(progress.duration(12), "12s")
+  test.equal(progress.duration(65), "1m 05s")
+  test.equal(progress.duration(3725), "1h 02m")
+  test.equal(progress.duration(-3), "0s")
+})
+
+test.case("eta scales what's left", fn() {
+  test.equal(progress.eta(0, 10, 5), nil)
+  test.equal(progress.eta(2, 10, 4), 16)
+  test.equal(progress.eta(10, 10, 4), 0)
+})
+
+test.case("step counters pad the number", fn() {
+  test.equal(progress.step(3, 10), "[ 3/10]")
+  test.equal(progress.step(10, 10), "[10/10]")
+})
+
+test.case("a quiet tracker counts and finishes", fn() {
+  let t = progress.tracker(3, "Hashing Tanisha's files").quiet_mode()
+  test.equal(t.tick(), 1)
+  test.equal(t.tick(), 2)
+  test.true(t.line().starts_with("Hashing Tanisha's files ["))
+  test.true(t.line().contains("(2/3)"))
+  t.finish()
+  test.equal(t["done"], 3)
+  test.true(t.line().contains("100%"))
+})
+
+test.case("every(n) prints less often", fn() {
+  let t = progress.tracker(100, "Scanning").every_n(25).quiet_mode()
+  let i = 0
+  while i < 30 { t.tick(); i = i + 1 }
+  test.equal(t["printed"], 25)
+  t.set(50)
+  test.equal(t["printed"], 50)
+})

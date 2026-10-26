@@ -53,7 +53,7 @@ def load(api):
         check_type(line, encoding, "text", f"encode.{fn}", "encoding")
         found = ENCODINGS.get(encoding.lower())
         if found is None:
-            fail(line, f"encode.{fn}() doesn't know the encoding \"{encoding}\". Try \"utf-8\", \"utf-16\" or \"latin-1\".")
+            fail(line, f"encode.{fn}() doesn't know the encoding \"{encoding}\". Try \"utf-8\", \"utf-16\" or \"latin-1\".", cls="ValueError")
         return found
 
     @m.fn("base64", 1, 2, doc="base64(text, encoding?) -> text\nThe text in base64. encoding is how the text becomes bytes first: "
@@ -70,14 +70,14 @@ def load(api):
         enc = encoding_arg(line, encoding, "unbase64")
         cleaned = re.sub(r"\s+", "", text).replace("-", "+").replace("_", "/")
         if not re.fullmatch(r"[A-Za-z0-9+/]*={0,2}", cleaned):
-            fail(line, "encode.unbase64() got text that isn't base64 (only A-Z, a-z, 0-9, +, / and = are allowed).")
+            fail(line, "encode.unbase64() got text that isn't base64 (only A-Z, a-z, 0-9, +, / and = are allowed).", cls="ParseError")
         cleaned = cleaned.rstrip("=")
         if len(cleaned) % 4 == 1:
-            fail(line, "encode.unbase64() got base64 with the wrong length; part of it may be missing.")
+            fail(line, "encode.unbase64() got base64 with the wrong length; part of it may be missing.", cls="ParseError")
         try:
             data = _b64.b64decode(cleaned + "=" * (-len(cleaned) % 4))
         except (binascii.Error, ValueError) as err:
-            fail(line, f"encode.unbase64() couldn't decode that: {err}.")
+            fail(line, f"encode.unbase64() couldn't decode that: {err}.", cls="ParseError")
         return bytes_to_text(data, enc)
 
     @m.fn("hex", 1, doc="hex(text) -> text\nThe text's UTF-8 bytes as hex: hex(\"hi\") is \"6869\".")
@@ -90,7 +90,7 @@ def load(api):
         text_arg(line, text, "unhex")
         cleaned = re.sub(r"0x|\\x|[\s:,-]", "", text, flags=re.IGNORECASE)
         if len(cleaned) % 2 or not re.fullmatch(r"[0-9A-Fa-f]*", cleaned):
-            fail(line, "encode.unhex() got text that isn't hex (pairs of 0-9 and a-f).")
+            fail(line, "encode.unhex() got text that isn't hex (pairs of 0-9 and a-f).", cls="ParseError")
         return bytes_to_text(bytes.fromhex(cleaned))
 
     @m.fn("url", 1, doc="url(text) -> text\nURL-encode text so it is safe inside a link: url(\"a b&c\") is \"a%20b%26c\".")
