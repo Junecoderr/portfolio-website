@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest==8.3.4"]
+dev = ["pytest==8.3.4", "pytest-timeout==2.3.1"]
 build = ["pyinstaller==6.11.1"]
 
 [tool.uv]
@@ -14,3 +14,8 @@ package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A hung test fails after 5 minutes with every thread's traceback, instead of
+# stalling CI for hours.
+timeout = 300
+timeout_method = "thread"
+faulthandler_timeout = 240

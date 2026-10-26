@@ -39,6 +39,7 @@ jobs:
             binary: dist/tb/tb
             xvfb: xvfb-run -a       # virtual display for the gui checks
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
     permissions:
       contents: read
     env:

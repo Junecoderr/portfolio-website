@@ -24,6 +24,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, windows-latest, macos-14]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     env:
       # Use the Python from actions/setup-python, never a uv download.
       UV_PYTHON_PREFERENCE: only-system
