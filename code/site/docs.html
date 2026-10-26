@@ -887,7 +887,7 @@ say(type(tasks[0]))</code></pre>
 import parallel
 
 let hosts = ["192.0.2.10", "192.0.2.11", "192.0.2.12"]
-let results = parallel.map(h =&gt; net.tcp_check(h, 443, 2), hosts, workers = 8)
+let results = parallel.map(h =&gt; net.tcp_check(h, 443, 2), hosts, 8)
 for [host, ok] in hosts.zip(results) {
   say(host, if ok then "open" else "closed")
 }</code></pre>

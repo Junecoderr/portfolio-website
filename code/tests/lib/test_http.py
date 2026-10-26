@@ -107,9 +107,9 @@ def test_4xx_and_5xx_do_not_raise(server):
 def test_default_user_agent_params_and_headers(server):
     src = (f'import http\nlet r = http.get("{server}/echo", {{"params": {{"q": "a b", "n": 2}}, "headers": {{"X-Token": "t1"}}}})\n'
            'say(r.json.path, r.json.ua, r.json.token)')
-    assert run_tb(src) == ["/echo?q=a+b&n=2 TB/2.0 t1"]
+    assert run_tb(src) == ["/echo?q=a+b&n=2 TB/3.0 t1"]
     src = f'import http\nsay(http.get("{server}/e?x=1", {{"params": {{"y": 2}}, "user_agent": "Mine"}}).json.path, http.USER_AGENT)'
-    assert run_tb(src) == ["/e?x=1&y=2 TB/2.0"]
+    assert run_tb(src) == ["/e?x=1&y=2 TB/3.0"]
 
 
 def test_custom_user_agent(server):

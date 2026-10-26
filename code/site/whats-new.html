@@ -118,7 +118,7 @@ try {
 import parallel
 
 let hosts = ["192.0.2.10", "192.0.2.11", "192.0.2.12"]
-let open = parallel.map(h =&gt; net.tcp_check(h, 443, 2), hosts, workers = 16)
+let open = parallel.map(h =&gt; net.tcp_check(h, 443, 2), hosts, 16)
 say(hosts.zip(open))</code></pre>
         <p class="note">The browser playground has no threads: tasks there run one after another, and <code>parallel</code> needs the TB app.</p>
         </section>

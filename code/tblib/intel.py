@@ -17,7 +17,7 @@ from tblib._api import Module, check_type, fail
 import tb as _tb
 
 TIMEOUT = 20  # seconds per lookup
-USER_AGENT = "TB/2.0"
+USER_AGENT = "TB/3.0"
 
 VT_BASE = "https://www.virustotal.com/api/v3"
 ABUSEIPDB_URL = "https://api.abuseipdb.com/api/v2/check"

@@ -16,7 +16,7 @@ from tblib._api import Module, check_type, fail, fail_os
 
 import tb as _tb
 
-USER_AGENT = "TB/2.0"
+USER_AGENT = "TB/3.0"
 DEFAULT_TIMEOUT = 15            # seconds
 MAX_TIMEOUT = 300               # seconds
 MAX_TEXT = 10_000_000           # bytes of a response body kept in "text"
@@ -235,7 +235,7 @@ def load(api):
     options_doc = (
         "options is a map with any of: \"headers\" (map), \"params\" (map added to the address as "
         "?key=value), \"json\" (a value sent as JSON), \"timeout\" (seconds, default 15), "
-        "\"user_agent\" (default \"TB/2.0\"), \"max_bytes\" (biggest answer to accept, default 10 MB).")
+        "\"user_agent\" (default \"TB/3.0\"), \"max_bytes\" (biggest answer to accept, default 10 MB).")
 
     @m.fn("get", 1, 2, doc=(
         "get(url, options?) -> map\n"

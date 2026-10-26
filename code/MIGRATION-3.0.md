@@ -2,7 +2,7 @@
 
 Almost every 2.x program runs unchanged on 3.0 and prints the same thing. This
 page lists what can break and how to fix it. Everything new is described in
-`README.md` ("New in 3.0") and the contract is `DESIGN-3.0.md`.
+the "What's new in 3.0" page (https://code.tanisha.ceo/whats-new) and the contract is `DESIGN-3.0.md`.
 
 ## 1. New reserved words
 

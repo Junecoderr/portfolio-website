@@ -111,6 +111,7 @@ class CriticalAlert extends Alert {
 }
 
 # Pattern matching
+let alert = CriticalAlert("ssh brute force")
 let action = match alert {
   CriticalAlert(a) => "page the on-call analyst"
   {"level": "high"} => "open a ticket"
@@ -127,7 +128,7 @@ try {
 } catch err: NotFoundError {
   say("No config file, using defaults")
 } catch err: ParseError {
-  say(f"Bad config on line {err.line}: {err.message}")
+  say(f"Bad config: {err.message}")
 } finally {
   say("ready")
 }
@@ -140,7 +141,7 @@ say(lines_matching("auth.log", "Failed").take(5).to_list())
 
 # Concurrency
 let hosts = ["192.0.2.10", "192.0.2.11"]
-let results = parallel.map(h => net.tcp_check(h, 443), hosts, workers = 16)
+let results = parallel.map(h => net.tcp_check(h, 443), hosts, 16)          # up to 16 at a time
 ```
 
 The complete guide is at https://code.tanisha.ceo/docs and the formal
@@ -192,6 +193,7 @@ download. Sample data lives in `apps/data/`.
 | Detection and response | `log-triage`, `brute-force-hunter`, `sigma-runner`, `sigma-studio`, `pcap-triage`, `evtx-triage`, `file-inspector`, `ioc-extractor`, `ioc-feed`, `siem-forwarder` |
 | Network and intelligence | `ip-reputation`, `port-check`, `uptime-monitor`, `dns-check`, `cert-check` |
 | Web | `dashboard` (alerts dashboard served by the `server` library) |
+| Concurrency | `parallel-scan` (checks ports on many hosts at once) |
 
 Run one with `tb apps/log-triage/main.tb`.
 

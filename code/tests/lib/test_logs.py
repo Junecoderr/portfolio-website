@@ -146,7 +146,7 @@ AUTH_CASES = [
     ("passwd[2]: pam_unix(passwd:chauthtok): password changed for sysupdate", {"action": "password_changed", "user": "sysupdate"}),
     ("CRON[5]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)",
      {"action": "session_open", "user": "root", "service": "cron"}),
-    ("systemd-logind[612]: New session 41 of user alice.", {"action": "session_open", "user": "alice."}),
+    ("systemd-logind[612]: New session 41 of user alice.", {"action": "session_open", "user": "alice"}),
 ]
 
 

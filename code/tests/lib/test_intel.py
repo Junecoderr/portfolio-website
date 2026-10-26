@@ -88,7 +88,7 @@ def test_vt_file_malicious(fake, monkeypatch):
     assert fake.last.full_url == f"https://www.virustotal.com/api/v3/files/{HASH}"
     assert fake.last.get_method() == "GET"
     assert fake.header("x-apikey") == VT_KEY
-    assert fake.header("user-agent") == "TB/2.0"
+    assert fake.header("user-agent") == "TB/3.0"
 
 
 def test_vt_verdicts():

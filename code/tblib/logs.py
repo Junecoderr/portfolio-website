@@ -402,7 +402,7 @@ AUTH_PATTERNS = [
     (re.compile(r"^delete user '(?P<user>[^']+)'"), "user_deleted", True),
     (re.compile(r"^add '(?P<user>[^']+)' to (?:shadow )?group '(?P<group>[^']+)'"), "group_member_added", True),
     (re.compile(r"(?:^|\): )password changed for (?P<user>\S+)"), "password_changed", True),
-    (re.compile(r"^New session \S+ of user (?P<user>\S+)"), "session_open", None),
+    (re.compile(r"^New session \S+ of user (?P<user>\S+?)\.?$"), "session_open", None),
 ]
 REPEATED = re.compile(r"^message repeated (\d+) times: \[\s*(.*?)\s*\]$")
 
