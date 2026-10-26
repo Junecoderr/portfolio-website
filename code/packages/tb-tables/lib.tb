@@ -20,10 +20,25 @@ let ESC = encode.unhex("1b")
 # Box-drawing styles. Each has: top, middle (header separator), bottom
 # as [left, fill, join, right], plus the vertical bar.
 let STYLES = {
-  "rounded": {"top": ["╭", "─", "┬", "╮"], "mid": ["├", "─", "┼", "┤"], "bottom": ["╰", "─", "┴", "╯"], "bar": "│"},
-  "box":     {"top": ["┌", "─", "┬", "┐"], "mid": ["├", "─", "┼", "┤"], "bottom": ["└", "─", "┴", "┘"], "bar": "│"},
-  "ascii":   {"top": ["+", "-", "+", "+"], "mid": ["+", "-", "+", "+"], "bottom": ["+", "-", "+", "+"], "bar": "|"},
-  "plain":   {"top": nil, "mid": ["", "-", "  ", ""], "bottom": nil, "bar": " "},
+  "rounded": {
+    "top": ["╭", "─", "┬", "╮"],
+    "mid": ["├", "─", "┼", "┤"],
+    "bottom": ["╰", "─", "┴", "╯"],
+    "bar": "│",
+  },
+  "box": {
+    "top": ["┌", "─", "┬", "┐"],
+    "mid": ["├", "─", "┼", "┤"],
+    "bottom": ["└", "─", "┴", "┘"],
+    "bar": "│",
+  },
+  "ascii": {
+    "top": ["+", "-", "+", "+"],
+    "mid": ["+", "-", "+", "+"],
+    "bottom": ["+", "-", "+", "+"],
+    "bar": "|",
+  },
+  "plain": {"top": nil, "mid": ["", "-", "  ", ""], "bottom": nil, "bar": " "},
 }
 
 # The column names of a list of rows: the keys of map rows in order of first
@@ -77,7 +92,11 @@ fn cell_text(value) {
     return ""
   }
   if type(value) == "bool" {
-    if value { return "yes" } else { return "no" }
+    if value {
+      return "yes"
+    } else {
+      return "no"
+    }
   }
   return str(value)
 }
@@ -139,7 +158,11 @@ fn _alignment(rows, columns, options) {
           }
         }
       }
-      if numeric and seen { result.push("right") } else { result.push("left") }
+      if numeric and seen {
+        result.push("right")
+      } else {
+        result.push("left")
+      }
     }
     i = i + 1
   }
@@ -147,7 +170,9 @@ fn _alignment(rows, columns, options) {
 }
 
 fn _widths(rows, columns, headers, options) {
-  let widths = headers.map(fn(h) { return width_of(h) })
+  let widths = headers.map(fn(h) {
+    return width_of(h)
+  })
   for row in rows {
     let cells = cells_of(row, columns)
     let i = 0
@@ -161,7 +186,9 @@ fn _widths(rows, columns, headers, options) {
   }
   let max_width = options.get("max_width")
   if max_width != nil {
-    widths = widths.map(fn(w) { return min(w, max_width) })
+    widths = widths.map(fn(w) {
+      return min(w, max_width)
+    })
   }
   return widths
 }
@@ -181,7 +208,9 @@ fn _line(parts, widths, pad) {
   if parts == nil {
     return nil
   }
-  let segments = widths.map(fn(w) { return parts[1].repeat(w + pad) })
+  let segments = widths.map(fn(w) {
+    return parts[1].repeat(w + pad)
+  })
   return parts[0] + segments.join(parts[2]) + parts[3]
 }
 
@@ -190,13 +219,20 @@ fn _line(parts, widths, pad) {
 #             "style": "rounded"|"box"|"ascii"|"plain", "align": {"col": "left|right|center"},
 #             "max_width": n, "title": "text", "footer": row}
 fn render(rows, options) {
-  if options == nil { options = {} }
-  if type(options) == "list" { options = {"columns": options} }
+  if options == nil {
+    options = {}
+  }
+  if type(options) == "list" {
+    options = {"columns": options}
+  }
   let columns = options.get("columns", columns_of(rows))
   let headers = _headers(columns, options)
   let style_name = options.get("style", "rounded")
   if not STYLES.has(style_name) {
-    throw "tb-tables doesn't know the style '" + style_name + "'. Pick one of: " + STYLES.keys().join(", ")
+    throw "tb-tables doesn't know the style '" +
+      style_name +
+      "'. Pick one of: " +
+      STYLES.keys().join(", ")
   }
   let style = STYLES[style_name]
   let all_rows = rows.copy()
@@ -207,7 +243,9 @@ fn render(rows, options) {
   let aligns = _alignment(rows, columns, options)
   let bar = style["bar"]
   let pad = 2
-  if style_name == "plain" { pad = 0 }
+  if style_name == "plain" {
+    pad = 0
+  }
   let lines = []
 
   fn row_line(cells) {
@@ -228,7 +266,9 @@ fn render(rows, options) {
     lines.push(text.center(str(options["title"]), total).trim())
   }
   let top = _line(style["top"], widths, pad)
-  if top != nil { lines.push(top) }
+  if top != nil {
+    lines.push(top)
+  }
   lines.push(row_line(headers))
   lines.push(_line(style["mid"], widths, pad))
   for row in rows {
@@ -239,14 +279,20 @@ fn render(rows, options) {
     lines.push(row_line(cells_of(options["footer"], columns)))
   }
   let bottom = _line(style["bottom"], widths, pad)
-  if bottom != nil { lines.push(bottom) }
+  if bottom != nil {
+    lines.push(bottom)
+  }
   return lines.join("\n")
 }
 
 # Render rows as a GitHub-flavoured Markdown table.
 fn markdown(rows, options) {
-  if options == nil { options = {} }
-  if type(options) == "list" { options = {"columns": options} }
+  if options == nil {
+    options = {}
+  }
+  if type(options) == "list" {
+    options = {"columns": options}
+  }
   let columns = options.get("columns", columns_of(rows))
   let headers = _headers(columns, options)
   let widths = _widths(rows, columns, headers, {})
@@ -286,8 +332,12 @@ fn markdown(rows, options) {
 
 # Render rows as CSV text (quotes cells that need it).
 fn csv(rows, options) {
-  if options == nil { options = {} }
-  if type(options) == "list" { options = {"columns": options} }
+  if options == nil {
+    options = {}
+  }
+  if type(options) == "list" {
+    options = {"columns": options}
+  }
   let columns = options.get("columns", columns_of(rows))
   let headers = _headers(columns, options)
   let lines = [headers.map(_csv_cell).join(",")]
@@ -307,17 +357,34 @@ fn _csv_cell(value) {
 
 # A two-column key/value table from a map: good for showing a record.
 fn record(m, options) {
-  if options == nil { options = {} }
-  let rows = m.items().map(fn(pair) { return {"field": pair[0], "value": pair[1]} })
-  let merged = {"headers": {"field": options.get("key_title", "Field"), "value": options.get("value_title", "Value")}}
+  if options == nil {
+    options = {}
+  }
+  let rows = m.items().map(fn(pair) {
+    return {"field": pair[0], "value": pair[1]}
+  })
+  let merged = {
+    "headers": {
+      "field": options.get("key_title", "Field"),
+      "value": options.get("value_title", "Value"),
+    },
+  }
   return render(rows, merged.merge(options))
 }
 
 # Shorthands with default options.
-fn table(rows) { return render(rows, {}) }
-fn md(rows) { return markdown(rows, {}) }
-fn to_csv(rows) { return csv(rows, {}) }
-fn record_of(m) { return record(m, {}) }
+fn table(rows) {
+  return render(rows, {})
+}
+fn md(rows) {
+  return markdown(rows, {})
+}
+fn to_csv(rows) {
+  return csv(rows, {})
+}
+fn record_of(m) {
+  return record(m, {})
+}
 
 # Print a table (same options as render).
 fn show(rows, options) {

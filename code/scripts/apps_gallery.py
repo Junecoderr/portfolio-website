@@ -15,16 +15,28 @@ from pathlib import Path
 TITLES = {
     "todo": "To-do list", "care": "Care check-in", "notes": "Notes", "calculator": "Calculator",
     "hash-checker": "Hash checker", "log-triage-gui": "Log triage (desktop)", "ioc-workbench": "IOC workbench",
+    "alerts-dashboard-gui": "Alerts dashboard (desktop)", "network-monitor": "Network monitor",
+    "file-inspector-gui": "File inspector (desktop)",
     "log-triage": "Log triage", "ioc-extractor": "IOC extractor", "brute-force-hunter": "Brute-force hunter",
-    "sigma-runner": "Sigma runner", "ip-reputation": "IP reputation", "port-check": "Port check",
-    "uptime-monitor": "Uptime monitor",
+    "sigma-runner": "Sigma runner", "sigma-studio": "Sigma studio", "pcap-triage": "Packet capture triage",
+    "evtx-triage": "Windows event log triage", "file-inspector": "File inspector", "ioc-feed": "IOC feed",
+    "siem-forwarder": "SIEM forwarder",
+    "ip-reputation": "IP reputation", "port-check": "Port check", "uptime-monitor": "Uptime monitor",
+    "dns-check": "DNS check", "cert-check": "Certificate check", "parallel-scan": "Parallel port scan",
+    "dashboard": "Alerts dashboard (web)",
 }
 ORDER = ["todo", "care", "notes", "calculator", "hash-checker", "log-triage-gui", "ioc-workbench",
-         "log-triage", "ioc-extractor", "brute-force-hunter", "sigma-runner",
-         "ip-reputation", "port-check", "uptime-monitor"]
-KINDS = [("gui", "Desktop apps", "Real windows with buttons, tables and menus, built with the gui library."),
-         ("soc", "Security (SOC) tools", "Command-line tools for the jobs a security analyst does every day."),
-         ("network", "Network and intel", "Check hosts you own, watch websites, and ask threat-intelligence services about indicators.")]
+         "alerts-dashboard-gui", "network-monitor", "file-inspector-gui",
+         "log-triage", "ioc-extractor", "brute-force-hunter", "sigma-runner", "sigma-studio", "pcap-triage",
+         "evtx-triage", "file-inspector", "ioc-feed", "siem-forwarder",
+         "ip-reputation", "port-check", "uptime-monitor", "dns-check", "cert-check", "parallel-scan",
+         "dashboard"]
+KINDS = [("gui", "Desktop apps", "Real windows with buttons, tables, tabs and charts, built with the gui library."),
+         ("soc", "Security (SOC) tools", "Command-line tools for the jobs a security analyst does every day: logs, "
+          "packet captures, Windows event logs, executables, Sigma rules, threat feeds and SIEMs."),
+         ("network", "Network and intel", "Check hosts you own, watch websites, look up DNS and certificates, and ask "
+          "threat-intelligence services about indicators."),
+         ("web", "Web apps", "A small web application served by TB itself with the server library.")]
 
 
 def esc(text: str) -> str:
@@ -82,7 +94,9 @@ def app_kind(folder: Path) -> str:
     src = "\n".join(p.read_text(encoding="utf-8") for p in folder.glob("*.tb"))
     if re.search(r"^\s*import\s+gui\b", src, re.M):
         return "gui"
-    if re.search(r"^\s*import\s+(net|http|intel)\b", src, re.M):
+    if re.search(r"^\s*import\s+server\b", src, re.M):
+        return "web"
+    if re.search(r"^\s*import\s+(net|http|intel|dns|tls|parallel)\b", src, re.M):
         return "network"
     return "soc"
 

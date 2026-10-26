@@ -322,11 +322,11 @@
       "patterns": [
         {
           "name": "variable.language.self.tb",
-          "match": "\\bself\\b"
+          "match": "\\b(?:self)\\b"
         },
         {
           "name": "variable.language.super.tb",
-          "match": "\\bsuper\\b"
+          "match": "\\b(?:super)\\b"
         },
         {
           "name": "variable.language.wildcard.tb",

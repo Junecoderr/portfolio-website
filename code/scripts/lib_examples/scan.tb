@@ -1,0 +1,20 @@
+import scan
+
+let rules = scan.rules("""
+rule Suspicious_PowerShell {
+  meta:
+    description = "Encoded PowerShell launched from a script"
+  strings:
+    $ps = "powershell" nocase
+    $enc = "-enc" nocase
+    $mz = { 4D 5A ?? 00 }
+  condition:
+    $ps and ($enc or $mz)
+}
+""")
+
+let sample = b"cmd /c PowerShell.exe -NoP -Enc SQBFAFgA... MZ\x90\x00"
+for hit in scan.bytes(sample, rules) {
+  say(f"{hit.rule} matched:", hit)
+}
+say(scan.strings(sample, 6))

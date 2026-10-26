@@ -41,7 +41,14 @@ fn load_config(path) {
 
 # Check one site: {"name", "url", "up", "status", "ms", "note"}.
 fn check(site, config) {
-  let result = {"name": site.name, "url": site.url, "up": false, "status": "-", "ms": nil, "note": ""}
+  let result = {
+    "name": site.name,
+    "url": site.url,
+    "up": false,
+    "status": "-",
+    "ms": nil,
+    "note": "",
+  }
   try {
     let r = http.get(site.url, {"timeout": config.timeout})
     result.status = r.status
@@ -58,7 +65,9 @@ fn check(site, config) {
 
 fn report(config) {
   say(f"Uptime check, {time.format(time.timestamp(), "%Y-%m-%d %H:%M:%S")}")
-  say(f"{text.pad_right("SITE", 22)}{text.pad_right("STATE", 7)}{text.pad_right("STATUS", 8)}{text.pad_left("TIME", 8)}  NOTE")
+  say(
+    f"{text.pad_right("SITE", 22)}{text.pad_right("STATE", 7)}{text.pad_right("STATUS", 8)}{text.pad_left("TIME", 8)}  NOTE",
+  )
   let down = 0
   for site in config.sites {
     let r = check(site, config)

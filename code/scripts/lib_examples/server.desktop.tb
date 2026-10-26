@@ -2,8 +2,14 @@ import server
 
 let app = server.create()
 let notes = [{"id": 1, "text": "check auth.log", "by": "Tanisha"}]
-app.get("/", fn(req) { return server.html("<h1>Notes</h1>") })
-app.get("/notes/{id}", fn(req) { return notes.filter(fn(n) { return str(n.id) == req.params.id }) })
+app.get("/", fn(req) {
+  return server.html("<h1>Notes</h1>")
+})
+app.get("/notes/{id}", fn(req) {
+  return notes.filter(fn(n) {
+    return str(n.id) == req.params.id
+  })
+})
 app.post("/notes", fn(req) {
   notes.push({"id": len(notes) + 1, "text": req.json.text, "by": "Tanisha"})
   return server.json(notes.last(), 201)

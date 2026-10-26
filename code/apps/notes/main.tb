@@ -15,30 +15,63 @@ let dirty = false      # true when there are unsaved changes
 let win = gui.window("Notes", {"width": 680, "height": 520})
 
 let bar = win.row()
-bar.button("New", fn() { new_note() })
-bar.button("Open…", fn() { open_note() })
-bar.button("Save", fn() { save_note() }, {"primary": true})
+bar.button("New", fn() {
+  new_note()
+})
+bar.button("Open…", fn() {
+  open_note()
+})
+bar.button(
+  "Save",
+  fn() {
+    save_note()
+  },
+  {"primary": true},
+)
 let file_label = bar.label("", {"style": "muted"})
 
-let editor = win.textarea({"on_change": fn(text) { changed(text) }, "height": 16})
+let editor = win.textarea({
+  "on_change": fn(text) {
+    changed(text)
+  },
+  "height": 16,
+})
 let status = win.status("")
 
 win.menu({
   "File": {
-    "New": fn() { new_note() },
-    "Open…": fn() { open_note() },
-    "Save": fn() { save_note() },
-    "Save As…": fn() { save_as() },
+    "New": fn() {
+      new_note()
+    },
+    "Open…": fn() {
+      open_note()
+    },
+    "Save": fn() {
+      save_note()
+    },
+    "Save As…": fn() {
+      save_as()
+    },
     "-": nil,
-    "Quit": fn() { quit() },
+    "Quit": fn() {
+      quit()
+    },
   },
   "Help": {
-    "About Notes": fn() { gui.alert("Notes, a tiny editor written in TB.", "About") },
+    "About Notes": fn() {
+      gui.alert("Notes, a tiny editor written in TB.", "About")
+    },
   },
 })
-win.key("Mod+N", fn() { new_note() })
-win.key("Mod+O", fn() { open_note() })
-win.key("Mod+S", fn() { save_note() })
+win.key("Mod+N", fn() {
+  new_note()
+})
+win.key("Mod+O", fn() {
+  open_note()
+})
+win.key("Mod+S", fn() {
+  save_note()
+})
 
 fn file_name() {
   if current == nil {

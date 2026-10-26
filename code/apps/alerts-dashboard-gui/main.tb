@@ -15,7 +15,13 @@ import "../log-triage/rules.tb" as rules
 let DATA = fs.join(fs.here(), "..", "data")
 let SAMPLES = ["auth.log", "access.log", "firewall.log", "windows_security.json"]
 let LEVELS = ["critical", "high", "medium", "low", "informational"]
-let BADGE = {"critical": "danger", "high": "warning", "medium": "accent", "low": "info", "informational": "muted"}
+let BADGE = {
+  "critical": "danger",
+  "high": "warning",
+  "medium": "accent",
+  "low": "info",
+  "informational": "muted",
+}
 
 let theme = "dark"
 let analyst = "Tanisha"
@@ -53,16 +59,29 @@ let titles = head.column({"expand": true})
 titles.label("TB Alerts Dashboard", {"style": "title"})
 let subtitle = titles.label(f"Analyst: {analyst}  ·  no logs open yet", {"style": "muted"})
 let bar = win.row()
-bar.button("Open logs…", fn() { open_logs() }, {"primary": true})
+bar.button(
+  "Open logs…",
+  fn() {
+    open_logs()
+  },
+  {"primary": true},
+)
 bar.label("or add a sample:", {"style": "muted"})
-let sample = bar.select(["(choose)"] + SAMPLES, {"on_change": fn(name) {
-  if name != "(choose)" {
-    add_log(fs.join(DATA, name))
-    sample.set("(choose)")
-  }
-}, "width": 24})
-bar.button("Clear", fn() { clear_all() })
-bar.button("Export HTML report…", fn() { export_report() })
+let sample = bar.select(["(choose)"] + SAMPLES, {
+  "on_change": fn(name) {
+    if name != "(choose)" {
+      add_log(fs.join(DATA, name))
+      sample.set("(choose)")
+    }
+  },
+  "width": 24,
+})
+bar.button("Clear", fn() {
+  clear_all()
+})
+bar.button("Export HTML report…", fn() {
+  export_report()
+})
 
 # -- summary cards -------------------------------------------------------------------
 
@@ -85,17 +104,35 @@ let tabs = win.tabs(["Overview", "Alerts", "Timeline", "Sources"], {"expand": tr
 
 let overview = tabs.page("Overview")
 let charts = overview.row({"expand": true})
-let level_chart = charts.chart({"type": "bar", "title": "Alerts by level", "labels": LEVELS,
-                                "data": [0, 0, 0, 0, 0], "expand": true})
-let rule_chart = charts.chart({"type": "pie", "title": "Alerts by rule", "empty": "No alerts yet", "expand": true})
-let actor_chart = overview.chart({"type": "bar", "title": "Busiest sources (alerts by who did it)",
-                                  "empty": "No alerts yet", "expand": true})
+let level_chart = charts.chart({
+  "type": "bar",
+  "title": "Alerts by level",
+  "labels": LEVELS,
+  "data": [0, 0, 0, 0, 0],
+  "expand": true,
+})
+let rule_chart = charts.chart({
+  "type": "pie",
+  "title": "Alerts by rule",
+  "empty": "No alerts yet",
+  "expand": true,
+})
+let actor_chart = overview.chart({
+  "type": "bar",
+  "title": "Busiest sources (alerts by who did it)",
+  "empty": "No alerts yet",
+  "expand": true,
+})
 
 let alerts_page = tabs.page("Alerts")
 let split = alerts_page.splitter({"expand": true})
 let tree_pane = split.pane({"weight": 3})
 let tree = tree_pane.tree(["Level / rule / who", "Count", "First seen", "Last seen"], {
-  "widths": [360, 70, 170, 170], "on_select": fn(values, id) { show_alert(id) }, "expand": true,
+  "widths": [360, 70, 170, 170],
+  "on_select": fn(values, id) {
+    show_alert(id)
+  },
+  "expand": true,
 })
 let details_pane = split.pane({"weight": 2})
 details_pane.label("Details", {"style": "heading"})
@@ -103,33 +140,58 @@ let details = details_pane.textarea({"readonly": true, "mono": true, "expand": t
 let tree_alert = {}   # tree node id -> alert
 
 let timeline_page = tabs.page("Timeline")
-let timeline = timeline_page.chart({"type": "line", "title": "Records and alerts per hour", "empty": "No timestamps yet",
-                                    "expand": true})
-let busiest = timeline_page.table(["Hour", "Records", "Alerts starting"], {"widths": [220, 100, 140], "height": 6})
+let timeline = timeline_page.chart({
+  "type": "line",
+  "title": "Records and alerts per hour",
+  "empty": "No timestamps yet",
+  "expand": true,
+})
+let busiest = timeline_page.table(["Hour", "Records", "Alerts starting"], {
+  "widths": [220, 100, 140],
+  "height": 6,
+})
 
 let sources_page = tabs.page("Sources")
-let sources_table = sources_page.table(["Log", "Format", "Records", "Alerts", "From", "To"],
-                                       {"widths": [260, 100, 90, 70, 180, 180], "expand": true,
-                                        "on_open": fn(row, i) { remove_source(i) }})
+let sources_table = sources_page.table(["Log", "Format", "Records", "Alerts", "From", "To"], {
+  "widths": [260, 100, 90, 70, 180, 180],
+  "expand": true,
+  "on_open": fn(row, i) {
+    remove_source(i)
+  },
+})
 sources_page.label("Double-click a log to close it.", {"style": "muted"})
 
 let status = win.status("Ready")
 
 win.menu({
   "File": {
-    "Open logs…": fn() { open_logs() },
-    "Export HTML report…": fn() { export_report() },
+    "Open logs…": fn() {
+      open_logs()
+    },
+    "Export HTML report…": fn() {
+      export_report()
+    },
     "-": nil,
     "Quit": win.close,
   },
   "View": {
-    "Overview": fn() { tabs.select("Overview") },
-    "Alerts": fn() { tabs.select("Alerts") },
-    "Timeline": fn() { tabs.select("Timeline") },
+    "Overview": fn() {
+      tabs.select("Overview")
+    },
+    "Alerts": fn() {
+      tabs.select("Alerts")
+    },
+    "Timeline": fn() {
+      tabs.select("Timeline")
+    },
   },
 })
-win.key("Mod+O", fn() { open_logs() })
-win.key("Mod+E", fn() { export_report() })
+win.key("Mod+O", fn() {
+  open_logs()
+})
+win.key("Mod+E", fn() {
+  export_report()
+})
 win.on_drop(fn(paths) {
   for path in paths {
     add_log(path)
@@ -147,24 +209,31 @@ fn add_log(path) {
   }
   loading += 1
   status.set(f"Reading {fs.name(path)}…")
-  win.run_in_background(fn() {
-    let fmt = logs.sniff(path)
-    let got = logs.read(path)
-    return {"path": path, "format": fmt, "records": got, "alerts": rules.triage(got)}
-  }, fn(source) {
-    loading -= 1
-    sources.push(source)
-    refresh()
-    status.set(f"{fs.name(path)}: {len(source.records)} records, {len(source.alerts)} alerts")
-  }, fn(message) {
-    loading -= 1
-    gui.alert(message, "Couldn't read the log")
-    status.set("Ready")
-  })
+  win.run_in_background(
+    fn() {
+      let fmt = logs.sniff(path)
+      let got = logs.read(path)
+      return {"path": path, "format": fmt, "records": got, "alerts": rules.triage(got)}
+    },
+    fn(source) {
+      loading -= 1
+      sources.push(source)
+      refresh()
+      status.set(f"{fs.name(path)}: {len(source.records)} records, {len(source.alerts)} alerts")
+    },
+    fn(message) {
+      loading -= 1
+      gui.alert(message, "Couldn't read the log")
+      status.set("Ready")
+    },
+  )
 }
 
 fn open_logs() {
-  let path = gui.open_file({"Logs": "*.log *.txt *.json *.jsonl *.csv", "All files": "*"}, "Open a log")
+  let path = gui.open_file(
+    {"Logs": "*.log *.txt *.json *.jsonl *.csv", "All files": "*"},
+    "Open a log",
+  )
   if path != nil {
     add_log(path)
   }
@@ -217,7 +286,9 @@ fn refresh() {
       records.push(r)
     }
   }
-  alerts = alerts.sort_by(fn(a) { return ORDER[a.level] * 10000000000 + (a.first or 0) })
+  alerts = alerts.sort_by(fn(a) {
+    return ORDER[a.level] * 10000000000 + (a.first or 0)
+  })
   let c = level_counts()
   records_stat.set(len(records))
   alerts_stat.set(len(alerts))
@@ -233,7 +304,9 @@ fn refresh() {
   if sources.is_empty() {
     subtitle.set(f"Analyst: {analyst}  ·  no logs open yet")
   } else {
-    subtitle.set(f"Analyst: {analyst}  ·  {len(sources)} log{plural(len(sources))}  ·  {len(records)} records  ·  {len(alerts)} alerts")
+    subtitle.set(
+      f"Analyst: {analyst}  ·  {len(sources)} log{plural(len(sources))}  ·  {len(records)} records  ·  {len(alerts)} alerts",
+    )
   }
   update_charts(c)
   update_tree()
@@ -249,7 +322,11 @@ fn plural(n) {
 }
 
 fn update_charts(c) {
-  level_chart.update({"data": LEVELS.map(fn(level) { return c[level] })})
+  level_chart.update({
+    "data": LEVELS.map(fn(level) {
+      return c[level]
+    }),
+  })
   let by_rule = {}
   let by_actor = {}
   for a in alerts {
@@ -260,19 +337,33 @@ fn update_charts(c) {
     }
   }
   rule_chart.update({"labels": by_rule.keys(), "data": by_rule.values()})
-  let actors = by_actor.keys().sort_by(fn(k) { return 0 - by_actor[k] }).slice(0, 8)
-  actor_chart.update({"labels": actors, "data": actors.map(fn(k) { return by_actor[k] })})
+  let actors = by_actor.keys().sort_by(fn(k) {
+    return 0 - by_actor[k]
+  }).slice(0, 8)
+  actor_chart.update({
+    "labels": actors,
+    "data": actors.map(fn(k) {
+      return by_actor[k]
+    }),
+  })
 }
 
 fn update_tree() {
   tree.clear()
   tree_alert = {}
   for level in LEVELS {
-    let mine = alerts.filter(fn(a) { return a.level == level })
+    let mine = alerts.filter(fn(a) {
+      return a.level == level
+    })
     if mine.is_empty() {
       continue
     }
-    let level_node = tree.add(nil, [f"{level.upper()} ({len(mine)})", mine.map(fn(a) { return a.count }).sum()])
+    let level_node = tree.add(nil, [
+      f"{level.upper()} ({len(mine)})",
+      mine.map(fn(a) {
+        return a.count
+      }).sum(),
+    ])
     let by_rule = {}
     for a in mine {
       if not by_rule.has(a.rule) {
@@ -282,16 +373,27 @@ fn update_tree() {
     }
     for rule in by_rule.keys() {
       let group = by_rule[rule]
-      let rule_node = tree.add(level_node, [rule, group.map(fn(a) { return a.count }).sum(),
-                                            group.first().first_when, group.last().last_when],
-                               {"open": level == "critical" or level == "high"})
+      let rule_node = tree.add(
+        level_node,
+        [
+          rule,
+          group.map(fn(a) {
+            return a.count
+          }).sum(),
+          group.first().first_when,
+          group.last().last_when,
+        ],
+        {"open": level == "critical" or level == "high"},
+      )
       for a in group {
         let node = tree.add(rule_node, [by_text(a), a.count, a.first_when, a.last_when])
         tree_alert[node] = a
       }
     }
   }
-  details.set(if_text(alerts.is_empty(), "No alerts. Open a log to start.", "Pick an alert in the tree."))
+  details.set(
+    if_text(alerts.is_empty(), "No alerts. Open a log to start.", "Pick an alert in the tree."),
+  )
 }
 
 fn if_text(cond, a, b) {
@@ -370,17 +472,36 @@ fn update_timeline() {
     }
   }
   let hours = hour_range(per_hour, 36)
-  let labels = hours.map(fn(h) { return time.format(h, "%d %b %H:00") })
-  timeline.update({"labels": labels, "data": {
-    "records": hours.map(fn(h) { return per_hour.get(h, 0) }),
-    "alerts": hours.map(fn(h) { return alerts_per_hour.get(h, 0) }),
-  }})
-  let top = per_hour.keys().sort_by(fn(h) { return 0 - per_hour[h] }).slice(0, 10)
-  busiest.set_rows(top.map(fn(h) { return [time.format(h, "%Y-%m-%d %H:00"), per_hour[h], alerts_per_hour.get(h, 0)] }))
+  let labels = hours.map(fn(h) {
+    return time.format(h, "%d %b %H:00")
+  })
+  timeline.update({
+    "labels": labels,
+    "data": {
+      "records": hours.map(fn(h) {
+        return per_hour.get(h, 0)
+      }),
+      "alerts": hours.map(fn(h) {
+        return alerts_per_hour.get(h, 0)
+      }),
+    },
+  })
+  let top = per_hour.keys().sort_by(fn(h) {
+    return 0 - per_hour[h]
+  }).slice(0, 10)
+  busiest.set_rows(
+    top.map(fn(h) {
+      return [time.format(h, "%Y-%m-%d %H:00"), per_hour[h], alerts_per_hour.get(h, 0)]
+    }),
+  )
 }
 
 fn span(recs) {
-  let timed = recs.filter(fn(r) { return r.time != nil }).sort_by(fn(r) { return r.time })
+  let timed = recs.filter(fn(r) {
+    return r.time != nil
+  }).sort_by(fn(r) {
+    return r.time
+  })
   if timed.is_empty() {
     return ["-", "-"]
   }
@@ -388,10 +509,12 @@ fn span(recs) {
 }
 
 fn update_sources() {
-  sources_table.set_rows(sources.map(fn(s) {
-    let when = span(s.records)
-    return [fs.name(s.path), s.format, len(s.records), len(s.alerts), when[0], when[1]]
-  }))
+  sources_table.set_rows(
+    sources.map(fn(s) {
+      let when = span(s.records)
+      return [fs.name(s.path), s.format, len(s.records), len(s.alerts), when[0], when[1]]
+    }),
+  )
 }
 
 fn export_report() {
@@ -404,13 +527,25 @@ fn export_report() {
     return
   }
   let rows = alerts.map(fn(a) {
-    return {"level": a.level, "rule": a.rule, "by": by_text(a), "count": a.count,
-            "first": a.first_when, "last": a.last_when}
+    return {
+      "level": a.level,
+      "rule": a.rule,
+      "by": by_text(a),
+      "count": a.count,
+      "first": a.first_when,
+      "last": a.last_when,
+    }
   })
   let c = level_counts()
   let page = report.html("TB Alerts Dashboard", rows, {
     "intro": f"Prepared by {analyst}: {len(sources)} log{plural(len(sources))}, {len(records)} records, {len(alerts)} alerts.",
-    "stats": {"Logs": len(sources), "Records": len(records), "Alerts": len(alerts), "Critical": c.critical, "High": c.high},
+    "stats": {
+      "Logs": len(sources),
+      "Records": len(records),
+      "Alerts": len(alerts),
+      "Critical": c.critical,
+      "High": c.high,
+    },
   })
   try {
     status.set(f"Report saved to {report.save(path, page)}")

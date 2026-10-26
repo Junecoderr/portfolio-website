@@ -233,7 +233,8 @@ class API:
 
     def call(self, fn, args, line=None):
         """Call a TB function (or built-in) with a list of arguments."""
-        return self.interpreter.call(fn, list(args), line)
+        # current(): the calling thread's interpreter view (TB 3.0 threads)
+        return self.interpreter.current().call(fn, list(args), line)
 
     def wrap(self, fn, line=None):
         """A plain Python callable that calls the TB function fn. TB errors

@@ -1,0 +1,61 @@
+import parallel
+
+# Run a function at the same time as the rest of the program.
+fn slow_square(x) {
+  parallel.sleep(0.5)
+  return x * x
+}
+let task = parallel.run(slow_square, 7)
+say("working...", task.done())
+say(task.wait())                     # 49
+
+# Map over a list with 8 workers: results stay in order.
+say(parallel.map(slow_square, [1, 2, 3, 4, 5, 6, 7, 8]))  # about 0.5 s, not 4 s
+
+# async fn gives back a Task; await waits for it.
+async fn fetch(name) {
+  parallel.sleep(0.2)
+  return name.upper()
+}
+let a = fetch("one")
+let b = fetch("two")
+say(await a, await b)
+
+# A queue between a producer and a consumer.
+let q = parallel.Queue()
+parallel.run(fn() {
+  for i in 1..=3 {
+    q.put(i)
+  }
+  q.close()
+})
+for item in q {
+  say("got", item)
+}
+
+# A lock around a shared counter.
+let lock = parallel.Lock()
+let count = {"n": 0}
+parallel.each(fn(i) {
+  lock.hold(fn() {
+    count.n += 1
+  })
+}, range(100))
+say(count.n)                         # 100
+
+# Errors in a task come back, with their class, when you wait.
+let bad = parallel.run(fn() {
+  throw ValueError("no thanks")
+})
+try {
+  bad.wait()
+} catch err: ValueError {
+  say("caught:", err.message)
+}
+
+# A timer, stopped after a while.
+let timer = parallel.every(100, fn() {
+  say("tick")
+})
+parallel.sleep(0.35)
+timer.stop()

@@ -7,14 +7,17 @@ Usage:
 
 What it does:
   * copies site/ (pages, assets, vendored Pyodide) to --out
-  * copies tb.py and welcome.tb to the site root
+  * copies tb.py and welcome.tb to the site root, and the language itself
+    (tbcore/: lexer, parser, compiler, VM, ...) with tbcore/index.json (the
+    files listed in tbcore/__init__.py FILES plus any other tbcore/*.py), so
+    the playground can load it
   * copies examples/*.tb into <out>/examples/ (plus welcome.tb)
   * writes <out>/examples/index.json from the "# Title:" / "# About:" header
     comments of each example (welcome first)
   * writes <out>/assets/js/config.js with the version; downloads are
     site-relative /dl/<asset> links (a rewrite on the host serves them)
-  * copies the standard library (tblib/*.py, *.tb) and writes tblib/index.json,
-    so the browser playground can `import` every library
+  * copies the standard library (tblib/*.py, *.tb and tblib/data/) and writes
+    tblib/index.json, so the browser playground can `import` every library
   * copies apps/data/ (sample logs, the phishing email, Sigma rules) and writes
     apps/data/index.json; the playground loads these into its pretend disk
   * copies every app's source (apps/<name>/) so the site can link to it, and
@@ -22,6 +25,13 @@ What it does:
   * adds the security examples in scripts/playground_examples/ to the playground
   * generates the library reference (library.html, lib/<name>.html) with
     scripts/gen_lib_docs.py
+  * renders spec.html (spec/SPEC.md) and migration.html (MIGRATION-3.0.md)
+    with scripts/md2html.py, and packages.html from packages/index.json and
+    each package's README.md
+  * zips every example package (packages/<name>/) into packages/<name>.zip and
+    copies packages/index.json, the index `tb add` reads
+  * refuses to finish if a served text file mentions github.com (downloads
+    and links stay on this site)
 
 Standard library only.
 """
@@ -29,16 +39,21 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import ast
+import html
 import json
 import re
 import shutil
 import sys
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 EXAMPLES = ROOT / "examples"
 TBLIB = ROOT / "tblib"
+TBCORE = ROOT / "tbcore"
+PACKAGES = ROOT / "packages"
 APPS = ROOT / "apps"
 SCRIPTS = Path(__file__).resolve().parent
 PLAYGROUND_EXAMPLES = SCRIPTS / "playground_examples"
@@ -90,13 +105,44 @@ def example_entry(name: str, path: Path) -> dict:
     }
 
 
+def tbcore_files() -> list[str]:
+    """The files of tbcore/: FILES from tbcore/__init__.py (the documented
+    list), plus any other tbcore/*.py so a new module is never left out."""
+    listed: list[str] = []
+    try:
+        tree = ast.parse((TBCORE / "__init__.py").read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "FILES" for t in node.targets):
+                listed = [str(x) for x in ast.literal_eval(node.value)]
+    except (OSError, SyntaxError, ValueError):
+        listed = []
+    found = sorted(p.name for p in TBCORE.glob("*.py"))
+    names = [n for n in listed if (TBCORE / n).is_file()]
+    names += [n for n in found if n not in names]
+    if "__init__.py" not in names:
+        fail("tbcore/__init__.py is missing")
+    return names
+
+
+def copy_tbcore(out: Path) -> list[str]:
+    dest = out / "tbcore"
+    dest.mkdir(parents=True, exist_ok=True)
+    names = tbcore_files()
+    for name in names:
+        shutil.copy2(TBCORE / name, dest / name)
+    (dest / "index.json").write_text(json.dumps(names, indent=2) + "\n", encoding="utf-8")
+    return names
+
+
 def copy_tblib(out: Path) -> list[str]:
-    """Copy tblib's .py and .tb files; return their names for tblib/index.json."""
+    """Copy tblib's .py and .tb files and tblib/data/; return their names for tblib/index.json."""
     dest = out / "tblib"
     dest.mkdir(parents=True, exist_ok=True)
     names = []
     for path in sorted(TBLIB.rglob("*")):
-        if path.is_file() and path.suffix in (".py", ".tb") and "__pycache__" not in path.parts:
+        rel_parts = path.relative_to(TBLIB).parts
+        data_file = rel_parts[0] == "data" and path.name != ".DS_Store"
+        if path.is_file() and (path.suffix in (".py", ".tb") or data_file) and "__pycache__" not in path.parts:
             rel = path.relative_to(TBLIB).as_posix()
             (dest / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, dest / rel)
@@ -142,6 +188,213 @@ def copy_app_sources(out: Path) -> list[str]:
     return names
 
 
+# Package zips are reproducible: fixed timestamps, sorted members.
+ZIP_DATE = (2026, 10, 26, 0, 0, 0)
+PACKAGE_SKIP = {".DS_Store", "tb.lock"}
+
+
+def build_packages(out: Path) -> list[str]:
+    """Zip packages/<name>/ into <out>/packages/<name>.zip (one top folder,
+    <name>/, which tb add strips) and copy packages/index.json."""
+    dest = out / "packages"
+    dest.mkdir(parents=True, exist_ok=True)
+    names = []
+    if not PACKAGES.is_dir():
+        return names
+    for folder in sorted(PACKAGES.iterdir()):
+        if not folder.is_dir() or not (folder / "tb.toml").exists():
+            continue
+        with zipfile.ZipFile(dest / f"{folder.name}.zip", "w", zipfile.ZIP_DEFLATED) as zf:
+            for path in sorted(folder.rglob("*")):
+                parts = path.relative_to(folder).parts
+                if (not path.is_file() or path.name in PACKAGE_SKIP or "__pycache__" in parts
+                        or "tb_packages" in parts or any(p.startswith(".") for p in parts)):
+                    continue
+                info = zipfile.ZipInfo(f"{folder.name}/" + "/".join(parts), ZIP_DATE)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+                zf.writestr(info, path.read_bytes())
+        names.append(folder.name)
+    if (PACKAGES / "index.json").exists():
+        shutil.copy2(PACKAGES / "index.json", dest / "index.json")
+    return names
+
+
+def sectionize(body: str) -> str:
+    """Wrap each <h2 id=X> and what follows it in <section id=X>, the shape
+    docs.js reads for its "On this page" list."""
+    parts = re.split(r'(<h2 id="[^"]+">)', body)
+    out = [parts[0]]
+    for k in range(1, len(parts), 2):
+        hid = re.search(r'id="([^"]+)"', parts[k]).group(1)
+        out.append(f'<section id="{hid}">\n<h2>' + parts[k + 1].rstrip() + "\n</section>\n")
+    return "".join(out)
+
+
+def _docs_page(title: str, description: str, h1: str, lead: str, body: str, headings, version: str,
+               *, current: str = "", aside_label: str = "Contents", min_level: int = 2) -> str:
+    import site_shell as shell
+    items = []
+    for level, hid, text in headings:
+        if level == min_level:
+            items.append(f'            <li><a href="#{hid}">{html.escape(text, quote=False)}</a></li>')
+    chevron = ('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" '
+               'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>')
+    main = f"""    <div class="container docs">
+      <aside class="docs-sidebar" aria-label="{aside_label}">
+        <button class="docs-nav-toggle" type="button" aria-expanded="false" aria-controls="docs-nav">{aside_label} {chevron}</button>
+        <div class="docs-sidebar-inner" id="docs-nav">
+          <h2>{html.escape(h1, quote=False)}</h2>
+          <ul>
+{chr(10).join(items)}
+          </ul>
+        </div>
+      </aside>
+      <article class="docs-main md-page">
+        <h1>{html.escape(h1, quote=False)}</h1>
+        <p class="lead">{lead}</p>
+{sectionize(body)}
+      </article>
+      <nav class="on-this-page" aria-label="On this page">
+        <div class="on-this-page-inner">
+          <h2>On this page</h2>
+          <ul id="on-this-page-list"></ul>
+        </div>
+      </nav>
+    </div>"""
+    return shell.page(title, description, main, current=current, scripts=("highlight.js", "docs.js", "runner.js"),
+                      version=version)
+
+
+def render_spec(out: Path, version: str) -> None:
+    import md2html
+    text = (ROOT / "spec" / "SPEC.md").read_text(encoding="utf-8")
+    body, _title, headings = md2html.convert(text, drop_title=True)
+    lead = (f"The formal definition of TB {html.escape(version)}: lexical structure, grammar, values, statements, "
+            "classes, errors, generators, patterns and formatting. For a gentle introduction, start with the "
+            '<a href="docs.html">guide</a>.')
+    page = _docs_page("Language specification · TB", f"The TB {version} language specification.",
+                      "Language specification", lead, body, headings, version)
+    (out / "spec.html").write_text(page, encoding="utf-8")
+
+
+def render_migration(out: Path, version: str) -> None:
+    import md2html
+    text = (ROOT / "MIGRATION-3.0.md").read_text(encoding="utf-8")
+    text = text.split("\n## Updated in this repository", 1)[0]  # notes for the project itself
+    body, title, headings = md2html.convert(text, drop_title=True)
+    body = body.replace(
+        'Everything new is described in <code>README.md</code> ("New in 3.0") and the contract is <code>DESIGN-3.0.md</code>.',
+        'Everything new is on <a href="whats-new.html">What\'s new in 3.0</a>, and the exact rules are in the '
+        '<a href="spec.html">language specification</a>.')
+    lead = "What can break when you move a TB 2.x program to TB 3.0, and how to fix it."
+    page = _docs_page("Moving from TB 2.x to 3.0 · TB", "How to move a TB 2.x program to TB 3.0: new keywords, numbers, typed errors and other changes.",
+                      title or "Moving from TB 2.x to TB 3.0", lead, body, headings, version)
+    (out / "migration.html").write_text(page, encoding="utf-8")
+
+
+def render_packages(out: Path, version: str) -> None:
+    import md2html
+    import site_shell as shell
+    index = {}
+    if (PACKAGES / "index.json").exists():
+        index = json.loads((PACKAGES / "index.json").read_text(encoding="utf-8"))
+    cards, docs = [], []
+    for name, info in index.items():
+        esc_name = html.escape(name, quote=False)
+        desc = html.escape(info.get("description", ""), quote=False)
+        ver = html.escape(str(info.get("version", "")), quote=False)
+        has_zip = (out / "packages" / f"{name}.zip").exists()
+        zip_link = f' <a href="packages/{html.escape(name, quote=True)}.zip" download>Download {esc_name}.zip</a>' if has_zip else ""
+        cards.append(f"""          <li class="pkg-card">
+            <h3><a href="#pkg-{html.escape(name, quote=True)}"><code>{esc_name}</code></a> <span class="pkg-version">{ver}</span></h3>
+            <p>{desc}</p>
+          </li>""")
+        readme = PACKAGES / name / "README.md"
+        body = ""
+        if readme.exists():
+            body, _t, _h = md2html.convert(readme.read_text(encoding="utf-8"), shift=2, drop_title=True,
+                                          id_prefix=f"{name}-")
+        docs.append(f"""      <section class="pkg" id="pkg-{html.escape(name, quote=True)}" aria-labelledby="pkg-{html.escape(name, quote=True)}-title">
+        <h2 id="pkg-{html.escape(name, quote=True)}-title"><code>{esc_name}</code> <span class="pkg-version">{ver}</span></h2>
+        <p class="lead">{desc}</p>
+        <pre class="md-code"><code>tb add {esc_name}</code></pre>
+        <p class="pkg-links">Then <code>import "{esc_name}" as {html.escape(name.replace("tb-", "").replace("-", "_"), quote=False)}</code> in your program.{zip_link}</p>
+        <div class="pkg-readme">
+{body}
+        </div>
+      </section>""")
+    main = f"""    <div class="container docs docs-wide">
+      <article class="docs-main md-page">
+        <h1>Packages</h1>
+        <p class="lead">Packages are TB code other people wrote, installed into your project with one command. The index below is what <code>tb add</code> searches.</p>
+        <section id="install" aria-labelledby="install-title">
+          <h2 id="install-title">Install a package</h2>
+          <ol>
+            <li>In your project folder, make a <code>tb.toml</code> once: <code>tb init</code>.</li>
+            <li>Add the package: <code>tb add tb-tables</code>. It lands in <code>tb_packages/</code> and is pinned in <code>tb.lock</code>.</li>
+            <li>Import it by name: <code>import "tb-tables" as tables</code>.</li>
+          </ol>
+          <pre class="md-code"><code>tb init
+tb add tb-tables
+tb packages            # what this project uses
+tb packages --index    # everything in the index
+tb update              # newer versions, within what tb.toml allows
+tb remove tb-tables</code></pre>
+          <p>Commit <code>tb.toml</code> and <code>tb.lock</code>; anyone who runs <code>tb add</code> with no arguments gets the same versions. You can also install straight from a zip or a git URL: <code>tb add https://example.com/my-package.zip</code>.</p>
+        </section>
+        <section id="index" aria-labelledby="index-title">
+          <h2 id="index-title">The index</h2>
+          <p>{len(index)} packages. The machine-readable index is <a href="packages/index.json">packages/index.json</a>.</p>
+          <ul class="pkg-grid">
+{chr(10).join(cards)}
+          </ul>
+        </section>
+{chr(10).join(docs)}
+        <section id="publish" aria-labelledby="publish-title">
+          <h2 id="publish-title">Publish your own</h2>
+          <ol>
+            <li>Start a project with <code>tb init</code> and give <code>[package]</code> in <code>tb.toml</code> a name, a version and a one-line description.</li>
+            <li>Put the code people import in <code>lib.tb</code> (or set <code>main = "file.tb"</code>). Mark the public names with <code>export</code> and write a doc comment (<code>##</code>) above each.</li>
+            <li>Add tests in <code>lib_test.tb</code> and run <code>tb test</code>; run <code>tb fmt</code> and <code>tb check</code>.</li>
+            <li>Host the folder as a public zip or git repository, then run <code>tb publish --zip URL</code> (or <code>--git URL</code>). It prints the entry for the index.</li>
+            <li>Send that entry to the TB maintainers to have it listed here. For a private index, serve your own <code>index.json</code> and set <code>TB_PACKAGE_INDEX</code> to its URL.</li>
+          </ol>
+          <pre class="md-code"><code>$ tb publish --zip https://example.com/tb-greet.zip
+Index entry for 'tb-greet' (entry file: lib.tb):
+
+{{
+  "tb-greet": {{
+    "description": "Friendly greetings.",
+    "version": "1.0.0",
+    "zip": "https://example.com/tb-greet.zip"
+  }}
+}}</code></pre>
+          <p>Packages are plain TB (no Python), so they run wherever TB runs. Only install packages you trust: a package's code runs with the same rights as your program.</p>
+        </section>
+      </article>
+    </div>"""
+    page = shell.page("Packages · TB", "TB packages: install them with tb add, browse the index and publish your own.",
+                      main, current="", scripts=("highlight.js", "docs.js"), version=version)
+    (out / "packages.html").write_text(page, encoding="utf-8")
+
+
+SERVED_TEXT = (".html", ".js", ".css", ".json", ".tb", ".md", ".txt", ".yml", ".toml", ".csv", ".log")
+
+
+def check_no_github(out: Path) -> None:
+    """Downloads and links stay on this site: no served text mentions github.com."""
+    bad = []
+    for path in out.rglob("*"):
+        if not path.is_file() or "vendor" in path.relative_to(out).parts or path.suffix not in SERVED_TEXT:
+            continue
+        if "github.com" in path.read_text(encoding="utf-8", errors="replace").lower():
+            bad.append(path.relative_to(out).as_posix())
+    if bad:
+        fail("these files would be served but mention github.com (the site never links to the "
+             "source repository): " + ", ".join(sorted(bad)))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the TB website.")
     parser.add_argument("--repo", default=None, help=argparse.SUPPRESS)  # ignored; kept so old commands still work
@@ -168,7 +421,9 @@ def main(argv: list[str] | None = None) -> int:
     shutil.copytree(SITE, out, ignore=shutil.ignore_patterns(".DS_Store", "*.part"))
 
     shutil.copy2(ROOT / "tb.py", out / "tb.py")
+    core_files = copy_tbcore(out)
     lib_files = copy_tblib(out)
+    package_names = build_packages(out)
     data_files = copy_app_data(out)
     app_names = copy_app_sources(out)
     shutil.copy2(ROOT / "welcome.tb", out / "welcome.tb")
@@ -179,7 +434,7 @@ def main(argv: list[str] | None = None) -> int:
     entries = [example_entry("welcome", ROOT / "welcome.tb")]
     extra = []
     if PLAYGROUND_EXAMPLES.is_dir():
-        for path in sorted(PLAYGROUND_EXAMPLES.glob("*.tb")):
+        for path in sorted(PLAYGROUND_EXAMPLES.glob("*.tb"), key=lambda p: (p.stem != "tb3_tour", p.stem)):
             shutil.copy2(path, ex_out / path.name)
             extra.append(example_entry(path.stem, path))
     if EXAMPLES.is_dir():
@@ -196,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
     (ex_out / "index.json").write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     match = VERSION_RE.search((ROOT / "tb.py").read_text(encoding="utf-8"))
-    version = match.group(1) if match else "2.0.1"
+    version = match.group(1) if match else "3.0.0"
 
     sys.path.insert(0, str(SCRIPTS))
     import gen_lib_docs  # noqa: E402  (imports tb, so only after the checks above)
@@ -210,6 +465,9 @@ def main(argv: list[str] | None = None) -> int:
             gallery_page.write_text(page, encoding="utf-8")
         else:
             print("  note: examples.html has no apps gallery marker; skipped the gallery")
+    render_spec(out, version)
+    render_migration(out, version)
+    render_packages(out, version)
     config_path = out / "assets" / "js" / "config.js"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
@@ -219,9 +477,11 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
 
+    check_no_github(out)
     print(f"Built site in {out}")
     print(f"  {len(entries)} example(s): " + ", ".join(e["name"] for e in entries))
-    print(f"  standard library: {len(lib_files)} files; sample data: {len(data_files)} files")
+    print(f"  language (tbcore): {len(core_files)} files; standard library: {len(lib_files)} files; sample data: {len(data_files)} files")
+    print(f"  packages: {', '.join(package_names) or 'none'}")
     print(f"  apps: {', '.join(app_names) or 'none'}; library pages: {len(lib_pages)}")
     print("  downloads point at /dl/<asset> (TB " + version + ")")
     print(f"Serve it with:  uv run python -m http.server -d {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out} 8000")

@@ -157,7 +157,7 @@ wheels = [
 
 [[package]]
 name = "tb-lang"
-version = "2.0.1"
+version = "3.0.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

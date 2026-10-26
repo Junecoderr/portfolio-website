@@ -49,7 +49,11 @@ while i < len(os.args) {
 }
 if files.is_empty() {
   let data = fs.join(fs.here(), "..", "data")
-  files = [fs.join(data, "auth.log"), fs.join(data, "windows_security.json"), fs.join(data, "windows_security.csv")]
+  files = [
+    fs.join(data, "auth.log"),
+    fs.join(data, "windows_security.json"),
+    fs.join(data, "windows_security.csv"),
+  ]
 }
 
 # 135 -> "2m15s"
@@ -124,15 +128,23 @@ if files_read == 0 {
 if offenders.is_empty() {
   say("No brute force found. Try a lower --attempts or a longer --within.")
 } else {
-  let ranked = offenders.sort_by(fn(o) { return 0 - o.failures })
+  let ranked = offenders.sort_by(fn(o) {
+    return 0 - o.failures
+  })
   say(f"{len(ranked)} brute-force source(s):")
-  say(report.table(ranked, ["source", "log", "failures", "accounts tried", "from", "for", "got in?"]))
+  say(
+    report.table(ranked, ["source", "log", "failures", "accounts tried", "from", "for", "got in?"]),
+  )
   for o in ranked {
     let a = o._alert
     if a.success_after {
       say("")
-      say(f"!! {a.by} guessed a password: {a.success_user} logged in at {a.success_when} after {a.count} failures.")
-      say("   Next steps: disable or reset that account, block the IP, and check what it did after logging in.")
+      say(
+        f"!! {a.by} guessed a password: {a.success_user} logged in at {a.success_when} after {a.count} failures.",
+      )
+      say(
+        "   Next steps: disable or reset that account, block the IP, and check what it did after logging in.",
+      )
     }
   }
 }

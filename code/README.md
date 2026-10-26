@@ -1,380 +1,258 @@
-# TB
+# The TB Programming Language
 
-TB is a friendly programming language for desktop apps, security tools and
-everything in between. It is a gentle first language whose mistakes come
-with a kind, plain-English "Oops!". Version 2.0 keeps that voice and adds what you need
-for real work: maps, methods, f-strings, modules, error handling, and a
-standard library of 20 libraries, from windows and buttons to log parsing,
-detection rules and IOC extraction.
+**TB is a general-purpose programming language for desktop applications,
+security operations tooling and everyday automation.** It pairs a small,
+readable syntax with a batteries-included standard library and error
+messages written for humans.
 
-Website: **https://code.tanisha.ceo** (guide, tutorials, library reference,
-examples and apps, and an in-browser playground).
+- Website and documentation: **https://code.tanisha.ceo**
+- Language guide: https://code.tanisha.ceo/docs
+- Standard library reference: https://code.tanisha.ceo/library
+- Try it in the browser: https://code.tanisha.ceo/playground
+- Download: https://code.tanisha.ceo/download
 
 ```tb
 import logs
 import detect
+import report
 
-let records = logs.read("apps/data/auth.log", "auth")
-for hit in detect.brute_force(records) {
-  say(f"{hit.level}: {hit.count} failed logins from {hit.by}")
+let records = logs.read("apps/data/auth.log")
+let alerts = detect.brute_force(records)
+
+for alert in alerts {
+  say(f"{alert.level:>8}  {alert.count:3} failed logins from {alert.by}")
 }
+report.save("alerts.html", report.html("SSH brute force", alerts))
 ```
 
-The interpreter is one Python file, `tb.py` (standard library only, Python
-3.10+); the standard library lives next to it in `tblib/`. TB ships as a
-Windows installer, portable folders for Windows, macOS (Apple silicon) and
-Linux built with PyInstaller, a fallback zip for running `tb.py` with your own
-Python, and the website, whose playground runs the real `tb.py` and `tblib/`
-in the browser through Pyodide.
+## Why TB
 
-## Quick start
+- **Readable by default.** Blocks in braces, no semicolons, no boilerplate.
+  Programs read top to bottom like a checklist.
+- **Errors that explain themselves.** Every mistake names the line, says what
+  went wrong in plain English and suggests a fix:
+  `Oops! On line 3: I don't know what 'nmae' is. Did you mean 'name'?`
+- **Batteries included.** 43 standard libraries ship inside the runtime:
+  files and data formats, SQLite, HTTP, DNS, TLS, a web server, a native GUI
+  toolkit, and a security library that reads logs, PCAPs and Windows EVTX
+  files, runs Sigma rules and maps findings to MITRE ATT&CK.
+- **A modern language.** Classes and inheritance, pattern matching,
+  destructuring, first-class functions and lambdas, generators, async tasks,
+  typed errors, modules and packages, optional type annotations.
+- **Real tooling.** Formatter, type checker and linter, language server,
+  VS Code extension, debugger, test runner with coverage, documentation
+  generator, package manager and an app builder.
+- **Runs everywhere.** Windows, macOS and Linux, plus the browser through
+  WebAssembly. One install, no external dependencies.
 
-You need [uv](https://docs.astral.sh/uv/). Python 3.12 is pinned in
-`.python-version`; uv fetches it if needed.
+## Installation
+
+| Platform | Package |
+|---|---|
+| Windows 10/11 (x64) | `tb-windows-x64-setup.exe`: per-user installer, no administrator rights. Adds `tb` to `PATH` and registers `.tb` files. A portable `tb-windows-x64.zip` is also available. |
+| macOS (Apple silicon) | `tb-macos-arm64.zip` |
+| Linux (x64) | `tb-linux-x64.tar.gz` |
+| Any OS with Python 3.10+ | `tb-python.zip`: runs from source with your own Python |
+
+All packages are listed at https://code.tanisha.ceo/download with
+step-by-step instructions and SHA-256 checksums.
+
+Check the installation:
 
 ```sh
-uv run python tb.py welcome.tb                   # a short tour of TB
-uv run python tb.py apps/log-triage/main.tb apps/data/auth.log
-uv run python tb.py                              # interactive prompt (type `exit` to leave)
-uv run python tb.py doc                          # list the libraries
-uv run python tb.py doc ioc                      # one library's functions
-uv run python tb.py test apps/log-triage         # run *_test.tb files
-uv run pytest                                    # the whole test suite
+tb --version
 ```
 
-On this Mac a shell hook blocks bare `python3`; always go through `uv run python`.
-If uv hangs looking for Python, add `--python /opt/homebrew/bin/python3.12`.
-That Python has no Tk, so GUI apps need a Python with Tk to open windows
-(for example `/opt/homebrew/bin/python3.13`).
+## Getting started
 
-## The language
+```sh
+tb welcome.tb            # a short tour of the language
+tb                       # interactive prompt (REPL)
+tb hello.tb              # run a program
+tb test                  # run every *_test.tb file below the current folder
+tb doc                   # list the standard libraries
+tb doc http              # reference for one library
+```
 
-Everything from 1.0 still works: `let`, `=`, `fn` (named or as values, with
-closures), `return`, `if / else if / else`, `while`, `for x in list_or_text`,
-numbers, text, `true` / `false` / `nil`, lists, `and or not`, `#` comments,
-and the built-ins `say len str num range push ask care`. 2.0 adds:
+A first program:
 
 ```tb
-let me = {"name": "Tanisha", "plants": 4}             # maps
-me.city = "Lisbon"                                 # dot access on maps
-say(f"{me.name} has {me.plants} plants")           # f-strings
-say("a,b".split(","), [3, 1, 2].sort(), me.keys()) # methods on text, lists, maps, numbers
-let big = [5, 12, 9].filter(fn(n) { return n > 8 })
+let name = ask("What's your name? ")
+say(f"Hello, {name}!")
+```
 
-import json                                        # libraries (and import "file.tb")
+## A tour of the language
+
+```tb
+import fs
+import json
+import net
+import parallel
+
+# Values: numbers, text, bytes, lists, maps, nil, true/false
+let ports = [22, 80, 443]
+let host = {"name": "web01", "ip": "192.0.2.10", "open": ports}
+say(f"{host.name} has {len(host.open)} open ports")
+
+# Functions, defaults, keyword arguments, lambdas
+fn connect(host, port = 22, timeout = 5) {
+  return net.tcp_check(host, port, timeout)
+}
+connect("192.0.2.10", port = 2222)
+let secure = ports.filter(p => p == 443)
+
+# Classes and inheritance
+class Alert {
+  fn init(rule, level) { self.rule = rule; self.level = level }
+  fn text() { return f"[{self.level}] {self.rule}" }
+}
+class CriticalAlert extends Alert {
+  fn init(rule) { super.init(rule, "critical") }
+}
+
+# Pattern matching
+let action = match alert {
+  CriticalAlert(a) => "page the on-call analyst"
+  {"level": "high"} => "open a ticket"
+  _ => "log it"
+}
+
+# Destructuring and spread
+let [first, ...rest] = ports
+let {name, ip, owner = "unknown"} = host
+
+# Typed errors
 try {
-  json.parse("{oops")
-} catch err {
-  say(err.message, err.line)                       # every error is catchable
+  let config = json.read("config.json")
+} catch err: NotFoundError {
+  say("No config file, using defaults")
+} catch err: ParseError {
+  say(f"Bad config on line {err.line}: {err.message}")
+} finally {
+  say("ready")
 }
-throw "custom error"                               # or throw a map with a "message"
 
-for n in range(10) {
-  if n == 3 { continue }
-  if n > 5 { break }
+# Generators and lazy pipelines
+fn lines_matching(path, word) {
+  for line in fs.lines(path) { if word in line { yield line } }
 }
-let total = 0
-total += 1                                         # += -= *= /=
-say(2 in [1, 2], "x" not in "TB")                  # membership
+say(lines_matching("auth.log", "Failed").take(5).to_list())
+
+# Concurrency
+let hosts = ["192.0.2.10", "192.0.2.11"]
+let results = parallel.map(h => net.tcp_check(h, 443), hosts, workers = 16)
 ```
 
-New built-ins: `type keys int round min max sum sorted exit`. The design
-contract is in [`DESIGN-2.0.md`](DESIGN-2.0.md).
-
-### New in 3.0
-
-```tb
-class Animal {                                     # classes, inheritance, statics
-  let sound = "..."
-  static let count = 0
-  fn init(name) { self.name = name; Animal.count += 1 }
-  fn speak() { return f"{self.name} says {self.sound}" }
-}
-class Dog extends Animal {
-  let sound = "woof"
-  fn speak() { return super.speak() + "!" }
-}
-say(Dog("Rex").speak(), Dog("Rex") is Animal)      # Rex says woof! true
-enum Level { low, medium, high }                   # enums: Level.high.index is 2
-
-let label = match score {                          # pattern matching
-  0 => "none"
-  1..=5 => "low"
-  n if n > 90 => "top"
-  [first, ...rest] => f"a list starting {first}"
-  {"kind": "alert", "level": lv} => lv
-  _ => "other"
-}
-let size = if n > 100 then "big" else "small"      # if as an expression
-
-let [a, b, ...rest] = [1, 2, 3, 4]                 # destructuring and spread
-let {name, port = 22} = host
-say(max(...nums), [...xs, ...ys], {...defaults, "debug": true})
-fn connect(host, port = 22, ...extra) { }          # defaults, varargs, keyword args
-connect("192.0.2.1", port = 2222)
-let double = x => x * 2                            # lambdas
-const LIMIT = 100                                  # constants
-
-say(7 / 2, 7 // 2, 2 ** 10, 0xff & 0b1010, 1_000_000)   # 3.5 3 1024 10 1000000
-say(f"{price:.2f} {count:>6} {ratio:.1%} {n:,} {n:x}")    # format specs
-let header = b"MZ\x90\x00"                        # bytes (and the binary library)
-say(xs[1:3], xs[::-1], text[-3:], (0..10).step(2).to_list())   # slices, ranges
-
-fn numbers() { let i = 0; while true { i += 1; yield i } }     # generators
-say(numbers().filter(x => x % 2 == 0).take(3).to_list())      # [2, 4, 6]
-
-try { fs.read("missing.txt") }                     # typed errors
-catch err: NotFoundError { say("no file") }
-catch err: FileError or ParseError { say(err.kind) }
-finally { say("done") }
-class QuotaError extends Error {}
-throw QuotaError("too many requests", {"limit": 100})
-
-from "helpers.tb" import parse_line, VERSION as v  # from-import, export
-import "tb-colors"                                 # packages in tb_packages/ (tb add)
-assert len(rows) > 0, "no rows"
-fn work() { let f = fs.open("out.txt", "w"); defer { f.close() } ... }
-```
-
-Breaking changes from 2.x are listed in [`MIGRATION-3.0.md`](MIGRATION-3.0.md)
-and the 3.0 contract is [`DESIGN-3.0.md`](DESIGN-3.0.md). The implementation
-is `tb.py` (entry point, public API, CLI) plus the `tbcore/` package (lexer,
-parser, ast, runtime, interp); tools such as `tb fmt`, `tb check` and `tb add`
-live in `tbtools/`.
+The complete guide is at https://code.tanisha.ceo/docs and the formal
+specification is in [`spec/SPEC.md`](spec/SPEC.md).
 
 ## Standard library
 
-Twenty libraries, all inside the TB app (reference with examples:
-https://code.tanisha.ceo/library, or `tb doc NAME`):
-
-| Group | Libraries |
+| Area | Libraries |
 |---|---|
-| Core | `math` `text` `time` `random` `re` `os` |
-| Files and data | `fs` `json` `csv` |
-| Security (SOC) | `logs` `detect` `ioc` `hash` `encode` `report` |
-| Network and intel | `net` `http` `intel` |
+| Core | `math` `text` `time` `datetime` `decimal` `random` `re` `os` `binary` |
+| Files and data | `fs` `json` `csv` `yaml` `toml` `xml` `sqlite` `archive` `template` |
+| Security operations | `logs` `detect` (incl. Sigma) `ioc` `hash` `encode` `crypto` `report` `pcap` `evtx` `pe` `elf` `scan` `attack` `stix` `siem` `intel` |
+| Networking | `net` `http` `dns` `tls` `websocket` `server` |
+| Concurrency | `parallel` |
 | Desktop GUI | `gui` |
 | Testing | `test` |
 
-Native libraries are `tblib/<name>.py` (see `tblib/_api.py`); libraries written
-in TB are `tblib/<name>.tb`.
+Every function is documented in the reference
+(https://code.tanisha.ceo/library) and from the command line with
+`tb doc <library>`.
 
-## Apps
+## Tooling
 
-`apps/` holds complete programs, each a folder with `main.tb` and a
-`README.md`. They ship inside every download; sample data is in `apps/data/`
-(auth.log, an Apache access log, a firewall log, Windows Security events as
-JSON and CSV, a phishing email and Sigma rules).
-
-- Desktop (gui): `todo`, `care`, `notes`, `calculator`, `hash-checker`,
-  `log-triage-gui`, `ioc-workbench`
-- Security tools: `log-triage`, `ioc-extractor`, `brute-force-hunter`, `sigma-runner`
-- Network and intel: `ip-reputation`, `port-check`, `uptime-monitor`
-
-Screenshots for the website are in `site/assets/img/apps/<name>.png`.
-
-## Tests
-
-```sh
-uv run pytest                          # everything
-uv run pytest tests/lib/test_ioc.py    # one library
-uv run pytest tests/test_site.py       # website scripts, tutorial snippets, page shell
-```
-
-- `tests/` covers the lexer, parser, interpreter, 2.0 language features, CLI,
-  each library (`tests/lib/test_<name>.py`), the apps and the website.
-- GUI tests use a fake backend, so they run anywhere. The few tests that open
-  real Tk windows are skipped unless the Python running them has Tk and a display.
-- `tests/test_examples.py` runs every example against its `.out` file and
-  checks that `site/examples.html` and the runnable snippets on
-  `site/docs.html` match and run.
-- `tests/test_site.py` runs every library example, playground example and
-  tutorial snippet, checks the generated library reference, the shared page
-  header and footer, that pages have no inline scripts (the CSP forbids them),
-  that every release asset the site links to is uploaded by the release
-  workflow, and does a full site build when Pyodide has been fetched.
-
-## Building the binaries locally
-
-```sh
-uv run --group build python packaging/build.py
-```
-
-This runs PyInstaller with `packaging/tb.spec` and makes a **one-folder** app in
-`dist/tb/`: the `tb` program (`tb.exe`, plus `tbw.exe` without a console window
-on Windows) next to `_internal/` (Python, the `tblib` standard library, Tcl/Tk).
-A one-folder app starts in a fraction of a second; a one-file app re-unpacks
-itself on every start (about 4 s on macOS). Unused Tcl/Tk data (translations,
-time zones, most encodings, demos) is left out in the spec.
-
-`build.py` then smoke-tests `dist/tb/tb` from an empty folder (`--version`,
-`welcome.tb`, `tb doc`, `tb doc gui`, a json/re/hash/ioc/logs program, and
-the calculator GUI app with `TB_GUI_AUTOCLOSE_MS=500` when Tk and a display are
-available; `TB_REQUIRE_GUI=1` makes that mandatory), packages the folder under
-the release name for the current OS, unpacks the archive and tests that copy,
-and updates `dist/SHA256SUMS.txt`:
-
-| OS | Assets | Inside |
-|---|---|---|
-| Windows x64 | `tb-windows-x64-setup.exe` (Inno Setup installer) and `tb-windows-x64.zip` (portable) | zip: `tb\tb.exe`, `tb\tbw.exe`, `tb\_internal\` |
-| macOS Apple Silicon | `tb-macos-arm64.zip` | `tb/tb`, `tb/_internal/` (exec bits and symlinks kept) |
-| Linux x64 | `tb-linux-x64.tar.gz` | `tb/tb`, `tb/_internal/` |
-
-The gui needs a Python with Tk to build from: CI's `actions/setup-python` has it;
-Homebrew's `python3.12` here does not (the build then works but skips the gui
-check), so for a local GUI build use `uv run --no-project --python
-/opt/homebrew/bin/python3.13 --with pyinstaller==6.11.1 python packaging/build.py`.
-An Intel Mac build is named `tb-macos-x64.zip` (CI only ships arm64).
-PyInstaller can't cross-compile, so each OS builds its own (CI does all three).
-
-`uv run python packaging/run_examples.py dist/tb/tb` runs every example, every
-non-GUI app (`apps/*/main.tb`) and `tb test apps/log-triage` through a build.
-
-**Windows installer** (`packaging/windows/tb.iss`, built by `build.py` on Windows
-when Inno Setup's `ISCC.exe` is installed; `--no-installer` skips it): per-user
-install, no admin rights, into `%LOCALAPPDATA%\Programs\TB`; adds that folder to
-the user PATH; `.tb` files run with a double-click (TB waits for Enter before
-the window closes) and have an Edit (Notepad) verb; Start menu folder "TB" with
-TB Prompt, TB website, TB Examples and the GUI apps (Care check-in, To-do, Notes,
-Calculator, Hash checker, Log triage, IOC workbench, started with `tbw.exe` so
-no console window flashes). `apps/`, `examples/` and `welcome.tb` are
-installed too. Uninstall removes all of it again but keeps files the apps saved
-(the Care journal, the to-do list). The `AppId` GUID in `tb.iss` must never
-change. `python packaging/windows/test_installer.py dist/tb-windows-x64-setup.exe`
-installs silently into a temp folder, checks it and uninstalls (CI runs it).
-
-The fallback zip (`tb.py`, `tblib/`, `welcome.tb`, `examples/*.tb`, `apps/`, `README.txt`):
-
-```sh
-uv run python packaging/make_fallback_zip.py   # -> dist/tb-python.zip
-```
-
-## Releasing
-
-Tag the version and push the tag:
-
-```sh
-git tag tb-v2.0.1 && git push origin tb-v2.0.1
-```
-
-`.github/workflows/tb-release.yml` (at the repo root) builds Windows, macOS
-and Linux on their own runners, tests each build (on Windows it also installs,
-tests and uninstalls the installer), and creates the GitHub release
-`tb-v2.0.1` with `--latest=false` (so it doesn't show as the portfolio's latest
-release). Assets:
-
-| Asset | What it is |
+| Command | Purpose |
 |---|---|
-| `tb-windows-x64-setup.exe` | Recommended for Windows. Per-user installer, no admin |
-| `tb-windows-x64.zip` | Portable `tb\` folder: `tb.exe`, `tbw.exe`, `_internal\`, `apps\`, `examples\`, `welcome.tb` |
-| `tb-macos-arm64.zip` | `tb/` folder: `tb`, `_internal/`, `apps/`, `examples/`, `welcome.tb` |
-| `tb-linux-x64.tar.gz` | Same layout as macOS |
-| `tb-python.zip` | `tb.py`, `tblib/`, examples, apps, `README.txt` |
-| `SHA256SUMS.txt` | `sha256sum` lines for all of the above |
+| `tb file.tb [args]` | Run a program |
+| `tb test [dir] [--coverage]` | Run `*_test.tb` files with the `test` library |
+| `tb fmt [paths] [--check]` | Format source code in the canonical style |
+| `tb check [paths] [--strict]` | Type check and lint |
+| `tb doc <library\|file.tb\|dir>` | Show or generate documentation |
+| `tb debug file.tb` | Step through a program with breakpoints |
+| `tb build app.tb` | Package an application as a standalone folder |
+| `tb init` / `tb add` / `tb remove` / `tb update` / `tb packages` | Manage project dependencies (`tb.toml`, `tb.lock`) |
+| `tb lsp` | Language server (used by editors) |
 
-The Download page links to site-relative `/dl/<asset>` URLs (asset names
-above); a rewrite on the hosting side maps `/dl/:file` to the matching release
-asset, so update that rewrite when you release a new version, and release
-before deploying a version bump. The version shown on the site comes from
-`tb.__version__`. Keep `tb.__version__`, `pyproject.toml` and the tag in step. If creating
-the release fails with "Resource not accessible by integration": **Settings,
-Actions, General, Workflow permissions, "Read and write permissions"**.
-`.github/workflows/tb-ci.yml` runs the tests on Windows, macOS and Linux
-whenever something in `code/` changes.
+**Editor support:** the VS Code extension (`tb-vscode-3.0.0.vsix`, from the
+download page) provides syntax highlighting, completion, hover documentation,
+diagnostics, go to definition, formatting and run/test commands. Any editor
+with Language Server Protocol support can use `tb lsp`.
 
-## The website
+## Example applications
 
-```sh
-uv run python scripts/fetch_pyodide.py          # once: pinned Pyodide 0.27.7 into site/vendor/pyodide/ (gitignored)
-uv run python scripts/build_site.py             # assembles dist/site/
-uv run python -m http.server -d dist/site 8000  # open http://localhost:8000
-```
+The [`apps/`](apps) folder contains complete programs, shipped with every
+download. Sample data lives in `apps/data/`.
 
-`build_site.py` copies `site/`, `tb.py`, `tblib/` (with `tblib/index.json`),
-`apps/data/` (with an index, loaded into the playground's virtual disk) and
-every app's source; adds `scripts/playground_examples/` to the playground;
-fills the Apps gallery on `examples.html` (`scripts/apps_gallery.py`); and
-generates the library reference, `library.html` and `lib/<name>.html`, from
-`tb.describe_library()` (`scripts/gen_lib_docs.py`, with one example per
-library in `scripts/lib_examples/`). Generated pages aren't committed.
+| Category | Applications |
+|---|---|
+| Desktop | `todo`, `notes`, `calculator`, `care`, `hash-checker`, `ioc-workbench`, `log-triage-gui`, `alerts-dashboard-gui`, `network-monitor`, `file-inspector-gui` |
+| Detection and response | `log-triage`, `brute-force-hunter`, `sigma-runner`, `sigma-studio`, `pcap-triage`, `evtx-triage`, `file-inspector`, `ioc-extractor`, `ioc-feed`, `siem-forwarder` |
+| Network and intelligence | `ip-reputation`, `port-check`, `uptime-monitor`, `dns-check`, `cert-check` |
+| Web | `dashboard` (alerts dashboard served by the `server` library) |
 
-Hand-written pages share the header and footer in `scripts/site_shell.py`;
-the tests fail if a page drifts from it. Code is coloured at runtime by
-`site/assets/js/highlight.js`, so the HTML keeps plain code (the tests compare
-it with the `.tb` files). The live site's CSP allows no inline scripts or event
-handlers.
+Run one with `tb apps/log-triage/main.tb`.
 
-### Deploying
+## Packages
 
-The site is served at **https://code.tanisha.ceo** by a separate Vercel
-project, **`tanisha-code`**, with Root Directory `code`. `code/vercel.json`
-holds the build (`scripts/fetch_pyodide.py` then `scripts/build_site.py --out
-dist/site`), clean URLs and security headers. The project isn't connected to
-git, so deploy from the **repo root**:
+Third-party packages are TB projects with a `tb.toml` manifest:
 
 ```sh
-vercel deploy --prod
+tb init
+tb add tb-tables
 ```
 
-The portfolio's own Vercel project ignores `code/`.
-
-## The welcome program
-
-`welcome.tb` is the first program people run (the playground opens on it).
-If its output changes, update `tests/welcome.out`, the expected lines in
-`tests/test_welcome.py` and the copy of the code on `site/examples.html`
-(`uv run pytest tests/test_examples.py tests/test_welcome.py` tells you if
-any of them is out of date).
-
-The site never names its author; `scripts/name_guard.py` checks generated
-pages for that without spelling the name out.
-
-## Examples
-
-Every `examples/<name>.tb` starts with `# Title: ...` and `# About: ...`
-lines, which the playground menu uses. Next to it, `<name>.out` holds the
-expected output (`♥ {care}` / `♥ {care:NAME}` stand for random `care()`
-lines) and `<name>.in` the answers for `ask()`. `site/examples.html` has a
-static copy of each example's code in `<pre class="tb-code" id="code-<name>">`:
-update it when you change an example.
-
-## Project layout
-
+```tb
+import "tb-tables" as tables
+say(tables.table([{"host": "web01", "status": "up"}]))
 ```
-tb.py                  the interpreter: lexer, parser, tree-walking interpreter, module loader, REPL, CLI
-tblib/                 the standard library (native .py modules and .tb modules; _api.py helpers)
-apps/                  example applications (+ data/ sample logs, emails, Sigma rules)
-examples/              small example programs (+ .out expected output, .in answers)
-welcome.tb             a short tour of TB, the first program to run
-tests/                 pytest suite (tests/lib/ for the libraries)
-scripts/               fetch_pyodide.py, build_site.py, gen_lib_docs.py, apps_gallery.py,
-                       site_shell.py, name_guard.py, lib_examples/, playground_examples/
-site/                  the website (index, docs, guide-*, examples, download, playground)
-  assets/              css/style.css, js/ (theme, highlight, runner, tb-pyodide, playground, home, docs, download), img/
-  vendor/pyodide/      downloaded by scripts/fetch_pyodide.py, gitignored
-packaging/             PyInstaller spec, build.py, make_fallback_zip.py, run_examples.py
-  windows/             tb.iss (Inno Setup installer), test_installer.py
-vercel.json            Vercel build and headers for code.tanisha.ceo
-DESIGN-2.0.md          the 2.0 design contract
-```
+
+The package index lives at https://code.tanisha.ceo/packages, which also
+explains how to publish your own.
+
+## Compatibility and versioning
+
+TB follows semantic versioning. The current release is **3.0.0**. Breaking
+changes between major versions are documented with migration steps; see
+[`MIGRATION-3.0.md`](MIGRATION-3.0.md) for 2.x to 3.0.
+
+## Implementation
+
+The reference implementation is written in Python and has no third-party
+runtime dependencies. Source is compiled to bytecode and executed by a
+virtual machine; a tree-walking interpreter remains available with
+`TB_ENGINE=tree` for comparison. The same runtime powers the in-browser
+playground through Pyodide.
+
+| Path | Contents |
+|---|---|
+| `tb.py` | Entry point, public API and command line |
+| `tbcore/` | Lexer, parser, AST, compiler, virtual machine, runtime, type checker |
+| `tblib/` | Standard library |
+| `tbtools/` | Formatter, linter, language server, debugger, package manager, builder |
+| `editors/vscode/` | VS Code extension |
+| `spec/` | Language specification and conformance tests |
+| `apps/`, `examples/`, `packages/` | Applications, examples and example packages |
+| `tests/` | Test suite |
+| `site/`, `scripts/` | Website and its build scripts |
+| `packaging/` | Installer and release builds |
+
+Building from source, running the test suite, releasing and deploying the
+website are covered in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Known limitations
 
-- **Unsigned binaries.** There's no code-signing certificate, so Windows
-  SmartScreen warns the first time the installer (or the portable `tb.exe`)
-  runs: More info, Run anyway.
-- **macOS quarantine.** Every file in the downloaded `tb/` folder is
-  quarantined and Gatekeeper blocks the unsigned program, so run
-  `xattr -dr com.apple.quarantine ~/tb` once on the unzipped folder. `tb` must
-  stay next to `_internal/`. The first run takes a few seconds.
-- **macOS builds are Apple silicon only** (`tb-macos-arm64.zip`). Intel Macs
-  can use `tb-python.zip` with their own Python, or the playground.
-- **The playground can't do everything.** `gui`, `http`, `intel`, network
-  lookups and port checks in `net`, and `os.run` need the TB app; in the
-  browser they stop with a friendly message. `fs` works on a virtual disk
-  holding `apps/data/`.
-- **The playground runs on the page's main thread**: the page can't repaint
-  while a program runs, so output appears when it finishes, and `ask()` uses
-  the browser's pop-up box (showing the last lines printed). Programs are
-  stopped after 10 seconds without a pause. It downloads about 10 MB
-  (Pyodide) the first time.
+- Release binaries are not code-signed. Windows SmartScreen and macOS
+  Gatekeeper ask for confirmation on first run; the download page explains
+  the steps.
+- macOS builds target Apple silicon. Intel Macs can use `tb-python.zip`.
+- The browser playground cannot open windows, use the network, run
+  processes or start threads; those programs need the installed runtime.
+- TB is an interpreted language. It is well suited to tools, automation and
+  applications, not to number crunching at native speed.
+
+## License
+
+TB is released under the MIT License. See [`LICENSE`](../LICENSE).

@@ -14,13 +14,27 @@ let NAMES = {"md5": "MD5", "sha1": "SHA-1", "sha256": "SHA-256"}
 
 let win = gui.window("Hash Checker", {"width": 900, "height": 600})
 win.label("Hash Checker", {"style": "title"})
-win.label("Is this file the one you think it is? Pick it, then paste the hash you expect.", {"style": "muted"})
+win.label("Is this file the one you think it is? Pick it, then paste the hash you expect.", {
+  "style": "muted",
+})
 
 let pick = win.row()
-let path_box = pick.input({"placeholder": "Path to a file (paste or type it, then press Enter)",
-                          "on_enter": fn(text) { check(text) }})
-pick.button("Choose file…", fn() { choose() })
-pick.button("Hash it", fn() { check(path_box.value()) }, {"primary": true})
+let path_box = pick.input({
+  "placeholder": "Path to a file (paste or type it, then press Enter)",
+  "on_enter": fn(text) {
+    check(text)
+  },
+})
+pick.button("Choose file…", fn() {
+  choose()
+})
+pick.button(
+  "Hash it",
+  fn() {
+    check(path_box.value())
+  },
+  {"primary": true},
+)
 
 win.separator()
 let file_label = win.label("No file yet.", {"style": "heading"})
@@ -48,8 +62,12 @@ for key in ["md5", "sha1", "sha256"] {
 win.separator()
 win.label("Expected hash", {"style": "heading"})
 let expect_row = win.row()
-let expected = expect_row.input({"placeholder": "Paste the MD5, SHA-1 or SHA-256 you were given",
-                                "on_change": fn(text) { compare() }})
+let expected = expect_row.input({
+  "placeholder": "Paste the MD5, SHA-1 or SHA-256 you were given",
+  "on_change": fn(text) {
+    compare()
+  },
+})
 expect_row.button("Paste", fn() {
   expected.set(gui.paste().trim())
   compare()
@@ -58,7 +76,9 @@ let verdict = win.label(" ", {"style": "bold"})
 
 win.separator()
 let vt_row = win.row()
-vt_row.button("Look up on VirusTotal", fn() { virustotal() })
+vt_row.button("Look up on VirusTotal", fn() {
+  virustotal()
+})
 let vt_label = vt_row.label("Only the SHA-256 is sent, never the file.", {"style": "muted"})
 
 let status = win.status("Ready")

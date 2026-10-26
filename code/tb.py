@@ -56,10 +56,26 @@ from tbcore.runtime import (  # noqa: E402,F401
     truthy, type_name, _extreme, _sum, _need_fn, _need_text, _need_whole, _slice,
 )
 from tbcore.interp import (  # noqa: E402,F401
-    BUILTIN_DOCS, BUILTIN_VALUE_DOCS, Frame, Interpreter, find_package, find_project_root,
+    BUILTIN_DOCS, BUILTIN_VALUE_DOCS, Frame, find_package, find_project_root,
     library_dirs, list_libraries, package_entry, read_source, tb_source_docs, toml_main,
     _native_spec, _tb_library_path, _tblib_package,
 )
+from tbcore.interp import Interpreter as TreeInterpreter  # noqa: E402
+from tbcore.vm import VMInterpreter  # noqa: E402
+
+# The engine: the bytecode VM by default; TB_ENGINE=tree (or `tb --engine tree
+# file.tb`) keeps the 2.x-style tree-walking interpreter for one release.
+ENGINES = {"vm": VMInterpreter, "tree": TreeInterpreter}
+
+
+def engine_class(name: str | None = None):
+    """The Interpreter class for an engine name ("vm" or "tree"; None: $TB_ENGINE, else vm)."""
+    if name is None:
+        name = os.environ.get("TB_ENGINE", "") or "vm"
+    return ENGINES.get(name.strip().lower(), VMInterpreter)
+
+
+Interpreter = engine_class()
 
 __version__ = "3.0.0"
 
@@ -129,6 +145,7 @@ Usage:
   tb doc                 list the standard libraries
   tb doc NAME            show what a library can do (try: tb doc fs)
   tb doc builtins        show the built-in functions, methods and error classes
+  tb doc FILE.tb|FOLDER  documentation from ## comments (--md, --html, --out PATH)
   tb test [FOLDER]       run every *_test.tb file in FOLDER (default: here)
   tb test --coverage     ... and show how many lines of each file the tests ran
   tb fmt [FILES]         tidy up the layout of TB files (--check to only report)
@@ -137,6 +154,7 @@ Usage:
   tb init / add / remove / packages / update   manage packages (tb_packages/)
   tb build APP.tb        bundle an app with the TB runtime into a folder
   tb lsp                 start the language server (used by editors)
+  tb --engine tree FILE.tb   run with the tree-walking interpreter (the VM is the default)
   tb --version           show the version
   tb --help              show this help
 
@@ -465,6 +483,10 @@ def doc_command(args: list) -> int:
         print("See one library with: tb doc NAME   (built-in functions: tb doc builtins)")
         return 0
     name = args[0]
+    # tb doc FILE.tb / tb doc FOLDER: documentation from ## comments (tbtools/docgen.py)
+    if any((a.lower().endswith(".tb") and os.path.isfile(a)) or (os.path.isdir(a) and a not in list_libraries())
+           for a in args if not a.startswith("--")):
+        return run_tool("docgen", args)
     if name in ("builtins", "builtin", "methods"):
         info = describe_builtins()
         print("Built-in functions (no import needed):")
@@ -734,7 +756,7 @@ def run_tool(name: str, args: list) -> int:
 
 def looks_like_command(word: str) -> bool:
     """`tb fmt` is a command; `tb hello.tb`, `tb ./x` and `tb hello` (a file) are not."""
-    if os.path.exists(word) or word.lower().endswith(".tb"):
+    if os.path.isfile(word) or word.lower().endswith(".tb"):
         return False
     if "/" in word or "\\" in word or "." in word:
         return False
@@ -764,6 +786,17 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(errors="replace")
         except Exception:
             pass
+    if args and args[0] == "--engine" or args and args[0].startswith("--engine="):
+        if args[0] == "--engine":
+            name, args = (args[1] if len(args) > 1 else ""), args[2:]
+        else:
+            name, args = args[0].split("=", 1)[1], args[1:]
+        if name not in ENGINES:
+            print(f"Oops! I don't know the engine '{name}'. Engines: vm (the default), tree.", file=sys.stderr)
+            return 2
+        global Interpreter
+        Interpreter = ENGINES[name]
+        os.environ["TB_ENGINE"] = name  # so tools started from here use it too
     if not args:
         return repl()
     first = args[0]

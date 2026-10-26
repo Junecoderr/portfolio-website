@@ -1,0 +1,56 @@
+import binary
+import pe
+
+# A tiny 32-bit Windows program, built byte by byte: a DOS header, the PE
+# headers and one section named like a packer's (UPX0), writable and runnable.
+let dos = binary.concat(b"MZ", binary.zeros(58), binary.pack("<I", 64))
+let coff = binary.pack("<4sHHIIIHH", b"PE\x00\x00", 0x14c, 1, 1700000000, 0, 0, 224, 0x0102)
+let optional = binary.concat(
+  binary.pack(
+    "<HBBIIIIIIIIIHHHHHHIIIIHHIIIIII",
+    0x10b,
+    14,
+    0,
+    512,
+    0,
+    0,
+    0x1000,
+    0x1000,
+    0x2000,
+    0x400000,
+    0x1000,
+    512,
+    6,
+    0,
+    0,
+    0,
+    6,
+    0,
+    0,
+    0x2000,
+    512,
+    0,
+    3,
+    0,
+    0x100000,
+    0x1000,
+    0x100000,
+    0x1000,
+    0,
+    16,
+  ),
+  binary.zeros(128),
+)
+let section = binary.pack("<8sIIIIIIHHI", b"UPX0", 512, 0x1000, 512, 512, 0, 0, 0, 0, 0xE0000020)
+let code = binary.concat(b"\x6a\x00\xff\x15", binary.zeros(508))
+let header = binary.concat(dos, coff, optional, section)
+let data = binary.concat(header, binary.zeros(512 - len(header)), code)
+
+let info = pe.parse_bytes(data)
+say(f"{info.format} for {info.architecture}, built {info.compiled}")
+for s in info.sections {
+  say(f"  section {s.name}: {s.size} bytes, entropy {s.entropy}")
+}
+for hit in pe.indicators(info) {
+  say(f"  [{hit.level}] {hit.detail}")
+}

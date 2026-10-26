@@ -1248,3 +1248,32 @@ details.more[open] summary { margin-bottom: 0.5rem; }
 .mock-menu-wrap .mock-menu { text-align: left; }
 .mock-tight { margin: 0; }
 .mock-check { display: inline-grid; place-items: center; width: 1rem; height: 1rem; border: 1px solid #2f7bf6; background: #2f7bf6; color: #fff; font-size: 0.7rem; border-radius: 3px; margin-right: 0.35rem; }
+
+/* ================================================================ TB 3.0 */
+.tok-spec { color: var(--code-num); }
+/* Markdown-rendered pages (spec, migration, packages) and terminal sessions */
+pre.md-code {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border-radius: var(--r);
+  padding: 1rem 1.15rem;
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  max-width: 100%;
+}
+pre.md-code code { font-size: inherit; background: none; border: 0; padding: 0; color: inherit; }
+.md-page h3 { margin-top: 2rem; }
+.md-page h4 { margin-top: 1.5rem; }
+.md-page blockquote { margin: 1.25rem 0; padding: 0.25rem 1rem; border-left: 3px solid var(--accent); color: var(--ink-soft); }
+.md-page table code { white-space: nowrap; }
+.docs.docs-wide { grid-template-columns: minmax(0, 1fr); max-width: 62rem; }
+.pkg-grid { list-style: none; padding: 0; margin: 1.25rem 0; display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); }
+.pkg-card { margin: 0; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r); }
+.pkg-card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.pkg-card p { margin: 0; color: var(--ink-soft); font-size: 0.93rem; }
+.pkg-version { font-size: 0.8rem; font-weight: 400; color: var(--ink-faint); font-family: var(--font-code); }
+.pkg { padding-top: 1.5rem; border-top: 1px solid var(--line); margin-top: 2.5rem; }
+.pkg-links a { margin-left: 0.5rem; }
+.steps-list li { margin-bottom: 0.5rem; }

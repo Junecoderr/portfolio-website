@@ -32,7 +32,9 @@ test.case("auth.log: brute force from 203.0.113.42, and the attacker got in", fn
 })
 
 test.case("auth.log: the slow scanner stays under the threshold", fn() {
-  let ips = alerts_for("auth.log").map(fn(a) { return a.by })
+  let ips = alerts_for("auth.log").map(fn(a) {
+    return a.by
+  })
   test.false("198.51.100.23" in ips)
 })
 

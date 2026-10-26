@@ -1,0 +1,68 @@
+# Conformance: §9 generators, iteration and tasks.
+
+import test
+
+fn count_to(n) {
+  for i in 1..=n {
+    yield i
+  }
+}
+
+test.case("§9 generators are lazy and end with done", fn() {
+  let g = count_to(2)
+  test.equal(type(g), "generator")
+  test.equal([g.next(), g.next(), g.next(), g.next()], [1, 2, done, done])
+})
+
+test.case("§9 generator helpers", fn() {
+  test.equal(count_to(5).map(x => x * 10).filter(x => x > 10).take(2).to_list(), [20, 30])
+  test.equal(count_to(2).zip(["a", "b"]).to_list(), [[1, "a"], [2, "b"]])
+  test.equal(count_to(2).enumerate().to_list(), [[0, 1], [1, 2]])
+  test.equal([1, 2].iter().map(x => x + 1).to_list(), [2, 3])
+})
+
+test.case("§9 the iteration protocol", fn() {
+  class Countdown {
+    fn init(n) {
+      self.n = n
+    }
+
+    fn iter() {
+      return self
+    }
+
+    fn next() {
+      if self.n == 0 {
+        return done
+      }
+      self.n -= 1
+      return self.n + 1
+    }
+  }
+  let seen = []
+  for x in Countdown(3) {
+    seen.push(x)
+  }
+  test.equal(seen, [3, 2, 1])
+})
+
+test.case("§9 async fn and await", fn() {
+  async fn double(n) {
+    return n * 2
+  }
+  let task = double(4)
+  test.equal(type(task), "Task")
+  test.equal(await task, 8)
+  test.equal(await 5, 5)
+  let later = async fn() {
+    return "later"
+  }
+  test.equal(await later(), "later")
+  async fn fails() {
+    throw ValueError("no")
+  }
+  test.raises(() => await fails(), "no")
+  test.raises(fn() {
+    import "support/bad/async_yield.tbx" as bad
+  }, "yield")
+})

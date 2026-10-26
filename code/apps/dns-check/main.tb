@@ -78,20 +78,30 @@ for kind in ["A", "AAAA", "MX", "NS", "TXT", "CAA", "SOA"] {
     say(f"The domain {domain} doesn't exist (NXDOMAIN).")
     exit(1)
   }
-  found[kind] = rs.filter(fn(r) { return r.type == kind })
+  found[kind] = rs.filter(fn(r) {
+    return r.type == kind
+  })
 }
 
 fn values(kind) {
-  return found[kind].map(fn(r) { return r.value })
+  return found[kind].map(fn(r) {
+    return r.value
+  })
 }
 
 let txt = values("TXT")
-let spf = txt.filter(fn(t) { return t.lower().starts_with("v=spf1") })
+let spf = txt.filter(fn(t) {
+  return t.lower().starts_with("v=spf1")
+})
 let dmarc_records = records("_dmarc." + domain, "TXT")
 if dmarc_records == nil {
   dmarc_records = []
 }
-let dmarc = dmarc_records.filter(fn(r) { return r.type == "TXT" and r.value.lower().starts_with("v=dmarc1") }).map(fn(r) { return r.value })
+let dmarc = dmarc_records.filter(fn(r) {
+  return r.type == "TXT" and r.value.lower().starts_with("v=dmarc1")
+}).map(fn(r) {
+  return r.value
+})
 
 # PTR (reverse) names of the addresses.
 let ptr = {}
@@ -119,12 +129,24 @@ fn check(name, ok, detail) {
 }
 
 let ns_count = len(found.NS)
-check("Name servers", ns_count >= 2, f"{ns_count} name server(s); two or more keep the domain up if one fails")
-check("Addresses", len(found.A) + len(found.AAAA) > 0, f"{len(found.A)} IPv4, {len(found.AAAA)} IPv6")
+check(
+  "Name servers",
+  ns_count >= 2,
+  f"{ns_count} name server(s); two or more keep the domain up if one fails",
+)
+check(
+  "Addresses",
+  len(found.A) + len(found.AAAA) > 0,
+  f"{len(found.A)} IPv4, {len(found.AAAA)} IPv6",
+)
 check("Mail servers", len(found.MX) > 0, f"{len(found.MX)} MX record(s)")
 if len(spf) == 1 {
   let strict = spf[0].contains("-all") or spf[0].contains("~all")
-  check("SPF", strict, pick(strict, "present and ends in -all/~all", "present but doesn't end in -all or ~all"))
+  check(
+    "SPF",
+    strict,
+    pick(strict, "present and ends in -all/~all", "present but doesn't end in -all or ~all"),
+  )
 } else if len(spf) == 0 {
   check("SPF", false, "no SPF record: anyone can send mail that claims to be from this domain")
 } else {
@@ -142,12 +164,43 @@ if len(dmarc) == 0 {
   }
   check("DMARC", policy != "none", f"policy p={policy}")
 }
-check("CAA", len(found.CAA) > 0, pick(len(found.CAA) > 0, "limits who can issue certificates", "no CAA: any certificate authority may issue for this domain"))
-let missing_ptr = keys(ptr).filter(fn(ip) { return ptr[ip] == nil })
-check("Reverse DNS", len(ptr) > 0 and len(missing_ptr) == 0, pick(len(missing_ptr) == 0, f"{len(ptr)} address(es) point back to a name", f"no PTR for {missing_ptr.join(", ")}"))
+check(
+  "CAA",
+  len(found.CAA) > 0,
+  pick(
+    len(found.CAA) > 0,
+    "limits who can issue certificates",
+    "no CAA: any certificate authority may issue for this domain",
+  ),
+)
+let missing_ptr = keys(ptr).filter(fn(ip) {
+  return ptr[ip] == nil
+})
+check(
+  "Reverse DNS",
+  len(ptr) > 0 and len(missing_ptr) == 0,
+  pick(
+    len(missing_ptr) == 0,
+    f"{len(ptr)} address(es) point back to a name",
+    f"no PTR for {missing_ptr.join(", ")}",
+  ),
+)
 
 if as_json {
-  say(json.stringify({"domain": domain, "server": server, "records": found, "dmarc": dmarc, "ptr": ptr, "checks": checks, "problems": problems}, true))
+  say(
+    json.stringify(
+      {
+        "domain": domain,
+        "server": server,
+        "records": found,
+        "dmarc": dmarc,
+        "ptr": ptr,
+        "checks": checks,
+        "problems": problems,
+      },
+      true,
+    ),
+  )
   exit(0)
 }
 

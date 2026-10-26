@@ -40,7 +40,13 @@ while i < len(os.args) {
   i += 1
 }
 if files.is_empty() {
-  for name in ["auth.log", "access.log", "firewall.log", "windows_security.json", "windows_security.csv"] {
+  for name in [
+    "auth.log",
+    "access.log",
+    "firewall.log",
+    "windows_security.json",
+    "windows_security.csv",
+  ] {
     files.push(fs.join(data, name))
   }
   say("No log given, so here is a triage of the sample logs in apps/data.")
@@ -49,7 +55,11 @@ if files.is_empty() {
 
 # The time span a list of records covers, as text.
 fn span(records) {
-  let timed = records.filter(fn(r) { return r.time != nil }).sort_by(fn(r) { return r.time })
+  let timed = records.filter(fn(r) {
+    return r.time != nil
+  }).sort_by(fn(r) {
+    return r.time
+  })
   if timed.is_empty() {
     return "no timestamps"
   }
@@ -60,7 +70,9 @@ fn span(records) {
 fn notes_for(alert) {
   let notes = []
   if alert.get("success_after", false) {
-    notes.push(f"{alert.by} guessed a password: {alert.success_user} logged in at {alert.success_when}. Treat the account as compromised.")
+    notes.push(
+      f"{alert.by} guessed a password: {alert.success_user} logged in at {alert.success_when}. Treat the account as compromised.",
+    )
   }
   if alert.rule == "Encoded PowerShell command" {
     let cmd = alert.records[0].command_line
@@ -94,7 +106,9 @@ for path in files {
   }
   say(f"== {fs.name(path)}  ({format}, {len(records)} records, {span(records)})")
 
-  let busiest = logs.top(records, "ip", 3).map(fn(t) { return f"{t.value} ({t.count})" })
+  let busiest = logs.top(records, "ip", 3).map(fn(t) {
+    return f"{t.value} ({t.count})"
+  })
   if not busiest.is_empty() {
     say("   busiest IPs: " + busiest.join(", "))
   }
@@ -109,7 +123,11 @@ for path in files {
     a.log = fs.name(path)
     all_alerts.push(a)
   }
-  say(report.table(alerts, ["level", "rule", "by", "count", "first_when", "last_when"], {"max_width": 36}))
+  say(
+    report.table(alerts, ["level", "rule", "by", "count", "first_when", "last_when"], {
+      "max_width": 36,
+    }),
+  )
   for a in alerts {
     for note in notes_for(a) {
       say("   ! " + note)
@@ -123,8 +141,12 @@ if files_read == 0 {
   exit(1)
 }
 
-let serious = all_alerts.filter(fn(a) { return a.level == "critical" or a.level == "high" })
-say(f"Done: {total_records} records in {files_read} file(s), {len(all_alerts)} alert(s), {len(serious)} high or critical.")
+let serious = all_alerts.filter(fn(a) {
+  return a.level == "critical" or a.level == "high"
+})
+say(
+  f"Done: {total_records} records in {files_read} file(s), {len(all_alerts)} alert(s), {len(serious)} high or critical.",
+)
 
 if not serious.is_empty() {
   say("")
@@ -136,7 +158,11 @@ if html_path != nil {
   let page = report.html("Log triage", all_alerts, {
     "columns": ["level", "rule", "by", "count", "first_when", "last_when", "log"],
     "intro": f"{len(files)} log file(s), {total_records} records. Alerts are sorted by level, then time.",
-    "stats": {"records": total_records, "alerts": len(all_alerts), "high or critical": len(serious)},
+    "stats": {
+      "records": total_records,
+      "alerts": len(all_alerts),
+      "high or critical": len(serious),
+    },
   })
   say("")
   say("HTML report saved to " + report.save(html_path, page))

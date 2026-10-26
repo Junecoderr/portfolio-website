@@ -7,14 +7,21 @@ Usage (from code/):
 What it does:
 
 1. Runs PyInstaller with packaging/tb.spec -> dist/tb/ (a one-folder build):
-     dist/tb/tb  (tb.exe on Windows, plus tbw.exe = no console window)
+     dist/tb/tb        (tb.exe on Windows, plus tbw.exe = no console window)
+     dist/tb/tblaunch  (the `tb build` launcher; Windows: tblaunch.exe and
+                        tblaunchw.exe = no console window)
      dist/tb/_internal/...
 2. Smoke-tests dist/tb/tb from a folder outside the repo (so the bundled
-   standard library is what gets used): `tb --version`, `tb welcome.tb`,
-   `tb doc`, `tb doc gui`, a program importing json/re/hash/ioc/logs, and a GUI
-   app (apps/calculator, closed after 0.5 s via TB_GUI_AUTOCLOSE_MS) when the
-   build Python has Tk and a display is available. Set TB_REQUIRE_GUI=1 to make
-   a missing Tk/display an error instead of a skip (CI does this).
+   standard library is what gets used): `tb --version` (and how long it takes),
+   `tb welcome.tb`, `tb check welcome.tb`, `tb fmt --check welcome.tb`,
+   `tb doc`, `tb doc gui`, `tb doc welcome.tb`, a program importing
+   json/re/hash/ioc/logs/sqlite, a TB 3.0 program (class + match + generator),
+   `tb build` of a small CLI app whose launcher is then run (and the raw
+   tblaunch launcher), and a GUI app (apps/calculator, closed after 0.5 s via
+   TB_GUI_AUTOCLOSE_MS; also built with `tb build --gui` and started through
+   its launcher) when the build Python has Tk and a display is available. Set
+   TB_REQUIRE_GUI=1 to make a missing Tk/display an error instead of a skip
+   (CI does this).
 3. Packages the folder into dist/ under the release asset name(s):
      Windows x64  -> tb-windows-x64.zip         (folder tb\ with tb.exe, tbw.exe, _internal\,
                                                  apps\, examples\, welcome.tb)
@@ -27,9 +34,11 @@ What it does:
    apps/, examples/ and welcome.tb are copied into dist/tb/ first, so they
    ship next to the launcher. Each archive is unpacked again into a temp
    folder, smoke-tested, and every example/app is run from the unpacked copy
-   (packaging/run_examples.py --root <unpacked tb/>).
+   (packaging/run_examples.py --root <unpacked tb/>, with --gui when Tk and a
+   display are available).
 4. Writes/updates dist/SHA256SUMS.txt (sha256sum format) for every release
-   asset found in dist/.
+   asset found in dist/ (including tb-python.zip and the VS Code extension
+   tb-vscode-<version>.vsix when present).
 
 Other modes:
 
@@ -51,13 +60,14 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging" / "tb.spec"
 DEMO = ROOT / "welcome.tb"
-VERSION = "2.0.1"
+VERSION = "3.0.0"
 GUI_APP = ROOT / "apps" / "calculator" / "main.tb"
 
 # A program that touches several native libraries, with its exact output.
@@ -66,6 +76,7 @@ import re
 import hash
 import ioc
 import logs
+import sqlite
 let data = json.parse("{\"a\": [1, 2, 3]}")
 say(json.stringify(data))
 say(re.find_all("[0-9]+", "port 22 and 443"))
@@ -74,18 +85,77 @@ let found = ioc.extract("bad host 203.0.113.7 at evil.example.com")
 say(found.ips)
 let rec = logs.parse_line("Jan  1 10:00:00 host sshd[1]: Failed password for root from 203.0.113.7 port 22 ssh2", "auth")
 say(f"{rec.user} {rec.ip} {rec.success}")
+let db = sqlite.open(":memory:")
+db.run("CREATE TABLE t (n INTEGER)")
+db.run("INSERT INTO t VALUES (?), (?)", [20, 22])
+say(db.value("SELECT sum(n) FROM t"))
 '''
 LIB_SNIPPET_OUT = """{"a": [1, 2, 3]}
 ["22", "443"]
 7aa5ae9ecf82f6fc5208ecd0940fd71d50cd4ac596fccac2ede05af806a87b6e
 ["203.0.113.7"]
 root 203.0.113.7 false
+42
 """
+
+# TB 3.0: classes, match, generators.
+LANG3_SNIPPET = """class Shape {
+  fn init(name) {
+    self.name = name
+  }
+  fn describe() {
+    return f"{self.name} with area {self.area()}"
+  }
+}
+
+class Square extends Shape {
+  fn init(side) {
+    super.init("square")
+    self.side = side
+  }
+  fn area() {
+    return self.side * self.side
+  }
+}
+
+fn squares(n) {
+  for i in 1..=n {
+    yield Square(i)
+  }
+}
+
+fn size(shape) {
+  return match shape.area() {
+    1 => "tiny"
+    n if n < 10 => "small"
+    _ => "big"
+  }
+}
+
+for s in squares(4) {
+  say(f"{s.describe()}: {size(s)}")
+}
+say(squares(5).map(s => s.area()).filter(a => a > 5).to_list())
+"""
+LANG3_SNIPPET_OUT = """square with area 1: tiny
+square with area 4: small
+square with area 9: small
+square with area 16: big
+[9, 16, 25]
+"""
+
+# A small CLI app for `tb build`: imports a file next to it, reads os.args.
+BUILD_APP = {
+    "main.tb": 'import os\nimport "greet.tb"\nsay(greet.hello(os.args))\n',
+    "greet.tb": 'export fn hello(names) {\n  return "hello " + names.join(", ")\n}\n',
+}
+BUILD_APP_OUT = "hello ada, bob\n"
 SUMS_NAME = "SHA256SUMS.txt"
 ISS = ROOT / "packaging" / "windows" / "tb.iss"
 FIXED_TIME = (2024, 1, 1, 0, 0, 0)
 
 # Every file that may appear in a release (all OSes). Used for SHA256SUMS.txt.
+VSIX = f"tb-vscode-{VERSION}.vsix"
 RELEASE_ASSETS = [
     "tb-windows-x64-setup.exe",
     "tb-windows-x64.zip",
@@ -96,6 +166,7 @@ RELEASE_ASSETS = [
     "tb-linux-x64.tar.gz",
     "tb-linux-arm64.tar.gz",
     "tb-python.zip",
+    VSIX,
 ]
 
 
@@ -200,6 +271,76 @@ def tk_available() -> tuple[bool, str]:
     return True, ""
 
 
+def startup_time(binary: Path, cwd: Path) -> float:
+    """Best of 3 wall-clock times of `tb --version` (start-up cost)."""
+    best = float("inf")
+    for _ in range(3):
+        t0 = time.perf_counter()
+        run_binary(binary, "--version", cwd=cwd)
+        best = min(best, time.perf_counter() - t0)
+    return best
+
+
+def launcher_name(binary: Path, gui: bool = False) -> str:
+    stem = "tblaunchw" if gui and os.name == "nt" else "tblaunch"
+    return stem + (".exe" if os.name == "nt" else "")
+
+
+def run_program(cmd: list[str], cwd: Path, env: dict | None = None,
+                timeout: int = 120) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, input=b"", capture_output=True, timeout=timeout, cwd=cwd, env=env)
+
+
+def build_smoke(binary: Path, work: Path, gui_ok: bool) -> None:
+    """`tb build` a small CLI app, run its launcher; run the raw tblaunch too;
+    with a display, build a GUI app with --gui and start it via its launcher."""
+    app = work / "hello-src"
+    app.mkdir()
+    for name, text in BUILD_APP.items():
+        (app / name).write_text(text, encoding="utf-8")
+    bundle = work / "bundle" / "hello"
+    check(binary, ["build", str(app / "main.tb"), "--name", "hello", "--out", str(bundle)], work)
+    for need in ("hello.tb", "greet.tb", "README.txt", binary.name, "_internal"):
+        if not (bundle / need).exists():
+            fail(f"`tb build` output has no {need}")
+    exe = bundle / ("hello.exe" if os.name == "nt" else "hello")
+    if not exe.is_file():
+        fail(f"`tb build` made no launcher {exe.name}")
+    res = run_program([str(exe), "ada", "bob"], work)
+    out = show(exe, ["ada", "bob"], res)
+    if res.returncode != 0 or out != BUILD_APP_OUT:
+        fail(f"built launcher printed {out!r} (exit {res.returncode}), expected {BUILD_APP_OUT!r}")
+
+    # The raw launcher (Windows copies it as hello.exe above; elsewhere tb build
+    # writes a shell script, so check tblaunch on its own here).
+    if os.name != "nt":
+        raw = bundle / "hello-launch"
+        shutil.copy2(binary.parent / launcher_name(binary), raw)
+        shutil.copy2(bundle / "hello.tb", bundle / "hello-launch.tb")
+        res = run_program([str(raw), "ada", "bob"], work)
+        out = show(raw, ["ada", "bob"], res)
+        if res.returncode != 0 or out != BUILD_APP_OUT:
+            fail(f"tblaunch printed {out!r} (exit {res.returncode}), expected {BUILD_APP_OUT!r}")
+    log("tb build check passed: the bundled app ran through its launcher")
+
+    if not gui_ok:
+        return
+    gui_bundle = work / "bundle" / "calculator"
+    check(binary, ["build", str(GUI_APP), "--gui", "--out", str(gui_bundle)], work, max_lines=4)
+    exe = gui_bundle / ("calculator.exe" if os.name == "nt" else "calculator")
+    env = dict(os.environ, TB_GUI_AUTOCLOSE_MS="500")
+    # tblaunchw.exe has no console: a failing app would wait in an error
+    # dialog, which shows up here as the timeout.
+    try:
+        res = subprocess.run([str(exe)], stdin=subprocess.DEVNULL, capture_output=os.name != "nt",
+                             timeout=90, cwd=work, env=env)
+    except subprocess.TimeoutExpired:
+        fail(f"{exe.name} (tb build --gui) did not close itself")
+    if res.returncode != 0:
+        fail(f"{exe.name} (tb build --gui) exited {res.returncode}")
+    log(f"tb build --gui check passed: {exe.name} opened and closed itself")
+
+
 def smoke_test(binary: Path, label: str) -> None:
     log(f"smoke test ({label}): {binary}")
     with tempfile.TemporaryDirectory() as tmp:
@@ -209,10 +350,17 @@ def smoke_test(binary: Path, label: str) -> None:
         out = check(binary, ["--version"], work).strip()
         if out != f"TB {VERSION}":
             fail(f"--version printed {out!r}, expected 'TB {VERSION}'")
+        log(f"start-up: `tb --version` takes {startup_time(binary, work) * 1000:.0f} ms (best of 3)")
 
         out = check(binary, [str(DEMO)], work)
         if "Welcome to TB" not in out:
             fail(f"{DEMO.name} output did not say 'Welcome to TB'")
+
+        check(binary, ["check", str(DEMO)], work)
+        check(binary, ["fmt", "--check", str(DEMO)], work)
+        out = check(binary, ["doc", str(DEMO)], work, max_lines=6)
+        if "fn " not in out:
+            fail(f"`tb doc {DEMO.name}` listed no functions")
 
         out = check(binary, ["doc"], work, max_lines=8)
         for lib in ("gui", "json", "hash", "ioc", "logs", "detect"):
@@ -229,6 +377,13 @@ def smoke_test(binary: Path, label: str) -> None:
         if out != LIB_SNIPPET_OUT:
             fail(f"library snippet printed {out!r}, expected {LIB_SNIPPET_OUT!r}")
 
+        snippet = work / "lang3.tb"
+        snippet.write_text(LANG3_SNIPPET, encoding="utf-8")
+        for engine in ("vm", "tree"):
+            out = check(binary, ["--engine", engine, str(snippet)], work)
+            if out != LANG3_SNIPPET_OUT:
+                fail(f"3.0 snippet ({engine}) printed {out!r}, expected {LANG3_SNIPPET_OUT!r}")
+
         ok, why = tk_available()
         if not ok:
             if os.environ.get("TB_REQUIRE_GUI") == "1":
@@ -238,6 +393,8 @@ def smoke_test(binary: Path, label: str) -> None:
             env = dict(os.environ, TB_GUI_AUTOCLOSE_MS="500")
             check(binary, [str(GUI_APP)], work, env=env)
             log(f"gui check passed: {GUI_APP.relative_to(ROOT)} opened and closed itself")
+
+        build_smoke(binary, work, ok)
 
 
 def folder_files(folder: Path) -> list[Path]:
@@ -334,6 +491,8 @@ def run_examples_in(folder: Path, exe_name: str) -> None:
     """Run every example/app from the copies inside folder (as a user would)."""
     cmd = [sys.executable, str(ROOT / "packaging" / "run_examples.py"),
            str(folder / exe_name), "--root", str(folder)]
+    if tk_available()[0]:
+        cmd.append("--gui")
     log("running: " + " ".join(cmd))
     if subprocess.run(cmd).returncode != 0:
         fail(f"examples/apps failed inside {folder}")
@@ -428,8 +587,10 @@ def main() -> int:
         run_pyinstaller(dist, ROOT / "build" / "pyinstaller")
     if not binary.is_file():
         fail(f"{binary} not found")
-    if os_name == "windows" and not (folder / "tbw.exe").is_file():
-        fail(f"{folder / 'tbw.exe'} not found")
+    programs = ["tbw.exe", "tblaunch.exe", "tblaunchw.exe"] if os_name == "windows" else ["tblaunch"]
+    for program in programs:
+        if not (folder / program).is_file():
+            fail(f"{folder / program} not found")
 
     add_extras(folder)
     smoke_test(binary, "fresh build")

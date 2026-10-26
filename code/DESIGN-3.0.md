@@ -316,6 +316,82 @@ let d = Dog("Rex"); say(d.speak()); say(d is Animal, type(d))   # true Dog
   producer/consumer, error propagation, cancel, async/await, GUI
   background update on the fake backend.
 
+### Part C: implemented semantics (concurrency-agent)
+
+Files: `tbcore/tasks.py` (Task, spawn, run_pool, cancel, wait), `tblib/parallel.py`
+(library surface), small hooks in `tbcore/interp.py`, `tbcore/parser.py`,
+`tbcore/ast.py`, `tbcore/runtime.py`, `tblib/_api.py`, `tblib/gui.py`.
+
+- **Interpreter views.** Per-thread state lives on an interpreter *view*:
+  `depth, current_file, call_stack, frame, root_frame, active_gen, trace,
+  current_module` and the node dispatch tables. `interp.fork()` makes a view
+  that shares everything else (globals, builtins, `modules`, output/input,
+  rng, the one `api` object, `_local`, `_owner`, `_import_lock`).
+  `interp.current()` gives the calling thread's view: the one registered in
+  `interp._local.interp` (tasks, pool workers, generator bodies), the
+  interpreter itself on its owner thread (`_owner`, set in `__init__` and
+  `run()`), else a fresh view for that thread (server/websocket/gui worker
+  callbacks). `api.call` always goes through `current()`. Imports take
+  `_import_lock` (one import at a time). The default `say` output prints
+  whole lines under a lock. No hot-path cost: nothing per statement changed.
+- **Tasks.** `tasks.spawn(interp, work, name)` runs `work(view)` on a daemon
+  thread with a fresh view (depth 0, its own root frame); the Task's TB
+  object is an instance of the native class `Task` (fields `name`; methods
+  `wait(timeout?) done() cancel() cancelled() status() on_done(fn,
+  on_error?) text()`). Results: `wait()` returns the value or re-raises the
+  *same* `TBError` (class, message, line, file, stack untouched; a missing
+  line gets the wait's line); `exit()` in a task re-raises `TBExit` in the
+  waiter; Python `RecursionError` becomes a friendly TBError. A wait timeout
+  raises `TimeoutError` and leaves the task running. Task threads raise
+  `sys.setrecursionlimit` like `tb._guarded` and use a 32 MB thread stack.
+  The program does not wait for unfinished tasks or timers when it ends;
+  failures nobody waits for are silent unless `on_done` is used.
+- **`async fn` / `await`.** Parser: `async fn name` (top level, also
+  exported), `async fn` / `static async fn` methods, and `async fn(...) {}`
+  expressions (`FnExpr.is_async`); `async` + `yield` is a parse error;
+  `async` not followed by `fn` is a parse error. Interp: `call_function`
+  binds parameters on the caller's thread (so arity and default errors
+  happen at the call), then for `fn.is_async` calls
+  `tasks.start_async(interp, fn, scope, line)`, which spawns
+  `view.call_function(fn, None, None, line, scope=scope)` and returns the
+  Task object. `await x`: if x has a `wait` method (Task, or any TB object
+  with `wait()`), call it; otherwise give back x unchanged. `await` works
+  anywhere, not only inside async fns.
+- **Cancel** is cooperative: `cancel()` sets `task.cancel_requested` and
+  installs a one-shot trace hook on every view working for the task (its
+  own and its `parallel.map` workers'). At the next statement/call the hook
+  clears itself and raises `TaskCancelled` (a `BaseException`: TB `catch`
+  can't swallow it, `finally`/`defer` still run). Blocking waits
+  (`tasks.wait_event`: `parallel.sleep`, `Queue.get/put`, `Lock.hold`,
+  `task.wait`) poll every 50 ms and raise it too. Waiting on a cancelled
+  task raises Error "The task was cancelled." with `err.cancelled == true`.
+- **Pools.** `parallel.map/each(fn, items, workers=8)`: up to `workers`
+  threads, one view each, pulling indexes; results in input order; on the
+  first failure the others stop taking items and the error with the lowest
+  index is raised in the caller. Workers inherit the caller's task, so
+  cancelling an outer task stops its pool.
+- **Generators.** A generator body swaps state with the view of the thread
+  that *starts* it (`ThreadGenerator` rebinds to `interp.current()` on its
+  first `next()`), and registers that view for its own thread. Consuming one
+  generator from two threads at once is not supported.
+- **GUI.** `tasks.MAIN_POSTER` is set by `gui.load`: while a window is open,
+  `task.on_done` callbacks are posted with `backend.on_main` and run through
+  `gui.fire` (errors → dialog), so they may change widgets; without windows
+  they run on the finishing task's thread. Tk windows' `on_main` from a
+  non-Tk thread now also schedules a drain with `top.after(0, ...)`.
+  `win.run_in_background` / `gui.on_main` are unchanged. Rule for users:
+  never `wait()` inside a GUI callback (it freezes the window); use
+  `on_done` or `gui.on_main`.
+- **Browser** (`sys.platform == "emscripten"`, `tasks.THREADS_OK` false):
+  every `parallel` function except `all/race/cpu_count` fails through
+  `api.need_desktop`; `async fn` calls run to completion at once and return
+  a finished Task, so `await` (and `await` on plain values) still works.
+- **VM mirror checklist:** per-view state + `fork()`/`current()`; async call
+  = bind params, then `start_async` with a body runner that does not re-bind;
+  `await` = call `wait` if present else identity; register the generator
+  view on its thread; honour `view.trace` as the cancel hook (or poll
+  `tasks.current_task().cancel_requested` at loop back-edges and calls).
+
 ## Part D — Gradual types and lint (types-agent, after Part A lands)
 
 - `tbtools/check.py` → `tb check [paths]`: parse errors; undefined names;

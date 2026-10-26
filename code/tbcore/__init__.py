@@ -16,10 +16,14 @@ Files (all pure Python 3.10+, standard library only):
     runtime.py    runtime values (Env, Function, Module, classes, enums,
                   ranges, generators, bytes), to_text, equality, the methods
                   of built-in values, format specs, the Error class family
-    interp.py     Interpreter: runs a Program, calls, modules and packages,
-                  the trace hook for the debugger
-
-Other agents add: compiler.py / vm.py (bytecode VM) and types.py (checker).
+    tasks.py      Task, spawn(), run_pool(): TB code on other threads (async fn, parallel)
+    interp.py     Interpreter: the tree-walking engine (TB_ENGINE=tree):
+                  runs a Program, calls, modules and packages, the trace
+                  hook for the debugger
+    compiler.py   the bytecode compiler: syntax tree -> Code objects
+    vm.py         VMInterpreter: the default engine, a stack VM that runs
+                  the compiled code (same API and messages as interp.py)
+    types.py      the gradual type checker used by `tb check` and the LSP
 """
 
 FILES = [
@@ -30,4 +34,8 @@ FILES = [
     "parser.py",
     "runtime.py",
     "interp.py",
+    "tasks.py",
+    "compiler.py",
+    "vm.py",
+    "types.py",
 ]

@@ -1,0 +1,40 @@
+# Conformance: §7.3 modules and §12 imports and packages.
+
+import test
+import fs
+import "support/exported.tb"
+import "support/plain.tb"
+import "support/plain.tb" as again
+from "support/exported.tb" import shown as s, VERSION
+from fs import join
+import "support/packaged.tb"
+
+test.case("§7.3 export decides what is public", fn() {
+  test.equal(exported.shown(), "shown")
+  test.equal(exported.VERSION, 3)
+  test.equal(s(), "shown")
+  test.equal(VERSION, 3)
+  test.raises(fn() {
+    import "support/bad/not_exported.tbx" as bad
+  }, "doesn't export 'hidden'")
+})
+
+test.case("§7.3 without export everything is public; a module runs once", fn() {
+  test.equal(plain.twice(2), 4)
+  test.equal(plain.loads, ["loaded"])
+  test.equal(again.loads, ["loaded"])
+})
+
+test.case("§12 from a library", fn() {
+  test.equal(join("a", "b"), fs.join("a", "b"))
+})
+
+test.case("§12 packages from tb_packages", fn() {
+  test.equal(packaged.both(), ["from a package", "from a package"])
+})
+
+test.case("§7.3 import circles are an error", fn() {
+  test.raises(fn() {
+    import "support/circle_a.tbx" as a
+  }, "circle")
+})

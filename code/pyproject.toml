@@ -1,6 +1,6 @@
 [project]
 name = "tb-lang"
-version = "2.0.1"
+version = "3.0.0"
 description = "TB - a small, friendly programming language"
 requires-python = ">=3.10"
 dependencies = []

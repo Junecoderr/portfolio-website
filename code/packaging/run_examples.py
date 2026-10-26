@@ -1,44 +1,106 @@
-"""Run every examples/*.tb, welcome.tb and the non-GUI apps through a built TB binary.
+"""Run every examples/*.tb, welcome.tb, every app and the TB test suites through a built TB binary.
 
 Usage:
     uv run python packaging/run_examples.py dist/tb/tb        # or dist/tb/tb.exe
     python packaging/run_examples.py <TB>/tb.exe --root <TB>  # an installed copy:
         use the examples/, apps/ and welcome.tb found in <TB>
+    ... --gui    also open every GUI app (closed after 0.5 s via
+                 TB_GUI_AUTOCLOSE_MS); needs Tk in the build and a display
 
 - An example with a matching <name>.in file gets that file on stdin (for ask()).
 - An example with a matching <name>.out file has its output compared, unless it
   calls care() (random message) or reads input (prompts make output differ).
 - Every example must exit with code 0.
 - Every apps/*/main.tb that does not `import gui` is run with no arguments and
-  must exit 0, except the apps in APP_EXIT_CODES (they need network or API
-  keys, so other exit codes are legitimate there).
-- `tb test apps/log-triage` must pass.
+  must exit 0, except the apps in APP_EXIT_CODES (they need network, API keys
+  or arguments, so other exit codes are legitimate there) and the server apps
+  in SERVER_APPS (started on a free port, must answer HTTP, then stopped).
+- GUI apps (`import gui`) are skipped unless --gui is given.
+- `tb test spec`, `tb test apps/log-triage` and `tb test packages` must pass.
+  spec/ and packages/ are not part of the binary downloads, so with --root
+  they come from <root> when present, else from this source checkout.
 
-Used by .github/workflows/release.yml to check the real binaries.
+Used by .github/workflows/tb-release.yml (and build.py / test_installer.py)
+to check the real binaries.
 """
 
 from __future__ import annotations
 
+import os
+import socket
 import subprocess
 import sys
+import time
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+SOURCE = ROOT  # the source checkout (for spec/ and packages/)
 
 # Apps that legitimately do not exit 0 when run with no arguments on a CI box.
 APP_EXIT_CODES = {
-    "ip-reputation": {1, 2},   # no indicator given -> usage (2); no API keys -> 1
-    "uptime-monitor": {0, 1},  # 1 = a site is down or the runner is offline
+    "ip-reputation": {1, 2},    # no indicator given -> usage (2); no API keys -> 1
+    "uptime-monitor": {0, 1},   # 1 = a site is down or the runner is offline
+    "cert-check": {0, 1, 2},    # no host given -> usage (2); TLS needs the network
+    "dns-check": {0, 1, 2},     # no domain given -> usage (2); DNS needs the network
 }
+
+# Server apps: started with these arguments (PORT is replaced by a free port),
+# must answer GET <path> with 200 within the timeout, and are then stopped.
+SERVER_APPS = {
+    "dashboard": (["--port", "PORT"], "/api/summary"),
+}
+
+# Test suites run with `tb test <folder>` (folders relative to the root).
+TEST_SUITES = ["spec", "apps/log-triage", "packages"]
 
 
 def norm(text: str) -> str:
     return "\n".join(line.rstrip() for line in text.replace("\r\n", "\n").strip("\n").split("\n"))
 
 
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def run_server_app(binary: Path, app: Path, args: list[str], path: str, timeout: float = 60) -> tuple[bool, str]:
+    port = free_port()
+    argv = [str(binary), str(app), "--", *[str(port) if a == "PORT" else a for a in args]]
+    proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, cwd=ROOT)
+    url = f"http://127.0.0.1:{port}{path}"
+    deadline = time.monotonic() + timeout
+    ok, why = False, f"no answer from {url} within {timeout:.0f} s"
+    try:
+        while time.monotonic() < deadline:
+            if proc.poll() is not None:
+                why = f"exited {proc.returncode} before answering"
+                break
+            try:
+                with urllib.request.urlopen(url, timeout=2) as resp:
+                    ok, why = resp.status == 200, f"GET {path} -> {resp.status}"
+                    break
+            except OSError:
+                time.sleep(0.3)
+    finally:
+        proc.terminate()
+        try:
+            out, _ = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            out, _ = proc.communicate()
+    if not ok:
+        why += "\n" + out.decode("utf-8", "replace")[-2000:]
+    return ok, why
+
+
 def main() -> int:
     global ROOT
     args = sys.argv[1:]
+    gui = "--gui" in args
+    args = [a for a in args if a != "--gui"]
     if len(args) == 3 and args[1] == "--root":
         ROOT = Path(args[2]).resolve()  # e.g. an installed TB folder with examples/ and apps/
         args = args[:1]
@@ -90,41 +152,63 @@ def main() -> int:
     print(f"\n{len(programs) - failures}/{len(programs)} example programs passed\n")
 
     apps = sorted((ROOT / "apps").glob("*/main.tb"))
+    app_failures = 0
     for app in apps:
         name = app.parent.name
         rel = app.relative_to(ROOT)
-        if "import gui" in app.read_text(encoding="utf-8"):
-            print(f"skip {rel} (GUI app; build.py opens one GUI app)")
+        is_gui = "import gui" in app.read_text(encoding="utf-8")
+        if is_gui and not gui:
+            print(f"skip {rel} (GUI app; run with --gui to open it)")
+            continue
+        if name in SERVER_APPS:
+            server_args, path = SERVER_APPS[name]
+            ok, why = run_server_app(binary, app, server_args, path)
+            print(f"{'ok  ' if ok else 'FAIL'} {rel} (server: {why})")
+            app_failures += not ok
             continue
         allowed = APP_EXIT_CODES.get(name, {0})
+        env = dict(os.environ, TB_GUI_AUTOCLOSE_MS="500") if is_gui else None
         try:
             res = subprocess.run([str(binary), str(app)], input=b"", capture_output=True,
-                                 timeout=120, cwd=ROOT)
+                                 timeout=120, cwd=ROOT, env=env)
         except subprocess.TimeoutExpired:
             print(f"FAIL {rel}: timed out")
-            failures += 1
+            app_failures += 1
             continue
         if res.returncode not in allowed:
             print(f"FAIL {rel}: exit {res.returncode} (allowed: {sorted(allowed)})")
             print(res.stdout.decode("utf-8", "replace")[-2000:])
             print(res.stderr.decode("utf-8", "replace")[-2000:])
+            app_failures += 1
+            continue
+        note = " (GUI, closed itself)" if is_gui else ""
+        if allowed != {0}:
+            note = f" (exit {res.returncode}; allowed {sorted(allowed)}: needs network/keys/arguments)"
+        print(f"ok   {rel}{note}")
+    failures += app_failures
+    print(f"\n{len(apps) - app_failures}/{len(apps)} apps checked without failure\n")
+
+    for suite in TEST_SUITES:
+        folder = ROOT / suite
+        if not folder.is_dir():
+            folder = SOURCE / suite
+        if not folder.is_dir():
+            print(f"FAIL tb test {suite}: folder not found")
             failures += 1
             continue
-        note = "" if allowed == {0} else f" (exit {res.returncode}; allowed {sorted(allowed)}: needs network/keys)"
-        print(f"ok   {rel}{note}")
-
-    res = subprocess.run([str(binary), "test", "apps/log-triage"], input=b"", capture_output=True,
-                         timeout=120, cwd=ROOT)
-    summary = res.stdout.decode("utf-8", "replace").strip().splitlines()
-    if res.returncode != 0:
-        print("FAIL tb test apps/log-triage\n" + "\n".join(summary[-30:]))
-        print(res.stderr.decode("utf-8", "replace"))
-        failures += 1
-    else:
-        print(f"ok   tb test apps/log-triage: {summary[-1] if summary else ''}")
+        res = subprocess.run([str(binary), "test", str(folder)], input=b"", capture_output=True,
+                             timeout=300, cwd=ROOT)
+        summary = res.stdout.decode("utf-8", "replace").strip().splitlines()
+        if res.returncode != 0:
+            print(f"FAIL tb test {suite}\n" + "\n".join(summary[-30:]))
+            print(res.stderr.decode("utf-8", "replace"))
+            failures += 1
+        else:
+            print(f"ok   tb test {suite}: {summary[-1] if summary else ''}")
 
     print(f"\n{failures} failure(s)")
     return 1 if failures else 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

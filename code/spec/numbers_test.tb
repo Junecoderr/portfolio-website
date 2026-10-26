@@ -1,0 +1,88 @@
+# Conformance: §3.1 numbers and §4 operators.
+
+import test
+
+test.case("§3.1 int and float arithmetic", fn() {
+  test.equal(7 / 2, 3.5)
+  test.true((6 / 3).is_float())
+  test.equal(str(6 / 3), "2")
+  test.equal(7 // 2, 3)
+  test.equal(-7 // 2, -4)
+  test.equal(2 ** 10, 1024)
+  test.equal(2 ** -1, 0.5)
+  test.true((2 + 3).is_int())
+})
+
+test.case("§3.1 floor modulo takes the divisor's sign", fn() {
+  test.equal(-7 % 3, 2)
+  test.equal(10 % -3, -2)
+  test.equal(7.5 % 2, 1.5)
+})
+
+test.case("§3.1 errors: zero division and too big", fn() {
+  test.raises(() => 1 / 0, "divide by zero")
+  test.raises(() => 3 // 0, "divide by zero")
+  test.raises(() => 2 ** 100000, "too big")
+})
+
+test.case("§3.1 bitwise operators need whole numbers", fn() {
+  test.equal([7 & 3, 7 | 8, 5 ^ 1, ~5, 1 << 4, 256 >> 2], [3, 15, 4, -6, 16, 64])
+  test.raises(() => 1.5 & 1, "whole numbers")
+})
+
+test.case("§3.1 conversions", fn() {
+  test.equal(int("42"), 42)
+  test.equal(float("1.5"), 1.5)
+  test.equal(int(3.9), 3)
+  test.equal((3.9).to_int(), 3)
+  test.true((5).is_int())
+  test.true((1.0).is_float())
+  test.equal(1, 1.0)
+})
+
+test.case("§3.1 chained comparisons", fn() {
+  let x = 5
+  test.true(0 < x <= 10)
+  test.false(1 < 0 < 5)
+})
+
+test.case("§3.1 text joins with +", fn() {
+  test.equal("x" + 1, "x1")
+  test.equal(1 + "x", "1x")
+})
+
+test.case("§3 ordering only between numbers, text and compare()", fn() {
+  test.true("a" < "b")
+  test.raises(fn() {
+    import "support/bad/compare_lists.tbx" as bad
+  }, "can't compare list with list")
+  test.raises(fn() {
+    import "support/bad/compare_mixed.tbx" as bad
+  }, "can't compare number with text")
+})
+
+test.case("§4 precedence", fn() {
+  test.equal(-2 ** 2, -4)
+  test.equal((-2) ** 2, 4)
+  test.equal(2 ** 3 ** 2, 512)
+  test.equal(1 + 2 * 3, 7)
+  test.equal(1 + 2..5, 3..5)
+  test.equal(1 | 2..5, 3..5)
+  test.true(not 1 == 2)
+  test.equal(nil or "x", "x")
+  test.equal(0 or 1, 0)
+  test.equal("" and "y", "y")
+  test.equal(if 1 > 2 then "a" else "b", "b")
+})
+
+test.case("§4 compound assignment", fn() {
+  let x = 5
+  x **= 2
+  x //= 3
+  x -= 1
+  test.equal(x, 7)
+  let bits = 1
+  bits <<= 3
+  bits |= 1
+  test.equal(bits, 9)
+})

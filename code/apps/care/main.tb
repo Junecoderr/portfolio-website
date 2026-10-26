@@ -72,12 +72,24 @@ for name in MOODS {
 
 let chosen = win.label("Pick the one that fits best.", {"style": "heading"})
 let note = win.textarea({"height": 4})
-win.button("Save today's check-in", fn() { save_entry() }, {"primary": true})
+win.button(
+  "Save today's check-in",
+  fn() {
+    save_entry()
+  },
+  {"primary": true},
+)
 let message = win.label("", {"style": "accent", "wrap": 520})
 
 win.separator()
 win.label("Your journal", {"style": "heading"})
-let table = win.table(["When", "Mood", "Note"], {"widths": [160, 90, 270], "height": 4, "on_open": fn(row) { read_entry(row) }})
+let table = win.table(["When", "Mood", "Note"], {
+  "widths": [160, 90, 270],
+  "height": 4,
+  "on_open": fn(row) {
+    read_entry(row)
+  },
+})
 let status = win.status("")
 
 fn kind_message(name) {
@@ -103,7 +115,11 @@ fn save_entry() {
     gui.alert("Pick how you feel first.")
     return
   }
-  let entry = {"date": time.format(time.timestamp(), "%Y-%m-%d %H:%M"), "mood": mood, "note": note.value().trim()}
+  let entry = {
+    "date": time.format(time.timestamp(), "%Y-%m-%d %H:%M"),
+    "mood": mood,
+    "note": note.value().trim(),
+  }
   journal.push(entry)
   json.write(FILE, journal)
   message.set(kind_message(mood))

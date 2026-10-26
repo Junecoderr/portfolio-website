@@ -1,0 +1,150 @@
+# Conformance: §7 classes and enums.
+
+import test
+
+class Animal {
+  let sound = "..."
+  static let count = 0
+
+  fn init(name) {
+    self.name = name
+    Animal.count += 1
+  }
+
+  fn speak() {
+    return f"{self.name} says {self.sound}"
+  }
+
+  static fn make(name) {
+    return Animal(name)
+  }
+}
+
+class Dog extends Animal {
+  let sound = "woof"
+
+  fn init(name) {
+    super.init(name)
+    self.tricks = []
+  }
+
+  fn speak() {
+    return super.speak() + "!"
+  }
+}
+
+test.case("§7.1 construction, fields, static members", fn() {
+  let before = Animal.count
+  let d = Dog("Rex")
+  test.equal(d.speak(), "Rex says woof!")
+  test.equal(Animal.make("Cat").speak(), "Cat says ...")
+  test.equal(Animal.count, before + 2)
+  test.equal(d.fields(), {"sound": "woof", "name": "Rex", "tricks": []})
+})
+
+test.case("§7.1 types and is", fn() {
+  let d = Dog("Rex")
+  test.equal(type(d), "Dog")
+  test.equal(type(Dog), "class")
+  test.equal(Dog.name, "Dog")
+  test.true(d is Animal)
+  test.true(d is Dog)
+  test.false(Animal("x") is Dog)
+})
+
+test.case("§7.1 field defaults are per instance", fn() {
+  class Bag {
+    let items = []
+  }
+  let a = Bag()
+  let b = Bag()
+  a.items.push(1)
+  test.equal(b.items, [])
+  test.raises(fn() {
+    import "support/bad/bag_args.tbx" as bad
+  }, "no init")
+})
+
+test.case("§7.1 missing fields say 'Did you mean'", fn() {
+  test.raises(fn() {
+    import "support/bad/missing_field.tbx" as bad
+  }, "Did you mean 'name'")
+})
+
+test.case("§7.1 display", fn() {
+  class Point {
+    fn init(x) {
+      self.x = x
+    }
+  }
+  class Shown {
+    fn text() {
+      return "Shown!"
+    }
+  }
+  test.equal(str(Point(1)), "Point {x: 1}")
+  test.equal(f"{Shown()}", "Shown!")
+})
+
+test.case("§7.1 special methods", fn() {
+  class Version {
+    fn init(n) {
+      self.n = n
+    }
+
+    fn equals(other) {
+      return self.n == other.n
+    }
+
+    fn compare(other) {
+      return self.n - other.n
+    }
+
+    fn add(other) {
+      return Version(self.n + other.n)
+    }
+  }
+  test.true(Version(1) == Version(1))
+  test.true(Version(1) < Version(2))
+  test.equal(sorted([Version(3), Version(1)]).map(v => v.n), [1, 3])
+  test.equal((Version(1) + Version(2)).n, 3)
+  class Box {
+    fn contains(x) {
+      return x == 1
+    }
+
+    fn len() {
+      return 9
+    }
+
+    fn get(i) {
+      return i * 2
+    }
+
+    fn call(x) {
+      return x + 1
+    }
+  }
+  let b = Box()
+  test.true(1 in b)
+  test.equal(len(b), 9)
+  test.equal(b[4], 8)
+  test.equal(b(1), 2)
+})
+
+enum Level { low, medium, high }
+
+test.case("§7.2 enums", fn() {
+  test.equal(type(Level.low), "Level")
+  test.equal(type(Level), "enum")
+  test.equal(Level.high.name, "high")
+  test.equal(Level.high.index, 2)
+  test.equal(Level.values(), [Level.low, Level.medium, Level.high])
+  test.true(Level.low == Level.low)
+  test.false(Level.low == Level.high)
+  test.equal(str(Level.low), "Level.low")
+  test.raises(fn() {
+    let m = {}
+    m[Level.low] = 1
+  }, "Map keys")
+})

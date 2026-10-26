@@ -1,0 +1,42 @@
+# Title: TB 3.0 in one page
+# About: Classes, enums, pattern matching, generators and f-string formats, the new parts of TB 3.0.
+enum Level { low, medium, high }
+
+class Alert {
+  fn init(rule, level, hits = 1) {
+    self.rule = rule
+    self.level = level
+    self.hits = hits
+  }
+  fn text() {
+    return f"{self.rule} (hits: {self.hits})"
+  }
+}
+
+class CriticalAlert extends Alert {
+  fn init(rule, hits) {
+    super.init(rule, Level.high, hits)
+  }
+}
+
+# A generator: it hands out one alert at a time, only when asked.
+fn alerts() {
+  yield Alert("port scan", Level.medium, 25)
+  yield CriticalAlert("ssh brute force", 22)
+  yield Alert("new cron job", Level.low)
+}
+
+for a in alerts() {
+  let action = match a {
+    CriticalAlert(c) => "page the on-call analyst"
+    Alert {level: Level.medium} => "open a ticket"
+    _ => "log it"
+  }
+  say(f"{a.level.name:<6} {a:<28} -> {action}")
+}
+
+# Destructuring, lambdas and ranges
+let [first, ...rest] = alerts().to_list()
+say(f"first: {first}, then {len(rest)} more")
+say((1..=5).to_list().map(n => n * n))
+say(f"{0.4567:.1%} of {1234567:,} events matched")

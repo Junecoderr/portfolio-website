@@ -1,0 +1,130 @@
+# Conformance: §5 statements.
+
+import test
+
+test.case("§5 block scope", fn() {
+  let x = 1
+  if true {
+    let x = 2
+    test.equal(x, 2)
+  }
+  test.equal(x, 1)
+})
+
+test.case("§5 declaring again replaces; assigning needs a declaration", fn() {
+  let a = 1
+  let a = 2
+  test.equal(a, 2)
+  test.raises(fn() {
+    import "support/bad/undeclared.tbx" as bad
+  }, "doesn't exist yet")
+})
+
+test.case("§5 destructuring", fn() {
+  let [a, b, ...rest] = [1, 2, 3, 4]
+  test.equal([a, b, rest], [1, 2, [3, 4]])
+  let {name, ip: address, port = 22} = {"name": "Tanisha", "ip": "192.0.2.1"}
+  test.equal([name, address, port], ["Tanisha", "192.0.2.1", 22])
+  let [x, [y, z]] = [1, [2, 3]]
+  test.equal(x + y + z, 6)
+  test.raises(fn() {
+    let {missing} = {}
+  }, "missing")
+})
+
+test.case("§5 let a, b = list", fn() {
+  fn pair() {
+    return 1, 2
+  }
+  let a, b = pair()
+  test.equal([a, b], [1, 2])
+  test.raises(fn() {
+    let c, d = [1, 2, 3]
+  }, "...rest")
+  test.raises(fn() {
+    import "support/bad/let_two_values.tbx" as bad
+  })
+})
+
+test.case("§5 swap", fn() {
+  let a = 1
+  let b = 2
+  a, b = b, a
+  test.equal([a, b], [2, 1])
+  let xs = [1, 2]
+  xs[0], xs[1] = xs[1], xs[0]
+  test.equal(xs, [2, 1])
+})
+
+test.case("§5 const", fn() {
+  const LIMIT = 3
+  test.equal(LIMIT, 3)
+  test.raises(fn() {
+    import "support/bad/const_change.tbx" as bad
+  }, "constant")
+})
+
+test.case("§5 loops", fn() {
+  let seen = []
+  for k, v in {"a": 1, "b": 2} {
+    seen.push(k + str(v))
+  }
+  for k in {"c": 3} {
+    seen.push(k)
+  }
+  for c in "hi" {
+    seen.push(c)
+  }
+  for i, x in ["x"].enumerate() {
+    seen.push(str(i) + x)
+  }
+  for [p, q] in [[1, 2]] {
+    seen.push(p + q)
+  }
+  test.equal(seen, ["a1", "b2", "c", "h", "i", "0x", 3])
+  let n = 0
+  while true {
+    n += 1
+    if n == 2 {
+      continue
+    }
+    if n > 3 {
+      break
+    }
+  }
+  test.equal(n, 4)
+})
+
+test.case("§5 defer runs last-first when the function ends", fn() {
+  let log = []
+  fn work() {
+    defer {
+      log.push("first")
+    }
+    defer {
+      log.push("second")
+    }
+    log.push("body")
+  }
+  work()
+  test.equal(log, ["body", "second", "first"])
+})
+
+test.case("§5 assert", fn() {
+  test.raises(fn() {
+    assert 1 == 2, "nope"
+  }, "nope")
+  let err = test.raises(fn() {
+    assert false
+  })
+  test.equal(err.kind, "assertion_error")
+})
+
+test.case("§5 return and break outside their place are errors", fn() {
+  test.raises(fn() {
+    import "support/bad/return_outside.tbx" as bad
+  }, "only works inside a function")
+  test.raises(fn() {
+    import "support/bad/break_outside.tbx" as bad
+  }, "only works inside a loop")
+})

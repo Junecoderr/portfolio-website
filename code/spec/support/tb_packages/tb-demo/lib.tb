@@ -1,0 +1,5 @@
+# A tiny package for the import conformance tests.
+
+fn hello() {
+  return "from a package"
+}

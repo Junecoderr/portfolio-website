@@ -7,10 +7,12 @@ let LEVELS = ["critical", "high", "medium", "low", "informational"]
 
 # Create the tables if they are not there yet.
 fn setup(db) {
-  db.run("CREATE TABLE IF NOT EXISTS alerts (" +
-    "id INTEGER PRIMARY KEY, file TEXT NOT NULL, rule TEXT NOT NULL, level TEXT NOT NULL, " +
-    "source TEXT, count INTEGER, first_when TEXT, last_when TEXT, first_time REAL, " +
-    "description TEXT, acked_by TEXT, UNIQUE (file, rule, source, first_time))")
+  db.run(
+    "CREATE TABLE IF NOT EXISTS alerts (" +
+      "id INTEGER PRIMARY KEY, file TEXT NOT NULL, rule TEXT NOT NULL, level TEXT NOT NULL, " +
+      "source TEXT, count INTEGER, first_when TEXT, last_when TEXT, first_time REAL, " +
+      "description TEXT, acked_by TEXT, UNIQUE (file, rule, source, first_time))",
+  )
   db.run("CREATE INDEX IF NOT EXISTS alerts_level ON alerts(level)")
 }
 
@@ -21,13 +23,22 @@ fn save(db, file, alerts) {
   let rows = []
   for a in alerts {
     rows.push({
-      "file": file, "rule": a.rule, "level": a.level, "source": str(a.by),
-      "count": a.count, "first_when": a.first_when, "last_when": a.last_when,
-      "first_time": a.first, "description": a.description or "",
+      "file": file,
+      "rule": a.rule,
+      "level": a.level,
+      "source": str(a.by),
+      "count": a.count,
+      "first_when": a.first_when,
+      "last_when": a.last_when,
+      "first_time": a.first,
+      "description": a.description or "",
     })
   }
   let before = db.value("SELECT COUNT(*) FROM alerts")
-  db.execute_many("INSERT OR IGNORE INTO alerts (file, rule, level, source, count, first_when, last_when, first_time, description) VALUES (:file, :rule, :level, :source, :count, :first_when, :last_when, :first_time, :description)", rows)
+  db.execute_many(
+    "INSERT OR IGNORE INTO alerts (file, rule, level, source, count, first_when, last_when, first_time, description) VALUES (:file, :rule, :level, :source, :count, :first_when, :last_when, :first_time, :description)",
+    rows,
+  )
   return db.value("SELECT COUNT(*) FROM alerts") - before
 }
 
@@ -51,7 +62,8 @@ fn find(db, filters) {
   if len(where) > 0 {
     sql = sql + " WHERE " + where.join(" AND ")
   }
-  sql = sql + " ORDER BY CASE level WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, first_time"
+  sql = sql +
+    " ORDER BY CASE level WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, first_time"
   return db.all(sql, params)
 }
 

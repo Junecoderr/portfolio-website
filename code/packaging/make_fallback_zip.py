@@ -6,9 +6,13 @@ Usage (from the repo root):
 Contents (flat, so "Extract all" on Windows gives one tidy folder):
     tb.py
     welcome.tb
+    tbcore/...         the language itself (lexer, parser, compiler, VM, ...)
+    tbtools/...        the `tb fmt`, `tb check`, `tb build`, ... commands
+    tblib/...          the standard library (needed by `import ...`), incl. tblib/data/
     examples/*.tb      (whatever exists at build time)
-    tblib/...          the standard library (needed by `import ...`)
     apps/...           the example apps and their sample data
+    packages/...       example TB packages (tb add ...)
+    spec/...           the language spec and its conformance tests (tb test spec)
     README.txt         (from packaging/README-python.txt, Windows line endings)
 """
 
@@ -32,7 +36,10 @@ def add(zf: zipfile.ZipFile, arcname: str, data: bytes) -> None:
     zf.writestr(info, data)
 
 
-SKIP_DIRS = {"__pycache__", ".pytest_cache"}
+SKIP_DIRS = {"__pycache__", ".pytest_cache", "dist"}
+# Data an app saved while being tried out on the build machine.
+SKIP_NAMES = {"todo.json", "journal.json", ".DS_Store"}
+FOLDERS = ("tbcore", "tbtools", "tblib", "apps", "packages", "spec")
 SKIP_SUFFIXES = {".pyc", ".pyo"}
 
 
@@ -43,7 +50,7 @@ def tree(folder: Path) -> list[Path]:
         rel = path.relative_to(folder)
         if any(part in SKIP_DIRS or part.startswith(".") for part in rel.parts):
             continue
-        if path.is_file() and path.suffix not in SKIP_SUFFIXES:
+        if path.is_file() and path.suffix not in SKIP_SUFFIXES and path.name not in SKIP_NAMES:
             files.append(path)
     return files
 
@@ -61,7 +68,8 @@ def main() -> int:
     out = dist / NAME
 
     required = [ROOT / "tb.py", ROOT / "welcome.tb", ROOT / "packaging" / "README-python.txt",
-                ROOT / "tblib" / "__init__.py"]
+                ROOT / "tblib" / "__init__.py", ROOT / "tbcore" / "__init__.py",
+                ROOT / "tbtools" / "__init__.py"]
     for path in required:
         if not path.is_file():
             print(f"missing {path}", file=sys.stderr)
@@ -73,15 +81,17 @@ def main() -> int:
         add(zf, "welcome.tb", (ROOT / "welcome.tb").read_bytes())
         for ex in examples:
             add(zf, f"examples/{ex.name}", ex.read_bytes())
-        for folder in ("tblib", "apps"):
+        for folder in FOLDERS:
             for path in tree(ROOT / folder):
                 add(zf, path.relative_to(ROOT).as_posix(), path.read_bytes())
         add(zf, "README.txt", crlf((ROOT / "packaging" / "README-python.txt").read_text(encoding="utf-8")))
 
-    print(f"wrote {out} ({len(examples)} examples)")
     with zipfile.ZipFile(out) as zf:
-        for name in zf.namelist():
-            print(f"  {name}")
+        names = zf.namelist()
+    print(f"wrote {out} ({len(names)} files, {out.stat().st_size / 1000:.0f} kB, {len(examples)} examples)")
+    for top in sorted({n.split("/", 1)[0] for n in names}):
+        count = sum(1 for n in names if n == top or n.startswith(top + "/"))
+        print(f"  {top}{'/' if count > 1 or '.' not in top else ''}  ({count} file{'s' if count != 1 else ''})")
 
     # Keep dist/SHA256SUMS.txt in step with the new zip.
     sys.path.insert(0, str(Path(__file__).resolve().parent))

@@ -10,6 +10,7 @@ import os
 import random
 import re
 import sys
+import threading
 
 from . import ast as A
 from .errors import (
@@ -26,6 +27,15 @@ from .runtime import (
     is_callable, is_number, is_whole, map_key, method_kind, missing_key, pow_guard, sort_values,
     tb_equal, tb_round, tb_type, text_to_number, tidy_number, to_text, truthy, type_name,
 )
+from .tasks import start_async
+
+_PRINT_LOCK = threading.Lock()
+
+
+def _print_line(text) -> None:
+    """The default output: one whole line at a time, even from many threads."""
+    with _PRINT_LOCK:
+        print(text, flush=True)
 
 # ---------------------------------------------------------------------------
 # Libraries (the standard library lives in tblib/ next to tb.py)
@@ -292,7 +302,7 @@ BUILTIN_TYPE_CHECKS = {
 class Interpreter:
     def __init__(self, output=None, input_fn=None, rng: random.Random | None = None,
                  *, base_dir: str | None = None, args: list | None = None):
-        self.output = output or (lambda text: print(text, flush=True))
+        self.output = output or _print_line
         self.input_fn = input_fn or input
         self.rng = rng or random.Random()
         self.builtins = Env()
@@ -311,11 +321,22 @@ class Interpreter:
         self.call_stack: list[Frame] = [self.root_frame]
         self.frame = self.root_frame
         self.active_gen = None         # the GenChannel of the generator body running now
+        # TB 3.0 threads: the state above (depth, current_file, call_stack,
+        # frame, active_gen, trace, current_module) is per interpreter *view*;
+        # each thread that runs TB code gets its own view (fork()), found by
+        # current(). Everything else is shared by all views.
+        self._local = threading.local()   # .interp: this thread's view
+        self._owner = threading.get_ident()  # the thread that uses self itself
+        self._import_lock = threading.RLock()
         for name, fn, arity in self._builtins():
             self.builtins.vars[name] = Builtin(name, fn, arity, BUILTIN_DOCS.get(name, ""))
         self.builtins.vars["done"] = DONE
         for name, cls in ERROR_CLASSES.items():
             self.builtins.vars[name] = cls
+        self._make_dispatch()
+
+    def _make_dispatch(self):
+        """The node -> handler tables (bound to this view; see fork())."""
         self._exec = {
             A.ExprStmt: self._exec_expr, A.Let: self._exec_let, A.Assign: self.assign,
             A.MultiAssign: self._exec_multi_assign, A.FnDecl: self._exec_fn,
@@ -491,6 +512,40 @@ class Interpreter:
             self._api = importlib.import_module("tblib._api").API(self)
         return self._api
 
+    # -- threads (TB 3.0; see tbcore/tasks.py) ------------------------------
+
+    def fork(self) -> "Interpreter":
+        """A view of this interpreter for another thread: shares globals,
+        builtins, modules, output/input, rng and the library api; has its own
+        call depth, call stack, frame, current file, active generator and
+        trace hook (None: the debugger only follows the main thread)."""
+        api = self.api  # make it now, so every view shares one API object
+        view = object.__new__(type(self))
+        view.__dict__.update(self.__dict__)
+        view._api = api
+        view.depth = 0
+        view.root_frame = Frame(None, None, 0, self.globals)
+        view.call_stack = [view.root_frame]
+        view.frame = view.root_frame
+        view.active_gen = None
+        view.trace = None
+        view.current_module = None
+        view._make_dispatch()
+        return view
+
+    def current(self) -> "Interpreter":
+        """The view for the calling thread: the one a task or generator
+        registered, self on the owner thread, else (a library thread such as
+        a server or gui worker calling back into TB) a new view of its own."""
+        view = getattr(self._local, "interp", None)
+        if view is not None:
+            return view
+        if threading.get_ident() == self._owner:
+            return self
+        view = self.fork()
+        self._local.interp = view
+        return view
+
     # -- debugger support ---------------------------------------------------
 
     def save_state(self) -> tuple:
@@ -543,6 +598,7 @@ class Interpreter:
     # -- running ----------------------------------------------------------
 
     def run(self, program: A.Program):
+        self._owner = threading.get_ident()
         try:
             self.exec_block(program.body, self.globals)
         except ReturnSignal:
@@ -1195,7 +1251,8 @@ class Interpreter:
         return "".join(out)
 
     def _eval_fnexpr(self, node, env):
-        return Function("anonymous", node.params, node.body, env, self.current_file, node.is_generator)
+        return Function("anonymous", node.params, node.body, env, self.current_file, node.is_generator,
+                        getattr(node, "is_async", False))
 
     def _eval_range(self, node, env):
         start = self.evaluate(node.start, env)
@@ -1801,7 +1858,9 @@ class Interpreter:
         listing = f" Its inputs are: {', '.join(names)}." if names else " It has no named inputs."
         return TBError(f"{label}() has no input called '{name}'.{extra}{listing}", line)
 
-    def call_function(self, fn: Function, args, kwargs, line, self_value=None, owner=None):
+    def call_function(self, fn: Function, args, kwargs, line, self_value=None, owner=None, scope=None):
+        """scope: already-bound parameters (an async fn's body starting on its
+        task thread); then args/kwargs are ignored."""
         if self.depth >= MAX_DEPTH:
             who = "This function" if fn.name == "anonymous" else f"'{fn.name}'"
             raise TBError(
@@ -1809,9 +1868,12 @@ class Interpreter:
                 "Is there a way for it to stop?",
                 line,
             )
-        scope = self.bind_params(fn, args, kwargs, line, self_value, owner)
-        if fn.is_generator:
-            return TBIterator(ThreadGenerator(self, fn, scope), "generator")
+        if scope is None:
+            scope = self.bind_params(fn, args, kwargs, line, self_value, owner)
+            if fn.is_generator:
+                return TBIterator(ThreadGenerator(self, fn, scope), "generator")
+            if fn.is_async:  # TB 3.0: run the body on its own thread; the caller gets a Task
+                return start_async(self, fn, scope, line)
         frame = Frame(fn.name, fn.file, line, scope)
         self.depth += 1
         outer_file, self.current_file = self.current_file, fn.file
@@ -1880,6 +1942,7 @@ class Interpreter:
         """Runs on the generator's thread: wait to be resumed, run the body,
         hand each yield back, finish."""
         channel.to_gen.acquire()
+        self._local.interp = self  # library callbacks on this thread use this view
         if channel.abort:
             channel.finished = True
             return
@@ -1909,6 +1972,10 @@ class Interpreter:
                                   getattr(node, "package_name", None))
 
     def import_target(self, target: str, is_file: bool, base_dir, line, package_name=None) -> Module:
+        with self._import_lock:  # one import at a time across threads
+            return self._import_target(target, is_file, base_dir, line, package_name)
+
+    def _import_target(self, target: str, is_file: bool, base_dir, line, package_name=None) -> Module:
         if is_file:
             base = base_dir or self.base_dir or os.getcwd()
             path = os.path.abspath(os.path.join(base, target))

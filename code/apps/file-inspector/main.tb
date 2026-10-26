@@ -102,12 +102,16 @@ fn show_one(r) {
   if d != nil {
     say("")
     if r.type == "pe" {
-      say(f"   compiled {d.compiled}   entry {d.entry_hex} in {d.entry_section}   subsystem {d.subsystem}   signed {d.is_signed}")
+      say(
+        f"   compiled {d.compiled}   entry {d.entry_hex} in {d.entry_section}   subsystem {d.subsystem}   signed {d.is_signed}",
+      )
       if d.pdb != nil {
         say("   pdb path: " + d.pdb)
       }
     } else {
-      say(f"   {d.type} for {d.architecture}   entry {d.entry_hex} in {d.entry_section}   interpreter {d.interpreter}")
+      say(
+        f"   {d.type} for {d.architecture}   entry {d.entry_hex} in {d.entry_section}   interpreter {d.interpreter}",
+      )
       if not d.needed.is_empty() {
         say("   needs: " + d.needed.join(", "))
       }
@@ -182,15 +186,31 @@ if len(results) == 1 {
 } else {
   let rows = []
   for r in results {
-    let names = r.matches.map(fn(m) { return m.rule })
-    let notes = r.indicators.filter(fn(x) { return x.level == "high" or x.level == "medium" }).map(fn(x) { return x.name })
-    rows.push({"file": r.name, "type": r.type, "size": inspect.human_size(r.size), "entropy": r.entropy,
-               "verdict": r.verdict, "why": (names + notes).join(", ")})
+    let names = r.matches.map(fn(m) {
+      return m.rule
+    })
+    let notes = r.indicators.filter(fn(x) {
+      return x.level == "high" or x.level == "medium"
+    }).map(fn(x) {
+      return x.name
+    })
+    rows.push({
+      "file": r.name,
+      "type": r.type,
+      "size": inspect.human_size(r.size),
+      "entropy": r.entropy,
+      "verdict": r.verdict,
+      "why": (names + notes).join(", "),
+    })
   }
   say(report.table(rows, ["file", "type", "size", "entropy", "verdict", "why"], {"max_width": 70}))
-  let odd = results.filter(fn(r) { return r.verdict != "nothing found" })
+  let odd = results.filter(fn(r) {
+    return r.verdict != "nothing found"
+  })
   say("")
-  say(f"Done: {len(results)} file(s), {len(odd)} worth a closer look. Run with one file for the details.")
+  say(
+    f"Done: {len(results)} file(s), {len(odd)} worth a closer look. Run with one file for the details.",
+  )
 }
 
 if json_path != nil {

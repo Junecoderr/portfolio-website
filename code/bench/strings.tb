@@ -1,0 +1,12 @@
+# string building: f-strings, + and join
+fn build(n) {
+  let parts = []
+  let line = ""
+  for i in 0..n {
+    line = line + "x"
+    if len(line) > 40 { line = "" }
+    parts.push(f"{i}:{line}")
+  }
+  return parts.join(",")
+}
+say(len(build(200000)))

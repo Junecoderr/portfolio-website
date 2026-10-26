@@ -1,8 +1,10 @@
 import template
 
 let page = "<h1>{{title|upper}}</h1>{{#alerts}}<li>{{rule}} from {{ip}}</li>{{/alerts}}{{^alerts}}<p>No alerts</p>{{/alerts}}"
-say(template.render(page, {
-  "title": "Alerts",
-  "alerts": [{"rule": "Brute force", "ip": "203.0.113.42"}, {"rule": "<script>", "ip": "x"}],
-}))
+say(
+  template.render(page, {
+    "title": "Alerts",
+    "alerts": [{"rule": "Brute force", "ip": "203.0.113.42"}, {"rule": "<script>", "ip": "x"}],
+  }),
+)
 say(template.render("Hello {{name}}!", {"name": "Tanisha"}))

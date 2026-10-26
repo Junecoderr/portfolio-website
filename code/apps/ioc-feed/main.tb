@@ -68,13 +68,17 @@ if backend != nil and not detect.backends.contains(backend) {
 if taxii_url != nil and collection == nil {
   usage_error("--taxii needs --collection ID too (run with --collection list to see them).")
 }
-if taxii_url == nil and not positional.is_empty() and (positional[0].ends_with(".json") or positional[0].ends_with(".stix")) {
+if taxii_url == nil and
+  not positional.is_empty() and
+  (positional[0].ends_with(".json") or positional[0].ends_with(".stix")) {
   feed = positional[0]
   positional = positional.slice(1)
 }
 files = positional
 if files.is_empty() {
-  files = ["auth.log", "access.log", "firewall.log"].map(fn(n) { return fs.join(data, n) })
+  files = ["auth.log", "access.log", "firewall.log"].map(fn(n) {
+    return fs.join(data, n)
+  })
 }
 
 # -- 1. get the intel -----------------------------------------------------------------
@@ -105,9 +109,13 @@ try {
 
 let active = stix.indicators(bundle)
 let everything = stix.indicators(bundle, {"expired": true})
-say(f"== Intel: {len(bundle.objects)} STIX objects, {len(active)} active indicator(s), {len(everything) - len(active)} expired (ignored)")
+say(
+  f"== Intel: {len(bundle.objects)} STIX objects, {len(active)} active indicator(s), {len(everything) - len(active)} expired (ignored)",
+)
 let rows = active.map(fn(ind) {
-  let values = ind.iocs.map(fn(x) { return x.value })
+  let values = ind.iocs.map(fn(x) {
+    return x.value
+  })
   let shown = values.join(", ")
   if values.is_empty() {
     shown = "(no exact IOC: " + ind.skipped.join(" ") + ")"
@@ -116,7 +124,9 @@ let rows = active.map(fn(ind) {
 })
 say(report.table(rows, ["indicator", "iocs", "confidence"], {"max_width": 50}))
 let counts = stix.iocs(bundle)
-say(f"IOCs: {len(counts.ips)} IP(s), {len(counts.cidrs)} range(s), {len(counts.domains)} domain(s), {len(counts.urls)} URL(s), {len(counts.sha256) + len(counts.sha1) + len(counts.md5)} hash(es)")
+say(
+  f"IOCs: {len(counts.ips)} IP(s), {len(counts.cidrs)} range(s), {len(counts.domains)} domain(s), {len(counts.urls)} URL(s), {len(counts.sha256) + len(counts.sha1) + len(counts.md5)} hash(es)",
+)
 
 # -- 2. rules ---------------------------------------------------------------------------
 let rules = stix.to_detect_rules(bundle, {"group": group})
@@ -158,7 +168,9 @@ say(f"== {len(alerts)} hit(s) in {len(records)} record(s)")
 say(report.table(alerts, ["level", "rule", "count", "first_when", "last_when"], {"max_width": 50}))
 for a in alerts {
   let example = a.records[0]
-  say(f"   e.g. [{example.get('format', '?')}] {example.get('raw', example.get('message', '')).slice(0, 110)}")
+  say(
+    f"   e.g. [{example.get('format', '?')}] {example.get('raw', example.get('message', '')).slice(0, 110)}",
+  )
 }
 let mapped = attack.map(alerts)
 if not mapped.techniques.is_empty() {

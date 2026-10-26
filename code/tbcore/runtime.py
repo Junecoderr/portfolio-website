@@ -431,6 +431,9 @@ class ThreadGenerator:
         interp = self.interp
         if not channel.started:
             channel.started = True
+            # TB 3.0 threads: the body runs on (and swaps state with) the view
+            # of the thread that starts it, which may not be the one that made it.
+            self.interp = interp = interp.current()
             self.state = interp.generator_start_state(self.fn, channel)
             thread = threading.Thread(
                 target=interp.run_generator_body, args=(self.fn, self.scope, channel),

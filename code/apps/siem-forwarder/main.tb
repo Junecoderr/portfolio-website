@@ -33,8 +33,7 @@ fn whole_number(option, text) {
     if n >= 0 {
       return n
     }
-  } catch err {
-  }
+  } catch err {}
   usage_error(f"{option} needs a whole number, not '{text}'.")
 }
 
@@ -134,7 +133,9 @@ try {
     let workspace = os.env("SENTINEL_WORKSPACE_ID")
     let key = os.env("SENTINEL_KEY")
     if really_send and (workspace == nil or key == nil) {
-      usage_error("--format sentinel --send needs SENTINEL_WORKSPACE_ID and SENTINEL_KEY in the environment.")
+      usage_error(
+        "--format sentinel --send needs SENTINEL_WORKSPACE_ID and SENTINEL_KEY in the environment.",
+      )
     }
     sender = siem.sentinel(workspace or "workspace-id", key or "ZHJ5LXJ1bi1vbmx5", {"dry_run": dry})
   }
@@ -193,7 +194,10 @@ fn pick(records) {
   if not only_alerts {
     # Give each record a short event name for the CEF/LEEF header (the action, or the program).
     return records.map(fn(r) {
-      let e = {"name": r.get("action", nil) or r.get("program", nil) or f"{r.format} line", "id": r.get("action", "log_line")}
+      let e = {
+        "name": r.get("action", nil) or r.get("program", nil) or f"{r.format} line",
+        "id": r.get("action", "log_line"),
+      }
       for key in r.keys() {
         if not ["raw", "when", "when_utc", "zone"].contains(key) {
           e[key] = r[key]
@@ -211,7 +215,10 @@ fn pick(records) {
   return detect.run(rules, records) + detect.brute_force(records)
 }
 
-say(f"# siem-forwarder: {fs.name(path)} as {format}" + (really_send and "" or " (dry run: nothing is sent; add --send)"))
+say(
+  f"# siem-forwarder: {fs.name(path)} as {format}" +
+    (really_send and "" or " (dry run: nothing is sent; add --send)"),
+)
 let records = []
 try {
   records = logs.read(path)
@@ -239,7 +246,11 @@ if follow {
       seen = 0
     }
     if len(lines) > seen {
-      let fresh = lines.slice(seen).filter(fn(l) { return l.trim() != "" }).map(fn(l) { return logs.parse_line(l) })
+      let fresh = lines.slice(seen).filter(fn(l) {
+        return l.trim() != ""
+      }).map(fn(l) {
+        return logs.parse_line(l)
+      })
       seen = len(lines)
       forward(pick(fresh))
     }

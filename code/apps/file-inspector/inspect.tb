@@ -20,11 +20,22 @@ fn default_rules(folder) {
 fn inspect(path, rules) {
   let kind = scan.file_type(path)
   let result = {
-    "path": path, "name": fs.name(path), "type": kind.type, "description": kind.description,
-    "size": kind.size, "executable": kind.get("executable", false),
-    "hashes": hash.file(path), "entropy": scan.entropy(path),
-    "format": nil, "summary": nil, "details": nil, "indicators": [], "matches": [],
-    "strings": [], "interesting": {}, "problem": nil,
+    "path": path,
+    "name": fs.name(path),
+    "type": kind.type,
+    "description": kind.description,
+    "size": kind.size,
+    "executable": kind.get("executable", false),
+    "hashes": hash.file(path),
+    "entropy": scan.entropy(path),
+    "format": nil,
+    "summary": nil,
+    "details": nil,
+    "indicators": [],
+    "matches": [],
+    "strings": [],
+    "interesting": {},
+    "problem": nil,
   }
   try {
     if kind.type == "pe" {
@@ -88,11 +99,18 @@ fn findings(result) {
     }
   }
   for m in result.matches {
-    let where = m.strings.map(fn(s) { return f"{s.name}@{s.offset}" }).slice(0, 4).join(" ")
-    rows.push({"level": m.meta.get("severity", "medium"), "what": "rule " + m.rule,
-               "detail": m.meta.get("description", "") + "  [" + where + "]"})
+    let where = m.strings.map(fn(s) {
+      return f"{s.name}@{s.offset}"
+    }).slice(0, 4).join(" ")
+    rows.push({
+      "level": m.meta.get("severity", "medium"),
+      "what": "rule " + m.rule,
+      "detail": m.meta.get("description", "") + "  [" + where + "]",
+    })
   }
-  return rows.sort_by(fn(r) { return LEVELS.get(r.level, 9) })
+  return rows.sort_by(fn(r) {
+    return LEVELS.get(r.level, 9)
+  })
 }
 
 # File sizes people can read: 812 B, 14.2 KB, 3.1 MB.

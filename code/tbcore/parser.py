@@ -216,10 +216,12 @@ class Parser:
                     return self.fn_declaration()
                 if nxt.kind == "KEYWORD" and nxt.value not in ("self", "super"):
                     raise keyword_as_name(nxt)
-            if word == "async" and self.peek_next().kind == "KEYWORD" and self.peek_next().value == "fn":
-                self.advance()
+            if word == "async" and self.peek_next().kind == "KEYWORD" and self.peek_next().value == "fn" \
+                    and self.peek_at(2).kind == "IDENT":
+                async_tok = self.advance()
                 decl = self.fn_declaration()
                 decl.is_async = True
+                self.check_async(decl.is_generator, async_tok)
                 return decl
             if word == "return":
                 return self.return_statement()
@@ -676,6 +678,12 @@ class Parser:
         body, is_generator = self.function_body()
         return FnDecl(name, params, body, tok.line, is_generator, returns)
 
+    @staticmethod
+    def check_async(is_generator: bool, tok: Token) -> None:
+        if is_generator:
+            raise TBError("An async fn can't use yield. Make it a normal generator fn, or give back a "
+                          "list from the async fn.", tok.line)
+
     def function_body(self) -> tuple[list[Node], bool]:
         self.fn_stack.append({"yield": False})
         loops, self.loop_depth = self.loop_depth, 0
@@ -763,6 +771,11 @@ class Parser:
                     continue
                 member_tok = self.peek()
                 is_static = self.match("KEYWORD", "static")
+                async_tok = self.peek() if self.check("KEYWORD", "async") else None
+                if async_tok is not None:  # async fn method() { }  (TB 3.0)
+                    self.advance()
+                    if not self.check("KEYWORD", "fn"):
+                        raise TBError(f"'async' goes right before 'fn', like: async fn load() {{ }}", async_tok.line)
                 if self.check("KEYWORD", "let") or self.check("KEYWORD", "const"):
                     self.advance()
                     fname = self.expect_name("a field name")
@@ -788,7 +801,10 @@ class Parser:
                         returns = self.type_annotation()
                     body, is_generator = self.function_body()
                     self.check_member(mname, seen, "method")
-                    decl = FnDecl(mname.value, params, body, fn_tok.line, is_generator, returns)
+                    decl = FnDecl(mname.value, params, body, fn_tok.line, is_generator, returns,
+                                  is_async=async_tok is not None)
+                    if async_tok is not None:
+                        self.check_async(is_generator, async_tok)
                     decl.comments = member_tok.comments_before
                     decl.blank_before = member_tok.blank_lines_before
                     (static_methods if is_static else methods).append(decl)
@@ -1174,6 +1190,14 @@ class Parser:
                     returns = self.type_annotation()
                 body, is_generator = self.function_body()
                 return FnExpr(params, body, tok.line, is_generator, returns)
+            if tok.value == "async":  # async fn(x) { ... } as a value (TB 3.0)
+                self.advance()
+                if not self.check("KEYWORD", "fn"):
+                    raise TBError("'async' goes right before 'fn', like: async fn load() { }", tok.line)
+                node = self.primary()
+                node.is_async = True
+                self.check_async(node.is_generator, tok)
+                return node
             if tok.value == "self":
                 self.advance()
                 return Name("self", tok.line)

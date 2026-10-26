@@ -297,9 +297,11 @@ class Super(Node):
 
 
 class FnExpr(Node):
-    def __init__(self, params, body, line, is_generator=False, returns=None, is_lambda=False):
+    def __init__(self, params, body, line, is_generator=False, returns=None, is_lambda=False,
+                 is_async=False):
         self.params, self.body, self.line = params, body, line
         self.is_generator, self.returns, self.is_lambda = is_generator, returns, is_lambda
+        self.is_async = is_async
 
 
 class RangeExpr(Node):

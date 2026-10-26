@@ -57,9 +57,14 @@ let found = ioc.extract(text)
 
 # Plain-English names for each kind of IOC (one, many), in the order to show them.
 let LABELS = {
-  "ips": ["IP address", "IP addresses"], "domains": ["domain", "domains"], "urls": ["URL", "URLs"],
-  "emails": ["email address", "email addresses"], "md5": ["MD5 hash", "MD5 hashes"],
-  "sha1": ["SHA-1 hash", "SHA-1 hashes"], "sha256": ["SHA-256 hash", "SHA-256 hashes"], "cves": ["CVE ID", "CVE IDs"],
+  "ips": ["IP address", "IP addresses"],
+  "domains": ["domain", "domains"],
+  "urls": ["URL", "URLs"],
+  "emails": ["email address", "email addresses"],
+  "md5": ["MD5 hash", "MD5 hashes"],
+  "sha1": ["SHA-1 hash", "SHA-1 hashes"],
+  "sha256": ["SHA-256 hash", "SHA-256 hashes"],
+  "cves": ["CVE ID", "CVE IDs"],
 }
 
 # 1 -> "1 URL", 3 -> "3 URLs"
@@ -88,7 +93,10 @@ if style == "json" {
   for kind in found {
     safe[kind] = found[kind].map(shown)
   }
-  output = json.stringify({"source": fs.name(path), "total": total, "defanged": defang, "iocs": safe}, true)
+  output = json.stringify(
+    {"source": fs.name(path), "total": total, "defanged": defang, "iocs": safe},
+    true,
+  )
 } else {
   let rows = []
   for kind in LABELS.keys() {
@@ -112,7 +120,9 @@ if style == "json" {
   }
   if defang {
     lines.push("")
-    lines.push("Values are defanged (hxxp, [.]) so they can't be clicked. Use --raw to see them as they are.")
+    lines.push(
+      "Values are defanged (hxxp, [.]) so they can't be clicked. Use --raw to see them as they are.",
+    )
   }
   output = lines.join("\n")
 }

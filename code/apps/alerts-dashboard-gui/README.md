@@ -22,7 +22,7 @@ ways:
 ```
 tb apps/alerts-dashboard-gui/main.tb                           # the sample auth.log, dark theme
 tb apps/alerts-dashboard-gui/main.tb /var/log/auth.log web.log # your own logs
-tb apps/alerts-dashboard-gui/main.tb --light --analyst Sam
+tb apps/alerts-dashboard-gui/main.tb --light --analyst Tanisha
 ```
 
 Keyboard: Ctrl+O open, Ctrl+E export (Cmd on a Mac). On a Mac you can also

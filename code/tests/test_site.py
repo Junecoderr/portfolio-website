@@ -97,6 +97,15 @@ def test_tutorial_snippets(page, sandbox):
         tb.parse(source)
 
 
+@pytest.mark.parametrize("page", [p for p in PAGES if not p.name.startswith(("guide-", "docs"))], ids=lambda p: p.stem)
+def test_page_snippets(page, sandbox):
+    """The runnable snippets on the home, What's new and Tools pages run (docs.html: test_examples.py)."""
+    for source in code_blocks(page, "data-runnable"):
+        run(source)
+    for source in code_blocks(page, "data-desktop"):
+        tb.parse(source)
+
+
 def test_library_reference(tmp_path):
     written = gen_lib_docs.build(tmp_path, tb.__version__)
     names = {p.name for p in written}
@@ -186,8 +195,11 @@ def test_release_assets_exist():
         linked |= set(re.findall(r'data-download="([^"]+)"', text))
         linked |= set(re.findall(r'file: "([^"]+)"', text))
     assert {"tb-windows-x64-setup.exe", "tb-windows-x64.zip", "tb-macos-arm64.zip", "tb-linux-x64.tar.gz"} <= linked
+    assert f"tb-vscode-{tb.__version__}.vsix" in linked
     for name in linked:
-        assert name in workflow, f"the site links to {name}, but tb-release.yml doesn't upload it"
+        # Versioned assets appear in the workflow as e.g. tb-vscode-${version}.vsix.
+        templated = name.replace(tb.__version__, "${version}")
+        assert name in workflow or templated in workflow, f"the site links to {name}, but tb-release.yml doesn't upload it"
     for path in SITE.rglob("*.html"):
         assert "tb-windows-x64.exe" not in path.read_text(encoding="utf-8"), f"{path.name} links the old Windows asset"
     # Every download link is site-relative (/dl/<asset>); the host serves the files.

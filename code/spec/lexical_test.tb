@@ -1,0 +1,94 @@
+# Conformance: §1 lexical structure.
+
+import test
+
+test.case("§1.1 statements end at newlines or ';'", fn() {
+  let a = 1
+  let b = 2
+  test.equal(a + b, 3)
+  let xs = [
+    1,
+    2,
+  ]
+  test.equal(xs, [1, 2])
+  let total = 1 + 2
+  test.equal(total, 3)
+})
+
+test.case("§1.1 return alone on a line returns nil", fn() {
+  fn f() {
+    return
+  }
+  test.equal(f(), nil)
+})
+
+test.case("§1.3 statement words are not reserved", fn() {
+  let import = 1
+  let catch = 2
+  let done = 3
+  test.equal(import + catch + done, 6)
+})
+
+test.case("§1.3 keywords can't be names, with a suggestion", fn() {
+  test.raises(fn() {
+    import "support/bad/keyword_name.tbx" as bad
+  }, "call it 'found' instead")
+  test.raises(fn() {
+    import "support/bad/class_name.tbx" as bad
+  }, "keyword")
+})
+
+test.case("§1.3 keywords are fine after a dot", fn() {
+  let m = {"from": 1, "match": 2}
+  test.equal(m.from + m.match, 3)
+})
+
+test.case("§1.4 number literals", fn() {
+  test.equal(1_000_000, 1000000)
+  test.equal(0x1F, 31)
+  test.equal(0b1010, 10)
+  test.equal(0o17, 15)
+  test.equal(1e3, 1000)
+  test.true((1e3).is_float())
+  test.equal(2.5e-3, 0.0025)
+  test.equal(12345678901234567890 * 10, 123456789012345678900)
+})
+
+test.case("§1.4 text literals and escapes", fn() {
+  test.equal("a\tb".len(), 3)
+  test.equal("\x41\u{E9}", "Aé")
+  test.equal(r"\d+".len(), 3)
+  test.equal("\d", r"\d")
+  test.equal("""two
+lines""", "two\nlines")
+  test.equal('single', "single")
+  let name = "Tanisha"
+  test.equal(f"hi {name}, {{braces}}", "hi Tanisha, {braces}")
+  test.equal(f"{ {"k": 2}["k"] }", "2")
+  test.equal(b"A\x00".len(), 2)
+})
+
+test.case("§1.4 bad literals are friendly errors", fn() {
+  test.raises(fn() {
+    import "support/bad/underscore_end.tbx" as bad
+  }, "can't end with '_'")
+  test.raises(fn() {
+    import "support/bad/empty_hole.tbx" as bad
+  }, "empty {}")
+  test.raises(fn() {
+    import "support/bad/bytes_non_ascii.tbx" as bad
+  }, "ASCII")
+  test.raises(fn() {
+    import "support/bad/unary_plus.tbx" as bad
+  })
+})
+
+test.case("§1.5 word operators", fn() {
+  test.true(3 not in [1, 2])
+  test.true(5 is not text)
+  test.true(not false)
+  test.equal((not true) == false, true)
+  test.raises(fn() {
+    import "support/bad/and_and.tbx" as bad
+  }, "'and'")
+})

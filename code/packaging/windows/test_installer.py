@@ -6,14 +6,16 @@ Usage (from code/):
 Steps:
 1. Silent per-user install into a fresh temp folder:
    setup.exe /VERYSILENT /SUPPRESSMSGBOXES /CURRENTUSER /NORESTART /DIR=<tmp>\\TB
-2. Checks: tb.exe, tbw.exe, apps\\, examples\\, welcome.tb are there;
-   `tb.exe --version` prints the version; the folder is on the user PATH
-   (HKCU\\Environment); .tb is associated with TB.Program;
-   packaging/run_examples.py passes against the installed tb.exe and the
-   installed examples/apps; tbw.exe opens a GUI app that closes itself
-   (TB_GUI_AUTOCLOSE_MS) and exits 0.
+2. Checks: tb.exe, tbw.exe, tblaunch.exe, tblaunchw.exe, tb.ico, apps\\,
+   examples\\, welcome.tb are there; `tb.exe --version` prints the version;
+   the folder is on the user PATH (HKCU\\Environment); .tb is associated with
+   TB.Program and shows tb.ico; the Start menu has a shortcut for every
+   desktop app; packaging/run_examples.py --gui passes against the installed
+   tb.exe and the installed examples/apps; tbw.exe opens a GUI app that
+   closes itself (TB_GUI_AUTOCLOSE_MS) and exits 0; `tb build --gui` of the
+   to-do app makes todo.exe (a copy of tblaunchw.exe) that opens and closes.
 3. Silent uninstall, then: the folder is gone, PATH no longer has it, the
-   .tb association is gone.
+   .tb association and the Start menu folder are gone.
 Exit code 0 when everything passed.
 """
 
@@ -62,6 +64,24 @@ def tb_association() -> str | None:
         return None
 
 
+# Start menu shortcuts the installer must create (tb.iss [Icons]).
+SHORTCUTS = ["TB Prompt", "TB Examples", "Care check-in", "To-do", "Notes", "Calculator",
+             "Hash checker", "Log triage", "IOC workbench", "Alerts dashboard", "Network monitor",
+             "File inspector", "Uninstall TB"]
+
+
+def start_menu_folder() -> Path:
+    return Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "TB"
+
+
+def tb_icon() -> str | None:
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\TB.Program\DefaultIcon") as key:
+            return winreg.QueryValueEx(key, "")[0]
+    except FileNotFoundError:
+        return None
+
+
 def main() -> int:
     if os.name != "nt":
         print("This test only runs on Windows.")
@@ -83,7 +103,8 @@ def main() -> int:
         print(log_file.read_text(errors="replace") if log_file.exists() else "(no log)")
         fail(f"setup exited {res.returncode}")
 
-    for rel in ("tb.exe", "tbw.exe", "_internal", "apps", "examples", "welcome.tb", "unins000.exe"):
+    for rel in ("tb.exe", "tbw.exe", "tblaunch.exe", "tblaunchw.exe", "tb.ico", "_internal", "apps",
+                "examples", "welcome.tb", "unins000.exe"):
         if not (app / rel).exists():
             fail(f"{rel} missing from the install folder")
     step("installed files are there")
@@ -102,10 +123,20 @@ def main() -> int:
     if not assoc or "tb.exe" not in assoc.lower():
         fail(f".tb association missing or wrong: {assoc!r}")
     step(f".tb opens with: {assoc}")
+    icon = tb_icon()
+    if not icon or "tb.ico" not in icon.lower():
+        fail(f".tb icon missing or wrong: {icon!r}")
+    step(f".tb icon: {icon}")
+    menu = start_menu_folder()
+    missing = [name for name in SHORTCUTS if not (menu / f"{name}.lnk").is_file()]
+    if missing:
+        have = sorted(p.name for p in menu.glob("*")) if menu.is_dir() else []
+        fail(f"Start menu shortcuts missing from {menu}: {missing} (found {have})")
+    step(f"Start menu has {len(SHORTCUTS)} shortcuts")
 
     step("running examples and apps from the installed copy")
     res = subprocess.run([sys.executable, str(CODE / "packaging" / "run_examples.py"), str(tb),
-                          "--root", str(app)], timeout=1800)
+                          "--root", str(app), "--gui"], timeout=1800)
     if res.returncode != 0:
         fail("run_examples.py against the installed tb.exe")
 
@@ -124,6 +155,22 @@ def main() -> int:
     print(f"  $ tbw.exe apps\\calculator\\main.tb (autoclose) -> exit {gui.returncode}")
     if gui.returncode != 0:
         fail("tbw.exe could not run the calculator app")
+
+    # tb build with the installed TB: the bundle's todo.exe is tblaunchw.exe.
+    bundle = base / "bundle-todo"
+    res = subprocess.run([str(tb), "build", str(app / "apps" / "todo" / "main.tb"), "--gui", "--out", str(bundle)],
+                         capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=300)
+    print(f"  $ tb.exe build apps\\todo\\main.tb --gui -> exit {res.returncode}\n{res.stdout}{res.stderr}")
+    launcher = bundle / "todo.exe"
+    if res.returncode != 0 or not launcher.is_file() or not (bundle / "todo.tb").is_file():
+        fail("tb build did not make todo.exe and todo.tb")
+    try:
+        gui = subprocess.run([str(launcher)], env=env, timeout=90, stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        fail("todo.exe (tblaunchw.exe) did not exit after the window closed itself")
+    print(f"  $ todo.exe (autoclose) -> exit {gui.returncode}")
+    if gui.returncode != 0:
+        fail("todo.exe built by tb build could not run the app")
 
     step("uninstalling")
     res = subprocess.run([str(app / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
@@ -146,6 +193,9 @@ def main() -> int:
     if tb_association() is not None:
         fail(".tb association still present")
     step(".tb association removed")
+    if start_menu_folder().exists():
+        fail(f"Start menu folder still there: {start_menu_folder()}")
+    step("Start menu folder removed")
     step("all installer checks passed")
     return 0
 

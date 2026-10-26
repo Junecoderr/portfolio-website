@@ -1,7 +1,8 @@
 name: TB Release
 
-# Push a tag like tb-v2.0.0 to build TB for Windows (installer + portable zip),
-# macOS and Linux and publish them, with checksums, as a GitHub Release. The website at
+# Push a tag like tb-v3.0.0 to build TB for Windows (installer + portable zip),
+# macOS and Linux, plus the VS Code extension (tb-vscode-<version>.vsix) and the
+# run-with-Python zip, and publish them, with checksums, as a GitHub Release. The website at
 # code.tanisha.ceo links to the release whose tag matches tb.__version__.
 # "Run workflow" (workflow_dispatch) only builds and tests the binaries.
 
@@ -16,6 +17,7 @@ permissions:
 env:
   UV_VERSION: "0.12.2"
   PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
 
 jobs:
   build:
@@ -72,7 +74,14 @@ jobs:
         if: runner.os == 'Linux'
         run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
 
-      - name: Run tests
+      # Every test runs on both engines: the bytecode VM (default) and the
+      # tree-walking interpreter (TB_ENGINE=tree).
+      - name: Run tests (VM engine)
+        run: $XVFB uv run --locked pytest
+
+      - name: Run tests (tree engine)
+        env:
+          TB_ENGINE: tree
         run: $XVFB uv run --locked pytest
 
       # The Windows installer is made with Inno Setup (preinstalled on
@@ -84,22 +93,27 @@ jobs:
             choco install innosetup -y --no-progress
           fi
 
-      # build.py builds dist/tb/, smoke-tests it (--version, welcome.tb,
-      # `tb doc`, `tb doc gui`, a json/re/hash/ioc/logs program and a GUI app
-      # that closes itself), packages it, unpacks the archive and tests that
-      # copy too, and on Windows builds the installer.
+      # build.py builds dist/tb/ (tb, tblaunch; Windows also tbw.exe and
+      # tblaunchw.exe), smoke-tests it (--version, welcome.tb, tb check,
+      # tb fmt --check, tb doc, a json/re/hash/ioc/logs/sqlite program, a 3.0
+      # class/match/generator program on both engines, tb build + running the
+      # built launcher, and a GUI app that closes itself), packages it, unpacks
+      # the archive and tests that copy too (every example and app, tb test
+      # spec / apps/log-triage / packages), and on Windows builds the installer.
       # TB_REQUIRE_GUI=1 turns a missing Tk/display into a failure.
       - name: Build
         env:
           TB_REQUIRE_GUI: "1"
         run: $XVFB uv run --locked --group build python packaging/build.py
 
-      - name: Run examples, non-GUI apps and app tests through the build
-        run: uv run --locked python packaging/run_examples.py "${{ matrix.binary }}" --root dist/tb
+      - name: Run examples, apps and test suites through the build
+        run: $XVFB uv run --locked python packaging/run_examples.py "${{ matrix.binary }}" --root dist/tb --gui
 
       # Silent per-user install into a temp folder, run the installed tb.exe
-      # (--version, every example/app, tbw.exe with a GUI app), then a silent
-      # uninstall that must remove the folder, the PATH entry and .tb.
+      # (--version, every example/app, tbw.exe with a GUI app, tb build --gui
+      # and the resulting tblaunchw-based app.exe), check the Start menu
+      # shortcuts and the .tb icon, then a silent uninstall that must remove
+      # the folder, the PATH entry, .tb and the Start menu folder.
       - name: Test the installer (Windows)
         if: runner.os == 'Windows'
         run: uv run --locked python packaging/windows/test_installer.py dist/tb-windows-x64-setup.exe
@@ -114,9 +128,48 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  vscode:
+    name: VS Code extension
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: code/editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: code/editors/vscode/package-lock.json
+
+      # npm ci installs exactly package-lock.json (vscode-languageclient and
+      # @vscode/vsce); `npm run package` runs vsce -> tb-vscode-<version>.vsix.
+      - name: Build the .vsix
+        run: |
+          npm ci --no-audit --no-fund
+          npm run lint
+          rm -f tb-vscode-*.vsix
+          npm run package
+          version="$(node -p "require('./package.json').version")"
+          test -f "tb-vscode-${version}.vsix"
+          unzip -l "tb-vscode-${version}.vsix"
+          mkdir -p ../../dist
+          mv "tb-vscode-${version}.vsix" ../../dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vscode
+          path: code/dist/tb-vscode-*.vsix
+          if-no-files-found: error
+          retention-days: 7
+
   release:
     name: GitHub Release
-    needs: build
+    needs: [build, vscode]
     if: startsWith(github.ref, 'refs/tags/tb-v')
     runs-on: ubuntu-22.04
     permissions:
@@ -162,6 +215,7 @@ jobs:
             dist/tb-macos-arm64.zip
             dist/tb-linux-x64.tar.gz
             dist/tb-python.zip
+            dist/tb-vscode-*.vsix
             dist/SHA256SUMS.txt
           )
           ls -l "${assets[@]}"

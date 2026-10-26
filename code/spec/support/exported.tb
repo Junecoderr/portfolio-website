@@ -1,0 +1,11 @@
+# A module that uses export: only exported names are public.
+
+export fn shown() {
+  return "shown"
+}
+
+fn hidden() {
+  return "hidden"
+}
+
+export const VERSION = 3

@@ -1,0 +1,8 @@
+# Imports a package found in tb_packages/ next to tb.toml.
+
+import "tb-demo"
+from "tb-demo" import hello
+
+export fn both() {
+  return [tb_demo.hello(), hello()]
+}

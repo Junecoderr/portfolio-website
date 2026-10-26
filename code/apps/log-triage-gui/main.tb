@@ -15,7 +15,13 @@ import time
 import "../log-triage/rules.tb" as rules
 
 let DATA = fs.join(fs.here(), "..", "data")
-let SAMPLES = ["auth.log", "access.log", "firewall.log", "windows_security.json", "windows_security.csv"]
+let SAMPLES = [
+  "auth.log",
+  "access.log",
+  "firewall.log",
+  "windows_security.json",
+  "windows_security.csv",
+]
 
 let current = nil     # path of the open log
 let format = ""
@@ -42,10 +48,23 @@ heading.label("TB Log Triage", {"style": "title"})
 let subtitle = heading.label("Open a log to look for trouble.", {"style": "muted"})
 
 let bar = win.row()
-bar.button("Open log…", fn() { open_log() }, {"primary": true})
+bar.button(
+  "Open log…",
+  fn() {
+    open_log()
+  },
+  {"primary": true},
+)
 bar.label("or try a sample:", {"style": "muted"})
-let sample = bar.select(SAMPLES, {"on_change": fn(name) { load(fs.join(DATA, name)) }, "width": 22})
-bar.button("Export HTML report…", fn() { export_report() })
+let sample = bar.select(SAMPLES, {
+  "on_change": fn(name) {
+    load(fs.join(DATA, name))
+  },
+  "width": 22,
+})
+bar.button("Export HTML report…", fn() {
+  export_report()
+})
 
 let counts = win.label(" ", {"style": "heading"})
 
@@ -54,8 +73,11 @@ let tabs = win.tabs(["Alerts", "Overview"], {"expand": true})
 let page = tabs.page("Alerts")
 
 let table = page.table(["Level", "Rule", "By", "Count", "First seen", "Last seen"], {
-  "widths": [100, 330, 140, 70, 180, 180], "height": 6,
-  "on_select": fn(row, i) { show_details(i) },
+  "widths": [100, 330, 140, 70, 180, 180],
+  "height": 6,
+  "on_select": fn(row, i) {
+    show_details(i)
+  },
 })
 
 page.label("Details", {"style": "heading"})
@@ -64,23 +86,45 @@ let details = page.textarea({"readonly": true, "mono": true, "height": 10})
 let LEVELS = ["critical", "high", "medium", "low", "informational"]
 let overview = tabs.page("Overview")
 let charts = overview.row({"expand": true})
-let level_chart = charts.chart({"type": "bar", "title": "Alerts by level", "labels": LEVELS,
-                                "data": [0, 0, 0, 0, 0], "expand": true})
-let rule_chart = charts.chart({"type": "pie", "title": "Alerts by rule", "empty": "No alerts", "expand": true})
-let timeline = overview.chart({"type": "line", "title": "Log records per hour", "empty": "No timestamps",
-                               "expand": true})
+let level_chart = charts.chart({
+  "type": "bar",
+  "title": "Alerts by level",
+  "labels": LEVELS,
+  "data": [0, 0, 0, 0, 0],
+  "expand": true,
+})
+let rule_chart = charts.chart({
+  "type": "pie",
+  "title": "Alerts by rule",
+  "empty": "No alerts",
+  "expand": true,
+})
+let timeline = overview.chart({
+  "type": "line",
+  "title": "Log records per hour",
+  "empty": "No timestamps",
+  "expand": true,
+})
 let status = win.status("")
 
 win.menu({
   "File": {
-    "Open log…": fn() { open_log() },
-    "Export HTML report…": fn() { export_report() },
+    "Open log…": fn() {
+      open_log()
+    },
+    "Export HTML report…": fn() {
+      export_report()
+    },
     "-": nil,
     "Quit": win.close,
   },
 })
-win.key("Mod+O", fn() { open_log() })
-win.key("Mod+E", fn() { export_report() })
+win.key("Mod+O", fn() {
+  open_log()
+})
+win.key("Mod+E", fn() {
+  export_report()
+})
 
 let ICON = {"critical": "●●●●", "high": "●●●", "medium": "●●", "low": "●", "informational": "·"}
 
@@ -123,7 +167,9 @@ fn load(path) {
     counts.style("success")
     details.set("Nothing matched the rules. That's good news!")
   } else {
-    counts.set(f"{len(alerts)} alerts:  {c.critical} critical,  {c.high} high,  {c.medium} medium,  {c.low + c.informational} low")
+    counts.set(
+      f"{len(alerts)} alerts:  {c.critical} critical,  {c.high} high,  {c.medium} medium,  {c.low + c.informational} low",
+    )
     if c.critical + c.high > 0 {
       counts.style("danger")
     } else {
@@ -139,7 +185,11 @@ fn load(path) {
 
 # Redraw the Overview page from the current alerts and records.
 fn update_charts(c) {
-  level_chart.update({"data": LEVELS.map(fn(level) { return c[level] })})
+  level_chart.update({
+    "data": LEVELS.map(fn(level) {
+      return c[level]
+    }),
+  })
   let by_rule = {}
   for a in alerts {
     by_rule[a.rule] = by_rule.get(a.rule, 0) + 1
@@ -153,8 +203,14 @@ fn update_charts(c) {
     }
   }
   let hours = hour_range(per_hour, 24)
-  timeline.update({"labels": hours.map(fn(h) { return time.format(h, "%d %b %H:00") }),
-                   "data": hours.map(fn(h) { return per_hour.get(h, 0) })})
+  timeline.update({
+    "labels": hours.map(fn(h) {
+      return time.format(h, "%d %b %H:00")
+    }),
+    "data": hours.map(fn(h) {
+      return per_hour.get(h, 0)
+    }),
+  })
 }
 
 # The start of the local hour t falls in (so 06:25 counts as 06:00 even in
@@ -185,7 +241,11 @@ fn hour_range(counts, most) {
 }
 
 fn time_span() {
-  let timed = records.filter(fn(r) { return r.time != nil }).sort_by(fn(r) { return r.time })
+  let timed = records.filter(fn(r) {
+    return r.time != nil
+  }).sort_by(fn(r) {
+    return r.time
+  })
   if timed.is_empty() {
     return "no timestamps"
   }
@@ -196,7 +256,9 @@ fn time_span() {
 fn notes_for(alert) {
   let notes = []
   if alert.get("success_after", false) {
-    notes.push(f"!! {alert.by} then logged in as {alert.success_user} at {alert.success_when}. Treat that account as compromised.")
+    notes.push(
+      f"!! {alert.by} then logged in as {alert.success_user} at {alert.success_when}. Treat that account as compromised.",
+    )
   }
   if alert.has("users") {
     notes.push("Accounts tried: " + alert.users.join(", "))
@@ -205,7 +267,10 @@ fn notes_for(alert) {
     notes.push(f"Ports probed: {alert.ports.slice(0, 20).join(", ")}")
   }
   if alert.rule == "Encoded PowerShell command" {
-    let m = re.match("(?i)-(?:e|ec|enc|encodedcommand)\s+([A-Za-z0-9+/=]+)", alert.records[0].command_line)
+    let m = re.match(
+      "(?i)-(?:e|ec|enc|encodedcommand)\s+([A-Za-z0-9+/=]+)",
+      alert.records[0].command_line,
+    )
     if m != nil {
       notes.push("Decoded PowerShell: " + encode.unbase64(m[1]))
     }
@@ -234,7 +299,10 @@ fn show_details(i) {
 }
 
 fn open_log() {
-  let path = gui.open_file({"Logs": "*.log *.txt *.json *.jsonl *.csv", "All files": "*"}, "Open a log")
+  let path = gui.open_file(
+    {"Logs": "*.log *.txt *.json *.jsonl *.csv", "All files": "*"},
+    "Open a log",
+  )
   if path != nil {
     load(path)
   }
@@ -251,13 +319,24 @@ fn export_report() {
   }
   let rows = []
   for a in alerts {
-    rows.push({"level": a.level, "rule": a.rule, "by": by_text(a), "count": a.count,
-               "first": a.first_when, "last": a.last_when})
+    rows.push({
+      "level": a.level,
+      "rule": a.rule,
+      "by": by_text(a),
+      "count": a.count,
+      "first": a.first_when,
+      "last": a.last_when,
+    })
   }
   let c = level_counts()
   let page = report.html(f"TB Log Triage: {fs.name(current)}", rows, {
     "intro": f"{len(records)} records in {format} format, {time_span()}.",
-    "stats": {"Records": len(records), "Alerts": len(alerts), "Critical": c.critical, "High": c.high},
+    "stats": {
+      "Records": len(records),
+      "Alerts": len(alerts),
+      "Critical": c.critical,
+      "High": c.high,
+    },
   })
   try {
     let saved = report.save(path, page)

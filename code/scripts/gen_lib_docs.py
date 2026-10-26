@@ -34,27 +34,46 @@ import site_shell as shell  # noqa: E402
 EXAMPLES = Path(__file__).resolve().parent / "lib_examples"
 
 GROUPS = [
-    ("core", "Core", "Everyday building blocks: numbers, text, dates, randomness, patterns and the computer you're on.",
-     ["math", "text", "time", "random", "re", "os"]),
-    ("data", "Files and data", "Read and write files, JSON and CSV.", ["fs", "json", "csv"]),
-    ("security", "Security (SOC)", "Parse logs, detect attacks, pull out and defang indicators, hash and decode, and report.",
-     ["logs", "detect", "ioc", "hash", "encode", "report"]),
-    ("network", "Network and intel", "IP and CIDR maths, port checks, web requests and threat-intelligence lookups.",
-     ["net", "http", "intel"]),
-    ("gui", "Desktop GUI", "Windows, buttons, tables, menus and dialogs.", ["gui"]),
+    ("core", "Core", "Everyday building blocks: numbers and exact decimals, text, dates and time zones, randomness, "
+     "patterns, bytes and the computer you're on.",
+     ["math", "text", "time", "datetime", "decimal", "random", "re", "os", "binary"]),
+    ("data", "Files and data", "Read and write files and the formats data comes in: JSON, CSV, YAML, TOML, XML, "
+     "SQLite databases, archives and templates.",
+     ["fs", "json", "csv", "yaml", "toml", "xml", "sqlite", "archive", "template"]),
+    ("security", "Security operations", "Parse logs, packet captures and Windows event logs, detect attacks (with "
+     "Sigma), look inside executables, scan with YARA-like rules, handle indicators and threat intel, encrypt, "
+     "and report to people and SIEMs.",
+     ["logs", "detect", "ioc", "hash", "encode", "crypto", "report", "pcap", "evtx", "pe", "elf", "scan",
+      "attack", "stix", "siem", "intel"]),
+    ("network", "Networking", "IP and CIDR maths, port checks, DNS, TLS certificates, web requests, WebSockets "
+     "and a small web server.", ["net", "http", "dns", "tls", "websocket", "server"]),
+    ("concurrency", "Concurrency", "Run work side by side: parallel maps, tasks and channels.", ["parallel"]),
+    ("gui", "Desktop GUI", "Windows, buttons, tables, tabs, charts, menus and dialogs.", ["gui"]),
     ("testing", "Testing", "Checks for your own programs, run with tb test.", ["test"]),
 ]
 
+# Libraries that can't do their job inside the browser playground (Pyodide has
+# no sockets, no threads, no windows and no other programs to run).
 DESKTOP_ONLY = {
     "gui": "opens real windows, so it needs the TB app on your computer",
     "http": "talks to websites, so it needs the TB app on your computer",
     "intel": "calls threat-intelligence services over the internet, so it needs the TB app on your computer",
+    "dns": "sends DNS queries over the network, so it needs the TB app on your computer",
+    "tls": "connects to servers to read their certificates, so it needs the TB app on your computer",
+    "websocket": "keeps a network connection open, so it needs the TB app on your computer",
+    "server": "listens for web requests on your computer, so it needs the TB app",
+    "parallel": "runs work on several threads at once, and the browser playground has no threads, so it needs the TB app on your computer",
 }
 PARTLY = {
-    "net": "The IP and CIDR helpers work everywhere, including the playground. Lookups and port checks (resolve, reverse, tcp_check, check_ports, banner, my_ip) need the TB app on your computer.",
+    "net": "The IP and CIDR helpers work everywhere, including the playground. Lookups, port checks and UDP (resolve, reverse, hostname, tcp_check, check_ports, banner, my_ip, udp_send, udp_listen) need the TB app on your computer.",
     "os": "os.run needs the TB app on your computer. In the playground, os.platform is \"browser\".",
-    "fs": "In the playground, files live in a pretend folder inside your browser that holds the sample data in apps/data/. Nothing touches your real disk.",
+    "fs": "In the playground, files live in a pretend folder inside your browser that holds the sample data in apps/data/. Nothing touches your real disk. fs.watch needs the TB app.",
+    "siem": "Formatting (cef, leef, syslog_line, event) and dry runs work everywhere, including the playground. Sending to a SIEM (send_syslog, splunk, elastic, sentinel) needs the TB app on your computer.",
+    "stix": "Reading and writing bundles works everywhere, including the playground. The TAXII client (stix.taxii) talks to a server, so it needs the TB app on your computer.",
+    "crypto": "Everything works in the playground; the first run of a program that imports crypto loads a little more of Python (about 2 MB) for scrypt and PBKDF2.",
+    "sqlite": "Works in the playground with databases in memory or in the pretend folder; the first run loads SQLite into the page (about 0.5 MB).",
 }
+FULLY_IN_BROWSER = {"crypto", "sqlite"}  # PARTLY only for the note about loading
 NO_VALUES = {"os"}  # values that depend on the computer the docs were built on
 
 
@@ -226,7 +245,7 @@ def index_page(version: str) -> str:
         cards = []
         for n in names:
             d = tb.describe_library(n)
-            where = "desktop" if n in DESKTOP_ONLY else ("browser and desktop" if n not in PARTLY else "mostly in the browser")
+            where = "desktop" if n in DESKTOP_ONLY else ("browser and desktop" if n not in PARTLY or n in FULLY_IN_BROWSER else "mostly in the browser")
             tag_cls = "tag-desktop" if n in DESKTOP_ONLY else ""
             cards.append(f"""          <li>
             <a class="lib-card" href="lib/{n}.html">
@@ -262,7 +281,7 @@ def index_page(version: str) -> str:
 {sidebar("", "")}
       <article class="docs-main">
         <h1>Library</h1>
-        <p class="lead">TB comes with {count} libraries, built into the app. Bring one in with <code>import</code>, then use its functions with a dot.</p>
+        <p class="lead">TB {esc(version)} comes with {count} libraries, built into the app. Bring one in with <code>import</code>, then use its functions with a dot. Libraries marked <em>desktop</em> need the TB app; the rest also run in the playground.</p>
         <pre class="tb-code" data-runnable><code>import ioc
 
 let note = "Beacon to hxxp://evil[.]example[.]com from 203.0.113.9"
@@ -289,7 +308,7 @@ say(found.urls, found.ips)</code></pre>
         </div>
       </nav>
     </div>"""
-    return shell.page("Library · TB", f"The {count} libraries that come with TB: files, JSON, logs, detection rules, IOCs, hashing, networking and desktop windows.",
+    return shell.page("Library · TB", f"The {count} libraries that come with TB: files and data formats, logs, packet captures, detection rules, IOCs, crypto, networking, concurrency and desktop windows.",
                       main, current="library.html", scripts=("highlight.js", "docs.js", "runner.js"), version=version)
 
 

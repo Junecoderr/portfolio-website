@@ -24,15 +24,37 @@ win.label("Things to do", {"style": "title"})
 win.label("Type a task and press Enter. Double-click a task to tick it.", {"style": "muted"})
 
 let entry = win.row()
-let box = entry.input({"placeholder": "What needs doing?", "on_enter": fn(text) { add_task(text) }})
-entry.button("Add", fn() { add_task(box.value()) }, {"primary": true})
+let box = entry.input({
+  "placeholder": "What needs doing?",
+  "on_enter": fn(text) {
+    add_task(text)
+  },
+})
+entry.button(
+  "Add",
+  fn() {
+    add_task(box.value())
+  },
+  {"primary": true},
+)
 
-let list = win.table(["Done", "Task"], {"widths": [60, 360], "on_open": fn(row, i) { toggle(i) }})
+let list = win.table(["Done", "Task"], {
+  "widths": [60, 360],
+  "on_open": fn(row, i) {
+    toggle(i)
+  },
+})
 
 let actions = win.row()
-actions.button("Tick", fn() { toggle_selected() })
-actions.button("Delete", fn() { delete_selected() })
-actions.button("Clear done", fn() { clear_finished() })
+actions.button("Tick", fn() {
+  toggle_selected()
+})
+actions.button("Delete", fn() {
+  delete_selected()
+})
+actions.button("Clear done", fn() {
+  clear_finished()
+})
 
 let status = win.status("")
 
@@ -53,7 +75,11 @@ fn show() {
     rows.push([mark(task), task["text"]])
   }
   list.set_rows(rows)
-  let left = len(tasks.filter(fn(t) { return not t["done"] }))
+  let left = len(
+    tasks.filter(fn(t) {
+      return not t["done"]
+    }),
+  )
   if len(tasks) == 0 {
     status.set("Nothing to do. Enjoy your day!")
   } else {
@@ -109,7 +135,9 @@ fn delete_selected() {
 }
 
 fn clear_finished() {
-  tasks = tasks.filter(fn(t) { return not t["done"] })
+  tasks = tasks.filter(fn(t) {
+    return not t["done"]
+  })
   save()
   show()
 }

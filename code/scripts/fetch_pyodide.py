@@ -32,6 +32,16 @@ FILES = {
     "pyodide.asm.wasm": "a50dd1843f805a0b7c45b61037ee0d7b26dfe85efe0e18ef95a34ad24e401f5f",
     "python_stdlib.zip": "16611534726e5d8ac2bd8f926410b2dcb8d6f49aa24913463533b457a2115c16",
     "pyodide-lock.json": "9c45b916001a750f4102fc287494f3eab215909c7535c626a20db80fd6333e2c",
+    # Packages Pyodide keeps outside python_stdlib.zip. The playground loads
+    # them on demand (site/assets/js/tb-pyodide.js) when a program imports a
+    # TB library that needs them: sqlite -> sqlite3; crypto (scrypt, PBKDF2)
+    # -> hashlib + openssl; datetime time zones -> tzdata; libraries that
+    # import ssl (stix, siem, http, intel, tls, websocket) -> ssl + openssl.
+    "sqlite3-1.0.0-cp312-cp312-pyodide_2024_0_wasm32.whl": "43061928762b03482676a1e11dcef99a003148e59fe914b6a3e41180c382cfc3",
+    "hashlib-1.0.0-cp312-cp312-pyodide_2024_0_wasm32.whl": "4a6971a70bf547ad93f011e121392803ce1595e62e8b3ca719ffa3ec91384722",
+    "openssl-1.1.1w.zip": "20b92cd9b9adb1a739af9f93772b60c084203aacf63ae1b2353951bd80c97f08",
+    "ssl-1.0.0-cp312-cp312-pyodide_2024_0_wasm32.whl": "1af0b011a3043331a8a2a358832dcee736deff73a55ad0393222ea533942094a",
+    "tzdata-2024.1-py2.py3-none-any.whl": "3f0d487be1b8180e8bfd72709a7727734cd1e02180d6a75e70d4232765215848",
 }
 
 ROOT = Path(__file__).resolve().parent.parent

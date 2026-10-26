@@ -1,0 +1,11 @@
+# map churn: insert, update, look up and remove keys
+fn churn(n) {
+  let m = {}
+  for i in 0..n {
+    let k = f"k{i % 1000}"
+    if m.has(k) { m[k] = m[k] + 1 } else { m[k] = 1 }
+    if i % 3 == 0 { m.remove(k) }
+  }
+  return len(m)
+}
+say(churn(300000))

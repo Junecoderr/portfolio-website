@@ -1,0 +1,2 @@
+fn gen() { yield 1 }
+let f = async fn() { yield 1 }

@@ -26,7 +26,10 @@ fn usage() {
 # Analysts often share "defanged" indicators so nobody clicks them by
 # accident: hxxp://evil[.]example. Turn them back into normal text.
 fn refang(x) {
-  return x.trim().replace("[.]", ".").replace("(.)", ".").replace("hxxp", "http").replace("[:]", ":")
+  return x.trim().replace("[.]", ".").replace("(.)", ".").replace("hxxp", "http").replace(
+    "[:]",
+    ":",
+  )
 }
 
 fn kind_of(x) {
@@ -171,7 +174,9 @@ for raw in items.unique() {
   for source in todo {
     try {
       let r = look_up(source, kind, x)
-      say(f"  {text.pad_right(source, 11)} {text.pad_right(r.verdict, 11)} score {text.pad_left(r.score, 3)}   {summary(r)}")
+      say(
+        f"  {text.pad_right(source, 11)} {text.pad_right(r.verdict, 11)} score {text.pad_left(r.score, 3)}   {summary(r)}",
+      )
       if RANK[r.verdict] > RANK[worst] {
         worst = r.verdict
       }

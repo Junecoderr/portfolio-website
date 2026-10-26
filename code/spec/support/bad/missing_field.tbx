@@ -1,0 +1,4 @@
+class Named {
+  let name = "x"
+}
+say(Named().nam)

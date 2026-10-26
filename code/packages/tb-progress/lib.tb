@@ -26,8 +26,12 @@ fn fraction(done, total) {
     return 1
   }
   let f = done / total
-  if f < 0 { return 0 }
-  if f > 1 { return 1 }
+  if f < 0 {
+    return 0
+  }
+  if f > 1 {
+    return 1
+  }
   return f
 }
 
@@ -44,7 +48,10 @@ fn render_bar(done, total, width, fill, empty) {
 
 # A complete bar with brackets and a percentage: "[██████              ]  30%".
 fn bar(done, total, width) {
-  return "[" + render_bar(done, total, width, "█", " ") + "] " + text.pad_left(str(percent(done, total)) + "%", 4)
+  return "[" +
+    render_bar(done, total, width, "█", " ") +
+    "] " +
+    text.pad_left(str(percent(done, total)) + "%", 4)
 }
 
 # A bar with every option:
@@ -56,7 +63,10 @@ fn bar_with(done, total, options) {
   if options.has("label") {
     out = str(options["label"]) + " "
   }
-  out = out + options.get("left", "[") + render_bar(done, total, width, options.get("fill", "█"), options.get("empty", " ")) + options.get("right", "]")
+  out = out +
+    options.get("left", "[") +
+    render_bar(done, total, width, options.get("fill", "█"), options.get("empty", " ")) +
+    options.get("right", "]")
   if options.get("show_percent", true) {
     out = out + " " + text.pad_left(str(percent(done, total)) + "%", 4)
   }
@@ -74,7 +84,10 @@ fn ascii_bar(done, total, width) {
 # One spinner frame. step counts up (0, 1, 2, ...); style is a key of FRAMES.
 fn spinner(step, style) {
   if not FRAMES.has(style) {
-    throw "tb-progress doesn't know the spinner '" + style + "'. Pick one of: " + FRAMES.keys().join(", ")
+    throw "tb-progress doesn't know the spinner '" +
+      style +
+      "'. Pick one of: " +
+      FRAMES.keys().join(", ")
   }
   let frames = FRAMES[style]
   return frames[int(step) % len(frames)]
@@ -83,7 +96,9 @@ fn spinner(step, style) {
 # Seconds as "1m 05s" / "2h 03m" / "12s".
 fn duration(seconds) {
   let s = int(seconds + 0.5)
-  if s < 0 { s = 0 }
+  if s < 0 {
+    s = 0
+  }
   if s < 60 {
     return str(s) + "s"
   }
@@ -118,11 +133,24 @@ fn step(done, total) {
 #   for f in files { work(f); t.tick() }
 #   t.finish()
 fn tracker(total, label) {
-  let state = {"done": 0, "total": total, "label": label, "started": time.timestamp(), "every": 1, "width": 30, "printed": 0, "quiet": false}
+  let state = {
+    "done": 0,
+    "total": total,
+    "label": label,
+    "started": time.timestamp(),
+    "every": 1,
+    "width": 30,
+    "printed": 0,
+    "quiet": false,
+  }
 
   fn line() {
     let elapsed = time.timestamp() - state["started"]
-    let out = bar_with(state["done"], state["total"], {"width": state["width"], "label": state["label"], "show_count": true})
+    let out = bar_with(state["done"], state["total"], {
+      "width": state["width"],
+      "label": state["label"],
+      "show_count": true,
+    })
     out = out + " " + duration(elapsed)
     let left = eta(state["done"], state["total"], elapsed)
     if left != nil and state["done"] < state["total"] {

@@ -1,6 +1,12 @@
 import siem
 
-let alert = {"rule": "Brute force", "level": "high", "by": "203.0.113.42", "by_field": "ip", "count": 12}
+let alert = {
+  "rule": "Brute force",
+  "level": "high",
+  "by": "203.0.113.42",
+  "by_field": "ip",
+  "count": 12,
+}
 say(siem.cef(alert))
 say(siem.syslog_line("disk almost full", {"host": "web01", "app": "tb", "severity": "warning"}))
 

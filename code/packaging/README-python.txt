@@ -3,16 +3,22 @@ TB - run it with Python
 
 This folder has everything TB needs:
 
-  tb.py            the TB language itself (version 2.0.1)
-  tblib\           TB's standard library (keep it next to tb.py)
+  tb.py            starts TB (version 3.0.0)
+  tbcore\          the TB language itself       (keep these three folders
+  tbtools\         tb fmt, tb check, tb build... next to tb.py)
+  tblib\           TB's standard library
   welcome.tb       a short tour of TB, written in TB
   examples\        small TB programs to try
   apps\            bigger apps: desktop windows (calculator, to-do, notes,
-                   care) and security tools (log triage, IOC extractor...)
+                   care, alerts dashboard, network monitor, file
+                   inspector...) and security tools (log triage, IOC
+                   extractor, a web dashboard...)
+  packages\        example TB packages
+  spec\            the language reference (SPEC.md) and its tests
   README.txt       this file
 
-TB is written in Python, so your computer needs Python 3 first.
-You only have to set this up once.
+TB is written in Python, so your computer needs Python 3.10 or newer
+first. You only have to set this up once.
 
 
 STEP 1 - Unzip this folder
@@ -103,6 +109,13 @@ See every library TB comes with, and what one can do:
     python tb.py doc
     python tb.py doc gui
 
+Tools that come with TB (Mac / Linux: python3 instead of python):
+
+    python tb.py check mine.tb       look for mistakes without running
+    python tb.py fmt mine.tb         tidy up the layout
+    python tb.py test spec           run the language's own tests
+    python tb.py build mine.tb       bundle a program into a folder to share
+
 To play with TB line by line, leave out the file name:
 
     python tb.py          (Windows)
@@ -144,8 +157,12 @@ If that also fails, run the Python installer again and make sure the
 "can't open file 'tb.py'": the terminal is not in the tb-python folder,
 or you are still inside the zip. Do STEP 1 and STEP 3 again.
 
-"There's no library called ...": tb.py cannot see the tblib folder.
-Keep tb.py and tblib together in the same folder.
+"There's no library called ..." or "No module named 'tbcore'": tb.py
+cannot see its folders. Keep tb.py, tbcore, tbtools and tblib together in
+the same folder.
+
+A Python "SyntaxError" as soon as you start tb.py: your Python is older
+than 3.10. Install a newer one (STEP 2), then check with  python --version
 
 A window app says it needs Tk / "No module named tkinter": your Python has
 no Tk. On Windows or Mac, install Python from python.org (STEP 2). On Linux,

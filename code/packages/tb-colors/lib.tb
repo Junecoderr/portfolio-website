@@ -14,14 +14,34 @@ let RESET = ESC + "[0m"
 
 # Colour names -> the number used by the 4-bit SGR codes.
 let NAMES = {
-  "black": 30, "red": 31, "green": 32, "yellow": 33,
-  "blue": 34, "magenta": 35, "cyan": 36, "white": 37,
-  "gray": 90, "grey": 90,
-  "bright_red": 91, "bright_green": 92, "bright_yellow": 93,
-  "bright_blue": 94, "bright_magenta": 95, "bright_cyan": 96, "bright_white": 97,
+  "black": 30,
+  "red": 31,
+  "green": 32,
+  "yellow": 33,
+  "blue": 34,
+  "magenta": 35,
+  "cyan": 36,
+  "white": 37,
+  "gray": 90,
+  "grey": 90,
+  "bright_red": 91,
+  "bright_green": 92,
+  "bright_yellow": 93,
+  "bright_blue": 94,
+  "bright_magenta": 95,
+  "bright_cyan": 96,
+  "bright_white": 97,
 }
 
-let STYLES = {"bold": 1, "dim": 2, "italic": 3, "underline": 4, "blink": 5, "inverse": 7, "strike": 9}
+let STYLES = {
+  "bold": 1,
+  "dim": 2,
+  "italic": 3,
+  "underline": 4,
+  "blink": 5,
+  "inverse": 7,
+  "strike": 9,
+}
 
 let _forced = nil
 
@@ -54,13 +74,18 @@ fn sgr(value, code) {
   if type(code) != "list" {
     codes = [code]
   }
-  return ESC + "[" + codes.map(fn(c) { return str(c) }).join(";") + "m" + str(value) + RESET
+  return ESC + "[" + codes.map(fn(c) {
+      return str(c)
+    }).join(";") + "m" + str(value) + RESET
 }
 
 # Colour text by name: paint("ok", "green"). Unknown names stop with an error.
 fn paint(value, name) {
   if not NAMES.has(name) {
-    throw "tb-colors doesn't know the colour '" + name + "'. Pick one of: " + NAMES.keys().join(", ")
+    throw "tb-colors doesn't know the colour '" +
+      name +
+      "'. Pick one of: " +
+      NAMES.keys().join(", ")
   }
   return sgr(value, NAMES[name])
 }
@@ -68,7 +93,10 @@ fn paint(value, name) {
 # Background colour by name: on("warning", "yellow").
 fn on(value, name) {
   if not NAMES.has(name) {
-    throw "tb-colors doesn't know the colour '" + name + "'. Pick one of: " + NAMES.keys().join(", ")
+    throw "tb-colors doesn't know the colour '" +
+      name +
+      "'. Pick one of: " +
+      NAMES.keys().join(", ")
   }
   return sgr(value, NAMES[name] + 10)
 }
@@ -76,27 +104,60 @@ fn on(value, name) {
 # A style by name: style("title", "bold").
 fn style(value, name) {
   if not STYLES.has(name) {
-    throw "tb-colors doesn't know the style '" + name + "'. Pick one of: " + STYLES.keys().join(", ")
+    throw "tb-colors doesn't know the style '" +
+      name +
+      "'. Pick one of: " +
+      STYLES.keys().join(", ")
   }
   return sgr(value, STYLES[name])
 }
 
-fn black(value) { return paint(value, "black") }
-fn red(value) { return paint(value, "red") }
-fn green(value) { return paint(value, "green") }
-fn yellow(value) { return paint(value, "yellow") }
-fn blue(value) { return paint(value, "blue") }
-fn magenta(value) { return paint(value, "magenta") }
-fn cyan(value) { return paint(value, "cyan") }
-fn white(value) { return paint(value, "white") }
-fn gray(value) { return paint(value, "gray") }
+fn black(value) {
+  return paint(value, "black")
+}
+fn red(value) {
+  return paint(value, "red")
+}
+fn green(value) {
+  return paint(value, "green")
+}
+fn yellow(value) {
+  return paint(value, "yellow")
+}
+fn blue(value) {
+  return paint(value, "blue")
+}
+fn magenta(value) {
+  return paint(value, "magenta")
+}
+fn cyan(value) {
+  return paint(value, "cyan")
+}
+fn white(value) {
+  return paint(value, "white")
+}
+fn gray(value) {
+  return paint(value, "gray")
+}
 
-fn bold(value) { return style(value, "bold") }
-fn dim(value) { return style(value, "dim") }
-fn italic(value) { return style(value, "italic") }
-fn underline(value) { return style(value, "underline") }
-fn inverse(value) { return style(value, "inverse") }
-fn strike(value) { return style(value, "strike") }
+fn bold(value) {
+  return style(value, "bold")
+}
+fn dim(value) {
+  return style(value, "dim")
+}
+fn italic(value) {
+  return style(value, "italic")
+}
+fn underline(value) {
+  return style(value, "underline")
+}
+fn inverse(value) {
+  return style(value, "inverse")
+}
+fn strike(value) {
+  return style(value, "strike")
+}
 
 # A 24-bit colour: rgb("hi", 255, 128, 0). Each part is 0..255.
 fn rgb(value, r, g, b) {
@@ -124,7 +185,11 @@ fn hex_to_rgb(code) {
   if len(digits) != 6 {
     throw "A hex colour needs 6 digits, like #ff8800 (got '" + code + "')."
   }
-  return [_hex_pair(digits.slice(0, 2)), _hex_pair(digits.slice(2, 4)), _hex_pair(digits.slice(4, 6))]
+  return [
+    _hex_pair(digits.slice(0, 2)),
+    _hex_pair(digits.slice(2, 4)),
+    _hex_pair(digits.slice(4, 6)),
+  ]
 }
 
 # Remove every ANSI escape code from text.

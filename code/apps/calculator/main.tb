@@ -23,7 +23,9 @@ let KEYS = [
 ]
 
 fn press_for(key) {
-  return fn() { press(key) }
+  return fn() {
+    press(key)
+  }
 }
 
 let grid = win.column({"expand": true})

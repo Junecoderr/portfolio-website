@@ -5,5 +5,10 @@ let email = fs.read("apps/data/phishing_email.txt")
 let found = ioc.extract(email)
 say("Domains:", found.domains)
 say("IPs:", found.ips)
-say("URLs:", found.urls.map(fn(u) { return ioc.defang(u) }))
+say(
+  "URLs:",
+  found.urls.map(fn(u) {
+    return ioc.defang(u)
+  }),
+)
 say(ioc.kind("44d88612fea8a8f36de82e1278abb02f"), ioc.is_ip("10.0.0.300"))

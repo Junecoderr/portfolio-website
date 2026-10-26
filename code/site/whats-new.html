@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What's new in TB 3.0</title>
+  <meta name="description" content="What&#x27;s new in TB 3.0.0: classes, match, generators, async, a bytecode VM, new tools, packages and 43 libraries.">
+  <meta name="theme-color" content="#b3123e">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="whats-new.html" aria-label="Version 3.0.0: what's new">v<span data-version>3.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html">Learn</a>
+        <a href="library.html">Library</a>
+        <a href="tools.html">Tools</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container docs">
+      <aside class="docs-sidebar" aria-label="Contents">
+        <button class="docs-nav-toggle" type="button" aria-expanded="false" aria-controls="docs-nav">Contents <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="docs-sidebar-inner" id="docs-nav">
+          <ul>
+            <li><a href="#language">The language</a></li>
+            <li><a href="#engine">A bytecode virtual machine</a></li>
+            <li><a href="#concurrency">Concurrency</a></li>
+            <li><a href="#tools">Tools</a></li>
+            <li><a href="#libraries">New libraries</a></li>
+            <li><a href="#apps">New apps</a></li>
+            <li><a href="#breaking">What might break</a></li>
+            <li><a href="#earlier">Earlier releases</a></li>
+          </ul>
+        </div>
+      </aside>
+      <article class="docs-main">
+        <h1>What's new in TB 3.0</h1>
+        <p class="lead">TB 3.0.0 brings classes, pattern matching, generators, tasks and a much bigger standard library to the same friendly language, plus a formatter, a checker, a debugger, packages and a VS Code extension. Press <strong>Run</strong> under any example to try it here.</p>
+        <p class="page-meta"><span>Version <strong data-version>3.0.0</strong></span><span>Released <time datetime="2026-10-26">26 October 2026</time></span><a href="download.html">Download</a><a href="migration.html">Moving from 2.x</a></p>
+        <section id="language">
+          <h2>The language</h2>
+        <p>Everything below is explained step by step in the <a href="docs.html#tb3">TB 3.0 lessons</a>, and exactly in the <a href="spec.html">language specification</a>.</p>
+        <h3>Classes, enums and pattern matching</h3>
+        <p><code>class</code> with fields, methods, <code>static</code> members, <code>extends</code> and <code>super</code>; special methods such as <code>text()</code>, <code>equals()</code> and <code>compare()</code>; <code>enum</code>; and <code>match</code> with value, range, list, map, type and class patterns, <code>or</code> and guards.</p>
+        <pre class="tb-code" data-runnable><code>enum Level { low, medium, high }
+
+class Alert {
+  fn init(rule, level) {
+    self.rule = rule
+    self.level = level
+  }
+}
+
+let a = Alert("ssh brute force", Level.high)
+say(match a {
+  Alert {level: Level.high} =&gt; f"page someone: {a.rule}"
+  _ =&gt; "log it"
+})</code></pre>
+        <h3>Functions and data</h3>
+        <p>Default, named, <code>...rest</code> and <code>**opts</code> arguments; lambdas (<code>x =&gt; x * 2</code>); destructuring in <code>let</code>, <code>for</code> and parameters; spread (<code>[...a, ...b]</code>, <code>{...m}</code>, <code>f(...xs)</code>); swaps (<code>a, b = b, a</code>); <code>const</code>; and <code>if ... then ... else</code> as an expression.</p>
+        <pre class="tb-code" data-runnable><code>fn scan(host, port = 22, timeout = 5) {
+  return f"{host}:{port} ({timeout}s)"
+}
+let {name, ip, owner = "nobody"} = {"name": "web01", "ip": "192.0.2.10"}
+say(scan(ip, timeout = 1), name, owner)
+say([3, 1, 2].map(x =&gt; x * 10), if len(name) &gt; 3 then "long" else "short")</code></pre>
+        <h3>Numbers, text and bytes</h3>
+        <p>Whole numbers and fractions are separate (<code>//</code>, <code>**</code>, <code>is_int()</code>); hex, binary and octal literals with <code>_</code>; bit operators; chained comparisons; format specs in f-strings (<code>{x:.2f}</code>, <code>{n:,}</code>, <code>{n:08b}</code>, <code>{p:.1%}</code>, <code>{s:&gt;10}</code>); escapes, raw <code>r"..."</code> and multi-line <code>"""..."""</code> text; a <code>bytes</code> type with <code>b"..."</code>; and ranges (<code>1..5</code>, <code>1..=5</code>) and slices (<code>xs[1:3]</code>, <code>xs[::-1]</code>).</p>
+        <pre class="tb-code" data-runnable><code>say(0xff, 0b1010, 1_000_000, 7 // 2, 2 ** 10, 0b1100 &amp; 0b1010)
+say(f"{1234.5678:,.2f} | {255:x} | {0.257:.1%} | {"tb":&gt;6}")
+let data = b"MZ\x90\x00"
+say(data.hex(), data[0], (1..=5).to_list(), "detection"[::-1])</code></pre>
+        <h3>Errors, generators and tasks</h3>
+        <p>Errors are objects with a kind: <code>catch err: ParseError</code>, your own classes that extend <code>Error</code>, and <code>finally</code>. Generators (<code>yield</code>) make lazy pipelines with <code>map</code>, <code>filter</code>, <code>take</code> and <code>zip</code>. <code>async fn</code> starts a task and <code>await</code> collects its answer. <code>defer</code> and <code>assert</code> round it off.</p>
+        <pre class="tb-code" data-runnable><code>import json
+
+fn evens() {
+  let n = 0
+  while true {
+    yield n
+    n += 2
+  }
+}
+say(evens().filter(n =&gt; n % 3 == 0).take(4).to_list())
+
+try {
+  json.parse("{oops")
+} catch err: ParseError {
+  say("kind:", err.kind)
+} finally {
+  say("done")
+}</code></pre>
+        <h3>Modules and packages</h3>
+        <p><code>export</code> decides what a module shares, <code>from ... import</code> picks names, and packages install into a project with <code>tb add</code>. See <a href="packages.html">Packages</a>.</p>
+        </section>
+        <section id="engine">
+          <h2>A bytecode virtual machine</h2>
+        <p>Programs are now compiled to bytecode and run on a virtual machine, which is faster than the 2.x interpreter on loops, function calls and methods, and runs generators without threads. Error messages are the same as before. The 2.x-style tree-walking interpreter is still there for one release: <code>TB_ENGINE=tree tb file.tb</code> or <code>tb --engine tree file.tb</code>.</p>
+        <p>The playground on this site runs the same virtual machine in your browser.</p>
+        </section>
+        <section id="concurrency">
+          <h2>Concurrency</h2>
+        <p><code>async fn</code> and <code>await</code> run work as tasks on their own threads, and the <a href="lib/parallel.html"><code>parallel</code></a> library adds <code>parallel.map</code>, <code>parallel.run</code>, <code>parallel.all</code>, queues and locks. Desktop windows stay responsive with <code>win.run_in_background</code>.</p>
+        <pre class="tb-code" data-desktop><code>import net
+import parallel
+
+let hosts = ["192.0.2.10", "192.0.2.11", "192.0.2.12"]
+let open = parallel.map(h =&gt; net.tcp_check(h, 443, 2), hosts, workers = 16)
+say(hosts.zip(open))</code></pre>
+        <p class="note">The browser playground has no threads: tasks there run one after another, and <code>parallel</code> needs the TB app.</p>
+        </section>
+        <section id="tools">
+          <h2>Tools</h2>
+        <p>New commands for bigger projects, all part of the <code>tb</code> program: <code>tb fmt</code> (formatter), <code>tb check</code> (finds mistakes before you run, with optional type hints), <code>tb debug</code> (breakpoints and stepping), <code>tb test --coverage</code>, <code>tb doc</code> for your own files, <code>tb build</code> (a folder you can give to someone without TB), <code>tb lsp</code> (a language server for editors), and <code>tb init</code>, <code>tb add</code>, <code>tb remove</code>, <code>tb update</code> and <code>tb packages</code> for packages. The <a href="tools.html#vscode">VS Code extension</a> brings them into your editor.</p>
+        <p><a href="tools.html">See every tool with examples</a>.</p>
+        </section>
+        <section id="libraries">
+          <h2>New libraries</h2>
+        <p>The standard library grew from 20 to <span data-lib-count>43</span> libraries. New in 3.0:</p>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="New libraries in TB 3.0">
+          <table class="kw-table">
+            <tbody>
+            <tr><th scope="row">Core</th><td><a href="lib/datetime.html"><code>datetime</code></a> <a href="lib/decimal.html"><code>decimal</code></a> <a href="lib/binary.html"><code>binary</code></a></td></tr>
+            <tr><th scope="row">Files and data</th><td><a href="lib/yaml.html"><code>yaml</code></a> <a href="lib/toml.html"><code>toml</code></a> <a href="lib/xml.html"><code>xml</code></a> <a href="lib/sqlite.html"><code>sqlite</code></a> <a href="lib/archive.html"><code>archive</code></a> <a href="lib/template.html"><code>template</code></a></td></tr>
+            <tr><th scope="row">Security operations</th><td><a href="lib/crypto.html"><code>crypto</code></a> <a href="lib/pcap.html"><code>pcap</code></a> <a href="lib/evtx.html"><code>evtx</code></a> <a href="lib/pe.html"><code>pe</code></a> <a href="lib/elf.html"><code>elf</code></a> <a href="lib/scan.html"><code>scan</code></a> <a href="lib/attack.html"><code>attack</code></a> <a href="lib/stix.html"><code>stix</code></a> <a href="lib/siem.html"><code>siem</code></a></td></tr>
+            <tr><th scope="row">Networking</th><td><a href="lib/dns.html"><code>dns</code></a> <a href="lib/tls.html"><code>tls</code></a> <a href="lib/websocket.html"><code>websocket</code></a> <a href="lib/server.html"><code>server</code></a></td></tr>
+            <tr><th scope="row">Concurrency</th><td><a href="lib/parallel.html"><code>parallel</code></a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Existing libraries grew too: <a href="lib/detect.html"><code>detect</code></a> runs full Sigma (all modifiers, aggregations, correlation rules) and converts rules to Splunk, Elastic and Sentinel queries; <a href="lib/logs.html"><code>logs</code></a> reads EVTX files and keeps time zones; <a href="lib/fs.html"><code>fs</code></a> reads and writes bytes and watches folders; <a href="lib/net.html"><code>net</code></a> sends UDP; <a href="lib/gui.html"><code>gui</code></a> has tabs, trees, charts, canvases, sliders, themes and notifications; <a href="lib/test.html"><code>test</code></a> has mocks, fixtures, parametrised cases and coverage.</p>
+        <pre class="tb-code" data-runnable><code>import pcap
+
+let packets = pcap.read("apps/data/sample.pcap")
+for q in pcap.dns_queries(packets).slice(0, 3) {
+  say(q.name, q.answers)
+}</code></pre>
+        </section>
+        <section id="apps">
+          <h2>New apps</h2>
+        <p>The <a href="examples.html#apps">apps gallery</a> now has every app that ships with TB, including <code>pcap-triage</code>, <code>evtx-triage</code>, <code>file-inspector</code> (and a desktop version), <code>sigma-studio</code>, <code>ioc-feed</code>, <code>siem-forwarder</code>, <code>alerts-dashboard-gui</code>, <code>network-monitor</code>, <code>parallel-scan</code>, <code>dns-check</code>, <code>cert-check</code> and <code>dashboard</code>, a web dashboard served by the <code>server</code> library.</p>
+        </section>
+        <section id="breaking">
+          <h2>What might break</h2>
+        <p>Almost every 2.x program runs unchanged and prints the same. The few changes: new reserved words (<code>class</code>, <code>match</code>, <code>from</code>, <code>is</code>, <code>const</code>, ... can't be names any more, and TB suggests another), <code>/</code> always gives a fraction (displayed as before), and errors from libraries have specific kinds. The <a href="migration.html">migration guide</a> lists everything with fixes.</p>
+        </section>
+        <section id="earlier">
+          <h2>Earlier releases</h2>
+        <h3>2.0.1</h3>
+        <p>Neutral sample programs and docs; no language changes. The first program became <code>welcome.tb</code>, a short tour of TB.</p>
+        <h3>2.0</h3>
+        <p>Maps, methods, f-strings, modules and <code>import</code>, <code>try</code>/<code>catch</code>/<code>throw</code>, twenty libraries (desktop GUI, logs, detection rules, IOCs, hashing, networking, threat intel), the Windows installer and the security apps.</p>
+        </section>
+      </article>
+      <nav class="on-this-page" aria-label="On this page">
+        <div class="on-this-page-inner">
+          <h2>On this page</h2>
+          <ul id="on-this-page-list"></ul>
+        </div>
+      </nav>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#tb3">TB 3.0 lessons</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="tools.html">Command-line tools</a></li>
+          <li><a href="tools.html#vscode">VS Code extension</a></li>
+          <li><a href="packages.html">Packages</a></li>
+          <li><a href="download.html">Download</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="whats-new.html">What's new in 3.0</a></li>
+          <li><a href="migration.html">Moving from 2.x</a></li>
+          <li><a href="spec.html">Language specification</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p>TB — a friendly programming language.</p>
+      <p>TB <span data-version>3.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
+  <script src="assets/js/docs.js" defer></script>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

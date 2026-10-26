@@ -1,0 +1,2 @@
+import "../exported.tb"
+exported.hidden()

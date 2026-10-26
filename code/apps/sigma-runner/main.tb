@@ -39,7 +39,9 @@ if files.is_empty() {
 # Load every rule file on its own, so one broken rule doesn't stop the rest.
 let rule_files = [rules_path]
 if fs.is_dir(rules_path) {
-  rule_files = fs.walk(rules_path).filter(fn(p) { return p.ends_with(".yml") or p.ends_with(".yaml") })
+  rule_files = fs.walk(rules_path).filter(fn(p) {
+    return p.ends_with(".yml") or p.ends_with(".yaml")
+  })
 }
 let rules = []
 let broken = 0
@@ -107,7 +109,11 @@ for path in files {
   total += len(alerts)
   say(f"== {fs.name(path)}: {len(records)} records, {len(alerts)} alert(s)")
   if not alerts.is_empty() {
-    say(report.table(alerts, ["level", "rule", "by", "count", "first_when", "last_when"], {"max_width": 44}))
+    say(
+      report.table(alerts, ["level", "rule", "by", "count", "first_when", "last_when"], {
+        "max_width": 44,
+      }),
+    )
     for a in alerts {
       let example = a.records[0]
       let detail = example.get("command_line", nil) or example.get("path", nil) or example.message

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tools · TB</title>
+  <meta name="description" content="TB 3.0.0 tools: tb fmt, check, test --coverage, debug, doc, build, packages, the language server and the VS Code extension.">
+  <meta name="theme-color" content="#b3123e">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="whats-new.html" aria-label="Version 3.0.0: what's new">v<span data-version>3.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html">Learn</a>
+        <a href="library.html">Library</a>
+        <a href="tools.html" aria-current="page">Tools</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container docs">
+      <aside class="docs-sidebar" aria-label="Contents">
+        <button class="docs-nav-toggle" type="button" aria-expanded="false" aria-controls="docs-nav">Contents <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="docs-sidebar-inner" id="docs-nav">
+          <ul>
+            <li><a href="#overview">Every command</a></li>
+            <li><a href="#fmt">tb fmt</a></li>
+            <li><a href="#check">tb check</a></li>
+            <li><a href="#test">tb test</a></li>
+            <li><a href="#debug">tb debug</a></li>
+            <li><a href="#doc">tb doc</a></li>
+            <li><a href="#build">tb build</a></li>
+            <li><a href="#packages">tb init, add, remove, update, packages</a></li>
+            <li><a href="#lsp">tb lsp</a></li>
+            <li><a href="#vscode">VS Code extension</a></li>
+          </ul>
+        </div>
+      </aside>
+      <article class="docs-main">
+        <h1>Tools</h1>
+        <p class="lead">TB 3.0.0 comes with a formatter, a checker, a test runner with coverage, a debugger, a documentation generator, an app builder, a package manager and a language server, all inside the <code>tb</code> command, plus an extension for VS Code.</p>
+        <section id="overview">
+          <h2>Every command</h2>
+        <p>All the tools are part of the <code>tb</code> program you already have; there is nothing else to install. <code>tb --help</code> lists them and <code>tb COMMAND --help</code> explains one.</p>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="TB commands">
+          <table class="kw-table">
+            <thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead>
+            <tbody>
+            <tr><td><code>tb file.tb [args]</code></td><td>Run a program (<code>os.args</code> holds the arguments)</td></tr>
+            <tr><td><code>tb</code></td><td>Type TB one line at a time (<code>exit</code> to leave)</td></tr>
+            <tr><td><a href="#fmt"><code>tb fmt</code></a></td><td>Lay code out in the standard style</td></tr>
+            <tr><td><a href="#check"><code>tb check</code></a></td><td>Find mistakes without running the program</td></tr>
+            <tr><td><a href="#test"><code>tb test [--coverage]</code></a></td><td>Run the <code>*_test.tb</code> files, and show which lines they reached</td></tr>
+            <tr><td><a href="#debug"><code>tb debug</code></a></td><td>Step through a program with breakpoints</td></tr>
+            <tr><td><a href="#doc"><code>tb doc</code></a></td><td>Show a library's help, or make docs from your own comments</td></tr>
+            <tr><td><a href="#build"><code>tb build</code></a></td><td>Pack an app into a folder that runs without TB installed</td></tr>
+            <tr><td><a href="#packages"><code>tb init / add / remove / update / packages</code></a></td><td>Manage a project's packages</td></tr>
+            <tr><td><a href="#lsp"><code>tb lsp</code></a></td><td>The language server editors talk to</td></tr>
+            <tr><td><code>tb --engine tree file.tb</code></td><td>Run with the 2.x-style interpreter instead of the virtual machine</td></tr>
+            </tbody>
+          </table>
+        </div>
+        </section>
+        <section id="fmt">
+          <h2>tb fmt: tidy layout</h2>
+        <p><code>tb fmt</code> rewrites <code>.tb</code> files in one standard layout: two-space indents, one statement per line, spaces around operators. Comments and blank lines stay where you put them. Run it on a file, a folder, or with no arguments for everything under the current folder; <code>--check</code> only lists files that would change (handy in CI).</p>
+        <pre class="md-code"><code>$ cat messy.tb
+fn  greet( name,greeting="Hello" ){
+return f"{greeting}, {name}!"}
+let people=["Tanisha","world"]
+for p in people { say(greet(p)) }
+
+$ tb fmt messy.tb
+formatted messy.tb
+1 file reformatted, 0 already tidy.
+
+$ cat messy.tb
+fn greet(name, greeting = "Hello") {
+  return f"{greeting}, {name}!"
+}
+let people = ["Tanisha", "world"]
+for p in people {
+  say(greet(p))
+}</code></pre>
+        </section>
+        <section id="check">
+          <h2>tb check: find mistakes early</h2>
+        <p><code>tb check</code> reads your program without running it and reports names that don't exist, the wrong number of inputs, unknown methods or library functions, changes to a <code>const</code>, and type mismatches where you wrote type hints (<code>let x: number = 1</code>, <code>fn f(a: text) -&gt; text</code>). Warnings cover unused names, code that never runs and a <code>match</code> that misses an enum value. <code>--strict</code> fails on warnings too; <code>--json</code> is for scripts and editors.</p>
+        <pre class="md-code"><code>$ tb check oops.tb
+oops.tb:3:5: error: I don't know what 'nmae' is. Did you mean 'name'?
+oops.tb:5:5: error: add() needs 2 inputs, but got 1.
+oops.tb:7:1: error: 'MAX' is a constant (made with const), so it can't be changed.
+Found 3 errors in 1 of 1 file. Fix the errors and run tb check again.</code></pre>
+        <p>A line that breaks a rule on purpose can end with <code># tb-check: ignore</code>.</p>
+        </section>
+        <section id="test">
+          <h2>tb test: tests and coverage</h2>
+        <p>Name test files <code>something_test.tb</code> and use the <a href="lib/test.html"><code>test</code></a> library. <code>tb test</code> runs every test file under a folder; <code>--coverage</code> adds how many lines of each file the tests ran, and which ones they missed.</p>
+        <pre class="tb-code"><code># calc_test.tb
+import test
+import "calc.tb"
+
+test.case("add", fn() {
+  test.equal(calc.add(2, 3), 5)
+})
+test.case("half", fn() {
+  test.equal(calc.half(9), 4.5)
+})</code></pre>
+        <pre class="md-code"><code>$ tb test --coverage
+calc_test.tb
+  ok   add
+  ok   half
+  All 2 checks passed.
+
+Coverage (lines the tests ran):
+  calc.tb: 50% (3 of 6 lines) - missed 4, 5, 7
+  calc_test.tb: 100% (6 of 6 lines)
+
+OK: 2 checks passed in 1 test file.</code></pre>
+        </section>
+        <section id="debug">
+          <h2>tb debug: step through a program</h2>
+        <p><code>tb debug file.tb</code> stops before the first line and waits at a <code>(tb)</code> prompt. Set breakpoints, step into or over functions, print any expression and list the variables in the current function.</p>
+        <pre class="md-code"><code>$ tb debug main.tb
+(tb) break 12          stop when line 12 is about to run   [b]
+(tb) run               start the program                    [r]
+(tb) next              run one line, stepping over calls    [n]
+(tb) step              run one line, going into calls       [s]
+(tb) print total * 2   show the value of an expression      [p]
+(tb) locals            names in this function, with values  [l]
+(tb) backtrace         the functions that are running       [bt]
+(tb) continue          run to the next breakpoint           [c]
+(tb) quit                                                   [q]</code></pre>
+        </section>
+        <section id="doc">
+          <h2>tb doc: help for libraries and your own code</h2>
+        <p><code>tb doc</code> lists the libraries and <code>tb doc pcap</code> shows one, the same text as the <a href="library.html">library reference</a>. Pointed at your own files, it turns <code>##</code> comments above functions, classes and constants into documentation: text, <code>--md</code> for Markdown or <code>--html</code> for a page per file.</p>
+        <pre class="tb-code"><code>## Greets someone by name and gives back the greeting.
+export fn greet(name, greeting = "Hello") {
+  return f"{greeting}, {name}!"
+}</code></pre>
+        <pre class="md-code"><code>$ tb doc greet.tb
+$ tb doc apps/ --html --out docs/</code></pre>
+        </section>
+        <section id="build">
+          <h2>tb build: share an app</h2>
+        <p><code>tb build app.tb</code> makes a folder in <code>dist/</code> with your program, the files it imports, its data and the TB runtime, plus a launcher. Zip it and anyone can run it, without installing TB. Use <code>--gui</code> for windowed apps (no console window on Windows) and <code>--include</code> for extra files.</p>
+        <pre class="md-code"><code>$ tb build apps/notes/main.tb --gui
+$ ls dist/notes
+notes  notes.tb  README.txt  ...</code></pre>
+        </section>
+        <section id="packages">
+          <h2>tb init, add, remove, update, packages</h2>
+        <p>A project is a folder with a <code>tb.toml</code>. <code>tb add</code> installs a package into <code>tb_packages/</code> and pins the exact version in <code>tb.lock</code>; commit both files and everyone gets the same code. Browse what's available on the <a href="packages.html">Packages</a> page.</p>
+        <pre class="md-code"><code>$ tb init
+Started the TB project 'report' (tb.toml written).
+$ tb add tb-tables
+Adding tb-tables...
+  + tb-tables 1.0.0 -&gt; tb_packages/tb-tables/
+$ tb packages           # what this project uses
+$ tb packages --index   # everything in the index
+$ tb update             # newer versions, within tb.toml's limits
+$ tb remove tb-tables</code></pre>
+        <pre class="tb-code"><code>import "tb-tables" as tables
+say(tables.table([{"host": "web01", "status": "up"}]))</code></pre>
+        </section>
+        <section id="lsp">
+          <h2>tb lsp: the language server</h2>
+        <p><code>tb lsp</code> speaks the Language Server Protocol over standard input and output, so any editor with LSP support can use it: errors as you type (from <code>tb check</code>), completion of keywords, built-ins, libraries and your own names, hover help, signature help, go to definition, document symbols, rename and formatting. The VS Code extension starts it for you.</p>
+        </section>
+        <section id="vscode">
+          <h2>VS Code extension</h2>
+        <p>The TB extension for Visual Studio Code adds highlighting for all of TB 3.0, snippets, <strong>TB: Run File</strong> (Cmd+Alt+N or Ctrl+Alt+N), <strong>TB: Check</strong>, <strong>TB: Format</strong>, <strong>TB: Run Tests</strong>, and everything <code>tb lsp</code> gives.</p>
+        <p><a class="button button-primary" data-download="tb-vscode-3.0.0.vsix" href="/dl/tb-vscode-3.0.0.vsix"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download <code>tb-vscode-3.0.0.vsix</code></a></p>
+        <ol class="steps-list">
+          <li>Install TB from the <a href="download.html">download page</a> and check that <code>tb --version</code> works in a terminal.</li>
+          <li>Download <code>tb-vscode-3.0.0.vsix</code> (above).</li>
+          <li>In VS Code, open the <strong>Extensions</strong> view (Cmd+Shift+X or Ctrl+Shift+X), click the <strong>…</strong> menu at the top of the view and choose <strong>Install from VSIX…</strong>, then pick the file. Or, in a terminal: <code>code --install-extension tb-vscode-3.0.0.vsix</code>.</li>
+          <li>Open any <code>.tb</code> file. If <code>tb</code> isn't on your PATH, set <strong>TB: Path</strong> (<code>tb.path</code>) in Settings to the full path of the program.</li>
+        </ol>
+        <p>Settings: <code>tb.path</code> (the tb program), <code>tb.languageServer.enabled</code>, <code>tb.check.onSave</code>, <code>tb.run.saveBeforeRun</code>. With TB 2.x only highlighting, snippets and Run File work; the rest needs TB 3.0.</p>
+        </section>
+      </article>
+      <nav class="on-this-page" aria-label="On this page">
+        <div class="on-this-page-inner">
+          <h2>On this page</h2>
+          <ul id="on-this-page-list"></ul>
+        </div>
+      </nav>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#tb3">TB 3.0 lessons</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="tools.html">Command-line tools</a></li>
+          <li><a href="tools.html#vscode">VS Code extension</a></li>
+          <li><a href="packages.html">Packages</a></li>
+          <li><a href="download.html">Download</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="whats-new.html">What's new in 3.0</a></li>
+          <li><a href="migration.html">Moving from 2.x</a></li>
+          <li><a href="spec.html">Language specification</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p>TB — a friendly programming language.</p>
+      <p>TB <span data-version>3.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
+  <script src="assets/js/docs.js" defer></script>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

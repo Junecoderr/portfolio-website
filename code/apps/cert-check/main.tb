@@ -17,7 +17,9 @@ import tls
 import json
 
 fn usage() {
-  say("Usage: tb main.tb HOST[:PORT] ... [--file hosts.txt] [--warn DAYS] [--versions] [--ca-file ca.pem] [--json]")
+  say(
+    "Usage: tb main.tb HOST[:PORT] ... [--file hosts.txt] [--warn DAYS] [--versions] [--ca-file ca.pem] [--json]",
+  )
 }
 
 let targets = []
@@ -118,7 +120,9 @@ if as_json {
     say(f"  trusted   {r.verified}, name matches {r.hostname_matches}, self-signed {r.self_signed}")
     say(f"  protocol  {r.version} {r.cipher}")
     if r.get("versions") != nil {
-      let on = keys(r.versions).filter(fn(v) { return r.versions[v] == true })
+      let on = keys(r.versions).filter(fn(v) {
+        return r.versions[v] == true
+      })
       say(f"  accepts   {on.join(", ")}")
     }
     for issue in r.issues {
@@ -126,10 +130,14 @@ if as_json {
     }
     say("")
   }
-  let bad = results.filter(fn(r) { return not r.ok })
+  let bad = results.filter(fn(r) {
+    return not r.ok
+  })
   say(f"{len(results) - len(bad)} of {len(results)} servers OK.")
 }
 
-if results.any(fn(r) { return not r.ok }) {
+if results.any(fn(r) {
+  return not r.ok
+}) {
   exit(1)
 }

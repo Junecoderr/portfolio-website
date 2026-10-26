@@ -16,11 +16,12 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="download.html#whats-new" aria-label="Version 2.0.1: what's new">v<span data-version>2.0.1</span></a>
+      <a class="version-badge" href="whats-new.html" aria-label="Version 3.0.0: what's new">v<span data-version>3.0.0</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html" aria-current="page">Learn</a>
         <a href="library.html">Library</a>
+        <a href="tools.html">Tools</a>
         <a href="examples.html">Examples</a>
         <a href="playground.html">Playground</a>
         <a href="download.html" class="nav-cta">Download</a>
@@ -57,6 +58,26 @@
             <li><a href="#modules">15. Libraries: import</a></li>
             <li><a href="#try-catch">16. Catching mistakes: try, catch and throw</a></li>
             <li><a href="#more-loops">17. More loops: break, continue, in and +=</a></li>
+          </ul>
+          <h2 id="nav-tb3">New in TB 3.0</h2>
+          <ul>
+            <li><a href="#tb3">What TB 3.0 adds</a></li>
+            <li><a href="#classes">18. Your own kinds of things: classes</a></li>
+            <li><a href="#enums">19. A fixed set of choices: enum</a></li>
+            <li><a href="#match">20. Choosing by shape: match</a></li>
+            <li><a href="#destructuring">21. Unpacking and spreading</a></li>
+            <li><a href="#functions-3">22. More about functions: defaults, names, extras and lambdas</a></li>
+            <li><a href="#const">23. Values that never change: const</a></li>
+            <li><a href="#numbers">24. Numbers in depth: whole numbers, bits and formats</a></li>
+            <li><a href="#text-3">25. More about text: escapes, raw and multi-line</a></li>
+            <li><a href="#bytes">26. Bytes: the raw data inside files</a></li>
+            <li><a href="#ranges">27. Ranges and slices</a></li>
+            <li><a href="#if-then">28. Choosing a value: if ... then ... else</a></li>
+            <li><a href="#typed-errors">29. Kinds of errors, and finally</a></li>
+            <li><a href="#generators">30. Generators: one value at a time</a></li>
+            <li><a href="#async">31. Doing things at the same time: async and await</a></li>
+            <li><a href="#modules-3">32. Sharing code: export, from-import and packages</a></li>
+            <li><a href="#assert-defer">33. assert and defer</a></li>
           </ul>
           <h2>Tutorials</h2>
           <ul>
@@ -139,7 +160,7 @@ say("line one\nline two")</code></pre>
     <section id="let">
       <h2><span class="chapter-num">3.</span>Remembering things with <code>let</code></h2>
       <p><code>let</code> gives a value a name, so you can use it again later. Think of it as a labelled box.</p>
-      <pre class="tb-code" data-runnable><code>let name = "Alex"
+      <pre class="tb-code" data-runnable><code>let name = "Tanisha"
 let age = 25
 say(name)
 say(age)</code></pre>
@@ -167,8 +188,8 @@ say(7 / 2)
 say(7 % 2)
 say((2 + 3) * 4)</code></pre>
       <p><code>+</code> also <strong>joins text</strong> together. If either side is text, TB joins them as text.</p>
-      <pre class="tb-code" data-runnable><code>let first = "Priya"
-let last = "Shah"
+      <pre class="tb-code" data-runnable><code>let first = "Tanisha"
+let last = "the analyst"
 say(first + " " + last)
 say("I have " + 3 + " plants")</code></pre>
       <p>Text times a number repeats the text:</p>
@@ -284,8 +305,8 @@ for flower in flowers {
   say("Hello, " + name + "! Have a nice day.")
 }
 
-greet("Alex")
-greet("Sam")</code></pre>
+greet("Tanisha")
+greet("world")</code></pre>
       <p><code>return</code> hands a value back, so you can use the answer somewhere else.</p>
       <pre class="tb-code" data-runnable><code>fn double(x) {
   return x * 2
@@ -345,7 +366,7 @@ say("Only " + str(cups + 1) + " more and you'll be a professional.")</code></pre
       <p><code>care</code> is TB's special instruction. It prints a kind message, picked at random,
       after a ♥ symbol. Give it a name to make the message personal.</p>
       <pre class="tb-code" data-runnable><code>care()
-care("Alex")</code></pre>
+care("Tanisha")</code></pre>
       <p>Try the <a href="examples.html#care_bot">Care bot</a> example to see <code>ask</code> and
       <code>care</code> working together.</p>
     </section>
@@ -358,7 +379,7 @@ care("Alex")</code></pre>
       <strong>what</strong> confused it:</p>
       <pre class="output">Oops! On line 2: I don't know what 'nmae' is. Did you mean 'name'?</pre>
       <p>Try running this one. It has a typo on line 2:</p>
-      <pre class="tb-code" data-runnable data-expect-error><code>let name = "Alex"
+      <pre class="tb-code" data-runnable data-expect-error><code>let name = "Tanisha"
 say(nmae)</code></pre>
       <p>Some common "Oops!" messages and what they mean:</p>
       <ul>
@@ -387,7 +408,7 @@ say(snacks[3])</code></pre>
       <h2><span class="chapter-num">12.</span>Maps: things with names</h2>
       <p>A list keeps things in order. A <strong>map</strong> keeps things by name: each <strong>key</strong> points to a
       <strong>value</strong>. Write it with curly brackets, a colon between each key and its value.</p>
-      <pre class="tb-code" data-runnable><code>let me = {"name": "Alex", "city": "Lisbon", "plants": 4}
+      <pre class="tb-code" data-runnable><code>let me = {"name": "Tanisha", "city": "Lisbon", "plants": 4}
 say(me["name"])
 say(me.city)
 say(len(me), "keys")</code></pre>
@@ -402,14 +423,14 @@ say(tea.get("milk", "no milk"))
 for key in tea {
   say(key + " is " + str(tea[key]))
 }</code></pre>
-      <p class="note">Maps are everywhere in TB 2.0: a log line, an alert and a JSON file all come back as maps.</p>
+      <p class="note">Maps are everywhere in TB: a log line, an alert and a JSON file all come back as maps.</p>
     </section>
 
     <section id="methods">
       <h2><span class="chapter-num">13.</span>Methods: asking a value to do something</h2>
       <p>Text, lists, maps and numbers come with <strong>methods</strong>: little built-in functions you call with a dot
       after the value. <code>"hi".upper()</code> asks the text <code>"hi"</code> for its capital-letter version.</p>
-      <pre class="tb-code" data-runnable><code>let name = "  Alex  "
+      <pre class="tb-code" data-runnable><code>let name = "  Tanisha  "
 say(name.trim().upper())
 say("apple,mango,kiwi".split(","))
 say("Hello".contains("ell"), "Hello".starts_with("He"))
@@ -428,7 +449,7 @@ say(["b", "a", "c"].sort().join(" &lt; "))</code></pre>
       <h2><span class="chapter-num">14.</span>Text with holes: f-strings</h2>
       <p>Joining text with <code>+</code> gets fiddly. Put an <code>f</code> before the quotes and you can drop any
       value straight into the text inside <code>{ }</code>. TB fills in each hole when the line runs.</p>
-      <pre class="tb-code" data-runnable><code>let name = "Alex"
+      <pre class="tb-code" data-runnable><code>let name = "Tanisha"
 let cups = 3
 say(f"{name} has had {cups} cups of tea.")
 say(f"That's {cups * 250} ml, or {round(cups * 0.25, 2)} litres.")
@@ -439,7 +460,7 @@ say(f"Shouting: {name.upper()}!")</code></pre>
 
     <section id="modules">
       <h2><span class="chapter-num">15.</span>Libraries: import</h2>
-      <p>TB comes with twenty <strong>libraries</strong>, extra sets of instructions for jobs like reading files, working
+      <p>TB comes with <span data-lib-count>43</span> <strong>libraries</strong>, extra sets of instructions for jobs like reading files, working
       with dates, parsing logs or opening windows. Bring one in with <code>import</code>, then use its functions with a dot.</p>
       <pre class="tb-code" data-runnable><code>import math
 import text
@@ -510,6 +531,410 @@ say(seen, total)
 say("cake" in seen, "x" in "TB")</code></pre>
     </section>
 
+    <!-- TB 3.0 -->
+    <section id="tb3">
+      <h2>What TB 3.0 adds</h2>
+      <p>Lessons 1 to 17 cover everything you need to write useful programs. The next lessons are about the parts that arrived in TB 3.0: your own classes, pattern matching, generators, tasks and more. Programs written for TB 2 keep working; <a href="whats-new.html">What's new in 3.0</a> has the full list and <a href="migration.html">Moving from 2.x</a> the few things that changed.</p>
+    </section>
+
+    <!-- 18 -->
+    <section id="classes">
+      <h2><span class="chapter-num">18.</span>Your own kinds of things: classes</h2>
+      <p>A <strong>class</strong> describes a kind of thing: what it remembers (its <strong>fields</strong>) and what it can do (its <strong>methods</strong>). Calling the class makes a new <strong>instance</strong>. Inside a method, <code>self</code> is the instance it was called on.</p>
+      <pre class="tb-code" data-runnable><code>class Alert {
+  let level = "low"
+  static let count = 0
+
+  fn init(rule, ip) {
+    self.rule = rule
+    self.ip = ip
+    Alert.count += 1
+  }
+
+  fn text() {
+    return f"[{self.level}] {self.rule} from {self.ip}"
+  }
+}
+
+let a = Alert("ssh brute force", "203.0.113.42")
+say(a)
+a.level = "high"
+say(a.rule, a.level)
+say(type(a), Alert.count)</code></pre>
+      <p><code>init</code> runs when an instance is made. <code>let</code> inside the class gives every instance a field with a starting value; <code>static let</code> belongs to the class itself. A method called <code>text()</code> decides how the instance looks in <code>say</code> and f-strings.</p>
+      <p>A class can <strong>extend</strong> another and get all of its fields and methods. <code>super.method()</code> calls the parent's version; <code>x is ClassName</code> checks what something is.</p>
+      <pre class="tb-code" data-runnable><code>class Animal {
+  let sound = "..."
+  fn init(name) { self.name = name }
+  fn speak() { return f"{self.name} says {self.sound}" }
+}
+
+class Dog extends Animal {
+  let sound = "woof"
+  fn init(name) {
+    super.init(name)
+    self.tricks = []
+  }
+  fn speak() { return super.speak() + "!" }
+}
+
+let d = Dog("Rex")
+d.tricks.push("sit")
+say(d.speak())
+say(d is Animal, d is Dog, type(d))
+say(d.fields())</code></pre>
+    </section>
+
+    <!-- 19 -->
+    <section id="enums">
+      <h2><span class="chapter-num">19.</span>A fixed set of choices: enum</h2>
+      <p>An <strong>enum</strong> names a small, fixed set of values, so you can't mistype one. Each value knows its <code>.name</code> and its position, <code>.index</code>.</p>
+      <pre class="tb-code" data-runnable><code>enum Level { low, medium, high }
+
+let now = Level.medium
+say(now, now.name, now.index)
+say(now == Level.medium, now == Level.high)
+for level in Level.values() {
+  say(level.index, level.name)
+}</code></pre>
+    </section>
+
+    <!-- 20 -->
+    <section id="match">
+      <h2><span class="chapter-num">20.</span>Choosing by shape: match</h2>
+      <p><code>match</code> compares a value against a list of <strong>patterns</strong>, top to bottom, and gives the result of the first arm that fits. <code>_</code> fits everything, so it goes last.</p>
+      <pre class="tb-code" data-runnable><code>fn describe(x) {
+  return match x {
+    0 =&gt; "zero"
+    1..=9 =&gt; "a small number"
+    n if n is number and n &lt; 0 =&gt; "below zero"
+    "critical" or "high" =&gt; "act now"
+    is text =&gt; f"some text: {x}"
+    [] =&gt; "an empty list"
+    [first, ...rest] =&gt; f"a list starting with {first} ({len(rest)} more)"
+    {"ip": ip, "port": 22} =&gt; f"SSH on {ip}"
+    _ =&gt; "something else"
+  }
+}
+
+for x in [0, 7, -3, "high", "hello", [], [5, 6, 7], {"ip": "192.0.2.10", "port": 22}, nil] {
+  say(describe(x))
+}</code></pre>
+      <p>Patterns can be plain values, several values joined with <code>or</code>, ranges like <code>1..=9</code>, a name that catches the value (with an <code>if</code> guard), <code>is text</code>, lists with <code>...rest</code>, and maps that need certain keys. They also work with enums and classes:</p>
+      <pre class="tb-code" data-runnable><code>enum Level { low, medium, high }
+
+class Alert {
+  fn init(rule, level) {
+    self.rule = rule
+    self.level = level
+  }
+}
+
+let alerts = [Alert("port scan", Level.medium), Alert("new admin", Level.high), Alert("login", Level.low)]
+for a in alerts {
+  let action = match a.level {
+    Level.high =&gt; "page someone"
+    Level.medium =&gt; "open a ticket"
+    _ =&gt; "just log it"
+  }
+  say(f"{a.rule}: {action}")
+}
+
+let first = alerts[0]
+match first {
+  Alert {rule: r, level: Level.medium} =&gt; say(f"medium alert: {r}")
+  _ =&gt; say("something else")
+}</code></pre>
+      <p>If nothing fits and there is no <code>_</code> arm, TB stops with an Oops that shows the value, so you notice the case you forgot.</p>
+    </section>
+
+    <!-- 21 -->
+    <section id="destructuring">
+      <h2><span class="chapter-num">21.</span>Unpacking and spreading</h2>
+      <p><strong>Destructuring</strong> takes a list or map apart into named pieces in one step. In a map pattern, <code>ip: address</code> renames a key and <code>owner = "nobody"</code> gives a default when the key is missing. <strong>Spread</strong> (<code>...</code>) does the opposite and pours a list or map into a new one.</p>
+      <pre class="tb-code" data-runnable><code>let ports = [22, 80, 443, 8080]
+let [first, second, ...rest] = ports
+say(first, second, rest)
+
+let host = {"name": "web01", "ip": "192.0.2.10"}
+let {name, ip: address, owner = "nobody"} = host
+say(name, address, owner)
+
+for [port, service] in [[22, "ssh"], [443, "https"]] {
+  say(f"{port} is {service}")
+}
+
+let a = 1
+let b = 2
+a, b = b, a
+say(a, b)
+
+let more = [...ports, 3389]
+let merged = {...host, "owner": "Tanisha"}
+say(more)
+say(merged)</code></pre>
+    </section>
+
+    <!-- 22 -->
+    <section id="functions-3">
+      <h2><span class="chapter-num">22.</span>More about functions: defaults, names, extras and lambdas</h2>
+      <p>Inputs can have <strong>defaults</strong>, and you can pass any input <strong>by name</strong>. <code>...rest</code> collects any extra inputs into a list, and <code>**opts</code> collects extra named ones into a map. A <strong>lambda</strong> such as <code>x =&gt; x * 2</code> is a short way to write a small function.</p>
+      <pre class="tb-code" data-runnable><code>fn connect(host, port = 22, timeout = 5) {
+  return f"{host}:{port} (wait {timeout}s)"
+}
+say(connect("192.0.2.10"))
+say(connect("192.0.2.10", 443))
+say(connect("192.0.2.10", timeout = 1))
+
+fn total(first, ...rest) {
+  return first + rest.sum()
+}
+say(total(1, 2, 3, 4))
+
+fn tag(text, **opts) {
+  return f"{text} {opts}"
+}
+say(tag("alert", level = "high", owner = "Tanisha"))
+
+let double = x =&gt; x * 2
+let add = (a, b) =&gt; a + b
+say(double(21), add(2, 3))
+say([3, 1, 2].map(x =&gt; x * 10))
+say([5, 12, 8].filter(n =&gt; n &gt; 6))
+say(double.name, add.arity)
+
+say(add(...[10, 20]))</code></pre>
+    </section>
+
+    <!-- 23 -->
+    <section id="const">
+      <h2><span class="chapter-num">23.</span>Values that never change: const</h2>
+      <p><code>const</code> is like <code>let</code>, but the name can never point at something else. (A list made with <code>const</code> can still grow; it's the name that is fixed.)</p>
+      <pre class="tb-code" data-runnable><code>const MAX_TRIES = 5
+const PORTS = [22, 80, 443]
+say(MAX_TRIES, PORTS)
+PORTS.push(8080)
+say(PORTS)</code></pre>
+      <p>Trying to change it is a mistake TB catches:</p>
+      <pre class="tb-code" data-runnable data-expect-error><code>const MAX_TRIES = 5
+MAX_TRIES = 6</code></pre>
+    </section>
+
+    <!-- 24 -->
+    <section id="numbers">
+      <h2><span class="chapter-num">24.</span>Numbers in depth: whole numbers, bits and formats</h2>
+      <p>Whole numbers can be as big as you like and can be written in hex (<code>0xff</code>), binary (<code>0b1010</code>) or octal (<code>0o17</code>), with <code>_</code> to make them readable. <code>/</code> always divides exactly; <code>//</code> divides and rounds down. The bit operators <code>&amp; | ^ ~ &lt;&lt; &gt;&gt;</code> work on whole numbers, and comparisons can be chained.</p>
+      <p>After a <code>:</code> inside an f-string hole comes a <strong>format</strong>: <code>.2f</code> for two decimals, <code>,</code> for thousands, <code>x</code> for hex, <code>b</code> for binary, <code>%</code> for percent, and <code>&lt;</code> <code>&gt;</code> <code>^</code> with a width to line things up.</p>
+      <pre class="tb-code" data-runnable><code>say(1_000_000, 0xff, 0b1010, 0o17, 2.5e-3)
+say(7 / 2, 6 / 3, 7 // 2, -7 % 3, 2 ** 10)
+say((7 / 2).is_float(), (6 // 3).is_int(), int(3.9), float(2))
+say(0b1100 &amp; 0b1010, 0b1100 | 0b1010, 0b1100 ^ 0b1010, ~0, 1 &lt;&lt; 4, 256 &gt;&gt; 2)
+let x = 5
+say(0 &lt; x &lt;= 10)
+
+let price = 1234.5678
+say(f"{price:.2f} | {price:,.1f} | {255:x} | {255:08b} | {0.257:.1%}")
+say(f"[{"left":&lt;8}] [{"right":&gt;8}] [{"mid":^8}] [{42:05}]")
+say(format(3.14159, ".3f"), (1234567).format(","))</code></pre>
+    </section>
+
+    <!-- 25 -->
+    <section id="text-3">
+      <h2><span class="chapter-num">25.</span>More about text: escapes, raw and multi-line</h2>
+      <p>Escapes start with a backslash: <code>\t</code> is a tab, <code>\xNN</code> and <code>\u{HEX}</code> give any character. Raw text, <code>r"..."</code>, keeps backslashes as they are, which is handy for Windows paths and regular expressions. Three quote marks make text that spans several lines, and text can be indexed and sliced like a list.</p>
+      <pre class="tb-code" data-runnable><code>say("tab:\tend", "quote: \"", 'single: \'')
+say("A is \x41, a heart is \u{2665}")
+say(r"C:\Users\Tanisha\new")
+let poem = """Roses are red,
+logs can be read."""
+say(poem)
+let name = "Tanisha"
+say(f"""Hello, {name}!
+You have {3 + 4} alerts.""")
+let s = "detection"
+say(s[0], s[-1], s[0:6], s[::-1])</code></pre>
+    </section>
+
+    <!-- 26 -->
+    <section id="bytes">
+      <h2><span class="chapter-num">26.</span>Bytes: the raw data inside files</h2>
+      <p>Files and network packets are made of <strong>bytes</strong>, numbers from 0 to 255. <code>b"..."</code> writes bytes directly; <code>text.bytes()</code> and <code>data.to_text()</code> convert. The <code>binary</code> library packs and unpacks numbers the way file formats store them.</p>
+      <pre class="tb-code" data-runnable><code>import binary
+import hash
+
+let data = b"MZ\x90\x00hello"
+say(type(data), len(data), data.hex())
+say(data[0], data.slice(0, 2), data.starts_with(b"MZ"))
+for byte in data.slice(0, 4) {
+  say(byte)
+}
+say("café".bytes(), b"caf\xc3\xa9".to_text())
+let packed = binary.pack("&lt;HI", 1, 70000)
+say(packed.hex(), binary.unpack("&lt;HI", packed))
+say(hash.sha256(b"hello").slice(0, 16))</code></pre>
+    </section>
+
+    <!-- 27 -->
+    <section id="ranges">
+      <h2><span class="chapter-num">27.</span>Ranges and slices</h2>
+      <p><code>1..5</code> is a <strong>range</strong> from 1 up to (not including) 5, and <code>1..=5</code> includes the 5. Ranges are lazy: they don't build a list until you ask. Slices like <code>xs[1:3]</code> cut a piece out of a list, text or bytes; a third number is the step, so <code>xs[::-1]</code> is reversed.</p>
+      <pre class="tb-code" data-runnable><code>let r = 1..5
+say(r, r.to_list(), (1..=5).to_list(), len(r))
+say(3 in r, 5 in r)
+say((0..10).step(3).to_list())
+for i in 0..3 {
+  say("turn", i)
+}
+let xs = [10, 20, 30, 40, 50]
+say(xs[1:3], xs[:2], xs[-2:], xs[::2], xs[::-1])</code></pre>
+    </section>
+
+    <!-- 28 -->
+    <section id="if-then">
+      <h2><span class="chapter-num">28.</span>Choosing a value: if ... then ... else</h2>
+      <p>When you just need to pick one of two values, <code>if</code> can be written on one line with <code>then</code>. It gives back the value of the branch it picked.</p>
+      <pre class="tb-code" data-runnable><code>let tries = 7
+let level = if tries &gt; 5 then "high" else "low"
+say(level)
+for n in [1, 2, 3] {
+  say(f"{n} is " + (if n % 2 == 0 then "even" else "odd"))
+}</code></pre>
+    </section>
+
+    <!-- 29 -->
+    <section id="typed-errors">
+      <h2><span class="chapter-num">29.</span>Kinds of errors, and finally</h2>
+      <p>Every error is an <code>Error</code> object with a <code>message</code>, a <code>line</code> and a <code>kind</code>. Libraries throw specific kinds, such as <code>ParseError</code> or <code>NotFoundError</code> (a kind of <code>FileError</code>), and <code>catch err: Kind</code> catches only that kind. <code>finally</code> runs whatever happened. Make your own kinds by extending <code>Error</code>.</p>
+      <pre class="tb-code" data-runnable><code>import json
+import fs
+
+try {
+  json.parse("{not json")
+} catch err: ParseError {
+  say("bad JSON:", err.kind)
+} finally {
+  say("done reading")
+}
+
+try {
+  fs.read("no-such-file.txt")
+} catch err: NotFoundError {
+  say("missing:", err.kind, err is FileError)
+}
+
+class QuotaError extends Error { }
+
+fn spend(amount) {
+  if amount &gt; 100 {
+    throw QuotaError("Too much at once", {"limit": 100})
+  }
+  return amount
+}
+
+try {
+  spend(500)
+} catch err: QuotaError or ValueError {
+  say(err.message, err.limit, err.kind, err.line)
+}</code></pre>
+    </section>
+
+    <!-- 30 -->
+    <section id="generators">
+      <h2><span class="chapter-num">30.</span>Generators: one value at a time</h2>
+      <p>A function that uses <code>yield</code> becomes a <strong>generator</strong>: each time someone asks for the next value, it runs until the next <code>yield</code> and pauses there. That means it can describe an endless sequence, and only the values you take are ever made. <code>.next()</code> gives <code>done</code> when it has finished.</p>
+      <pre class="tb-code" data-runnable><code>fn countdown(n) {
+  while n &gt; 0 {
+    yield n
+    n -= 1
+  }
+}
+for x in countdown(3) {
+  say(x)
+}
+
+fn evens() {
+  let n = 0
+  while true {
+    yield n
+    n += 2
+  }
+}
+say(evens().take(5).to_list())
+say(evens().map(x =&gt; x * x).filter(x =&gt; x &gt; 10).take(3).to_list())
+
+let g = countdown(2)
+say(g.next(), g.next(), g.next())
+for i, word in ["a", "b"].enumerate() {
+  say(i, word)
+}</code></pre>
+    </section>
+
+    <!-- 31 -->
+    <section id="async">
+      <h2><span class="chapter-num">31.</span>Doing things at the same time: async and await</h2>
+      <p>Calling an <code>async fn</code> starts it as a <strong>task</strong> and gives you the task straight away; <code>await</code> waits for its answer. On your computer each task runs on its own thread, so slow work such as network checks overlaps. In the playground, tasks run one after another.</p>
+      <pre class="tb-code" data-runnable><code>async fn check(host) {
+  return f"{host} looks fine"
+}
+
+let tasks = ["web01", "web02", "db01"].map(h =&gt; check(h))
+for t in tasks {
+  say(await t)
+}
+say(type(tasks[0]))</code></pre>
+      <p>The <code>parallel</code> library runs a function over many items at once. This one needs the TB app on your computer:</p>
+      <pre class="tb-code" data-desktop><code>import net
+import parallel
+
+let hosts = ["192.0.2.10", "192.0.2.11", "192.0.2.12"]
+let results = parallel.map(h =&gt; net.tcp_check(h, 443, 2), hosts, workers = 8)
+for [host, ok] in hosts.zip(results) {
+  say(host, if ok then "open" else "closed")
+}</code></pre>
+    </section>
+
+    <!-- 32 -->
+    <section id="modules-3">
+      <h2><span class="chapter-num">32.</span>Sharing code: export, from-import and packages</h2>
+      <p>Any <code>.tb</code> file is a module. Mark what other files may use with <code>export</code>; everything else stays private:</p>
+      <pre class="tb-code"><code># helpers.tb
+export fn shout(text) { return text.upper() + "!" }
+export const GREETING = "Hello"
+fn secret() { return 42 }       # not exported</code></pre>
+      <pre class="tb-code"><code># main.tb
+import "helpers.tb"
+from "helpers.tb" import shout, GREETING as hi
+say(shout(hi))</code></pre>
+      <p><code>from ... import</code> also works with the standard library, and <code>as</code> gives a name of your choice:</p>
+      <pre class="tb-code" data-runnable><code>from json import parse, stringify
+from text import pad_left as pad
+
+let data = parse("{\"host\": \"web01\", \"alerts\": 3}")
+say(stringify(data))
+say(pad("7", 3, "0"))</code></pre>
+      <p><strong>Packages</strong> are modules other people wrote. <code>tb add tb-tables</code> installs one into your project, then <code>import "tb-tables" as tables</code>. See <a href="packages.html">Packages</a>.</p>
+    </section>
+
+    <!-- 33 -->
+    <section id="assert-defer">
+      <h2><span class="chapter-num">33.</span>assert and defer</h2>
+      <p><code>assert</code> checks something you believe is true and stops with an <code>AssertionError</code> if it isn't. <code>defer { ... }</code> inside a function runs when the function finishes, however it finishes: the right place to close files or print a summary.</p>
+      <pre class="tb-code" data-runnable><code>fn work() {
+  defer { say("cleaning up (runs last)") }
+  say("working")
+  return "result"
+}
+say(work())
+
+let ports = [22, 443]
+assert len(ports) == 2, "expected two ports"
+try {
+  assert 1 + 1 == 3, "maths is broken"
+} catch err: AssertionError {
+  say("caught:", err.message)
+}</code></pre>
+    </section>
+
     <section id="guides">
       <h2>Tutorials</h2>
       <p>Longer walk-throughs that build something real. The security ones run right here in your browser, on sample logs and emails that come with TB.</p>
@@ -524,7 +949,7 @@ say("cake" in seen, "x" in "TB")</code></pre>
 
     <section id="reference">
       <h2>Reference: built-in instructions</h2>
-      <p>These eight instructions have been in TB from the start. Version 2.0 adds a few more (<code>type</code>, <code>keys</code>, <code>int</code>, <code>round</code>, <code>min</code>, <code>max</code>, <code>sum</code>, <code>sorted</code>, <code>exit</code>), plus methods on every value and twenty libraries: see the <a href="library.html">library reference</a>.</p>
+      <p>These eight instructions have been in TB from the start. Version 2.0 adds a few more (<code>type</code>, <code>keys</code>, <code>int</code>, <code>round</code>, <code>min</code>, <code>max</code>, <code>sum</code>, <code>sorted</code>, <code>exit</code>), plus methods on every value and <span data-lib-count>43</span> libraries (3.0 adds <code>format</code>, <code>float</code> and more): see the <a href="library.html">library reference</a>.</p>
       <div class="sig-list">
         <article class="sig" id="ref-say">
           <div class="sig-head">
@@ -613,7 +1038,7 @@ say("Hello, " + name + "!")</code></pre>
           <div class="sig-body">
             <p>Prints <code>♥</code> and a kind message, chosen at random. Give it a name to make it personal.</p>
             <pre class="tb-code" data-runnable><code>care()
-care("Alex")</code></pre>
+care("Tanisha")</code></pre>
           </div>
         </article>
       </div>
@@ -626,7 +1051,7 @@ care("Alex")</code></pre>
         <table class="kw-table">
           <thead><tr><th scope="col">Keyword</th><th scope="col">What it does</th><th scope="col">Example</th></tr></thead>
           <tbody>
-            <tr><td><code>let</code></td><td>Makes a new named box</td><td><code>let name = "Alex"</code></td></tr>
+            <tr><td><code>let</code></td><td>Makes a new named box</td><td><code>let name = "Tanisha"</code></td></tr>
             <tr><td><code>=</code></td><td>Changes a box that already exists</td><td><code>name = "Tani"</code></td></tr>
             <tr><td><code>fn</code></td><td>Makes a function (named or not)</td><td><code>fn double(x) { return x * 2 }</code></td></tr>
             <tr><td><code>return</code></td><td>Hands a value back from a function</td><td><code>return x * 2</code></td></tr>
@@ -643,6 +1068,17 @@ care("Alex")</code></pre>
             <tr><td><code>in / not in</code></td><td>Is it inside a list, text or map?</td><td><code>if "tea" in drinks { ... }</code></td></tr>
             <tr><td><code>+= -= *= /=</code></td><td>Change a box in one step</td><td><code>total += 1</code></td></tr>
             <tr><td><code>f"..."</code></td><td>Text with {holes} filled in</td><td><code>f"Hi {name}"</code></td></tr>
+            <tr><td><code>const</code></td><td>A name that can never be changed (3.0)</td><td><code>const MAX = 5</code></td></tr>
+            <tr><td><code>class / extends / self / super / static</code></td><td>Your own kinds of things (3.0)</td><td><code>class Dog extends Animal { ... }</code></td></tr>
+            <tr><td><code>enum</code></td><td>A fixed set of named values (3.0)</td><td><code>enum Level { low, high }</code></td></tr>
+            <tr><td><code>match</code></td><td>Picks the first pattern that fits (3.0)</td><td><code>match x { 0 =&gt; "zero"  _ =&gt; "more" }</code></td></tr>
+            <tr><td><code>if ... then ... else</code></td><td>Chooses a value in one line (3.0)</td><td><code>if ok then "yes" else "no"</code></td></tr>
+            <tr><td><code>is</code></td><td>Is it this type or class? (3.0)</td><td><code>if x is text { ... }</code></td></tr>
+            <tr><td><code>yield</code></td><td>Hands out the next value of a generator (3.0)</td><td><code>yield n</code></td></tr>
+            <tr><td><code>async / await</code></td><td>Start a task, and wait for its answer (3.0)</td><td><code>let t = check(host)</code>, <code>await t</code></td></tr>
+            <tr><td><code>finally</code></td><td>Always runs after try and catch (3.0)</td><td><code>try { ... } finally { ... }</code></td></tr>
+            <tr><td><code>export / from</code></td><td>Share names from a module, and import them (3.0)</td><td><code>from json import parse</code></td></tr>
+            <tr><td><code>defer / assert</code></td><td>Run at the end of a function; check something is true (3.0)</td><td><code>assert n &gt; 0, "need a number"</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -694,6 +1130,7 @@ care("Alex")</code></pre>
         <h2 id="footer-learn">Learn</h2>
         <ul>
           <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#tb3">TB 3.0 lessons</a></li>
           <li><a href="docs.html#guides">Tutorials</a></li>
           <li><a href="library.html">Library reference</a></li>
           <li><a href="examples.html">Examples and apps</a></li>
@@ -703,21 +1140,26 @@ care("Alex")</code></pre>
         <h2 id="footer-tools">Tools</h2>
         <ul>
           <li><a href="playground.html">Playground</a></li>
+          <li><a href="tools.html">Command-line tools</a></li>
+          <li><a href="tools.html#vscode">VS Code extension</a></li>
+          <li><a href="packages.html">Packages</a></li>
           <li><a href="download.html">Download</a></li>
-          <li><a href="download.html#verify">Checksums</a></li>
         </ul>
       </nav>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="download.html#whats-new">What's new</a></li>
+          <li><a href="whats-new.html">What's new in 3.0</a></li>
+          <li><a href="migration.html">Moving from 2.x</a></li>
+          <li><a href="spec.html">Language specification</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
       </nav>
     </div>
     <div class="footer-bottom">
       <p>TB — a friendly programming language.</p>
-      <p>TB <span data-version>2.0.1</span>, released 26 October 2026.</p>
+      <p>TB <span data-version>3.0.0</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

@@ -65,7 +65,9 @@ if not fs.exists(rules_path) {
 # -- loading ------------------------------------------------------------------------------
 fn rule_files(path) {
   if fs.is_dir(path) {
-    return fs.walk(path).filter(fn(p) { return p.ends_with(".yml") or p.ends_with(".yaml") })
+    return fs.walk(path).filter(fn(p) {
+      return p.ends_with(".yml") or p.ends_with(".yaml")
+    })
   }
   return [path]
 }
@@ -123,7 +125,14 @@ fn validate(path) {
     if source != nil {
       formats = source.formats.join(", ")
     }
-    rows.push({"ok": "yes", "file": item.file, "title": r.name, "level": r.level, "kind": kind_of(r), "reads": formats})
+    rows.push({
+      "ok": "yes",
+      "file": item.file,
+      "title": r.name,
+      "level": r.level,
+      "kind": kind_of(r),
+      "reads": formats,
+    })
   }
   if not rows.is_empty() {
     say(report.table(rows, ["ok", "file", "title", "level", "kind", "reads"], {"max_width": 40}))
@@ -177,7 +186,9 @@ fn convert(path, wanted) {
 
 fn run_rules(path, files) {
   let result = load_rules(path)
-  let rules = result.loaded.map(fn(item) { return item.rule })
+  let rules = result.loaded.map(fn(item) {
+    return item.rule
+  })
   if rules.is_empty() {
     say("No rules loaded, so there is nothing to run.")
     exit(1)
@@ -208,7 +219,9 @@ fn run_rules(path, files) {
 }
 
 fn sample_logs() {
-  return ["auth.log", "access.log", "windows_security.json"].map(fn(n) { return fs.join(data, n) })
+  return ["auth.log", "access.log", "windows_security.json"].map(fn(n) {
+    return fs.join(data, n)
+  })
 }
 
 if command == "validate" {

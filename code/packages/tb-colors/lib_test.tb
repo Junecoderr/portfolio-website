@@ -38,14 +38,24 @@ test.case("colours can be switched off", fn() {
 test.case("hex codes become rgb parts", fn() {
   test.equal(colors.hex_to_rgb("#008080"), [0, 128, 128])
   test.equal(colors.hex_to_rgb("FFF"), [255, 255, 255])
-  test.raises(fn() { colors.hex_to_rgb("#12") }, "6 digits")
-  test.raises(fn() { colors.hex_to_rgb("#zzzzzz") }, "hex")
+  test.raises(fn() {
+    colors.hex_to_rgb("#12")
+  }, "6 digits")
+  test.raises(fn() {
+    colors.hex_to_rgb("#zzzzzz")
+  }, "hex")
 })
 
 test.case("unknown names are friendly errors", fn() {
-  test.raises(fn() { colors.paint("x", "purple") }, "doesn't know the colour 'purple'")
-  test.raises(fn() { colors.style("x", "wobbly") }, "doesn't know the style 'wobbly'")
-  test.raises(fn() { colors.rgb("x", 300, 0, 0) }, "0 to 255")
+  test.raises(fn() {
+    colors.paint("x", "purple")
+  }, "doesn't know the colour 'purple'")
+  test.raises(fn() {
+    colors.style("x", "wobbly")
+  }, "doesn't know the style 'wobbly'")
+  test.raises(fn() {
+    colors.rgb("x", 300, 0, 0)
+  }, "0 to 255")
 })
 
 test.case("status picks the usual colour", fn() {

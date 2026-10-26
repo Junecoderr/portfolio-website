@@ -1,0 +1,38 @@
+# Conformance: §11 formatting.
+
+import test
+
+test.case("§11 format specs in f-text", fn() {
+  test.equal(f"{3.14159:.2f}", "3.14")
+  test.equal(f"{42:>5}|{42:<5}|", "   42|42   |")
+  test.equal(f"{"ab":^6}|", "  ab  |")
+  test.equal(f"{1234567:,}", "1,234,567")
+  test.equal(f"{255:x} {255:X} {5:b} {8:o}", "ff FF 101 10")
+  test.equal(f"{0.25:.1%}", "25.0%")
+  test.equal(f"{"hello":.3}", "hel")
+  test.equal(f"{7:08.3f}", "0007.000")
+  test.equal(f"{"s":*^5}", "**s**")
+})
+
+test.case("§11 !r shows values as code", fn() {
+  test.equal(f"{"x"!r}", "\"x\"")
+  test.equal(f"{"hi"!r:>6}|", "  \"hi\"|")
+  test.equal(f"{[1, "a"]!r}", "[1, \"a\"]")
+})
+
+test.case("§11 format() and .format()", fn() {
+  test.equal(format(3.14159, ".2f"), "3.14")
+  test.equal((3.14159).format(".1f"), "3.1")
+  test.equal("ab".format(">4"), "  ab")
+  test.equal((255).format("X"), "FF")
+})
+
+test.case("§11 unknown specs are friendly errors", fn() {
+  test.raises(() => format(1, "q"), "I don't understand the format 'q'")
+})
+
+test.case("§3.1 tidy display", fn() {
+  test.equal(str(6 / 3), "2")
+  test.equal(str(7 / 2), "3.5")
+  test.equal(str(1.5), "1.5")
+})

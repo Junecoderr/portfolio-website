@@ -1,0 +1,10 @@
+import evtx
+
+# apps/data/sample.evtx is a small made-up Windows Security log.
+let records = evtx.read("apps/data/sample.evtx")
+say(f"{len(records)} events")
+
+for r in records.slice(0, 5) {
+  say(f"{r.when}  {r.EventID}  {r.action}  {r.user}")
+}
+say(evtx.summary(records))

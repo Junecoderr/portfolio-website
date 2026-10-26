@@ -69,7 +69,9 @@ if not info.checksums_ok {
 if info.dirty {
   health += ", not closed cleanly"
 }
-say(f"== {fs.name(path)}  (EVTX {info.version}, {info.chunk_count} chunk(s), {summary.records} events, {health})")
+say(
+  f"== {fs.name(path)}  (EVTX {info.version}, {info.chunk_count} chunk(s), {summary.records} events, {health})",
+)
 say(f"   {summary.first_when} to {summary.last_when}")
 let computers = []
 for name in summary.computers.keys() {
@@ -89,12 +91,19 @@ say("")
 say("Events by type")
 let type_rows = []
 for id in summary.event_ids.keys() {
-  let sample = records.filter(fn(r) { return r.event_id == id }).first()
+  let sample = records.filter(fn(r) {
+    return r.event_id == id
+  }).first()
   let what = sample.description
   if what == nil {
     what = "(no description for this event)"
   }
-  type_rows.push({"event_id": id, "count": summary.event_ids[id], "action": sample.action, "description": what})
+  type_rows.push({
+    "event_id": id,
+    "count": summary.event_ids[id],
+    "action": sample.action,
+    "description": what,
+  })
 }
 say(report.table(type_rows, ["event_id", "count", "action", "description"], {"max_width": 60}))
 say("")
@@ -103,7 +112,9 @@ say("")
 fn notes_for(alert) {
   let notes = []
   if alert.get("success_after", false) {
-    notes.push(f"{alert.by} guessed a password: {alert.success_user} logged in at {alert.success_when}. Treat the account as compromised.")
+    notes.push(
+      f"{alert.by} guessed a password: {alert.success_user} logged in at {alert.success_when}. Treat the account as compromised.",
+    )
   }
   if alert.has("users") {
     notes.push("Accounts tried: " + alert.users.join(", "))
@@ -122,25 +133,51 @@ let alerts = rules.triage(records)
 
 # A few checks that only make sense for the binary log itself.
 let extra = []
-let installs = records.filter(fn(r) { return r.event_id == 7045 })
+let installs = records.filter(fn(r) {
+  return r.event_id == 7045
+})
 for r in installs {
   let image = r.get("ImagePath", "")
-  if image != nil and (image.lower().contains("\\users\\") or image.lower().contains("\\temp\\") or image.lower().contains("\\programdata\\")) {
-    extra.push({"level": "high", "rule": "Service installed from a user-writable folder", "by": r.get("ServiceName", "?"), "count": 1,
-                "first_when": r.when, "last_when": r.when, "records": [r], "description": f"{r.get("ServiceName", "?")} runs {image}"})
+  if image != nil and
+    (image.lower().contains("\\users\\") or
+      image.lower().contains("\\temp\\") or
+      image.lower().contains("\\programdata\\")) {
+    extra.push({
+      "level": "high",
+      "rule": "Service installed from a user-writable folder",
+      "by": r.get("ServiceName", "?"),
+      "count": 1,
+      "first_when": r.when,
+      "last_when": r.when,
+      "records": [r],
+      "description": f"{r.get("ServiceName", "?")} runs {image}",
+    })
   }
 }
-let sysmon = records.filter(fn(r) { return r.provider == "Microsoft-Windows-Sysmon" and r.event_id == 1 })
+let sysmon = records.filter(fn(r) {
+  return r.provider == "Microsoft-Windows-Sysmon" and r.event_id == 1
+})
 for r in sysmon {
   let image = r.get("Image", "")
-  if image != nil and (image.lower().contains("\\temp\\") or image.lower().contains("\\downloads\\")) {
-    extra.push({"level": "medium", "rule": "Program started from a Temp or Downloads folder", "by": r.user, "count": 1,
-                "first_when": r.when, "last_when": r.when, "records": [r], "description": image})
+  if image != nil and
+    (image.lower().contains("\\temp\\") or image.lower().contains("\\downloads\\")) {
+    extra.push({
+      "level": "medium",
+      "rule": "Program started from a Temp or Downloads folder",
+      "by": r.user,
+      "count": 1,
+      "first_when": r.when,
+      "last_when": r.when,
+      "records": [r],
+      "description": image,
+    })
   }
 }
 alerts = alerts + extra
 let order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
-alerts = alerts.sort_by(fn(a) { return order[a.level] })
+alerts = alerts.sort_by(fn(a) {
+  return order[a.level]
+})
 
 say("Alerts")
 if alerts.is_empty() {
@@ -152,7 +189,14 @@ if alerts.is_empty() {
     if by == nil {
       by = "-"
     }
-    rows.push({"level": a.level, "rule": a.rule, "by": by, "count": a.count, "first": a.first_when, "last": a.last_when})
+    rows.push({
+      "level": a.level,
+      "rule": a.rule,
+      "by": by,
+      "count": a.count,
+      "first": a.first_when,
+      "last": a.last_when,
+    })
   }
   say(report.table(rows, ["level", "rule", "by", "count", "first", "last"]))
   for a in alerts {
@@ -163,7 +207,9 @@ if alerts.is_empty() {
 }
 say("")
 
-let high = alerts.filter(fn(a) { return a.level == "high" or a.level == "critical" })
+let high = alerts.filter(fn(a) {
+  return a.level == "high" or a.level == "critical"
+})
 if not high.is_empty() {
   say("Timeline of the high and critical alerts:")
   let events = []
@@ -172,7 +218,14 @@ if not high.is_empty() {
       events.push(r)
     }
   }
-  say(report.timeline(events.sort_by(fn(r) { return r.time }).unique(), {"limit": 25, "max_width": 150}))
+  say(
+    report.timeline(
+      events.sort_by(fn(r) {
+        return r.time
+      }).unique(),
+      {"limit": 25, "max_width": 150},
+    ),
+  )
   say("")
 }
 
@@ -194,12 +247,30 @@ if json_path != nil {
 if html_path != nil {
   let rows = []
   for a in alerts {
-    rows.push({"level": a.level, "rule": a.rule, "by": a.by, "count": a.count, "first": a.first_when, "last": a.last_when})
+    rows.push({
+      "level": a.level,
+      "rule": a.rule,
+      "by": a.by,
+      "count": a.count,
+      "first": a.first_when,
+      "last": a.last_when,
+    })
   }
   let page = report.html(f"EVTX triage: {fs.name(path)}", rows, {
     "intro": f"{summary.records} events from {summary.first_when} to {summary.last_when}; {health}.",
-    "stats": {"Events": summary.records, "Alerts": len(alerts), "High": len(high), "Failures": summary.failures},
-    "sections": [{"title": "Events by type", "rows": type_rows, "columns": ["event_id", "count", "action", "description"]}],
+    "stats": {
+      "Events": summary.records,
+      "Alerts": len(alerts),
+      "High": len(high),
+      "Failures": summary.failures,
+    },
+    "sections": [
+      {
+        "title": "Events by type",
+        "rows": type_rows,
+        "columns": ["event_id", "count", "action", "description"],
+      },
+    ],
   })
   try {
     say("HTML report saved to " + report.save(html_path, page))

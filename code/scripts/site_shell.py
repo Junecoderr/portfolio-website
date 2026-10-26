@@ -13,7 +13,7 @@ RELEASE_DATE_HUMAN = "26 October 2026"
 
 
 def whats_new_url(prefix: str = "") -> str:
-    return f"{prefix}download.html#whats-new"
+    return f"{prefix}whats-new.html"
 
 
 LOGO = ('<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
@@ -29,15 +29,15 @@ PLAY_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill
 DL_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" '
            'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>')
 
-NAV = [("docs.html", "Learn"), ("library.html", "Library"), ("examples.html", "Examples"),
-       ("playground.html", "Playground"), ("download.html", "Download")]
+NAV = [("docs.html", "Learn"), ("library.html", "Library"), ("tools.html", "Tools"),
+       ("examples.html", "Examples"), ("playground.html", "Playground"), ("download.html", "Download")]
 
 
 def esc(text: str) -> str:
     return html.escape(text, quote=False)
 
 
-def header(current: str = "", prefix: str = "", version: str = "2.0.1") -> str:
+def header(current: str = "", prefix: str = "", version: str = "3.0.0") -> str:
     links = []
     for href, label in NAV:
         attrs = f'href="{prefix}{href}"'
@@ -60,7 +60,7 @@ def header(current: str = "", prefix: str = "", version: str = "2.0.1") -> str:
   </header>"""
 
 
-def footer(prefix: str = "", version: str = "2.0.1") -> str:
+def footer(prefix: str = "", version: str = "3.0.0") -> str:
     p = prefix
     return f"""  <footer class="site-footer">
     <div class="footer-inner">
@@ -72,6 +72,7 @@ def footer(prefix: str = "", version: str = "2.0.1") -> str:
         <h2 id="footer-learn">Learn</h2>
         <ul>
           <li><a href="{p}docs.html">Guide</a></li>
+          <li><a href="{p}docs.html#tb3">TB 3.0 lessons</a></li>
           <li><a href="{p}docs.html#guides">Tutorials</a></li>
           <li><a href="{p}library.html">Library reference</a></li>
           <li><a href="{p}examples.html">Examples and apps</a></li>
@@ -81,14 +82,19 @@ def footer(prefix: str = "", version: str = "2.0.1") -> str:
         <h2 id="footer-tools">Tools</h2>
         <ul>
           <li><a href="{p}playground.html">Playground</a></li>
+          <li><a href="{p}tools.html">Command-line tools</a></li>
+          <li><a href="{p}tools.html#vscode">VS Code extension</a></li>
+          <li><a href="{p}packages.html">Packages</a></li>
           <li><a href="{p}download.html">Download</a></li>
-          <li><a href="{p}download.html#verify">Checksums</a></li>
         </ul>
       </nav>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="{whats_new_url(p)}">What's new</a></li>
+          <li><a href="{whats_new_url(p)}">What's new in 3.0</a></li>
+          <li><a href="{p}migration.html">Moving from 2.x</a></li>
+          <li><a href="{p}spec.html">Language specification</a></li>
+          <li><a href="{p}download.html#verify">Checksums</a></li>
           <li><a href="{p}index.html#why">Why TB</a></li>
         </ul>
       </nav>
@@ -101,7 +107,7 @@ def footer(prefix: str = "", version: str = "2.0.1") -> str:
 
 
 def page(title: str, description: str, main: str, *, current: str = "", prefix: str = "",
-         scripts: tuple[str, ...] = (), version: str = "2.0.1") -> str:
+         scripts: tuple[str, ...] = (), version: str = "3.0.0") -> str:
     tags = "\n".join(f'  <script src="{prefix}assets/js/{s}" defer></script>' for s in scripts)
     return f"""<!doctype html>
 <html lang="en">

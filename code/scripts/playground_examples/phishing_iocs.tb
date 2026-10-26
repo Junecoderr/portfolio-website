@@ -11,6 +11,10 @@ for kind in ["domains", "ips", "urls", "emails"] {
   say(f"{kind}: {len(found[kind])}")
 }
 say("")
-say(report.markdown(ioc.rows(found).map(fn(row) {
-  return {"type": row.type, "value": ioc.defang(row.value)}
-})))
+say(
+  report.markdown(
+    ioc.rows(found).map(fn(row) {
+      return {"type": row.type, "value": ioc.defang(row.value)}
+    }),
+  ),
+)

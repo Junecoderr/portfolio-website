@@ -1,0 +1,92 @@
+# Conformance: §8 errors.
+
+import test
+
+test.case("§8 Error fields", fn() {
+  let err = Error("broken", {"code": 7})
+  test.equal([err.message, err.kind, err.code], ["broken", "error", 7])
+  test.equal(type(Error), "class")
+  test.equal(FileError("x").kind, "file_error")
+  test.true(FileError("x") is Error)
+})
+
+test.case("§8 throw text or a map", fn() {
+  try {
+    throw "plain"
+  } catch err {
+    test.equal([err.message, err.kind, type(err)], ["plain", "error", "Error"])
+  }
+  try {
+    throw {"message": "m", "code": 3}
+  } catch err {
+    test.equal(err.code, 3)
+  }
+})
+
+test.case("§8 typed catch clauses", fn() {
+  let caught = []
+  for make in [() => ValueError("v"), () => TypeError("t"), () => FileError("f")] {
+    try {
+      throw make()
+    } catch err: ValueError or TypeError {
+      caught.push("vt:" + err.kind)
+    } catch err: FileError {
+      caught.push("file")
+    }
+  }
+  test.equal(caught, ["vt:value_error", "vt:type_error", "file"])
+})
+
+test.case("§8 user error classes", fn() {
+  class Broken extends Error {}
+  try {
+    throw Broken("bad")
+  } catch err: Broken {
+    test.equal(err.kind, "broken")
+    test.true(err is Error)
+  }
+})
+
+test.case("§8 language errors are plain Errors", fn() {
+  let err = test.raises(() => [1][5])
+  test.equal(err.kind, "error")
+})
+
+test.case("§8 finally always runs", fn() {
+  let log = []
+  fn early() {
+    try {
+      return 1
+    } finally {
+      log.push("finally")
+    }
+  }
+  test.equal(early(), 1)
+  try {
+    try {
+      throw "x"
+    } finally {
+      log.push("after error")
+    }
+  } catch err {
+    log.push("caught")
+  }
+  test.equal(log, ["finally", "after error", "caught"])
+})
+
+test.case("§8 the standard error classes exist", fn() {
+  for cls in [
+    TypeError,
+    ValueError,
+    FileError,
+    ParseError,
+    NetworkError,
+    PermissionError,
+    NotFoundError,
+    TimeoutError,
+    StopIteration,
+    AssertionError,
+  ] {
+    test.true(cls("x") is Error)
+  }
+})

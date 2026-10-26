@@ -1,0 +1,8 @@
+# A module without export: every top-level name is public.
+
+let loads = []
+loads.push("loaded")
+
+fn twice(x) {
+  return x * 2
+}

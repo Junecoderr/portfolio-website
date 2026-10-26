@@ -13,7 +13,9 @@ let RULES = [
     "name": "Web scanner: many 404s",
     "level": "medium",
     "where": {"status": 404},
-    "count": 15, "within": 120, "by": "ip",
+    "count": 15,
+    "within": 120,
+    "by": "ip",
   }),
   detect.rule({
     "name": "Web attack in the URL",
@@ -24,14 +26,27 @@ let RULES = [
   detect.rule({
     "name": "Known attack tool user agent",
     "level": "medium",
-    "where": {"agent|contains": ["sqlmap", "nikto", "nmap", "masscan", "zgrab", "nuclei", "gobuster", "dirbuster"]},
+    "where": {
+      "agent|contains": [
+        "sqlmap",
+        "nikto",
+        "nmap",
+        "masscan",
+        "zgrab",
+        "nuclei",
+        "gobuster",
+        "dirbuster",
+      ],
+    },
     "by": "ip",
   }),
   detect.rule({
     "name": "Password spraying on a web login",
     "level": "high",
     "where": {"method": "POST", "status": 401},
-    "count": 10, "within": 120, "by": "ip",
+    "count": 10,
+    "within": 120,
+    "by": "ip",
   }),
   # --- accounts (Linux auth.log and Windows Security) ---
   detect.rule({
@@ -56,7 +71,10 @@ let RULES = [
   detect.rule({
     "name": "sudo used to manage accounts or get a shell",
     "level": "medium",
-    "where": {"action": "sudo", "command|re": "(useradd|usermod|userdel|passwd|visudo|/bin/(ba|z)?sh\b)"},
+    "where": {
+      "action": "sudo",
+      "command|re": "(useradd|usermod|userdel|passwd|visudo|/bin/(ba|z)?sh\b)",
+    },
     "by": "user",
   }),
   # --- Windows ---
@@ -90,5 +108,7 @@ fn triage(records) {
     alerts.push(a)
   }
   let order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
-  return alerts.sort_by(fn(a) { return order[a.level] * 10000000000 + (a.first or 0) })
+  return alerts.sort_by(fn(a) {
+    return order[a.level] * 10000000000 + (a.first or 0)
+  })
 }

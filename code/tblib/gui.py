@@ -1430,6 +1430,11 @@ class _TkWindow:
             self._queue.append(cb)
         if threading.current_thread() is threading.main_thread():
             self._drain()
+        else:  # a parallel task: ask Tk (thread-safe with threaded Tcl) to drain soon
+            try:
+                self.top.after(0, self._drain)
+            except Exception:
+                pass  # the background() poller still picks it up
 
     def _drain(self):
         if not self.open:
@@ -4064,6 +4069,18 @@ def load(api):
 
     m = Module("gui", DOC)
     gui = _Gui(api)
+
+    def post_to_window(fn, args, line):
+        """parallel / async Task.on_done callbacks run on the window thread
+        while a window is open (tbcore.tasks.MAIN_POSTER)."""
+        backend = _backend
+        if backend is None or not any(w.is_open() for w in getattr(backend, "windows", [])):
+            return False
+        backend.on_main(lambda: gui.fire(fn, line, list(args)))
+        return True
+
+    from tbcore import tasks as _tasks
+    _tasks.MAIN_POSTER = post_to_window
 
     @m.fn("window", 1, 2, doc="window(title, options?) -> window\nMake a window. options: width, height "
                                "(pixels; default 520 x 400), theme (\"light\" or \"dark\"), resizable. "

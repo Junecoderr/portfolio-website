@@ -130,13 +130,15 @@ app.get("/", fn(req) {
       cards.push({"level": level, "count": summary.levels[level]})
     }
   }
-  return server.html(template.render(page, {
-    "analyst": ANALYST,
-    "summary": summary,
-    "cards": cards,
-    "filter": f.get("level"),
-    "alerts": store.find(db, f),
-  }))
+  return server.html(
+    template.render(page, {
+      "analyst": ANALYST,
+      "summary": summary,
+      "cards": cards,
+      "filter": f.get("level"),
+      "alerts": store.find(db, f),
+    }),
+  )
 })
 
 app.get("/api/alerts", fn(req) {

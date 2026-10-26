@@ -48,10 +48,24 @@ jobs:
         if: runner.os == 'Linux'
         run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
 
-      - name: Run tests (Linux, virtual display)
+      # Every test runs twice: on the bytecode VM (the default engine) and
+      # on the tree-walking interpreter kept for one release (TB_ENGINE=tree).
+      - name: Run tests, VM engine (Linux, virtual display)
         if: runner.os == 'Linux'
         run: xvfb-run -a uv run --locked pytest
 
-      - name: Run tests
+      - name: Run tests, tree engine (Linux, virtual display)
+        if: runner.os == 'Linux'
+        env:
+          TB_ENGINE: tree
+        run: xvfb-run -a uv run --locked pytest
+
+      - name: Run tests, VM engine
         if: runner.os != 'Linux'
+        run: uv run --locked pytest
+
+      - name: Run tests, tree engine
+        if: runner.os != 'Linux'
+        env:
+          TB_ENGINE: tree
         run: uv run --locked pytest

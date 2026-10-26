@@ -29,7 +29,16 @@ let checking = false
 let timer = nil
 
 fn add_target(name, host, port) {
-  targets.push({"name": name, "host": host, "port": port, "up": nil, "ms": nil, "checks": 0, "ups": 0, "history": []})
+  targets.push({
+    "name": name,
+    "host": host,
+    "port": port,
+    "up": nil,
+    "ms": nil,
+    "checks": 0,
+    "ups": 0,
+    "history": [],
+  })
 }
 
 let config = {"interval": 5, "timeout": 2, "targets": []}
@@ -49,7 +58,9 @@ let win = gui.window("TB Network Monitor", {"width": 1000, "height": 860, "theme
 let head = win.row()
 let titles = head.column({"expand": true})
 titles.label("TB Network Monitor", {"style": "title"})
-let subtitle = titles.label(f"{len(targets)} targets from {fs.name(config_path)}", {"style": "muted"})
+let subtitle = titles.label(f"{len(targets)} targets from {fs.name(config_path)}", {
+  "style": "muted",
+})
 
 let cards = win.row()
 let up_card = cards.card({"title": "Up", "expand": true})
@@ -63,31 +74,71 @@ let next_stat = next_card.label(f"{config.interval} s", {"style": "display"})
 
 let controls = win.row()
 controls.label("Every", {"style": "muted"})
-let interval = controls.slider(1, 60, {"value": config.interval, "step": 1, "show_value": true,
-                                      "on_change": fn(v) { set_interval(v) }})
+let interval = controls.slider(1, 60, {
+  "value": config.interval,
+  "step": 1,
+  "show_value": true,
+  "on_change": fn(v) {
+    set_interval(v)
+  },
+})
 controls.label("seconds", {"style": "muted"})
-let pause = controls.button("Pause", fn() { toggle_pause() })
-controls.button("Check now", fn() { check_all() }, {"primary": true})
-controls.button("Minimize to tray", fn() { tray.minimize() })
+let pause = controls.button("Pause", fn() {
+  toggle_pause()
+})
+controls.button(
+  "Check now",
+  fn() {
+    check_all()
+  },
+  {"primary": true},
+)
+controls.button("Minimize to tray", fn() {
+  tray.minimize()
+})
 
 let adder = win.row()
-let new_target = adder.input({"placeholder": "host:port to watch, like 127.0.0.1:8080", "on_enter": fn(text) { add_from_text(text) }})
-adder.button("Add", fn() { add_from_text(new_target.value()) })
-adder.button("Remove selected", fn() { remove_selected() })
+let new_target = adder.input({
+  "placeholder": "host:port to watch, like 127.0.0.1:8080",
+  "on_enter": fn(text) {
+    add_from_text(text)
+  },
+})
+adder.button("Add", fn() {
+  add_from_text(new_target.value())
+})
+adder.button("Remove selected", fn() {
+  remove_selected()
+})
 let notify = adder.checkbox("Notify me when a target changes", {"checked": true})
 
-let table = win.table(["Target", "Host", "Port", "State", "Latency", "Checks", "Uptime"],
-                      {"widths": [220, 160, 70, 90, 100, 80, 90], "height": 5, "expand": false})
-let chart = win.chart({"type": "line", "title": "Latency (ms) over the last checks", "empty": "No checks yet",
-                       "height": 260, "expand": true})
+let table = win.table(["Target", "Host", "Port", "State", "Latency", "Checks", "Uptime"], {
+  "widths": [220, 160, 70, 90, 100, 80, 90],
+  "height": 5,
+  "expand": false,
+})
+let chart = win.chart({
+  "type": "line",
+  "title": "Latency (ms) over the last checks",
+  "empty": "No checks yet",
+  "height": 260,
+  "expand": true,
+})
 let status = win.status("Starting…")
 
-let tray = win.tray({
-  "Show": fn() { tray.restore() },
-  "Check now": fn() { check_all() },
-  "-": nil,
-  "Quit": win.close,
-}, {"title": "Monitor"})
+let tray = win.tray(
+  {
+    "Show": fn() {
+      tray.restore()
+    },
+    "Check now": fn() {
+      check_all()
+    },
+    "-": nil,
+    "Quit": win.close,
+  },
+  {"title": "Monitor"},
+)
 
 win.on_close(fn() {
   if checking {
@@ -96,8 +147,17 @@ win.on_close(fn() {
   return true
 })
 
-win.menu({"File": {"Check now": fn() { check_all() }, "Quit": win.close}})
-win.key("F5", fn() { check_all() })
+win.menu({
+  "File": {
+    "Check now": fn() {
+      check_all()
+    },
+    "Quit": win.close,
+  },
+})
+win.key("F5", fn() {
+  check_all()
+})
 
 # -- the checks (run on another thread; the window updates in on_done) -------------
 
@@ -120,15 +180,21 @@ fn check_all() {
   checking = true
   status.set(f"Checking {len(targets)} targets…")
   let snapshot = targets.copy()
-  win.run_in_background(fn() {
-    return snapshot.map(fn(t) { return check_one(t) })
-  }, fn(results) {
-    checking = false
-    apply(snapshot, results)
-  }, fn(message) {
-    checking = false
-    status.set(f"Check failed: {message}")
-  })
+  win.run_in_background(
+    fn() {
+      return snapshot.map(fn(t) {
+        return check_one(t)
+      })
+    },
+    fn(results) {
+      checking = false
+      apply(snapshot, results)
+    },
+    fn(message) {
+      checking = false
+      status.set(f"Check failed: {message}")
+    },
+  )
 }
 
 fn apply(snapshot, results) {
@@ -176,7 +242,9 @@ fn apply(snapshot, results) {
 }
 
 fn up_count() {
-  return targets.filter(fn(t) { return t.up == true }).len()
+  return targets.filter(fn(t) {
+    return t.up == true
+  }).len()
 }
 
 fn refresh() {
@@ -200,10 +268,16 @@ fn refresh() {
   }
   table.set_rows(rows)
   let ups = up_count()
-  let checked = targets.filter(fn(t) { return t.up != nil })
+  let checked = targets.filter(fn(t) {
+    return t.up != nil
+  })
   up_stat.set(ups)
   down_stat.set(len(checked) - ups)
-  let slow = checked.filter(fn(t) { return t.up == true }).sort_by(fn(t) { return 0 - t.ms })
+  let slow = checked.filter(fn(t) {
+    return t.up == true
+  }).sort_by(fn(t) {
+    return 0 - t.ms
+  })
   if slow.is_empty() {
     slow_stat.set("-")
   } else {
@@ -211,7 +285,9 @@ fn refresh() {
   }
   let series = {}
   for t in targets {
-    if not t.history.filter(fn(ms) { return ms != nil }).is_empty() {   # skip targets that never answered
+    if not t.history.filter(fn(ms) {
+      return ms != nil
+    }).is_empty() {                                                     # skip targets that never answered
       series[t.name] = t.history
     }
   }

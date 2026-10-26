@@ -41,17 +41,32 @@ win.label("TB File Inspector", {"style": "title"})
 let subtitle = win.label("Open a file to look inside it. Nothing is ever run.", {"style": "muted"})
 
 let bar = win.row()
-bar.button("Open file…", fn() { choose() }, {"primary": true})
+bar.button(
+  "Open file…",
+  fn() {
+    choose()
+  },
+  {"primary": true},
+)
 bar.label("or try a sample:", {"style": "muted"})
-let sample = bar.select(["(choose)", "sample.pcap", "sample.evtx", "windows_security.json", "phishing_email.txt"], {
-  "on_change": fn(name) {
-    if name != "(choose)" {
-      open_path(fs.join(DATA, name))
-      sample.set("(choose)")
-    }
-  }, "width": 22})
-bar.button("Copy SHA-256", fn() { copy_hash() })
-bar.button("Save JSON report…", fn() { save_report() })
+let sample = bar.select(
+  ["(choose)", "sample.pcap", "sample.evtx", "windows_security.json", "phishing_email.txt"],
+  {
+    "on_change": fn(name) {
+      if name != "(choose)" {
+        open_path(fs.join(DATA, name))
+        sample.set("(choose)")
+      }
+    },
+    "width": 22,
+  },
+)
+bar.button("Copy SHA-256", fn() {
+  copy_hash()
+})
+bar.button("Save JSON report…", fn() {
+  save_report()
+})
 
 let verdict = win.label(" ", {"style": "heading"})
 let badges = win.row()
@@ -62,21 +77,39 @@ let overview = tabs.page("Overview")
 let facts = overview.table(["Property", "Value"], {"widths": [160, 760], "expand": true})
 
 let findings_page = tabs.page("Findings")
-let findings = findings_page.table(["Level", "What", "Detail"], {"widths": [80, 260, 600], "height": 8,
-                                                                "on_select": fn(row, i) { show_finding(i) }})
+let findings = findings_page.table(["Level", "What", "Detail"], {
+  "widths": [80, 260, 600],
+  "height": 8,
+  "on_select": fn(row, i) {
+    show_finding(i)
+  },
+})
 let finding_text = findings_page.textarea({"readonly": true, "mono": true, "height": 6})
 
 let sections_page = tabs.page("Sections")
-let sections = sections_page.table(["Name", "Size", "Entropy", "Perms"], {"widths": [200, 120, 120, 100], "expand": true})
-sections_page.label("Entropy near 8 means packed or encrypted bytes; rwx sections can rewrite their own code.", {"style": "muted"})
+let sections = sections_page.table(["Name", "Size", "Entropy", "Perms"], {
+  "widths": [200, 120, 120, 100],
+  "expand": true,
+})
+sections_page.label(
+  "Entropy near 8 means packed or encrypted bytes; rwx sections can rewrite their own code.",
+  {"style": "muted"},
+)
 
 let imports_page = tabs.page("Imports")
 let imports = imports_page.table(["Library", "Function"], {"widths": [260, 500], "expand": true})
 
 let strings_page = tabs.page("Strings")
-let filter = strings_page.input({"placeholder": "Filter strings (for example http, .dll, powershell)",
-                                 "on_change": fn(text) { show_strings(text) }})
-let strings = strings_page.table(["Offset", "Encoding", "Text"], {"widths": [90, 80, 760], "expand": true})
+let filter = strings_page.input({
+  "placeholder": "Filter strings (for example http, .dll, powershell)",
+  "on_change": fn(text) {
+    show_strings(text)
+  },
+})
+let strings = strings_page.table(["Offset", "Encoding", "Text"], {
+  "widths": [90, 80, 760],
+  "expand": true,
+})
 
 let status = win.status("Ready")
 if rules_problem != nil {
@@ -85,13 +118,19 @@ if rules_problem != nil {
 
 win.menu({
   "File": {
-    "Open file…": fn() { choose() },
-    "Save JSON report…": fn() { save_report() },
+    "Open file…": fn() {
+      choose()
+    },
+    "Save JSON report…": fn() {
+      save_report()
+    },
     "-": nil,
     "Quit": win.close,
   },
 })
-win.key("Mod+O", fn() { choose() })
+win.key("Mod+O", fn() {
+  choose()
+})
 win.on_drop(fn(paths) {
   if not paths.is_empty() {
     open_path(paths[0])
@@ -135,13 +174,20 @@ fn show() {
   }
   for level in ["high", "medium", "low"] {
     if counts[level] > 0 {
-      badges.badge(f"{counts[level]} {level}", {"style": {"high": "danger", "medium": "warning", "low": "accent"}[level]})
+      badges.badge(f"{counts[level]} {level}", {
+        "style": {"high": "danger", "medium": "warning", "low": "accent"}[level],
+      })
     }
   }
 
   let rows = [
-    ["File", r.path], ["Type", r.description], ["Size", f"{inspect.human_size(r.size)} ({r.size} bytes)"],
-    ["Entropy", str(r.entropy)], ["MD5", r.hashes.md5], ["SHA-1", r.hashes.sha1], ["SHA-256", r.hashes.sha256],
+    ["File", r.path],
+    ["Type", r.description],
+    ["Size", f"{inspect.human_size(r.size)} ({r.size} bytes)"],
+    ["Entropy", str(r.entropy)],
+    ["MD5", r.hashes.md5],
+    ["SHA-1", r.hashes.sha1],
+    ["SHA-256", r.hashes.sha256],
   ]
   let d = r.details
   if r.summary != nil {
@@ -168,7 +214,11 @@ fn show() {
   }
   facts.set_rows(rows)
 
-  findings.set_rows(found.map(fn(f) { return [f.level.upper(), f.what, f.detail] }))
+  findings.set_rows(
+    found.map(fn(f) {
+      return [f.level.upper(), f.what, f.detail]
+    }),
+  )
   if found.is_empty() {
     finding_text.set("Nothing stood out. That is not a guarantee the file is safe.")
   } else {
@@ -206,7 +256,9 @@ fn show() {
   imports.set_rows(irows)
   filter.set("")
   show_strings("")
-  status.set(f"{len(found)} finding(s)  ·  {len(r.matches)} rule match(es)  ·  {len(r.strings)} strings")
+  status.set(
+    f"{len(found)} finding(s)  ·  {len(r.matches)} rule match(es)  ·  {len(r.strings)} strings",
+  )
 }
 
 fn show_finding(i) {

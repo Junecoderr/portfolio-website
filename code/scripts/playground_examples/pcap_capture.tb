@@ -1,0 +1,37 @@
+# Title: Read a packet capture
+# About: Open a pcap file, list DNS lookups and TLS server names, and spot a port scan with the pcap library.
+import pcap
+import report
+
+let packets = pcap.read("apps/data/sample.pcap")
+let info = pcap.summary(packets)
+say(f"{info.packets} packets between {len(pcap.top_talkers(packets, 99))} hosts")
+say("")
+
+say("DNS lookups:")
+for q in pcap.dns_queries(packets) {
+  let answer = if q.answers.is_empty() then q.rcode else q.answers.join(", ")
+  say(f"  {q.name:<36} {answer}")
+}
+say("")
+
+say("TLS server names:")
+for name in pcap.sni(packets).map(h => h.sni).unique() {
+  say(f"  {name}")
+}
+say("")
+
+for scan in pcap.port_scans(packets) {
+  say(f"Port scan: {scan.src} tried {scan.count} ports on {scan.dst}")
+}
+say("")
+say(
+  report.table(pcap.flows(packets).slice(0, 5), [
+    "protocol",
+    "src",
+    "dst",
+    "dport",
+    "packets",
+    "bytes",
+  ]),
+)

@@ -54,7 +54,11 @@ test.case("plain style has no borders", fn() {
 })
 
 test.case("list rows, alignment overrides and max_width", fn() {
-  let out = tables.render([["abcdefghij", 1], ["ab", 12345]], {"headers": ["text", "n"], "max_width": 6, "align": {"0": "center"}})
+  let out = tables.render([["abcdefghij", 1], ["ab", 12345]], {
+    "headers": ["text", "n"],
+    "max_width": 6,
+    "align": {"0": "center"},
+  })
   test.equal(out.lines()[3], "│ abcde… │     1 │")
   test.equal(out.lines()[4], "│   ab   │ 12345 │")
 })
@@ -84,8 +88,10 @@ test.case("markdown tables", fn() {
 })
 
 test.case("csv quotes what it must", fn() {
-  test.equal(tables.to_csv([{"name": "Tanisha, Lead", "note": "said \"hi\""}]),
-    "name,note\n\"Tanisha, Lead\",\"said \"\"hi\"\"\"")
+  test.equal(
+    tables.to_csv([{"name": "Tanisha, Lead", "note": "said \"hi\""}]),
+    "name,note\n\"Tanisha, Lead\",\"said \"\"hi\"\"\"",
+  )
 })
 
 test.case("record shows a map as two columns", fn() {
@@ -95,5 +101,7 @@ test.case("record shows a map as two columns", fn() {
 })
 
 test.case("unknown style is a friendly error", fn() {
-  test.raises(fn() { tables.render(rows, {"style": "fancy"}) }, "doesn't know the style 'fancy'")
+  test.raises(fn() {
+    tables.render(rows, {"style": "fancy"})
+  }, "doesn't know the style 'fancy'")
 })

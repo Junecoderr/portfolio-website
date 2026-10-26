@@ -1,0 +1,19 @@
+# method calls on class instances
+class Counter {
+  let count = 0
+  fn add(n) { self.count = self.count + n }
+  fn get() { return self.count }
+}
+class Point {
+  fn init(x, y) { self.x = x; self.y = y }
+  fn dot(other) { return self.x * other.x + self.y * other.y }
+}
+let c = Counter()
+let p = Point(1, 2)
+let q = Point(3, 4)
+let i = 0
+while i < 300000 {
+  c.add(p.dot(q))
+  i += 1
+}
+say(c.get())

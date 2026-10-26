@@ -21,7 +21,14 @@ test.case("bars have the right width", fn() {
 })
 
 test.case("bar_with options", fn() {
-  let out = progress.bar_with(2, 4, {"width": 4, "label": "Copying", "left": "<", "right": ">", "show_count": true, "show_percent": false})
+  let out = progress.bar_with(2, 4, {
+    "width": 4,
+    "label": "Copying",
+    "left": "<",
+    "right": ">",
+    "show_count": true,
+    "show_percent": false,
+  })
   test.equal(out, "Copying <██  > (2/4)")
 })
 
@@ -29,7 +36,9 @@ test.case("spinners cycle through their frames", fn() {
   test.equal(progress.spinner(0, "line"), "-")
   test.equal(progress.spinner(5, "line"), "\\")
   test.equal(progress.spinner(10, "dots"), "⠋")
-  test.raises(fn() { progress.spinner(0, "wobble") }, "doesn't know the spinner 'wobble'")
+  test.raises(fn() {
+    progress.spinner(0, "wobble")
+  }, "doesn't know the spinner 'wobble'")
 })
 
 test.case("durations read well", fn() {
@@ -64,7 +73,10 @@ test.case("a quiet tracker counts and finishes", fn() {
 test.case("every(n) prints less often", fn() {
   let t = progress.tracker(100, "Scanning").every_n(25).quiet_mode()
   let i = 0
-  while i < 30 { t.tick(); i = i + 1 }
+  while i < 30 {
+    t.tick()
+    i = i + 1
+  }
   test.equal(t["printed"], 25)
   t.set(50)
   test.equal(t["printed"], 50)

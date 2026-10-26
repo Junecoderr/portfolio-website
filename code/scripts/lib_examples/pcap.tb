@@ -1,0 +1,18 @@
+import pcap
+
+# apps/data/sample.pcap is a small made-up capture (documentation addresses).
+let packets = pcap.read("apps/data/sample.pcap")
+say(f"{len(packets)} packets")
+
+for q in pcap.dns_queries(packets).slice(0, 3) {
+  say(f"DNS {q.type} {q.name} -> {q.answers} ({q.rcode})")
+}
+for flow in pcap.top_talkers(packets, 3) {
+  say("talker:", flow)
+}
+for hello in pcap.sni(packets) {
+  say(f"TLS to {hello.dst}:{hello.dport} for {hello.sni}")
+}
+for s in pcap.port_scans(packets) {
+  say(f"{s.src} probed {s.count} ports on {s.dst}")
+}
