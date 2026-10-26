@@ -6,7 +6,7 @@
   var base = "https://github.com/" + cfg.repo + "/releases/download/tb-v" + cfg.version + "/";
 
   var OS = {
-    windows: { name: "Windows", file: "tb-windows-x64.exe", note: "For Windows 10 and 11 laptops (64-bit).", tab: "windows" },
+    windows: { name: "Windows", file: "tb-windows-x64-setup.exe", note: "The Windows installer for Windows 10 and 11 (64-bit): no admin needed, adds TB to the Start menu.", tab: "windows" },
     mac: { name: "Mac", file: "tb-macos-arm64.zip", note: "For Macs with Apple silicon (M1 and newer). On an Intel Mac, use the Python version below.", tab: "mac" },
     linux: { name: "Linux", file: "tb-linux-x64.tar.gz", note: "For 64-bit Intel or AMD computers.", tab: "linux" }
   };

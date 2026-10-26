@@ -16,11 +16,11 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html" aria-current="page">Learn</a>
-        <a href="docs.html#reference">Reference</a>
+        <a href="library.html">Library</a>
         <a href="examples.html">Examples</a>
         <a href="playground.html">Playground</a>
         <a href="download.html" class="nav-cta">Download</a>
@@ -51,6 +51,20 @@
             <li><a href="#closures">9. Functions that remember (and call themselves)</a></li>
             <li><a href="#ask-care">10. Talking to your program: ask and care</a></li>
             <li><a href="#errors">11. Reading "Oops!" messages</a></li>
+            <li><a href="#maps">12. Maps: things with names</a></li>
+            <li><a href="#methods">13. Methods: asking a value to do something</a></li>
+            <li><a href="#fstrings">14. Text with holes: f-strings</a></li>
+            <li><a href="#modules">15. Libraries: import</a></li>
+            <li><a href="#try-catch">16. Catching mistakes: try, catch and throw</a></li>
+            <li><a href="#more-loops">17. More loops: break, continue, in and +=</a></li>
+          </ul>
+          <h2>Tutorials</h2>
+          <ul>
+            <li><a href="guide-desktop-app.html">Build your first desktop app</a></li>
+            <li><a href="guide-ssh-brute-force.html">Triage an SSH brute force with TB</a></li>
+            <li><a href="guide-phishing-iocs.html">Extract and defang IOCs from a phishing email</a></li>
+            <li><a href="guide-sigma.html">Write a Sigma rule and run it</a></li>
+            <li><a href="guide-ports-and-reputation.html">Check your own ports and IP reputation</a></li>
           </ul>
           <h2>Reference</h2>
           <ul>
@@ -64,6 +78,7 @@
             <li><a href="#ref-ask"><code>ask</code></a></li>
             <li><a href="#ref-care"><code>care</code></a></li>
             <li><a href="#keywords">Keywords</a></li>
+            <li><a href="library.html">Library reference</a></li>
             <li><a href="#cheat-sheet">Little reminders</a></li>
           </ul>
         </div>
@@ -367,9 +382,149 @@ say(snacks[3])</code></pre>
     </section>
 
 
+    <!-- 2.0 -->
+    <section id="maps">
+      <h2><span class="chapter-num">12.</span>Maps: things with names</h2>
+      <p>A list keeps things in order. A <strong>map</strong> keeps things by name: each <strong>key</strong> points to a
+      <strong>value</strong>. Write it with curly brackets, a colon between each key and its value.</p>
+      <pre class="tb-code" data-runnable><code>let me = {"name": "Tanisha", "city": "Guwahati", "plants": 4}
+say(me["name"])
+say(me.city)
+say(len(me), "keys")</code></pre>
+      <p>Read a value with <code>me["name"]</code> or, when the key is a simple word, with a dot: <code>me.name</code>.
+      Set one the same way. Asking for a key that isn't there is a mistake, so use <code>.get(key, default)</code>
+      when you're not sure.</p>
+      <pre class="tb-code" data-runnable><code>let tea = {"cups": 2}
+tea.cups = tea.cups + 1
+tea["sugar"] = false
+say(tea)
+say(tea.get("milk", "no milk"))
+for key in tea {
+  say(key + " is " + str(tea[key]))
+}</code></pre>
+      <p class="note">Maps are everywhere in TB 2.0: a log line, an alert and a JSON file all come back as maps.</p>
+    </section>
+
+    <section id="methods">
+      <h2><span class="chapter-num">13.</span>Methods: asking a value to do something</h2>
+      <p>Text, lists, maps and numbers come with <strong>methods</strong>: little built-in functions you call with a dot
+      after the value. <code>"hi".upper()</code> asks the text <code>"hi"</code> for its capital-letter version.</p>
+      <pre class="tb-code" data-runnable><code>let name = "  Tanisha  "
+say(name.trim().upper())
+say("apple,mango,kiwi".split(","))
+say("Hello".contains("ell"), "Hello".starts_with("He"))
+say("ha".repeat(3))</code></pre>
+      <p>Lists have the most useful ones. <code>map</code>, <code>filter</code> and <code>sort_by</code> take a function
+      and use it on every item.</p>
+      <pre class="tb-code" data-runnable><code>let cups = [3, 1, 4, 1, 5]
+say(cups.sum(), cups.max(), cups.sort())
+say(cups.filter(fn(c) { return c &gt; 2 }))
+say(cups.map(fn(c) { return c * 2 }))
+say(["b", "a", "c"].sort().join(" &lt; "))</code></pre>
+      <p>See every method in the <a href="library.html#builtins">library reference</a>.</p>
+    </section>
+
+    <section id="fstrings">
+      <h2><span class="chapter-num">14.</span>Text with holes: f-strings</h2>
+      <p>Joining text with <code>+</code> gets fiddly. Put an <code>f</code> before the quotes and you can drop any
+      value straight into the text inside <code>{ }</code>. TB fills in each hole when the line runs.</p>
+      <pre class="tb-code" data-runnable><code>let name = "Tanisha"
+let cups = 3
+say(f"{name} has had {cups} cups of tea.")
+say(f"That's {cups * 250} ml, or {round(cups * 0.25, 2)} litres.")
+say(f"Shouting: {name.upper()}!")</code></pre>
+      <p>Plain <code>"..."</code> text never fills in holes, so curly brackets in ordinary text stay as they are. To put a real
+      curly bracket in an f-string, write it twice: <code>{{</code> or <code>}}</code>.</p>
+    </section>
+
+    <section id="modules">
+      <h2><span class="chapter-num">15.</span>Libraries: import</h2>
+      <p>TB comes with twenty <strong>libraries</strong>, extra sets of instructions for jobs like reading files, working
+      with dates, parsing logs or opening windows. Bring one in with <code>import</code>, then use its functions with a dot.</p>
+      <pre class="tb-code" data-runnable><code>import math
+import text
+
+say(math.sqrt(81))
+say(text.pad_left("7", 3, "0"))
+say(math.round(math.pi, 2))</code></pre>
+      <p>You can give a library a shorter name with <code>as</code>, and you can import your own <code>.tb</code> files
+      too: <code>import "helpers.tb"</code> gives you everything that file made with <code>let</code> and <code>fn</code>.</p>
+      <pre class="tb-code" data-runnable><code>import encode as enc
+say(enc.base64("secret message"))</code></pre>
+      <p>The <a href="library.html">library reference</a> lists every library and function. In the browser, the libraries
+      that need your computer (windows, the network) explain that politely instead of running.</p>
+    </section>
+
+    <section id="try-catch">
+      <h2><span class="chapter-num">16.</span>Catching mistakes: try, catch and throw</h2>
+      <p>Some mistakes aren't in your program but in the world: a file that isn't there, text that isn't a number.
+      Put the risky lines inside <code>try</code>, and say what to do instead in <code>catch</code>. The error arrives as
+      a map with a <code>message</code> and a <code>line</code>.</p>
+      <pre class="tb-code" data-runnable><code>try {
+  let n = num("twelve")
+  say(n)
+} catch err {
+  say(f"That didn't work: {err.message}")
+}
+say("...and the program carries on.")</code></pre>
+      <p><code>throw</code> raises your own error, with text or a map. Whoever called your function can catch it.</p>
+      <pre class="tb-code" data-runnable><code>fn take(cups) {
+  if cups &gt; 10 {
+    throw {"message": "That's too much tea", "cups": cups}
+  }
+  return cups
+}
+
+try {
+  take(12)
+} catch err {
+  say(err.message, "(" + str(err.cups) + " cups)")
+}</code></pre>
+      <p>An error nobody catches stops the program with the usual friendly "Oops!", like this one:</p>
+      <pre class="tb-code" data-runnable data-expect-error><code>throw "Something went wrong"</code></pre>
+    </section>
+
+    <section id="more-loops">
+      <h2><span class="chapter-num">17.</span>More loops: break, continue, in and +=</h2>
+      <p><code>break</code> leaves a loop straight away. <code>continue</code> skips to the next time round.</p>
+      <pre class="tb-code" data-runnable><code>for n in range(1, 100) {
+  if n % 3 != 0 {
+    continue
+  }
+  if n &gt; 15 {
+    break
+  }
+  say(n)
+}</code></pre>
+      <p><code>in</code> asks whether something is inside a list, text or map, and <code>not in</code> asks the opposite.
+      <code>+=</code> adds to a box in one step (<code>-=</code>, <code>*=</code> and <code>/=</code> work too).</p>
+      <pre class="tb-code" data-runnable><code>let seen = []
+let total = 0
+for word in ["tea", "cake", "tea", "rain"] {
+  if word not in seen {
+    seen.push(word)
+  }
+  total += 1
+}
+say(seen, total)
+say("cake" in seen, "x" in "TB")</code></pre>
+    </section>
+
+    <section id="guides">
+      <h2>Tutorials</h2>
+      <p>Longer walk-throughs that build something real. The security ones run right here in your browser, on sample logs and emails that come with TB.</p>
+      <ul class="guide-list">
+        <li><a class="guide-card" href="guide-desktop-app.html"><strong>Build your first desktop app</strong><span>A to-do list with a window, a text box, a button and a table, step by step.</span><small>Desktop, about 20 minutes</small></a></li>
+        <li><a class="guide-card" href="guide-ssh-brute-force.html"><strong>Triage an SSH brute force with TB</strong><span>Read a real-looking auth.log, find password guessing, and find out whether the attacker got in. Runs in your browser.</span><small>Security, runnable</small></a></li>
+        <li><a class="guide-card" href="guide-phishing-iocs.html"><strong>Extract and defang IOCs from a phishing email</strong><span>Pull every domain, IP, link and hash out of a suspicious email and make them safe to share. Runs in your browser.</span><small>Security, runnable</small></a></li>
+        <li><a class="guide-card" href="guide-sigma.html"><strong>Write a Sigma rule and run it</strong><span>Describe an attack once in YAML and run it over web and Windows logs. Runs in your browser.</span><small>Detection, runnable</small></a></li>
+        <li><a class="guide-card" href="guide-ports-and-reputation.html"><strong>Check your own ports and IP reputation</strong><span>Which services does your laptop expose, and does an address have a bad name? Desktop code.</span><small>Network, desktop</small></a></li>
+      </ul>
+    </section>
+
     <section id="reference">
       <h2>Reference: built-in instructions</h2>
-      <p>These eight instructions come with TB, ready to use. Everything else you build yourself with <code>let</code> and <code>fn</code>.</p>
+      <p>These eight instructions have been in TB from the start. Version 2.0 adds a few more (<code>type</code>, <code>keys</code>, <code>int</code>, <code>round</code>, <code>min</code>, <code>max</code>, <code>sum</code>, <code>sorted</code>, <code>exit</code>), plus methods on every value and twenty libraries: see the <a href="library.html">library reference</a>.</p>
       <div class="sig-list">
         <article class="sig" id="ref-say">
           <div class="sig-head">
@@ -481,6 +636,13 @@ care("Tanisha")</code></pre>
             <tr><td><code>true / false / nil</code></td><td>Yes, no and nothing</td><td><code>let done = false</code></td></tr>
             <tr><td><code>and / or / not</code></td><td>Combine or flip checks</td><td><code>if sunny and not raining { ... }</code></td></tr>
             <tr><td><code>#</code></td><td>A note TB ignores</td><td><code># this is a comment</code></td></tr>
+            <tr><td><code>import ... as</code></td><td>Brings in a library or a .tb file</td><td><code>import json as j</code></td></tr>
+            <tr><td><code>try / catch</code></td><td>Runs risky lines and handles a mistake</td><td><code>try { ... } catch err { ... }</code></td></tr>
+            <tr><td><code>throw</code></td><td>Raises your own error</td><td><code>throw "Out of tea"</code></td></tr>
+            <tr><td><code>break / continue</code></td><td>Leave a loop, or skip to the next round</td><td><code>if done { break }</code></td></tr>
+            <tr><td><code>in / not in</code></td><td>Is it inside a list, text or map?</td><td><code>if "tea" in drinks { ... }</code></td></tr>
+            <tr><td><code>+= -= *= /=</code></td><td>Change a box in one step</td><td><code>total += 1</code></td></tr>
+            <tr><td><code>f"..."</code></td><td>Text with {holes} filled in</td><td><code>f"Hi {name}"</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -504,10 +666,10 @@ care("Tanisha")</code></pre>
       <p>The <a href="playground.html">Playground</a> works right here in your browser. To run TB programs on your
       laptop, without the internet:</p>
       <ol class="steps">
-        <li>Get <code>tb-windows-x64.exe</code> from the <a href="download.html">Download page</a>.</li>
+        <li>Get the installer, <code>tb-windows-x64-setup.exe</code>, from the <a href="download.html">Download page</a> and run it.</li>
         <li>Write your program in Notepad and save it with a name ending in <code>.tb</code>, like <code>hello.tb</code>.
         (In the save box, choose "All files" so Notepad doesn't add <code>.txt</code>.)</li>
-        <li>Drag your <code>.tb</code> file onto the TB program, and a window opens to run it.</li>
+        <li>Double-click your <code>.tb</code> file, and a window opens to run it. Right-click it and choose <strong>Edit</strong> to change it.</li>
       </ol>
       <p>The <a href="download.html">Download page</a> has the full step-by-step guide, including what to
       click if Windows asks whether it's safe.</p>
@@ -526,14 +688,15 @@ care("Tanisha")</code></pre>
     <div class="footer-inner">
       <div class="footer-brand">
         <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-        <p>A tiny, friendly programming language.</p>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
       </div>
       <nav aria-labelledby="footer-learn">
         <h2 id="footer-learn">Learn</h2>
         <ul>
           <li><a href="docs.html">Guide</a></li>
-          <li><a href="docs.html#reference">Reference</a></li>
-          <li><a href="examples.html">Examples</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
         </ul>
       </nav>
       <nav aria-labelledby="footer-tools">
@@ -547,7 +710,7 @@ care("Tanisha")</code></pre>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
           <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
@@ -555,7 +718,7 @@ care("Tanisha")</code></pre>
     </div>
     <div class="footer-bottom">
       <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
-      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

@@ -1,0 +1,6 @@
+import math
+
+say(math.sqrt(16), math.pow(2, 10))
+say(math.round(math.pi, 3))
+say(math.clamp(15, 0, 10))
+say(math.max([3, 9, 4]))

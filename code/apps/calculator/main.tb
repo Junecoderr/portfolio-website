@@ -1,0 +1,176 @@
+# Calculator: a grid of buttons, like the one on your phone.
+# You can type too: digits, + - * / . and Enter (=), Escape (clear), Backspace.
+# Run: tb apps/calculator/main.tb
+
+import gui
+
+let shown = "0"     # the number on the display, as text
+let stored = nil    # the number before the operator
+let op = nil        # "+", "−", "×" or "÷"
+let fresh = true    # true when the next digit starts a new number
+let problem = nil   # a message to show above the number (like dividing by zero)
+
+let win = gui.window("Calculator", {"width": 340, "height": 480, "theme": "dark"})
+let history = win.label(" ", {"style": "muted", "align": "right"})
+let display = win.label("0", {"style": "display", "align": "right"})
+
+let KEYS = [
+  ["C", "±", "%", "÷"],
+  ["7", "8", "9", "×"],
+  ["4", "5", "6", "−"],
+  ["1", "2", "3", "+"],
+  ["0", ".", "⌫", "="],
+]
+
+fn press_for(key) {
+  return fn() { press(key) }
+}
+
+let grid = win.column({"expand": true})
+for keys in KEYS {
+  let row = grid.row({"expand": true})
+  for key in keys {
+    row.button(key, press_for(key), {"expand": true, "primary": key == "=", "width": 3})
+  }
+}
+
+fn to_display(x) {
+  if x.abs() >= 1000000000000000 {
+    return "Too big"
+  }
+  return str(round(x, 10))
+}
+
+fn show() {
+  display.set(shown)
+  if problem != nil {
+    history.set(problem)
+  } else if op == nil {
+    history.set(" ")
+  } else {
+    history.set(f"{to_display(stored)} {op}")
+  }
+}
+
+fn digit(d) {
+  if fresh or shown == "0" {
+    shown = d
+    fresh = false
+  } else if len(shown) < 15 {
+    shown += d
+  }
+}
+
+fn dot() {
+  if fresh {
+    shown = "0."
+    fresh = false
+  } else if not shown.contains(".") {
+    shown += "."
+  }
+}
+
+fn calculate(a, how, b) {
+  if how == "+" {
+    return a + b
+  }
+  if how == "−" {
+    return a - b
+  }
+  if how == "×" {
+    return a * b
+  }
+  if b == 0 {
+    throw "You can't divide by zero."
+  }
+  return a / b
+}
+
+fn finish() {
+  if op == nil or shown == "Too big" or shown == "Oops" {
+    return
+  }
+  try {
+    shown = to_display(calculate(stored, op, num(shown)))
+  } catch err {
+    shown = "Oops"
+    problem = err.message
+    op = nil
+    fresh = true
+    return
+  }
+  op = nil
+  fresh = true
+}
+
+fn operator(how) {
+  if op != nil and not fresh {
+    finish()
+  }
+  if shown == "Too big" or shown == "Oops" {
+    return
+  }
+  stored = num(shown)
+  op = how
+  fresh = true
+}
+
+fn press(key) {
+  let broken = shown == "Oops" or shown == "Too big"
+  if broken and not "0123456789.C".contains(key) {
+    return
+  }
+  problem = nil
+  if "0123456789".contains(key) {
+    digit(key)
+  } else if key == "." {
+    dot()
+  } else if key == "C" {
+    shown = "0"
+    stored = nil
+    op = nil
+    fresh = true
+  } else if key == "⌫" {
+    if not fresh and len(shown) > 1 and shown != "-0" {
+      shown = shown.slice(0, len(shown) - 1)
+      if shown == "-" {
+        shown = "0"
+      }
+    } else {
+      shown = "0"
+    }
+  } else if key == "±" {
+    if shown.starts_with("-") {
+      shown = shown.slice(1)
+    } else if shown != "0" {
+      shown = "-" + shown
+    }
+  } else if key == "%" {
+    shown = to_display(num(shown) / 100)
+    fresh = true
+  } else if key == "=" {
+    finish()
+    show()
+    return
+  } else {
+    operator(key)
+  }
+  show()
+}
+
+# The keyboard works too.
+for d in "0123456789".chars() {
+  win.key(d, press_for(d))
+}
+win.key("+", press_for("+"))
+win.key("-", press_for("−"))
+win.key("*", press_for("×"))
+win.key("/", press_for("÷"))
+win.key(".", press_for("."))
+win.key("%", press_for("%"))
+win.key("=", press_for("="))
+win.key("Enter", press_for("="))
+win.key("Escape", press_for("C"))
+win.key("Backspace", press_for("⌫"))
+
+win.run()

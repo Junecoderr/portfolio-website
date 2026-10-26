@@ -1,0 +1,123 @@
+# How are you today? A little mood check-in, made for Tanisha.
+# Pick a mood, write a note if you like, and save it to your journal
+# (journal.json, next to this file). You get a kind message back.
+# Run: tb apps/care/main.tb
+
+import gui
+import json
+import fs
+import time
+import random
+
+let FILE = fs.here("journal.json")
+
+let MOODS = ["Happy", "Calm", "Okay", "Tired", "Sad", "Worried"]
+let ICONS = {"Happy": "☀", "Calm": "✿", "Okay": "☁", "Tired": "☾", "Sad": "☂", "Worried": "☘"}
+
+let FOR_MOOD = {
+  "Happy": "I love seeing you happy. Hold on to this feeling.",
+  "Calm": "Calm looks good on you. Breathe it in.",
+  "Okay": "Okay is enough. You don't have to be more than that today.",
+  "Tired": "Rest isn't a reward, it's a need. Be soft with yourself tonight.",
+  "Sad": "It's okay to feel sad. You are not alone, and this will pass.",
+  "Worried": "One small step at a time. You've handled hard things before.",
+}
+
+let ALWAYS = [
+  "You are doing better than you think.",
+  "Drink some water and take a deep breath.",
+  "Whatever happens today, you are loved.",
+  "Small steps still move you forward.",
+  "Proud of you, always.",
+  "You make the world softer just by being in it.",
+]
+
+# Each entry: {"date": "2026-10-26 21:30", "mood": "Calm", "note": "..."}
+let journal = []
+if fs.exists(FILE) {
+  try {
+    journal = json.read(FILE)
+  } catch err {
+    say(f"I couldn't read {FILE}, so I'm starting a new journal. ({err.message})")
+  }
+}
+
+let mood = nil
+let now = time.now()
+
+let win = gui.window("How are you today?", {"width": 580, "height": 720})
+win.label("How are you today, Tanisha?", {"style": "title"})
+win.label(f"{now.weekday}, {now.day} {now.month_name}", {"style": "muted"})
+
+# A button needs a function; this makes one that remembers its mood.
+fn pick_mood(name) {
+  return fn() {
+    mood = name
+    chosen.set(f"{ICONS[name]}  Feeling {name.lower()} today")
+  }
+}
+
+let moods = win.column()
+let first_row = moods.row()
+let second_row = moods.row()
+let index = 0
+for name in MOODS {
+  let row = first_row
+  if index >= 3 {
+    row = second_row
+  }
+  row.button(f"{ICONS[name]}  {name}", pick_mood(name), {"expand": true})
+  index += 1
+}
+
+let chosen = win.label("Pick the one that fits best.", {"style": "heading"})
+let note = win.textarea({"height": 4})
+win.button("Save today's check-in", fn() { save_entry() }, {"primary": true})
+let message = win.label("", {"style": "accent", "wrap": 520})
+
+win.separator()
+win.label("Your journal", {"style": "heading"})
+let table = win.table(["When", "Mood", "Note"], {"widths": [160, 90, 270], "height": 4, "on_open": fn(row) { read_entry(row) }})
+let status = win.status("")
+
+fn kind_message(name) {
+  return FOR_MOOD[name] + " " + random.choice(ALWAYS)
+}
+
+fn show_journal() {
+  let rows = []
+  for entry in journal.reverse() {
+    rows.push([entry["date"], entry["mood"], entry["note"]])
+  }
+  table.set_rows(rows)
+  let n = len(journal)
+  if n == 1 {
+    status.set("1 check-in in your journal")
+  } else {
+    status.set(f"{n} check-ins in your journal")
+  }
+}
+
+fn save_entry() {
+  if mood == nil {
+    gui.alert("Pick how you feel first ♥")
+    return
+  }
+  let entry = {"date": time.format(time.timestamp(), "%Y-%m-%d %H:%M"), "mood": mood, "note": note.value().trim()}
+  journal.push(entry)
+  json.write(FILE, journal)
+  message.set(kind_message(mood))
+  note.clear()
+  show_journal()
+}
+
+fn read_entry(row) {
+  let text = row[2]
+  if text == "" {
+    text = "(no note)"
+  }
+  gui.alert(f"{row[1]} on {row[0]}\n\n{text}", "Journal")
+}
+
+show_journal()
+win.run()

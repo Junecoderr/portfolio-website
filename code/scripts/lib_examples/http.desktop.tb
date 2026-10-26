@@ -1,0 +1,10 @@
+import http
+
+let answer = http.get("https://example.com", {"timeout": 10})
+say(answer.status, answer.ok)
+say(answer.text.slice(0, 60))
+
+let api = http.get("https://httpbin.org/json")
+if api.ok {
+  say(api.json.slideshow.title)
+}

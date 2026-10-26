@@ -1,0 +1,9 @@
+import logs
+
+let records = logs.read("apps/data/auth.log", "auth")
+say(f"{len(records)} records")
+let failed = records.filter(fn(r) { return r.get("action") == "failed_login" })
+say(f"{len(failed)} failed logins")
+for row in logs.top(failed, "ip", 3) {
+  say(row)
+}

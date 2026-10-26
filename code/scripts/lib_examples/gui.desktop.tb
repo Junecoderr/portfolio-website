@@ -1,0 +1,9 @@
+import gui
+
+let win = gui.window("Hello", {"width": 360, "height": 200})
+win.label("What's your name?")
+let box = win.input({"placeholder": "Type here"})
+win.button("Say hello", fn() {
+  gui.alert(f"Hello, {box.value}!")
+})
+win.run()

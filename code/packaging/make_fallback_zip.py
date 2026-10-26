@@ -7,6 +7,8 @@ Contents (flat, so "Extract all" on Windows gives one tidy folder):
     tb.py
     for_tanisha.tb
     examples/*.tb      (whatever exists at build time)
+    tblib/...          the standard library (needed by `import ...`)
+    apps/...           the example apps and their sample data
     README.txt         (from packaging/README-python.txt, Windows line endings)
 """
 
@@ -30,6 +32,22 @@ def add(zf: zipfile.ZipFile, arcname: str, data: bytes) -> None:
     zf.writestr(info, data)
 
 
+SKIP_DIRS = {"__pycache__", ".pytest_cache"}
+SKIP_SUFFIXES = {".pyc", ".pyo"}
+
+
+def tree(folder: Path) -> list[Path]:
+    """Every file under folder (sorted), minus caches and hidden files."""
+    files = []
+    for path in sorted(folder.rglob("*")):
+        rel = path.relative_to(folder)
+        if any(part in SKIP_DIRS or part.startswith(".") for part in rel.parts):
+            continue
+        if path.is_file() and path.suffix not in SKIP_SUFFIXES:
+            files.append(path)
+    return files
+
+
 def crlf(text: str) -> bytes:
     return text.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
 
@@ -42,7 +60,8 @@ def main() -> int:
     dist.mkdir(parents=True, exist_ok=True)
     out = dist / NAME
 
-    required = [ROOT / "tb.py", ROOT / "for_tanisha.tb", ROOT / "packaging" / "README-python.txt"]
+    required = [ROOT / "tb.py", ROOT / "for_tanisha.tb", ROOT / "packaging" / "README-python.txt",
+                ROOT / "tblib" / "__init__.py"]
     for path in required:
         if not path.is_file():
             print(f"missing {path}", file=sys.stderr)
@@ -54,6 +73,9 @@ def main() -> int:
         add(zf, "for_tanisha.tb", (ROOT / "for_tanisha.tb").read_bytes())
         for ex in examples:
             add(zf, f"examples/{ex.name}", ex.read_bytes())
+        for folder in ("tblib", "apps"):
+            for path in tree(ROOT / folder):
+                add(zf, path.relative_to(ROOT).as_posix(), path.read_bytes())
         add(zf, "README.txt", crlf((ROOT / "packaging" / "README-python.txt").read_text(encoding="utf-8")))
 
     print(f"wrote {out} ({len(examples)} examples)")

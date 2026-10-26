@@ -1,0 +1,58 @@
+# Tests for the log-triage rules, using small hand-made records.
+# Run them with:  tb test apps/log-triage
+
+import test
+import detect
+import logs
+import "rules.tb"
+
+fn fired(records) {
+  return rules.triage(records).map(fn(a) { return a.rule })
+}
+
+test.case("a path traversal request is a web attack", fn() {
+  let r = logs.parse_line("198.51.100.9 - - [12/Mar/2026:10:00:00 +0000] \"GET /a/../../etc/passwd HTTP/1.1\" 400 10 \"-\" \"curl/8.0\"")
+  test.equal(r.format, "apache")
+  test.true("Web attack in the URL" in fired([r]))
+})
+
+test.case("a normal page view raises nothing", fn() {
+  let r = logs.parse_line("192.0.2.10 - - [12/Mar/2026:10:00:00 +0000] \"GET /blog/ HTTP/1.1\" 200 5120 \"-\" \"Mozilla/5.0\"")
+  test.equal(fired([r]), [])
+})
+
+test.case("sqlmap's user agent is spotted", fn() {
+  let r = logs.parse_line("198.51.100.9 - - [12/Mar/2026:10:00:00 +0000] \"GET /?id=1 HTTP/1.1\" 200 10 \"-\" \"sqlmap/1.7.2\"")
+  test.true("Known attack tool user agent" in fired([r]))
+})
+
+test.case("a new Linux user is flagged with its name", fn() {
+  let r = logs.parse_line("Mar 12 09:19:18 web01 useradd[2156]: new user: name=sysupdate, UID=1002, GID=1002, home=/home/sysupdate, shell=/bin/bash", "auth")
+  let alerts = rules.triage([r])
+  test.equal(alerts[0].rule, "New user account created")
+  test.equal(alerts[0].by, "sysupdate")
+})
+
+test.case("machine accounts ending in $ are not new-user alerts", fn() {
+  let r = {"action": "user_created", "user": "WS-FIN-08$", "time": 1}
+  test.equal(fired([r]), [])
+})
+
+test.case("an encoded PowerShell command line is caught", fn() {
+  let r = {"command_line": "powershell.exe -NoP -Enc SQBFAFgA", "user": "backup", "time": 1}
+  test.equal(fired([r]), ["Encoded PowerShell command"])
+})
+
+test.case("ten 404s are not a scan, but twenty in a minute are", fn() {
+  let few = []
+  let many = []
+  for n in range(20) {
+    let r = {"ip": "198.51.100.9", "status": 404, "time": 1000 + n}
+    many.push(r)
+    if n < 10 {
+      few.push(r)
+    }
+  }
+  test.equal(fired(few), [])
+  test.equal(fired(many), ["Web scanner: many 404s"])
+})

@@ -1,0 +1,24 @@
+title: Web Attack Attempts (Path Traversal or SQL Injection)
+id: 41d7c0aa-3e5b-4f2c-9d18-7e6f5a4b3c74
+status: experimental
+description: Requests whose path tries to climb out of the web root or inject SQL.
+logsource:
+  category: webserver
+detection:
+  traversal:
+    path|contains:
+      - '../'
+      - '/etc/passwd'
+  sqli:
+    path|contains|all:
+      - 'UNION'
+      - 'SELECT'
+  scanners:
+    agent|contains:
+      - 'sqlmap'
+      - 'Nikto'
+  condition: traversal or sqli or scanners
+level: high
+tags:
+  - attack.initial_access
+  - attack.t1190

@@ -1,0 +1,10 @@
+import fs
+
+fs.write("notes.txt", "first line\n")
+fs.append("notes.txt", "second line\n")
+say(fs.lines("notes.txt"))
+say(fs.size("notes.txt"), "bytes")
+say(fs.ext("apps/data/auth.log"), fs.name("apps/data/auth.log"))
+say(fs.list("apps/data").filter(fn(name) { return name.ends_with(".log") }))
+fs.remove("notes.txt")
+say(fs.exists("notes.txt"))

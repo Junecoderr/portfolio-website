@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Extract and defang IOCs from a phishing email · TB</title>
+  <meta name="description" content="Check a phishing email&#x27;s headers, extract every IOC with TB&#x27;s ioc library and share them defanged. Runs in the browser.">
+  <meta name="theme-color" content="#b3123e">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html" aria-current="page">Learn</a>
+        <a href="library.html">Library</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container docs">
+      <aside class="docs-sidebar" aria-label="Steps">
+        <button class="docs-nav-toggle" type="button" aria-expanded="false" aria-controls="docs-nav">Steps <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="docs-sidebar-inner" id="docs-nav">
+          <h2>In this tutorial</h2>
+          <ul>
+            <li><a href="#step-1">Read the email</a></li>
+            <li><a href="#step-2">Check the sender</a></li>
+            <li><a href="#step-3">Pull out every IOC</a></li>
+            <li><a href="#step-4">Leave out your own domains</a></li>
+            <li><a href="#step-5">Defang and share</a></li>
+          </ul>
+          <h2>More tutorials</h2>
+          <ul>
+            <li><a href="docs.html#guides">All tutorials</a></li>
+            <li><a href="library.html">Library reference</a></li>
+          </ul>
+        </div>
+      </aside>
+      <article class="docs-main">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><a href="docs.html">Learn</a> <span aria-hidden="true">/</span> <a href="docs.html#guides">Tutorials</a></nav>
+        <h1>Extract and defang IOCs from a phishing email</h1>
+        <p class="lead">A finance team got an urgent "payment failed" email. You'll check whether it's forged, pull out every indicator of compromise (IOC) and share them safely, defanged so nobody clicks by accident. Every step runs in your browser.</p>
+      <section id="step-1">
+        <h2><span class="chapter-num">1.</span>Read the email</h2>
+        <p>The sample is a raw email with its headers, as you'd export it from a mail client.</p>
+        <pre class="tb-code" data-runnable><code>import fs
+
+let email = fs.read("apps/data/phishing_email.txt")
+for line in email.lines().slice(0, 14) {
+  say(line)
+}</code></pre>
+      </section>
+      <section id="step-2">
+        <h2><span class="chapter-num">2.</span>Check the sender</h2>
+        <p>The <code>Authentication-Results</code> header says whether the sending server was allowed to send for that domain. <code>re.find_all</code> picks out each verdict.</p>
+        <pre class="tb-code" data-runnable><code>import fs
+import re
+
+let email = fs.read("apps/data/phishing_email.txt")
+for check in re.find_all("(spf|dkim|dmarc)=(\\w+)", email) {
+  say(check)
+}
+let sender = re.match("From: .*&lt;(?P&lt;address&gt;[^&gt;]+)&gt;", email)
+say("Claims to be from:", sender.address)</code></pre>
+        <p>SPF and DMARC both fail, and the domain is <code>paypa1</code> with a number one. Forged.</p>
+      </section>
+      <section id="step-3">
+        <h2><span class="chapter-num">3.</span>Pull out every IOC</h2>
+        <p><code>ioc.extract</code> finds IPs, domains, URLs, email addresses, file hashes and CVE numbers in one go, each list without repeats.</p>
+        <pre class="tb-code" data-runnable><code>import fs
+import ioc
+
+let found = ioc.extract(fs.read("apps/data/phishing_email.txt"))
+for kind in found {
+  say(f"{kind}: {len(found[kind])}")
+}
+say(found.urls)</code></pre>
+      </section>
+      <section id="step-4">
+        <h2><span class="chapter-num">4.</span>Leave out your own domains</h2>
+        <p>Your own mail servers show up too. Filter them out before you block anything.</p>
+        <pre class="tb-code" data-runnable><code>import fs
+import ioc
+
+let found = ioc.extract(fs.read("apps/data/phishing_email.txt"))
+let ours = "corp.example.com"
+let outside = found.domains.filter(fn(d) { return not d.ends_with(ours) })
+say(outside)</code></pre>
+      </section>
+      <section id="step-5">
+        <h2><span class="chapter-num">5.</span>Defang and share</h2>
+        <p>Defanged indicators (<code>hxxp://</code>, <code>[.]</code>) can't be clicked by accident in a chat or ticket. <code>ioc.rows</code> and <code>report.markdown</code> make a table to paste.</p>
+        <pre class="tb-code" data-runnable><code>import fs
+import ioc
+import report
+
+let found = ioc.extract(fs.read("apps/data/phishing_email.txt"))
+let rows = ioc.rows(found).filter(fn(r) { return r.type in ["urls", "ips", "sha256"] })
+say(report.markdown(rows.map(fn(r) {
+  return {"type": r.type, "indicator": ioc.defang(r.value)}
+})))</code></pre>
+      </section>
+      <section id="next">
+        <h2>Where next</h2>
+        <p>The <a href="examples.html#app-ioc-extractor">IOC extractor</a> app does this for any file from the command line, and the <a href="examples.html#app-ioc-workbench">IOC workbench</a> is a desktop app for pasting and cleaning indicators:</p>
+        <figure class="guide-shot"><img src="assets/img/apps/ioc-workbench.png" alt="The IOC workbench desktop app with extracted indicators" width="2200" height="1496" loading="lazy"><figcaption>apps/ioc-workbench.</figcaption></figure>
+        <p>On your computer you can also look each indicator up in VirusTotal or AbuseIPDB with the <a href="lib/intel.html">intel</a> library. See the <a href="lib/ioc.html">ioc reference</a>.</p>
+      </section>
+      </article>
+      <nav class="on-this-page" aria-label="On this page">
+        <div class="on-this-page-inner">
+          <h2>On this page</h2>
+          <ul id="on-this-page-list"></ul>
+        </div>
+      </nav>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
+  <script src="assets/js/docs.js" defer></script>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

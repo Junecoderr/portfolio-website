@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Check your own ports and IP reputation · TB</title>
+  <meta name="description" content="Check which ports your own computer exposes and look up IP reputation with TB&#x27;s net and intel libraries.">
+  <meta name="theme-color" content="#b3123e">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html" aria-current="page">Learn</a>
+        <a href="library.html">Library</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container docs">
+      <aside class="docs-sidebar" aria-label="Steps">
+        <button class="docs-nav-toggle" type="button" aria-expanded="false" aria-controls="docs-nav">Steps <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="docs-sidebar-inner" id="docs-nav">
+          <h2>In this tutorial</h2>
+          <ul>
+            <li><a href="#step-1">Ground rules</a></li>
+            <li><a href="#step-2">Understand an address</a></li>
+            <li><a href="#step-3">Which ports are open on my computer?</a></li>
+            <li><a href="#step-4">What is listening?</a></li>
+            <li><a href="#step-5">Look up an address's reputation</a></li>
+          </ul>
+          <h2>More tutorials</h2>
+          <ul>
+            <li><a href="docs.html#guides">All tutorials</a></li>
+            <li><a href="library.html">Library reference</a></li>
+          </ul>
+        </div>
+      </aside>
+      <article class="docs-main">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><a href="docs.html">Learn</a> <span aria-hidden="true">/</span> <a href="docs.html#guides">Tutorials</a></nav>
+        <h1>Check your own ports and IP reputation</h1>
+        <p class="lead">Which services is your own laptop offering to the network, and does an address from an alert have a bad reputation? These steps talk to the network, so they run with the TB app on your computer; the address maths at the start also runs in the browser.</p>
+      <section id="step-1">
+        <h2><span class="chapter-num">1.</span>Ground rules</h2>
+        <p class="warning">Only check computers you own or have written permission to test. Probing other people's systems can be against the law, even out of curiosity. Everything below points at your own machine (<code>127.0.0.1</code>) or looks addresses up in public services.</p>
+      </section>
+      <section id="step-2">
+        <h2><span class="chapter-num">2.</span>Understand an address</h2>
+        <p>Before looking anything up, work out what kind of address you have. These helpers are pure maths, so they run here too.</p>
+        <pre class="tb-code" data-runnable><code>import net
+
+for ip in ["192.168.1.20", "203.0.113.42", "127.0.0.1"] {
+  say(ip, "private:", net.is_private(ip), "loopback:", net.is_loopback(ip))
+}
+say(net.in_cidr("10.20.30.40", "10.0.0.0/8"))
+say(net.cidr_info("192.168.1.0/24").size, "addresses in a /24")</code></pre>
+      </section>
+      <section id="step-3">
+        <h2><span class="chapter-num">3.</span>Which ports are open on my computer?</h2>
+        <p><code>net.check_ports</code> tries to connect to each port and gives back a map of port to true or false. <code>net.common_ports</code> knows what usually runs where.</p>
+        <p class="ex-note">Desktop code: save it as a .tb file and run it with the TB app.</p><pre class="tb-code" data-desktop><code>import net
+
+let ports = [22, 80, 443, 3306, 5432, 8000, 8080]
+let open = net.check_ports("127.0.0.1", ports, 0.5)
+for port in ports {
+  if open[port] {
+    say(f"{port} open ({net.common_ports.get(port, "unknown")})")
+  }
+}</code></pre>
+      </section>
+      <section id="step-4">
+        <h2><span class="chapter-num">4.</span>What is listening?</h2>
+        <p>Many services say hello when you connect. <code>net.banner</code> reads that first line.</p>
+        <p class="ex-note">Desktop code: save it as a .tb file and run it with the TB app.</p><pre class="tb-code" data-desktop><code>import net
+
+if net.tcp_check("127.0.0.1", 22) {
+  say(net.banner("127.0.0.1", 22))
+}</code></pre>
+      </section>
+      <section id="step-5">
+        <h2><span class="chapter-num">5.</span>Look up an address's reputation</h2>
+        <p>AbuseIPDB and VirusTotal keep track of addresses that attack people. Get a free API key from each and set it as the <code>ABUSEIPDB_API_KEY</code> or <code>VT_API_KEY</code> environment variable; <code>intel.key_help()</code> explains how.</p>
+        <p class="ex-note">Desktop code: save it as a .tb file and run it with the TB app.</p><pre class="tb-code" data-desktop><code>import intel
+
+let ip = "203.0.113.42"
+if intel.has_key("abuseipdb") {
+  let r = intel.abuseipdb(ip)
+  say(f"AbuseIPDB: {r.verdict}, score {r.score}")
+}
+if intel.has_key("virustotal") {
+  let v = intel.virustotal_ip(ip)
+  say(f"VirusTotal: {v.verdict}, score {v.score}")
+}
+if not intel.has_key("abuseipdb") and not intel.has_key("virustotal") {
+  say(intel.key_help())
+}</code></pre>
+      </section>
+      <section id="next">
+        <h2>Where next</h2>
+        <p>The <a href="examples.html#app-port-check">Port check</a> app wraps steps 3 and 4 with safety checks built in, and <a href="examples.html#app-ip-reputation">IP reputation</a> looks up any mix of IPs, domains, URLs and hashes. See the <a href="lib/net.html">net</a>, <a href="lib/http.html">http</a> and <a href="lib/intel.html">intel</a> references.</p>
+      </section>
+      </article>
+      <nav class="on-this-page" aria-label="On this page">
+        <div class="on-this-page-inner">
+          <h2>On this page</h2>
+          <ul id="on-this-page-list"></ul>
+        </div>
+      </nav>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
+  <script src="assets/js/docs.js" defer></script>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

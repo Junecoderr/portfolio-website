@@ -1,0 +1,106 @@
+# port-check: which common ports are open on a computer you own?
+#
+#   tb main.tb                         check this computer (127.0.0.1)
+#   tb main.tb 192.168.1.20            check another machine on your network
+#   tb main.tb 127.0.0.1 22,80,8000-8010
+#   tb main.tb 127.0.0.1 --banners     also show what open services say first
+#
+# Only check computers you own or have written permission to test.
+# Checking other people's systems can be against the law.
+
+import os
+import net
+import text
+
+fn usage() {
+  say("Usage: tb main.tb [HOST] [PORTS] [--banners] [--authorised]")
+  say("  HOST     default 127.0.0.1 (this computer)")
+  say("  PORTS    like 22,80,443 or 8000-8010 (default: common ports)")
+  say("  --banners     read the greeting of each open port (SSH, FTP, mail...)")
+  say("  --authorised  needed for addresses outside your own network:")
+  say("                you confirm you own the machine or have written permission.")
+}
+
+let host = "127.0.0.1"
+let ports = nil
+let banners = false
+let authorised = false
+let positional = []
+for a in os.args {
+  if a == "--help" or a == "-h" {
+    usage()
+    exit(0)
+  } else if a == "--banners" {
+    banners = true
+  } else if a == "--authorised" or a == "--authorized" {
+    authorised = true
+  } else {
+    positional.push(a)
+  }
+}
+if len(positional) > 0 {
+  host = positional[0]
+}
+if len(positional) > 1 {
+  ports = positional[1]
+}
+if ports == nil {
+  ports = sorted(keys(net.common_ports))
+}
+
+# Resolve the name first, so we know where the checks really go.
+let ip = host
+if not net.is_ip(host) {
+  try {
+    ip = net.resolve(host)[0]
+  } catch err {
+    say(err.message)
+    exit(2)
+  }
+}
+
+# Public addresses need an explicit promise that this is allowed.
+if not net.is_private(ip) and not authorised {
+  say(f"{host} ({ip}) is outside your own network.")
+  say("Only check machines you own or have written permission to test.")
+  say("If that's the case, run again with --authorised.")
+  exit(2)
+}
+
+let results = {}
+try {
+  results = net.check_ports(ip, ports, 1)
+} catch err {
+  say(err.message)
+  exit(2)
+}
+
+say(f"Port check for {host} ({ip}), {len(results)} ports")
+say("")
+say(f"{text.pad_right("PORT", 7)}{text.pad_right("SERVICE", 15)}STATE")
+let open_count = 0
+for port in keys(results) {
+  let service = net.common_ports.get(port, "")
+  let state = "closed"
+  if results[port] {
+    state = "OPEN"
+    open_count += 1
+  }
+  let row = f"{text.pad_right(port, 7)}{text.pad_right(service, 15)}{state}"
+  if banners and results[port] {
+    try {
+      let b = net.banner(ip, port, 1)
+      if b != "" {
+        row = row + "   " + b.slice(0, 60)
+      }
+    } catch err {
+      # the service went away between the check and the banner; skip it
+    }
+  }
+  say(row)
+}
+say("")
+say(f"{open_count} open, {len(results) - open_count} closed or filtered.")
+if open_count > 0 {
+  say("Tip: anything open that you don't recognise is worth a look (what program is listening?).")
+}

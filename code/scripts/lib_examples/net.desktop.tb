@@ -1,0 +1,10 @@
+import net
+
+# Only check computers you own or are allowed to test.
+let open = net.check_ports("127.0.0.1", [22, 80, 443, 8000])
+for port in open {
+  if open[port] {
+    say(f"port {port} is open")
+  }
+}
+say(net.resolve("example.com"))

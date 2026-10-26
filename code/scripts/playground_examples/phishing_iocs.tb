@@ -1,0 +1,16 @@
+# Title: Extract IOCs from a phishing email
+# About: Pulls the domains, IPs and links out of a suspicious email and defangs them, ready for a ticket.
+import fs
+import ioc
+import report
+
+let email = fs.read("apps/data/phishing_email.txt")
+let found = ioc.extract(email)
+
+for kind in ["domains", "ips", "urls", "emails"] {
+  say(f"{kind}: {len(found[kind])}")
+}
+say("")
+say(report.markdown(ioc.rows(found).map(fn(row) {
+  return {"type": row.type, "value": ioc.defang(row.value)}
+})))

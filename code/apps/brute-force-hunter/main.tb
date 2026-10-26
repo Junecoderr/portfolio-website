@@ -1,0 +1,144 @@
+# brute-force-hunter: find password guessing in Linux auth.log and Windows
+# Security logs, and say whether any attacker got in.
+#
+#   tb apps/brute-force-hunter/main.tb                        the sample logs
+#   tb apps/brute-force-hunter/main.tb /var/log/auth.log      your own log(s)
+#   tb apps/brute-force-hunter/main.tb auth.log --attempts 10 --within 300
+
+import os
+import fs
+import logs
+import detect
+import report
+
+let attempts = 5
+let within = 600
+let files = []
+
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if (arg == "--attempts" or arg == "--within") and i + 1 >= len(os.args) {
+    say(f"{arg} needs a number after it.")
+    exit(2)
+  }
+  if arg == "--attempts" or arg == "--within" {
+    let value = os.args[i + 1]
+    if not value.is_number() {
+      say(f"{arg} needs a number, not \"{value}\".")
+      exit(2)
+    }
+    if arg == "--attempts" {
+      attempts = int(value.to_number())
+    } else {
+      within = value.to_number()
+    }
+    i += 2
+    continue
+  }
+  if arg == "--help" or arg == "-h" {
+    say("Usage: tb main.tb [log ...] [--attempts N] [--within SECONDS]")
+    exit(0)
+  }
+  if arg.starts_with("--") {
+    say(f"Unknown option {arg}. Usage: tb main.tb [log ...] [--attempts N] [--within SECONDS]")
+    exit(2)
+  }
+  files.push(arg)
+  i += 1
+}
+if files.is_empty() {
+  let data = fs.join(fs.here(), "..", "data")
+  files = [fs.join(data, "auth.log"), fs.join(data, "windows_security.json"), fs.join(data, "windows_security.csv")]
+}
+
+# 135 -> "2m15s"
+fn duration(seconds) {
+  let s = int(seconds)
+  if s < 60 {
+    return f"{s}s"
+  }
+  if s < 3600 {
+    if s % 60 == 0 {
+      return f"{int(s / 60)}m"
+    }
+    return f"{int(s / 60)}m{s % 60}s"
+  }
+  return f"{int(s / 3600)}h{int((s % 3600) / 60)}m"
+}
+
+# ["a", "b", "c", "d", "e"] -> "a, b, c +2"
+fn short_list(items, n) {
+  if len(items) <= n {
+    return items.join(", ")
+  }
+  return items.slice(0, n).join(", ") + f" +{len(items) - n}"
+}
+
+say(f"Hunting for {attempts}+ failed logins from one source within {duration(within)}.")
+say("")
+
+let offenders = []
+let quiet = []
+let files_read = 0
+for path in files {
+  let records = []
+  try {
+    records = logs.read(path)
+  } catch err {
+    say(f"Skipping {path}: {err.message}")
+    continue
+  }
+  files_read += 1
+  let failures = detect.failed_logins(records)
+  say(f"{fs.name(path)}: {len(records)} records, {len(failures)} failed logins")
+
+  let alerts = detect.brute_force(records, attempts, within)
+  let loud = []
+  for a in alerts {
+    loud.push(a.by)
+    offenders.push({
+      "source": a.by,
+      "log": fs.name(path),
+      "failures": a.count,
+      "accounts tried": short_list(a.users, 4),
+      "from": a.first_when,
+      "for": duration(a.last - a.first),
+      "got in?": a.success_after and f"YES as {a.success_user}" or "no",
+      "_alert": a,
+    })
+  }
+  # Sources that failed, but too few times to count as brute force.
+  for t in logs.top(failures, "ip", 50) {
+    if t.value not in loud {
+      quiet.push({"source": t.value, "log": fs.name(path), "failures": t.count})
+    }
+  }
+}
+
+say("")
+if files_read == 0 {
+  say("None of the logs could be read, so there is nothing to hunt in.")
+  exit(1)
+}
+if offenders.is_empty() {
+  say("No brute force found. Try a lower --attempts or a longer --within.")
+} else {
+  let ranked = offenders.sort_by(fn(o) { return 0 - o.failures })
+  say(f"{len(ranked)} brute-force source(s):")
+  say(report.table(ranked, ["source", "log", "failures", "accounts tried", "from", "for", "got in?"]))
+  for o in ranked {
+    let a = o._alert
+    if a.success_after {
+      say("")
+      say(f"!! {a.by} guessed a password: {a.success_user} logged in at {a.success_when} after {a.count} failures.")
+      say("   Next steps: disable or reset that account, block the IP, and check what it did after logging in.")
+    }
+  }
+}
+
+if not quiet.is_empty() {
+  say("")
+  say("Below the threshold (worth a look, slow attackers stay quiet on purpose):")
+  say(report.table(quiet))
+}

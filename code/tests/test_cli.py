@@ -43,13 +43,13 @@ def feed_input(monkeypatch, lines):
 
 def test_version(capsys):
     assert tb.main(["--version"]) == 0
-    assert capsys.readouterr().out.strip() == "TB 1.0.0"
+    assert capsys.readouterr().out.strip() == "TB 2.0.0"
     assert tb.main(["-V"]) == 0
-    assert capsys.readouterr().out.strip() == "TB 1.0.0"
+    assert capsys.readouterr().out.strip() == "TB 2.0.0"
 
 
 def test_version_constant():
-    assert tb.__version__ == "1.0.0"
+    assert tb.__version__ == "2.0.0"
 
 
 def test_help(capsys):
@@ -162,7 +162,7 @@ def test_ask_from_cli_uses_input(capsys, script, monkeypatch):
 def test_main_uses_sys_argv(capsys, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["tb", "--version"])
     assert tb.main() == 0
-    assert "TB 1.0.0" in capsys.readouterr().out
+    assert "TB 2.0.0" in capsys.readouterr().out
 
 
 # -- REPL ---------------------------------------------------------------------
@@ -171,7 +171,7 @@ def test_repl_expressions_and_statements(capsys, monkeypatch):
     prompts = feed_input(monkeypatch, ["1 + 2", 'let x = "hi"', "x", 'say(x + "!")', "[1, x]", "nil", "exit"])
     assert tb.main([]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[0].startswith("TB 1.0.0")
+    assert out[0].startswith("TB 2.0.0")
     assert out[1:] == ["3", '"hi"', "hi!", '[1, "hi"]']
     assert set(prompts) == {"tb> "}
 
@@ -365,9 +365,22 @@ class TestOwnsConsoleWindow:
         self.tty(monkeypatch)
         assert tb.owns_console_window() is False
 
-    def test_frozen_onefile_counts_its_launcher(self, monkeypatch):
+    def test_frozen_onedir_is_one_process(self, monkeypatch, tmp_path):
         monkeypatch.setattr(sys, "platform", "win32")
         monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "executable", str(tmp_path / "tb" / "tb.exe"))
+        monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path / "tb" / "_internal"), raising=False)
+        self.tty(monkeypatch)
+        self.fake_ctypes(monkeypatch, 1)  # double-clicked tb.exe
+        assert tb.owns_console_window() is True
+        self.fake_ctypes(monkeypatch, 2)  # cmd.exe + tb.exe
+        assert tb.owns_console_window() is False
+
+    def test_frozen_onefile_counts_its_launcher(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "executable", str(tmp_path / "app" / "tb.exe"))
+        monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path / "temp" / "_MEI123"), raising=False)
         self.tty(monkeypatch)
         self.fake_ctypes(monkeypatch, 2)  # launcher + tb
         assert tb.owns_console_window() is True

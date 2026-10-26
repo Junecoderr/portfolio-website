@@ -16,11 +16,11 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html">Learn</a>
-        <a href="docs.html#reference">Reference</a>
+        <a href="library.html">Library</a>
         <a href="examples.html" aria-current="page">Examples</a>
         <a href="playground.html">Playground</a>
         <a href="download.html" class="nav-cta">Download</a>
@@ -31,10 +31,13 @@
   <main id="main">
     <div class="container">
       <div class="page-head">
-        <h1>Examples</h1>
-        <p class="lead">Little TB programs to read, run and change. Every one is also in the <code>examples</code> folder that comes with TB: run it with <kbd>tb examples\care_bot.tb</kbd>.</p>
+        <h1>Examples and apps</h1>
+        <p class="lead">Small programs to learn from, and real applications to use and take apart: desktop apps, security tools and network utilities, each with its full source.</p>
+        <p class="page-meta"><a href="#programs">Example programs</a><a href="#apps">Apps</a><a href="playground.html">Open the playground</a></p>
       </div>
       <!-- The code blocks below must match examples/*.tb exactly (tests/test_examples.py checks this). -->
+      <h2 id="programs" class="flush-top">Example programs</h2>
+      <p>Short programs that each show one idea. Run them here, or find them in the <code>examples</code> folder that comes with TB: <kbd>tb examples\care_bot.tb</kbd>.</p>
       <ul class="gallery" aria-label="All examples">
           <li>
             <article class="ex-card">
@@ -260,7 +263,7 @@ fn is_one_of(word, options) {
       <section class="example" id="for_tanisha" aria-labelledby="for_tanisha-title">
         <div class="example-head">
           <div>
-            <h2 id="for_tanisha-title">For Tanisha</h2>
+            <h3 id="for_tanisha-title">For Tanisha</h3>
             <p>The very first TB program, a little letter written in code. Lists, loops, functions and a note at the end.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/for_tanisha.tb" download>Download for_tanisha.tb</a></div>
@@ -339,7 +342,7 @@ say("With love, always.")</code></pre>
       <section class="example" id="hello" aria-labelledby="hello-title">
         <div class="example-head">
           <div>
-            <h2 id="hello-title">Hello, world</h2>
+            <h3 id="hello-title">Hello, world</h3>
             <p>Your very first TB program. It says hello and does a little maths.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/hello.tb" download>Download hello.tb</a></div>
@@ -362,7 +365,7 @@ say("Welcome to TB, " + name + ".")</code></pre>
       <section class="example" id="compliments" aria-labelledby="compliments-title">
         <div class="example-head">
           <div>
-            <h2 id="compliments-title">Compliment machine</h2>
+            <h3 id="compliments-title">Compliment machine</h3>
             <p>Mixes words from two lists to write lots of little compliments.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/compliments.tb" download>Download compliments.tb</a></div>
@@ -389,7 +392,7 @@ say("That's " + str(len(things) * len(words)) + " compliments, and every one is 
       <section class="example" id="countdown" aria-labelledby="countdown-title">
         <div class="example-head">
           <div>
-            <h2 id="countdown-title">Countdown to a hug</h2>
+            <h3 id="countdown-title">Countdown to a hug</h3>
             <p>Counts down with a while loop, then counts by twos with range().</p>
           </div>
           <div class="button-row"><a class="button" href="examples/countdown.tb" download>Download countdown.tb</a></div>
@@ -415,7 +418,7 @@ for n in range(10, 0, -2) {
       <section class="example" id="love_buzz" aria-labelledby="love_buzz-title">
         <div class="example-head">
           <div>
-            <h2 id="love_buzz-title">Love buzz</h2>
+            <h3 id="love_buzz-title">Love buzz</h3>
             <p>A playful pattern: every 3rd number says "love", every 5th says "hugs".</p>
           </div>
           <div class="button-row"><a class="button" href="examples/love_buzz.tb" download>Download love_buzz.tb</a></div>
@@ -445,7 +448,7 @@ for size in range(1, 6) {
       <section class="example" id="grocery_list" aria-labelledby="grocery_list-title">
         <div class="example-head">
           <div>
-            <h2 id="grocery_list-title">Grocery list</h2>
+            <h3 id="grocery_list-title">Grocery list</h3>
             <p>Builds a shopping list with push(), changes an item, and prints it with for.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/grocery_list.tb" download>Download grocery_list.tb</a></div>
@@ -488,7 +491,7 @@ for item in everything {
       <section class="example" id="closures" aria-labelledby="closures-title">
         <div class="example-head">
           <div>
-            <h2 id="closures-title">Functions that remember</h2>
+            <h3 id="closures-title">Functions that remember</h3>
             <p>Closures: little functions that keep their own memory, like a hug counter.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/closures.tb" download>Download closures.tb</a></div>
@@ -526,7 +529,7 @@ say(twice(shout, "I love you"))</code></pre>
       <section class="example" id="recursion" aria-labelledby="recursion-title">
         <div class="example-head">
           <div>
-            <h2 id="recursion-title">Functions that call themselves</h2>
+            <h3 id="recursion-title">Functions that call themselves</h3>
             <p>Recursion: Fibonacci numbers, factorials, and a staircase of stars.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/recursion.tb" download>Download recursion.tb</a></div>
@@ -570,7 +573,7 @@ stairs(4)</code></pre>
       <section class="example" id="guess_the_number" aria-labelledby="guess_the_number-title">
         <div class="example-head">
           <div>
-            <h2 id="guess_the_number-title">Guess the number</h2>
+            <h3 id="guess_the_number-title">Guess the number</h3>
             <p>A small guessing game. TB is thinking of a number from 1 to 20.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/guess_the_number.tb" download>Download guess_the_number.tb</a></div>
@@ -617,7 +620,7 @@ if found {
       <section class="example" id="care_bot" aria-labelledby="care_bot-title">
         <div class="example-head">
           <div>
-            <h2 id="care_bot-title">Care bot</h2>
+            <h3 id="care_bot-title">Care bot</h3>
             <p>A gentle little bot that asks how you are feeling and answers kindly.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/care_bot.tb" download>Download care_bot.tb</a></div>
@@ -696,20 +699,39 @@ say("")
 say("One last thing before you go:")
 care(name)</code></pre>
       </section>
+      <section class="apps-intro" id="apps" aria-labelledby="apps-title">
+        <h2 id="apps-title">Apps</h2>
+        <p class="lead">Complete programs written in TB 2.0. Desktop apps open windows; the security and network tools run in a terminal. Every one is a single readable <code>main.tb</code>.</p>
+        <p>They already come inside your <a href="download.html">TB download</a>, in its <code>apps</code> folder (with sample logs in <code>apps/data</code>). On Windows, the installer also puts the desktop apps in the Start menu. To run one yourself:</p>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="How to run an app on each computer">
+          <table class="hash-table">
+            <thead><tr><th scope="col">Your TB</th><th scope="col">Run the To-do app</th></tr></thead>
+            <tbody>
+              <tr><td>Windows installer</td><td>Start menu, TB, <strong>To-do</strong>, or in TB Prompt: <code>tb "%LOCALAPPDATA%\Programs\TB\apps\todo\main.tb"</code></td></tr>
+              <tr><td>Windows zip</td><td><code>tb\tbw.exe tb\apps\todo\main.tb</code></td></tr>
+              <tr><td>Mac</td><td><code>~/tb/tb ~/tb/apps/todo/main.tb</code></td></tr>
+              <tr><td>Linux</td><td><code>./tb/tb tb/apps/todo/main.tb</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Command-line tools take a file to read, for example <code>tb apps/log-triage/main.tb apps/data/auth.log</code>. The source links below are for reading or copying a single app.</p>
+<!-- APPS GALLERY (filled in by scripts/build_site.py) -->
+      </section>
     </div>
   </main>
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-brand">
         <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-        <p>A tiny, friendly programming language.</p>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
       </div>
       <nav aria-labelledby="footer-learn">
         <h2 id="footer-learn">Learn</h2>
         <ul>
           <li><a href="docs.html">Guide</a></li>
-          <li><a href="docs.html#reference">Reference</a></li>
-          <li><a href="examples.html">Examples</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
         </ul>
       </nav>
       <nav aria-labelledby="footer-tools">
@@ -723,7 +745,7 @@ care(name)</code></pre>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
           <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
@@ -731,7 +753,7 @@ care(name)</code></pre>
     </div>
     <div class="footer-bottom">
       <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
-      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

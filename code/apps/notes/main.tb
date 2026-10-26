@@ -1,0 +1,154 @@
+# Notes: a small plain-text editor.
+# Open and save files with the File menu (or Ctrl+O / Ctrl+S; Cmd on a Mac).
+# The status bar counts your words as you type.
+# Run: tb apps/notes/main.tb            (or: tb apps/notes/main.tb some-file.txt)
+
+import gui
+import fs
+import os
+
+let FILTERS = {"Text files": "*.txt *.md *.tb *.log", "All files": "*"}
+
+let current = nil      # the file being edited (nil: not saved yet)
+let dirty = false      # true when there are unsaved changes
+
+let win = gui.window("Notes", {"width": 680, "height": 520})
+
+let bar = win.row()
+bar.button("New", fn() { new_note() })
+bar.button("Open…", fn() { open_note() })
+bar.button("Save", fn() { save_note() }, {"primary": true})
+let file_label = bar.label("", {"style": "muted"})
+
+let editor = win.textarea({"on_change": fn(text) { changed(text) }, "height": 16})
+let status = win.status("")
+
+win.menu({
+  "File": {
+    "New": fn() { new_note() },
+    "Open…": fn() { open_note() },
+    "Save": fn() { save_note() },
+    "Save As…": fn() { save_as() },
+    "-": nil,
+    "Quit": fn() { quit() },
+  },
+  "Help": {
+    "About Notes": fn() { gui.alert("Notes, a tiny editor written in TB.\nMade with love, for Tanisha.", "About") },
+  },
+})
+win.key("Mod+N", fn() { new_note() })
+win.key("Mod+O", fn() { open_note() })
+win.key("Mod+S", fn() { save_note() })
+
+fn file_name() {
+  if current == nil {
+    return "Untitled"
+  }
+  return fs.name(current)
+}
+
+fn count_words(text) {
+  return len(text.split())
+}
+
+fn update() {
+  let text = editor.value()
+  let words = count_words(text)
+  let plural = "s"
+  if words == 1 {
+    plural = ""
+  }
+  let mark = ""
+  if dirty {
+    mark = " •"
+  }
+  status.set(f"{words} word{plural}, {len(text)} characters")
+  file_label.set(file_name() + mark)
+  win.title(f"{file_name()}{mark} - Notes")
+}
+
+fn changed(text) {
+  dirty = true
+  update()
+}
+
+fn okay_to_lose_changes() {
+  if not dirty {
+    return true
+  }
+  return gui.confirm("You have unsaved changes. Throw them away?")
+}
+
+fn new_note() {
+  if okay_to_lose_changes() {
+    editor.set("")
+    current = nil
+    dirty = false
+    update()
+    editor.focus()
+  }
+}
+
+fn load(path) {
+  try {
+    editor.set(fs.read(path))
+    current = path
+    dirty = false
+  } catch err {
+    gui.alert(err.message, "Couldn't open")
+  }
+  update()
+}
+
+fn open_note() {
+  if not okay_to_lose_changes() {
+    return
+  }
+  let path = gui.open_file(FILTERS)
+  if path != nil {
+    load(path)
+  }
+}
+
+fn write_to(path) {
+  try {
+    fs.write(path, editor.value())
+    current = path
+    dirty = false
+  } catch err {
+    gui.alert(err.message, "Couldn't save")
+  }
+  update()
+}
+
+fn save_as() {
+  let suggested = file_name()
+  if current == nil {
+    suggested = "Untitled.txt"
+  }
+  let path = gui.save_file(suggested, FILTERS)
+  if path != nil {
+    write_to(path)
+  }
+}
+
+fn save_note() {
+  if current == nil {
+    save_as()
+  } else {
+    write_to(current)
+  }
+}
+
+fn quit() {
+  if okay_to_lose_changes() {
+    win.close()
+  }
+}
+
+if len(os.args) > 0 {
+  load(os.args[0])
+}
+update()
+editor.focus()
+win.run()

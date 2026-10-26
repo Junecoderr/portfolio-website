@@ -1,0 +1,9 @@
+import json
+
+let alert = {"rule": "Brute force", "ip": "203.0.113.42", "count": 22}
+let text = json.stringify(alert)
+say(text)
+
+let back = json.parse(text)
+say(back.ip, back["count"] + 1)
+say(json.stringify({"tags": ["ssh", "auth"]}, true))

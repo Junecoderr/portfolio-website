@@ -1,0 +1,6 @@
+import hash
+
+say(hash.sha256("hello"))
+say(hash.md5("hello"))
+say(hash.hmac_sha256("secret", "message"))
+say(hash.compare(hash.sha256("a"), hash.sha256("a")))

@@ -1,0 +1,21 @@
+title: Encoded PowerShell Command Line
+id: 9c3a8e11-2f4d-4c6a-8e7b-1a2b3c4d5e63
+status: test
+description: PowerShell started with a base64 -EncodedCommand, a common way to hide what a script does.
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection_image:
+    - Image|endswith: '\powershell.exe'
+    - Image|endswith: '\pwsh.exe'
+  selection_flag:
+    CommandLine|contains:
+      - ' -enc '
+      - ' -EncodedCommand '
+      - ' -ec '
+  condition: all of selection_*
+level: high
+tags:
+  - attack.execution
+  - attack.t1059.001

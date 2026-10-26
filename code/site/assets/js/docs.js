@@ -34,7 +34,7 @@
       a.textContent = h.textContent.replace(/^\d+\.\s*/, function (m) { return m.trim() + " "; });
       li.appendChild(a);
       list.appendChild(li);
-      if (sec.id === "reference") {
+      if (sec.querySelector(".sig[id]")) {
         var cards = sec.querySelectorAll(".sig[id]");
         for (var i = 0; i < cards.length; i++) {
           var sli = document.createElement("li");

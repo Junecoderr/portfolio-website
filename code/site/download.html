@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Install TB · TB</title>
-  <meta name="description" content="Download TB 1.0 for Windows, macOS or Linux, with step-by-step install help and an honest note about security warnings.">
+  <meta name="description" content="Download TB 2.0 for Windows (installer or portable zip), macOS or Linux, with step-by-step help and an honest note about security warnings.">
   <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -16,11 +16,11 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html">Learn</a>
-        <a href="docs.html#reference">Reference</a>
+        <a href="library.html">Library</a>
         <a href="examples.html">Examples</a>
         <a href="playground.html">Playground</a>
         <a href="download.html" class="nav-cta" aria-current="page">Download</a>
@@ -32,46 +32,46 @@
     <div class="container">
 
       <div class="page-head">
-        <h1>Install TB</h1>
-        <p class="lead">TB is one small file. Download it, put it in a folder, and you're ready. Every click is explained below.</p>
-        <p class="page-meta"><span>Version <strong data-version>1.0.0</strong></span><span>Released <time datetime="2026-10-26">26 October 2026</time></span><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></p>
+        <h1>Install TB 2.0</h1>
+        <p class="lead">TB comes as one download with everything inside: the language, all twenty libraries, the example programs and the desktop apps. Every click is explained below.</p>
+        <p class="page-meta"><span>Version <strong data-version>2.0.0</strong></span><span>Released <time datetime="2026-10-26">26 October 2026</time></span><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></p>
       </div>
 
       <section class="release" aria-labelledby="dl-main-title" id="dl-primary">
         <div>
           <h2 id="dl-main-title">TB for <span data-os-name>Windows</span></h2>
-          <p class="dl-meta" data-os-note>For Windows 10 and 11 laptops (64-bit). Version <span data-version>1.0.0</span>.</p>
+          <p class="dl-meta" data-os-note>The Windows installer: no admin needed, adds TB to the Start menu. Version <span data-version>2.0.0</span>.</p>
           <p class="dl-meta" data-mobile-note hidden>It looks like you're on a phone or tablet. TB runs on a laptop or desktop computer, but you can <a href="playground.html">try it in the browser</a> right now.</p>
         </div>
-        <a class="button button-primary button-big" data-download="tb-windows-x64.exe" data-primary-link href="#">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg><span>Download <code data-primary-file>tb-windows-x64.exe</code></span>
+        <a class="button button-primary button-big" data-download="tb-windows-x64-setup.exe" data-primary-link href="#">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg><span>Download <code data-primary-file>tb-windows-x64-setup.exe</code></span>
         </a>
       </section>
 
       <section aria-labelledby="all-downloads">
-        <h2 id="all-downloads">Other platforms</h2>
+        <h2 id="all-downloads">All downloads</h2>
         <div class="table-wrap" role="region" tabindex="0" aria-label="All download files (scrolls sideways on small screens)">
           <table class="hash-table">
-            <thead><tr><th scope="col">File</th><th scope="col">For</th><th scope="col">Contains</th></tr></thead>
+            <thead><tr><th scope="col">File</th><th scope="col">For</th><th scope="col">What it is</th></tr></thead>
             <tbody>
-              <tr><td><a data-download="tb-windows-x64.exe" href="#"><code>tb-windows-x64.exe</code></a></td><td>Windows 10 and 11, 64-bit</td><td>PyInstaller app, one file</td></tr>
-              <tr><td><a data-download="tb-macos-arm64.zip" href="#"><code>tb-macos-arm64.zip</code></a></td><td>macOS on Apple silicon (M1 and newer)</td><td>zip with the tb program</td></tr>
-              <tr><td><a data-download="tb-linux-x64.tar.gz" href="#"><code>tb-linux-x64.tar.gz</code></a></td><td>Linux, 64-bit Intel or AMD</td><td>tar.gz with the tb program</td></tr>
-              <tr><td><a data-download="tb-python.zip" href="#"><code>tb-python.zip</code></a></td><td>Any computer with Python 3.10 or newer</td><td>tb.py and the examples</td></tr>
+              <tr><td><a data-download="tb-windows-x64-setup.exe" href="#"><code>tb-windows-x64-setup.exe</code></a></td><td>Windows 10 and 11, 64-bit <strong>(recommended)</strong></td><td>Installer: Start menu, double-click .tb files, tb on your PATH</td></tr>
+              <tr><td><a data-download="tb-windows-x64.zip" href="#"><code>tb-windows-x64.zip</code></a></td><td>Windows 10 and 11, 64-bit</td><td>Portable folder, nothing installed</td></tr>
+              <tr><td><a data-download="tb-macos-arm64.zip" href="#"><code>tb-macos-arm64.zip</code></a></td><td>macOS on Apple silicon (M1 and newer)</td><td>A <code>tb</code> folder</td></tr>
+              <tr><td><a data-download="tb-linux-x64.tar.gz" href="#"><code>tb-linux-x64.tar.gz</code></a></td><td>Linux, 64-bit Intel or AMD</td><td>A <code>tb</code> folder</td></tr>
+              <tr><td><a data-download="tb-python.zip" href="#"><code>tb-python.zip</code></a></td><td>Any computer with Python 3.10 or newer</td><td><code>tb.py</code>, the standard library, examples and apps</td></tr>
               <tr><td><a data-download="SHA256SUMS.txt" href="#"><code>SHA256SUMS.txt</code></a></td><td>Checking your download</td><td>SHA-256 fingerprints of every file</td></tr>
-              <tr><td><a href="examples/for_tanisha.tb" download="for_tanisha.tb"><code>for_tanisha.tb</code></a></td><td>Your first program</td><td>A little letter, written in TB</td></tr>
             </tbody>
           </table>
         </div>
-        <p>Rather not install anything? <a href="playground.html">The playground</a> runs TB in your browser.</p>
+        <p>Every download has the same folders inside: <code>apps</code> (the desktop apps and security tools), <code>examples</code> and <code>for_tanisha.tb</code>. Rather not install anything? <a href="playground.html">The playground</a> runs TB in your browser.</p>
       </section>
 
       <section class="section" aria-labelledby="why-title">
         <h2 id="why-title">Why your computer might warn you</h2>
         <div class="prose">
-          <p>When you open TB for the first time, Windows or macOS may show a warning saying it doesn't recognise the app. That's expected, and here is the honest reason.</p>
+          <p>When you open TB for the first time, Windows or macOS may say it doesn't recognise the app. That's expected, and here is the honest reason.</p>
           <p>Big companies pay every year for a <strong>code-signing certificate</strong>, a kind of ID card that tells your computer who made a program. TB is a small gift, not a company product, so it doesn't have one. Your computer simply hasn't met TB before, so it plays safe and asks you first.</p>
-          <p>TB can't reach the internet, and it only reads the program file you give it. All of its code is public, and you can check that your download is exactly the published file using the <a href="#verify">checksums</a> below. The steps that follow show how to say "yes, I trust this one".</p>
+          <p>TB itself never phones home and collects nothing. Like any programming language, a TB program can read and write files, use the network (the <code>http</code>, <code>net</code> and <code>intel</code> libraries) and run other programs (<code>os.run</code>), but only when its code says so. So run programs you trust, the same as you would with Python or anything else. All of TB's code is public, and the <a href="#verify">checksums</a> below prove your download is exactly the published file.</p>
         </div>
       </section>
 
@@ -90,43 +90,23 @@
             <li>
               <div class="step-card">
                 <div>
-                  <h4>Download TB and keep it</h4>
-                  <p>Click the <strong>Download</strong> button above. Because TB is new, your browser might pause and say the file "isn't commonly downloaded".</p>
-                  <p>In <strong>Microsoft Edge</strong>: point at the download, click the <strong>…</strong> (three dots), choose <strong>Keep</strong>, then <strong>Show more</strong> and <strong>Keep anyway</strong>.</p>
-                  <p>In <strong>Chrome</strong>: open the downloads list and click <strong>Keep</strong>.</p>
+                  <h4>Download the installer and keep it</h4>
+                  <p>Download <code>tb-windows-x64-setup.exe</code>. Because TB is new, your browser might say the file "isn't commonly downloaded".</p>
+                  <p>In <strong>Microsoft Edge</strong>: point at the download, click the <strong>…</strong>, choose <strong>Keep</strong>, then <strong>Show more</strong> and <strong>Keep anyway</strong>. In <strong>Chrome</strong>: open the downloads list and click <strong>Keep</strong>.</p>
                 </div>
                 <div>
-                  <div class="mock" role="img" aria-label="Drawing of the Edge downloads panel. It says tb-windows-x64.exe isn't commonly downloaded, with a menu showing Keep highlighted.">
+                  <div class="mock" role="img" aria-label="Drawing of the Edge downloads panel. It says tb-windows-x64-setup.exe isn't commonly downloaded, with a menu showing Keep highlighted.">
                     <div class="mock-title">Downloads</div>
                     <div class="mock-bar">
                       <span class="mock-file">EXE</span>
                       <div>
-                        <div><strong>tb-windows-x64.exe</strong></div>
-                        <div style="color:#8a5a00">isn't commonly downloaded. Make sure you trust it before you open it.</div>
+                        <div><strong>tb-windows-x64-setup.exe</strong></div>
+                        <div class="mock-warn-text">isn't commonly downloaded. Make sure you trust it before you open it.</div>
                       </div>
-                      <span class="mock-btn" style="margin-left:auto">…</span>
+                      <span class="mock-btn mock-more">…</span>
                     </div>
-                    <div style="padding:0 0.75rem 0.75rem; text-align:right">
-                      <span class="mock-menu" style="text-align:left"><span>Delete</span><span class="is-target">Keep</span><span>Report this file as safe</span></span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </li>
-            <li>
-              <div class="step-card">
-                <div>
-                  <h4>Make a TB folder</h4>
-                  <p>Open <strong>File Explorer</strong>, go to <strong>Documents</strong>, and make a new folder called <code>TB</code> (right-click → New → Folder).</p>
-                  <p>Move the downloaded file from <strong>Downloads</strong> into it, and rename it to <code>tb</code> (right-click → Rename). If you see <code>.exe</code> on the end, keep it: the name becomes <code>tb.exe</code>.</p>
-                  <p>Then download <a href="examples/for_tanisha.tb" download="for_tanisha.tb">your first program, <code>for_tanisha.tb</code></a>, and move it into the same folder.</p>
-                </div>
-                <div>
-                  <div class="mock" role="img" aria-label="Drawing of a folder called TB containing two files, tb.exe and for_tanisha.tb.">
-                    <div class="mock-title">Documents › TB</div>
-                    <div class="mock-folder">
-                      <figure><div class="icon icon-exe">TB</div>tb.exe</figure>
-                      <figure><div class="icon icon-tb">.tb</div>for_tanisha.tb</figure>
+                    <div class="mock-menu-wrap">
+                      <span class="mock-menu"><span>Delete</span><span class="is-target">Keep</span><span>Report this file as safe</span></span>
                     </div>
                   </div>
                 </div>
@@ -135,36 +115,17 @@
             <li>
               <div class="step-card">
                 <div>
-                  <h4>Drag the program onto TB</h4>
-                  <p>This is the easiest way to run a TB program. Click and hold <code>for_tanisha.tb</code>, drag it on top of <code>tb.exe</code>, and let go.</p>
-                  <p>A black window opens and the program runs inside it.</p>
+                  <h4>Open it: "Windows protected your PC"</h4>
+                  <p>Double-click the installer in your Downloads. A blue box appears: Windows SmartScreen being careful with a program it hasn't seen before.</p>
+                  <p>Click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
                 </div>
                 <div>
-                  <div class="mock" role="img" aria-label="Drawing showing for_tanisha.tb being dragged onto tb.exe.">
-                    <div class="mock-title">Documents › TB</div>
-                    <div class="mock-folder" style="padding-top:2.6rem">
-                      <svg class="drag-arrow" viewBox="0 0 100 50" aria-hidden="true"><path d="M88 44 C 70 2, 30 2, 14 34" fill="none" stroke="#a61e55" stroke-width="3" stroke-dasharray="5 4" stroke-linecap="round"/><path d="M8 26 L14 36 L22 28" fill="none" stroke="#a61e55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      <figure><div class="icon icon-exe">TB</div>tb.exe</figure>
-                      <figure><div class="icon icon-tb">.tb</div>for_tanisha.tb</figure>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </li>
-            <li>
-              <div class="step-card">
-                <div>
-                  <h4>The first time: "Windows protected your PC"</h4>
-                  <p>The first time only, a blue box appears. This is Windows SmartScreen being careful with a new app.</p>
-                  <p>Click <strong>More info</strong>, then click <strong>Run anyway</strong>. Windows remembers, so you won't see this again.</p>
-                </div>
-                <div>
-                  <div class="mock mock-smartscreen" role="img" aria-label="Drawing of the blue Windows protected your PC box, with the More info link and the Run anyway button highlighted.">
+                  <div class="mock mock-smartscreen" role="img" aria-label="Drawing of the blue Windows protected your PC box for tb-windows-x64-setup.exe, with More info and Run anyway highlighted.">
                     <div class="mock-body">
                       <p class="mock-head">Windows protected your PC</p>
                       <p>Microsoft Defender SmartScreen prevented an unrecognised app from starting. Running this app might put your PC at risk.</p>
                       <p><span class="mock-link is-target">More info</span></p>
-                      <p style="margin:0">App: tb.exe<br>Publisher: Unknown publisher</p>
+                      <p class="mock-tight">App: tb-windows-x64-setup.exe<br>Publisher: Unknown publisher</p>
                       <div class="mock-buttons"><span class="mock-btn is-target">Run anyway</span><span class="mock-btn">Don't run</span></div>
                     </div>
                   </div>
@@ -174,13 +135,58 @@
             <li>
               <div class="step-card">
                 <div>
-                  <h4>Read your letter</h4>
-                  <p>The very first time, TB can take a few seconds to start while it unpacks itself. After that it's quicker.</p>
-                  <p>The program prints its message. When it's finished, the window waits for you and says <strong>Press Enter to close</strong>, so take your time.</p>
+                  <h4>Click through the installer</h4>
+                  <p>It installs just for you, so it never asks for an administrator password. TB goes into <code>%LOCALAPPDATA%\Programs\TB</code>, and the installer:</p>
+                  <ul>
+                    <li>adds <code>tb</code> to your PATH, so any command window understands it,</li>
+                    <li>lets you <strong>double-click a .tb file</strong> to run it (right-click, <strong>Edit</strong> opens it in Notepad),</li>
+                    <li>adds a <strong>TB</strong> folder to the Start menu.</li>
+                  </ul>
+                  <p>On the last page, leave <strong>Open the Care check-in app</strong> ticked and click <strong>Finish</strong> to see a TB desktop app straight away.</p>
                 </div>
                 <div>
-                  <div class="mock" role="img" aria-label="Drawing of a console window showing the program's output, ending with With love, always. and Press Enter to close.">
-                    <div class="mock-title">C:\Users\Tanisha\Documents\TB\tb.exe</div>
+                  <div class="mock" role="img" aria-label="Drawing of the last page of the TB installer, with the Open the Care check-in app box ticked and the Finish button highlighted.">
+                    <div class="mock-title">Setup - TB</div>
+                    <div class="mock-body">
+                      <p class="mock-head">Completing the TB Setup Wizard</p>
+                      <p>Setup has finished installing TB on your computer. The programs can be launched from the Start menu.</p>
+                      <p><span class="mock-check" aria-hidden="true">✓</span> Open the Care check-in app</p>
+                      <div class="mock-buttons"><span class="mock-btn is-target">Finish</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="step-card">
+                <div>
+                  <h4>Say hello from the TB Prompt</h4>
+                  <p>Open the Start menu, go to the <strong>TB</strong> folder and click <strong>TB Prompt</strong>. A command window opens with TB ready. Type this and press <kbd>Enter</kbd>:</p>
+                  <pre class="cmd"><code>tb --version</code></pre>
+                  <p>It answers <code>TB 2.0.0</code>. Try <code>tb</code> on its own to type TB one line at a time (<code>exit</code> to leave), or <code>tb doc</code> to list the libraries.</p>
+                </div>
+                <div>
+                  <div class="mock" role="img" aria-label="Drawing of the TB Prompt window: tb --version prints TB 2.0.0.">
+                    <div class="mock-title">TB Prompt</div>
+                    <div class="mock-terminal">TB 2.0.0
+Type  tb FILE.tb  to run a program,  tb  to try TB line by line,  tb doc  to see the libraries.
+
+C:\Users\Tanisha\Documents&gt;tb --version
+TB 2.0.0</div>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="step-card">
+                <div>
+                  <h4>Read your letter</h4>
+                  <p>In the Start menu, click <strong>TB Examples</strong>. It opens TB's folder. Double-click <code>for_tanisha.tb</code>.</p>
+                  <p>A window runs the program and waits with <strong>Press Enter to close</strong>, so take your time.</p>
+                </div>
+                <div>
+                  <div class="mock" role="img" aria-label="Drawing of a console window showing for_tanisha.tb's output, ending with With love, always. and Press Enter to close.">
+                    <div class="mock-title">for_tanisha.tb</div>
                     <div class="mock-terminal">Hello, Tanisha!
 This language is called TB. Can you guess why?
 …
@@ -193,19 +199,28 @@ Press Enter to close</div>
             </li>
           </ol>
 
+          <h3>What's in the Start menu</h3>
+          <ul>
+            <li><strong>TB Prompt</strong>: a command window with <code>tb</code> ready.</li>
+            <li><strong>Care check-in</strong>, <strong>To-do</strong>, <strong>Notes</strong>, <strong>Calculator</strong>, <strong>Hash checker</strong>, <strong>Log triage</strong> and <strong>IOC workbench</strong>: the desktop apps, written in TB.</li>
+            <li><strong>TB Examples</strong> opens the folder with the examples and apps; <strong>TB website</strong> opens this site.</li>
+            <li><strong>Uninstall TB</strong> removes everything (so does <strong>Settings, Apps</strong>).</li>
+          </ul>
+
           <h3>Writing your own program</h3>
           <ol class="steps">
             <li><p>Open <strong>Notepad</strong> and type <code>say("Hello from me!")</code></p></li>
-            <li><p>Choose <strong>File → Save as</strong>. Go to your <code>TB</code> folder. Set <strong>Save as type</strong> to <strong>All files</strong> and name it <code>hello.tb</code>.</p>
+            <li><p>Choose <strong>File, Save as</strong>. Set <strong>Save as type</strong> to <strong>All files</strong> and name it <code>hello.tb</code>.</p>
               <p class="note">If you leave the type as "Text documents", Notepad quietly names it <code>hello.tb.txt</code>, and TB won't recognise it.</p></li>
-            <li><p>Drag <code>hello.tb</code> onto <code>tb.exe</code>, just like before.</p></li>
+            <li><p>Double-click <code>hello.tb</code>. To change it later, right-click it and choose <strong>Edit</strong>.</p></li>
           </ol>
 
-          <details class="more">
-            <summary>The terminal way (optional)</summary>
-            <p>Open your <code>TB</code> folder in File Explorer. Click the address bar at the top, type <code>cmd</code> and press <kbd>Enter</kbd>. A command window opens in that folder. Type:</p>
-            <pre class="cmd"><code>tb for_tanisha.tb</code></pre>
-            <p>and press <kbd>Enter</kbd>. Typing just <code>tb</code> on its own opens TB's interactive prompt, where you can try one line at a time. Type <code>exit</code> to leave.</p>
+          <details class="more" id="windows-zip">
+            <summary>No installer: the portable zip</summary>
+            <p>Download <a data-download="tb-windows-x64.zip" href="#"><code>tb-windows-x64.zip</code></a>, right-click it, choose <strong>Extract All</strong>, and you get a <code>tb</code> folder with <code>tb.exe</code>, <code>tbw.exe</code>, an <code>_internal</code> folder (keep it next to the programs), <code>apps</code>, <code>examples</code> and <code>for_tanisha.tb</code>. Nothing is installed. Open a command window in the folder that holds <code>tb</code> and run:</p>
+            <pre class="cmd"><code>tb\tb.exe tb\for_tanisha.tb</code></pre>
+            <pre class="cmd"><code>tb\tbw.exe tb\apps\todo\main.tb</code></pre>
+            <p><code>tbw.exe</code> is the same TB without a black console window, which is nicer for desktop apps. The first time, SmartScreen asks about <code>tb.exe</code>: <strong>More info</strong>, <strong>Run anyway</strong>.</p>
           </details>
         </div>
 
@@ -215,56 +230,48 @@ Press Enter to close</div>
           <ol class="steps steps-wide">
             <li>
               <h4>Download and unzip</h4>
-              <p>Download <code>tb-macos-arm64.zip</code>. Safari usually unzips it for you; if not, double-click the zip in <strong>Downloads</strong>. You get a file called <code>tb</code>.</p>
-              <p>This version is for Macs with Apple silicon (M1 or newer). On an older Intel Mac, use the <a href="#python">Python version</a> instead.</p>
+              <p>Download <code>tb-macos-arm64.zip</code>. Safari unzips it for you; otherwise double-click it in <strong>Downloads</strong>. You get a folder called <code>tb</code> with the <code>tb</code> program, an <code>_internal</code> folder it needs, <code>apps</code>, <code>examples</code> and <code>for_tanisha.tb</code>.</p>
+              <p>This version is for Macs with Apple silicon (M1 and newer). On an older Intel Mac, use the <a href="#python">Python version</a>.</p>
             </li>
             <li>
-              <h4>Make a TB folder</h4>
-              <p>In <strong>Finder</strong>, make a folder called <code>TB</code> inside <strong>Documents</strong>. Move <code>tb</code> and <a href="examples/for_tanisha.tb" download="for_tanisha.tb"><code>for_tanisha.tb</code></a> into it.</p>
-            </li>
-            <li>
-              <div class="step-card">
-                <div>
-                  <h4>Tell macOS you trust TB</h4>
-                  <p>Hold <kbd>Control</kbd> and click <code>tb</code>, then choose <strong>Open</strong>. If the box offers an <strong>Open</strong> button, click it. That's all.</p>
-                  <p>On newer macOS versions the box only says <strong>Done</strong>. Click <strong>Done</strong>, then open <strong>System Settings → Privacy &amp; Security</strong>, scroll down to the message about <code>tb</code>, and click <strong>Open Anyway</strong>. Your Mac asks for your password to confirm.</p>
-                </div>
-                <div>
-                  <div class="mock mock-mac" role="img" aria-label="Drawing of the Privacy and Security settings page saying tb was blocked to protect your Mac, with the Open Anyway button highlighted.">
-                    <div class="mock-title"><span class="mock-dots"><i></i><i></i><i></i></span> Privacy &amp; Security</div>
-                    <div class="mock-body">
-                      <p class="mock-head">Security</p>
-                      <p>"tb" was blocked to protect your Mac.</p>
-                      <div class="mock-buttons" style="justify-content:flex-start"><span class="mock-btn is-target">Open Anyway</span></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <h4>Give it a home</h4>
+              <p>Drag the <code>tb</code> folder from Downloads into your home folder (in Finder, <strong>Go, Home</strong>), so it lives at <code>~/tb</code>. Keep everything inside together: <code>tb</code> only works next to <code>_internal</code>.</p>
             </li>
             <li>
               <div class="step-card">
                 <div>
-                  <h4>Run your first program</h4>
-                  <p>Open <strong>Terminal</strong> (press <kbd>⌘</kbd> <kbd>Space</kbd>, type "Terminal", press <kbd>Return</kbd>). Type <code>cd </code> with a space after it, drag your <code>TB</code> folder into the window, and press <kbd>Return</kbd>. Then type:</p>
-                  <pre class="cmd"><code>./tb for_tanisha.tb</code></pre>
-                  <p>The first run can take several seconds while macOS checks the new app and TB unpacks itself. Give it a moment; later runs start faster.</p>
+                  <h4>Tell macOS you trust it (once)</h4>
+                  <p>macOS marks every file that came from the internet as "quarantined" and refuses to run unsigned ones. One command lifts that mark from the whole folder. Open <strong>Terminal</strong> (press <kbd>⌘</kbd> <kbd>Space</kbd>, type "Terminal", press <kbd>Return</kbd>), paste this and press <kbd>Return</kbd>:</p>
+                  <pre class="cmd"><code>xattr -dr com.apple.quarantine ~/tb</code></pre>
+                  <p>It prints nothing; that means it worked. (If you left the folder in Downloads, use <code>~/Downloads/tb</code> instead.)</p>
                 </div>
                 <div>
-                  <div class="mock" role="img" aria-label="Drawing of a Terminal window running ./tb for_tanisha.tb and printing Hello, Tanisha!">
+                  <div class="mock" role="img" aria-label="Drawing of a Terminal window: the xattr command, then ./tb --version printing TB 2.0.0.">
                     <div class="mock-title"><span class="mock-dots"><i></i><i></i><i></i></span> Terminal</div>
-                    <div class="mock-terminal"><span class="p">TB %</span> ./tb for_tanisha.tb
-Hello, Tanisha!
-This language is called TB. Can you guess why?
-…</div>
+                    <div class="mock-terminal"><span class="p">~ %</span> xattr -dr com.apple.quarantine ~/tb
+<span class="p">~ %</span> cd ~/tb
+<span class="p">tb %</span> ./tb --version
+TB 2.0.0</div>
                   </div>
                 </div>
               </div>
+            </li>
+            <li>
+              <h4>Run your first program</h4>
+              <pre class="cmd"><code>cd ~/tb</code></pre>
+              <pre class="cmd"><code>./tb for_tanisha.tb</code></pre>
+              <p>The very first run takes a few seconds while macOS checks the new program. After that, TB starts instantly. A desktop app: <code>./tb apps/todo/main.tb</code>.</p>
+            </li>
+            <li>
+              <h4>Optional: type tb from anywhere</h4>
+              <p>Add the folder to your PATH, then open a new Terminal window:</p>
+              <pre class="cmd"><code>echo 'export PATH="$HOME/tb:$PATH"' &gt;&gt; ~/.zshrc</code></pre>
+              <p>Now <code>tb hello.tb</code> works in any folder.</p>
             </li>
           </ol>
           <details class="more">
-            <summary>Advanced: remove the warning from Terminal</summary>
-            <p>If you're comfortable in Terminal, this removes the "downloaded from the internet" flag from <code>tb</code>, which has the same effect as <strong>Open Anyway</strong>:</p>
-            <pre class="cmd"><code>xattr -d com.apple.quarantine tb</code></pre>
+            <summary>Rather not use Terminal for the trust step?</summary>
+            <p>Double-click <code>tb</code> in Finder, click <strong>Done</strong> on the warning, then open <strong>System Settings, Privacy &amp; Security</strong>, scroll down and click <strong>Open Anyway</strong>. Because TB is a folder of many files, macOS may ask again for some of them, which is why the one-line <code>xattr</code> command is the easier way.</p>
           </details>
         </div>
 
@@ -274,28 +281,46 @@ This language is called TB. Can you guess why?
           <ol class="steps">
             <li>
               <h4>Download and unpack</h4>
-              <p>Download <code>tb-linux-x64.tar.gz</code>, open a terminal in the folder where it landed, and unpack it:</p>
-              <pre class="cmd"><code>tar -xzf tb-linux-x64.tar.gz</code></pre>
-            </li>
-            <li>
-              <h4>Allow it to run</h4>
-              <p>Mark the file as a program you're allowed to run:</p>
-              <pre class="cmd"><code>chmod +x tb</code></pre>
+              <p>Download <code>tb-linux-x64.tar.gz</code>, open a terminal where it landed, and unpack it. You get a <code>tb</code> folder (keep <code>tb</code> next to <code>_internal</code>).</p>
+              <pre class="cmd"><code>tar xzf tb-linux-x64.tar.gz</code></pre>
             </li>
             <li>
               <h4>Run your first program</h4>
-              <p>Put <a href="examples/for_tanisha.tb" download="for_tanisha.tb"><code>for_tanisha.tb</code></a> in the same folder, then:</p>
-              <pre class="cmd"><code>./tb for_tanisha.tb</code></pre>
-              <p>To use <code>tb</code> from anywhere, move it into <code>~/.local/bin</code>.</p>
+              <pre class="cmd"><code>./tb/tb --version</code></pre>
+              <pre class="cmd"><code>./tb/tb tb/for_tanisha.tb</code></pre>
+            </li>
+            <li>
+              <h4>Optional: put it on your PATH</h4>
+              <pre class="cmd"><code>echo 'export PATH="$PWD/tb:$PATH"' &gt;&gt; ~/.bashrc</code></pre>
+              <p>Desktop apps need Tk, which most desktops have (on Debian or Ubuntu: <code>sudo apt install tk</code> if a window doesn't open).</p>
             </li>
           </ol>
         </div>
       </section>
 
+      <section class="section" aria-labelledby="run-apps">
+        <h2 id="run-apps">Run the apps</h2>
+        <div class="prose">
+          <p>The apps come inside every download, in the <code>apps</code> folder. Each one is a single <code>main.tb</code> you can read and change. <a href="examples.html#apps">See them all</a>.</p>
+        </div>
+        <div class="table-wrap" role="region" tabindex="0" aria-label="How to run an app on each computer">
+          <table class="hash-table">
+            <thead><tr><th scope="col">Your TB</th><th scope="col">Desktop app</th><th scope="col">Security tool on a sample log</th></tr></thead>
+            <tbody>
+              <tr><td>Windows installer</td><td>Start menu, TB, <strong>To-do</strong> (or any app)</td><td><code>tb "%LOCALAPPDATA%\Programs\TB\apps\log-triage\main.tb" "%LOCALAPPDATA%\Programs\TB\apps\data\auth.log"</code></td></tr>
+              <tr><td>Windows zip</td><td><code>tb\tbw.exe tb\apps\todo\main.tb</code></td><td><code>tb\tb.exe tb\apps\log-triage\main.tb tb\apps\data\auth.log</code></td></tr>
+              <tr><td>Mac</td><td><code>~/tb/tb ~/tb/apps/todo/main.tb</code></td><td><code>~/tb/tb ~/tb/apps/log-triage/main.tb ~/tb/apps/data/auth.log</code></td></tr>
+              <tr><td>Linux</td><td><code>./tb/tb tb/apps/todo/main.tb</code></td><td><code>./tb/tb tb/apps/log-triage/main.tb tb/apps/data/auth.log</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">The first time, a desktop app can take a few seconds to appear. On Windows you can also double-click any app's <code>main.tb</code>.</p>
+      </section>
+
       <section class="section" aria-labelledby="python">
         <h2 id="python">The Python version</h2>
         <div class="prose">
-          <p>If the app won't run on your computer, <a data-download="tb-python.zip" href="#"><code>tb-python.zip</code></a> is a fallback. It holds TB itself as a single Python file, <code>tb.py</code>, along with the example programs. It needs <a href="https://www.python.org/downloads/">Python</a> 3.10 or newer.</p>
+          <p>If the app won't run on your computer, <a data-download="tb-python.zip" href="#"><code>tb-python.zip</code></a> is a fallback. It holds TB as a single Python file, <code>tb.py</code>, with the standard library (<code>tblib/</code>), the examples and the apps. It needs <a href="https://www.python.org/downloads/">Python</a> 3.10 or newer (with Tk for the desktop apps).</p>
           <p>Unzip it, open a terminal in that folder, and run:</p>
           <pre class="cmd"><code>python tb.py for_tanisha.tb</code></pre>
           <p>On Windows, if <code>python</code> isn't found, try <code>py tb.py for_tanisha.tb</code>. On a Mac, use <code>python3</code>.</p>
@@ -305,21 +330,21 @@ This language is called TB. Can you guess why?
       <section class="section" aria-labelledby="verify">
         <h2 id="verify">Check your download (optional)</h2>
         <div class="prose">
-          <p><a data-download="SHA256SUMS.txt" href="#"><code>SHA256SUMS.txt</code></a> lists a fingerprint (a long code of letters and numbers) for every file. If your file's fingerprint matches its line, it's exactly the file that was published, with nothing changed on the way.</p>
-          <p>Open a terminal in your Downloads folder and run the command for your computer:</p>
+          <p><a data-download="SHA256SUMS.txt" href="#"><code>SHA256SUMS.txt</code></a> lists a fingerprint (a long code of letters and numbers) for every file. If your file's fingerprint matches its line, it's exactly the file that was published.</p>
+          <p>Open a terminal in your Downloads folder and run the command for your file:</p>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" role="region" tabindex="0" aria-label="Checksum commands (scrolls sideways on small screens)">
           <table class="hash-table">
             <thead><tr><th scope="col">Computer</th><th scope="col">Command</th></tr></thead>
             <tbody>
-              <tr><td>Windows</td><td><code>certutil -hashfile tb-windows-x64.exe SHA256</code></td></tr>
+              <tr><td>Windows</td><td><code>certutil -hashfile tb-windows-x64-setup.exe SHA256</code></td></tr>
               <tr><td>Mac</td><td><code>shasum -a 256 tb-macos-arm64.zip</code></td></tr>
               <tr><td>Linux</td><td><code>sha256sum -c SHA256SUMS.txt --ignore-missing</code></td></tr>
             </tbody>
           </table>
         </div>
         <p class="note">Compare the code it prints with the matching line in <code>SHA256SUMS.txt</code>. Capital or small letters don't matter. On Linux the command checks for you and prints <code>OK</code>.</p>
-        <p class="note">On a Mac, Safari often unzips the download and then moves the zip to the Bin, so there may be nothing left to check. If you want to check it, find the zip in the Bin and put it back (or turn off <strong>Open "safe" files after downloading</strong> in Safari's settings and download again). Checking is optional: the steps above work either way.</p>
+        <p class="note">On a Mac, Safari unzips the download and moves the zip to the Bin, so check the zip from the Bin (put it back first), or turn off <strong>Open "safe" files after downloading</strong> in Safari's settings and download again. Checking is optional.</p>
       </section>
 
     </div>
@@ -328,14 +353,15 @@ This language is called TB. Can you guess why?
     <div class="footer-inner">
       <div class="footer-brand">
         <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-        <p>A tiny, friendly programming language.</p>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
       </div>
       <nav aria-labelledby="footer-learn">
         <h2 id="footer-learn">Learn</h2>
         <ul>
           <li><a href="docs.html">Guide</a></li>
-          <li><a href="docs.html#reference">Reference</a></li>
-          <li><a href="examples.html">Examples</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
         </ul>
       </nav>
       <nav aria-labelledby="footer-tools">
@@ -349,7 +375,7 @@ This language is called TB. Can you guess why?
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
           <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
@@ -357,7 +383,7 @@ This language is called TB. Can you guess why?
     </div>
     <div class="footer-bottom">
       <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
-      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/download.js" defer></script>

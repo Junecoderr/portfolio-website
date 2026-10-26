@@ -1,0 +1,25 @@
+# Title: Run a Sigma rule
+# About: Writes a small Sigma detection rule, then runs it over web server logs to find path traversal.
+import logs
+import detect
+
+# A Sigma rule is YAML. Here it is built line by line.
+let yaml = [
+  "title: Path traversal attempt",
+  "level: high",
+  "detection:",
+  "  selection:",
+  "    path|contains: '../'",
+  "  condition: selection",
+].join("\n")
+let rule = detect.sigma(yaml)
+
+let records = logs.read("apps/data/access.log", "apache")
+let alerts = detect.run([rule], records)
+say(f"{len(alerts)} alert from {len(records)} requests")
+for alert in alerts {
+  say(f"{alert.level}: {alert.rule} ({alert.count} requests)")
+  for r in alert.records {
+    say(f"  {r.when}  {r.ip}  {r.status}  {r.path}")
+  }
+}

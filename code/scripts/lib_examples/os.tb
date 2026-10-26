@@ -1,0 +1,5 @@
+import os
+
+say(f"Running on: {os.platform}")
+say(f"Arguments: {os.args}")
+say(os.env("TB_EXAMPLE_SETTING", "not set"))

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Triage an SSH brute force with TB · TB</title>
+  <meta name="description" content="Find an SSH brute force in auth.log with TB&#x27;s logs and detect libraries, see whether the attacker got in, and write it up. Runs in the browser.">
+  <meta name="theme-color" content="#b3123e">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html" aria-current="page">Learn</a>
+        <a href="library.html">Library</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
+  </header>
+  <main id="main">
+    <div class="container docs">
+      <aside class="docs-sidebar" aria-label="Steps">
+        <button class="docs-nav-toggle" type="button" aria-expanded="false" aria-controls="docs-nav">Steps <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="docs-sidebar-inner" id="docs-nav">
+          <h2>In this tutorial</h2>
+          <ul>
+            <li><a href="#step-1">Look at the raw log</a></li>
+            <li><a href="#step-2">Turn lines into records</a></li>
+            <li><a href="#step-3">Count failures by address</a></li>
+            <li><a href="#step-4">Let a rule find it</a></li>
+            <li><a href="#step-5">What did they do once inside?</a></li>
+            <li><a href="#step-6">Write it up</a></li>
+          </ul>
+          <h2>More tutorials</h2>
+          <ul>
+            <li><a href="docs.html#guides">All tutorials</a></li>
+            <li><a href="library.html">Library reference</a></li>
+          </ul>
+        </div>
+      </aside>
+      <article class="docs-main">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><a href="docs.html">Learn</a> <span aria-hidden="true">/</span> <a href="docs.html#guides">Tutorials</a></nav>
+        <h1>Triage an SSH brute force with TB</h1>
+        <p class="lead">Someone has been guessing passwords on a Linux server. Using the sample <code>auth.log</code> that comes with TB, you'll find the attacker, see which accounts they tried, and answer the question that matters: did they get in? Every step runs here in your browser.</p>
+      <section id="step-1">
+        <h2><span class="chapter-num">1.</span>Look at the raw log</h2>
+        <p>Start by reading a few lines. <code>fs.lines</code> gives back a list, one item per line.</p>
+        <pre class="tb-code" data-runnable><code>import fs
+
+let lines = fs.lines("apps/data/auth.log")
+say(len(lines), "lines")
+for line in lines.slice(20, 26) {
+  say(line)
+}</code></pre>
+      </section>
+      <section id="step-2">
+        <h2><span class="chapter-num">2.</span>Turn lines into records</h2>
+        <p>Lines are hard to count. <code>logs.read</code> parses each one into a map with fields like <code>user</code>, <code>ip</code>, <code>action</code> and <code>success</code>.</p>
+        <pre class="tb-code" data-runnable><code>import logs
+
+let records = logs.read("apps/data/auth.log", "auth")
+let failed = records.filter(fn(r) { return r.get("action") == "failed_login" })
+say(failed[0])</code></pre>
+      </section>
+      <section id="step-3">
+        <h2><span class="chapter-num">3.</span>Count failures by address</h2>
+        <p><code>logs.top</code> counts how often each value of a field appears. One address stands out.</p>
+        <pre class="tb-code" data-runnable><code>import logs
+import report
+
+let records = logs.read("apps/data/auth.log", "auth")
+let failed = records.filter(fn(r) { return r.get("action") == "failed_login" })
+say(report.table(logs.top(failed, "ip", 5)))
+say(report.table(logs.top(failed, "user", 5)))</code></pre>
+      </section>
+      <section id="step-4">
+        <h2><span class="chapter-num">4.</span>Let a rule find it</h2>
+        <p>Counting by hand works once. A detection rule works every time. <code>detect.brute_force</code> looks for five or more failures from one source within ten minutes, and checks what happened next.</p>
+        <pre class="tb-code" data-runnable><code>import logs
+import detect
+
+let records = logs.read("apps/data/auth.log", "auth")
+for alert in detect.brute_force(records) {
+  say(f"{alert.level}: {alert.rule} from {alert.by}")
+  say(f"  {alert.count} failures between {alert.first_when} and {alert.last_when}")
+  say(f"  accounts tried: {alert.users}")
+  say(f"  logged in afterwards: {alert.success_after} as {alert.success_user}")
+}</code></pre>
+      </section>
+      <section id="step-5">
+        <h2><span class="chapter-num">5.</span>What did they do once inside?</h2>
+        <p>The attacker guessed the <code>deploy</code> account's password. Follow that account from the moment it logged in.</p>
+        <pre class="tb-code" data-runnable><code>import logs
+
+let records = logs.read("apps/data/auth.log", "auth")
+let start = records.filter(fn(r) {
+  return r.get("user") == "deploy" and r.get("success") == true
+}).first().time
+
+for r in records {
+  if r.time &gt;= start and (r.get("user") == "deploy" or r.get("target_user") == "deploy") {
+    say(r.when, r.action, r.message)
+  }
+}</code></pre>
+        <p>A new account, a sudo session: this is an incident, not just noise.</p>
+      </section>
+      <section id="step-6">
+        <h2><span class="chapter-num">6.</span>Write it up</h2>
+        <p>Alerts are maps, so <code>report</code> can turn them into a table for a ticket, Markdown, CSV or a full HTML page.</p>
+        <pre class="tb-code" data-runnable><code>import logs
+import detect
+import report
+
+let records = logs.read("apps/data/auth.log", "auth")
+let alerts = detect.brute_force(records)
+say(report.markdown(alerts, ["level", "rule", "by", "count", "success_user", "success_when"]))</code></pre>
+      </section>
+      <section id="next">
+        <h2>Where next</h2>
+        <p>The <a href="examples.html#app-brute-force-hunter">Brute-force hunter</a> app does all of this for Linux and Windows logs from the command line, and the <a href="examples.html#app-log-triage-gui">Log triage</a> desktop app shows alerts in a window:</p>
+        <figure class="guide-shot"><img src="assets/img/apps/log-triage-gui.png" alt="The Log triage desktop app listing four alerts from auth.log" width="2160" height="1616" loading="lazy"><figcaption>apps/log-triage-gui running on the same auth.log.</figcaption></figure>
+        <p>See also the <a href="lib/logs.html">logs</a>, <a href="lib/detect.html">detect</a> and <a href="lib/report.html">report</a> references.</p>
+      </section>
+      </article>
+      <nav class="on-this-page" aria-label="On this page">
+        <div class="on-this-page-inner">
+          <h2>On this page</h2>
+          <ul id="on-this-page-list"></ul>
+        </div>
+      </nav>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
+  <script src="assets/js/docs.js" defer></script>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

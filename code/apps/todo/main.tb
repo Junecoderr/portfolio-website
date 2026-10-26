@@ -1,0 +1,119 @@
+# To-do: add tasks, tick them off, delete them.
+# Your list is saved in todo.json, next to this file.
+# Run: tb apps/todo/main.tb
+
+import gui
+import json
+import fs
+
+let FILE = fs.here("todo.json")
+
+# Each task is a map: {"text": "Buy flowers", "done": false}
+let tasks = []
+if fs.exists(FILE) {
+  try {
+    tasks = json.read(FILE)
+  } catch err {
+    say(f"I couldn't read {FILE}, so I'm starting a fresh list. ({err.message})")
+    tasks = []
+  }
+}
+
+let win = gui.window("To-do", {"width": 480, "height": 560})
+win.label("Things to do", {"style": "title"})
+win.label("Type a task and press Enter. Double-click a task to tick it.", {"style": "muted"})
+
+let entry = win.row()
+let box = entry.input({"placeholder": "What needs doing?", "on_enter": fn(text) { add_task(text) }})
+entry.button("Add", fn() { add_task(box.value()) }, {"primary": true})
+
+let list = win.table(["Done", "Task"], {"widths": [60, 360], "on_open": fn(row, i) { toggle(i) }})
+
+let actions = win.row()
+actions.button("Tick", fn() { toggle_selected() })
+actions.button("Delete", fn() { delete_selected() })
+actions.button("Clear done", fn() { clear_finished() })
+
+let status = win.status("")
+
+fn save() {
+  json.write(FILE, tasks)
+}
+
+fn mark(task) {
+  if task["done"] {
+    return "✓"
+  }
+  return ""
+}
+
+fn show() {
+  let rows = []
+  for task in tasks {
+    rows.push([mark(task), task["text"]])
+  }
+  list.set_rows(rows)
+  let left = len(tasks.filter(fn(t) { return not t["done"] }))
+  if len(tasks) == 0 {
+    status.set("Nothing to do. Enjoy your day!")
+  } else {
+    status.set(f"{left} to do, {len(tasks) - left} done")
+  }
+}
+
+fn add_task(text) {
+  let clean = text.trim()
+  if clean == "" {
+    return
+  }
+  tasks.push({"text": clean, "done": false})
+  box.clear()
+  save()
+  show()
+}
+
+fn toggle(i) {
+  let task = tasks[i]
+  task["done"] = not task["done"]
+  save()
+  show()
+  list.select(i)
+}
+
+fn picked() {
+  let i = list.selected_index()
+  if i == nil {
+    gui.alert("Pick a task in the list first.")
+  }
+  return i
+}
+
+fn toggle_selected() {
+  let i = picked()
+  if i != nil {
+    toggle(i)
+  }
+}
+
+fn delete_selected() {
+  let i = picked()
+  if i == nil {
+    return
+  }
+  let text = tasks[i]["text"]
+  if gui.confirm(f"Delete \"{text}\"?") {
+    tasks.remove_at(i)
+    save()
+    show()
+  }
+}
+
+fn clear_finished() {
+  tasks = tasks.filter(fn(t) { return not t["done"] })
+  save()
+  show()
+}
+
+show()
+box.focus()
+win.run()

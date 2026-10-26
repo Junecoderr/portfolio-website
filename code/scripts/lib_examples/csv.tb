@@ -1,0 +1,7 @@
+import csv
+
+let rows = csv.parse("name,score\nTanisha,10\nMum,9")
+for row in rows {
+  say(f"{row.name} scored {row.score}")
+}
+say(csv.stringify(rows))

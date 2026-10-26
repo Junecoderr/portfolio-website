@@ -1,0 +1,166 @@
+# Hash Checker: fingerprint a file (MD5, SHA-1, SHA-256), compare it with
+# the hash a download page or a threat report gives you, and optionally look
+# it up on VirusTotal (only the hash is sent, never the file).
+# Run: tb apps/hash-checker/main.tb [file]
+
+import gui
+import hash
+import intel
+import fs
+import os
+
+let result = {}     # {"md5", "sha1", "sha256", "size"} of the current file
+let NAMES = {"md5": "MD5", "sha1": "SHA-1", "sha256": "SHA-256"}
+
+let win = gui.window("Hash Checker", {"width": 900, "height": 600})
+win.label("Hash Checker", {"style": "title"})
+win.label("Is this file the one you think it is? Pick it, then paste the hash you expect.", {"style": "muted"})
+
+let pick = win.row()
+let path_box = pick.input({"placeholder": "Path to a file (paste or type it, then press Enter)",
+                          "on_enter": fn(text) { check(text) }})
+pick.button("Choose file…", fn() { choose() })
+pick.button("Hash it", fn() { check(path_box.value()) }, {"primary": true})
+
+win.separator()
+let file_label = win.label("No file yet.", {"style": "heading"})
+let size_label = win.label(" ", {"style": "muted"})
+
+# A Copy button needs a function; this makes one for each hash.
+fn copier(key) {
+  return fn() {
+    if result.has(key) {
+      gui.copy(result[key])
+      status.set(f"{NAMES[key]} copied to the clipboard.")
+    }
+  }
+}
+
+# One row per hash: name, value, copy button.
+let values = {}
+for key in ["md5", "sha1", "sha256"] {
+  let line = win.row()
+  line.label(NAMES[key], {"style": "bold", "width": 8})
+  line.button("Copy", copier(key), {"width": 5})
+  values[key] = line.label("-", {"style": "mono"})
+}
+
+win.separator()
+win.label("Expected hash", {"style": "heading"})
+let expect_row = win.row()
+let expected = expect_row.input({"placeholder": "Paste the MD5, SHA-1 or SHA-256 you were given",
+                                "on_change": fn(text) { compare() }})
+expect_row.button("Paste", fn() {
+  expected.set(gui.paste().trim())
+  compare()
+})
+let verdict = win.label(" ", {"style": "bold"})
+
+win.separator()
+let vt_row = win.row()
+vt_row.button("Look up on VirusTotal", fn() { virustotal() })
+let vt_label = vt_row.label("Only the SHA-256 is sent, never the file.", {"style": "muted"})
+
+let status = win.status("Ready")
+
+fn nice_size(n) {
+  if n < 1024 {
+    return f"{n} bytes"
+  }
+  if n < 1024 * 1024 {
+    return f"{round(n / 1024, 1)} KB ({n} bytes)"
+  }
+  return f"{round(n / 1024 / 1024, 1)} MB ({n} bytes)"
+}
+
+fn choose() {
+  let path = gui.open_file()
+  if path != nil {
+    path_box.set(path)
+    check(path)
+  }
+}
+
+fn check(path) {
+  let clean = path.trim().replace("\"", "").replace("'", "")
+  if clean == "" {
+    gui.alert("Choose a file first, or paste its path into the box.")
+    return
+  }
+  if not fs.is_file(clean) {
+    gui.alert(f"I couldn't find a file at:\n{clean}", "No such file")
+    return
+  }
+  status.set("Hashing…")
+  try {
+    result = hash.file(clean)
+  } catch err {
+    gui.alert(err.message, "Couldn't read the file")
+    status.set("Ready")
+    return
+  }
+  file_label.set(fs.name(clean))
+  size_label.set(nice_size(result["size"]) + "   ·   " + clean)
+  for key in ["md5", "sha1", "sha256"] {
+    values[key].set(result[key])
+  }
+  vt_label.set("Only the SHA-256 is sent, never the file.")
+  vt_label.style("muted")
+  status.set(f"Hashed {fs.name(clean)}")
+  compare()
+}
+
+fn compare() {
+  let want = expected.value().trim().lower()
+  if want == "" {
+    verdict.set(" ")
+    return
+  }
+  if result.is_empty() {
+    verdict.set("Pick a file to compare with.")
+    verdict.style("muted")
+    return
+  }
+  for key in ["md5", "sha1", "sha256"] {
+    if hash.compare(want, result[key]) {
+      verdict.set(f"✓  Match: the {NAMES[key]} is exactly what you expected.")
+      verdict.style("success")
+      return
+    }
+  }
+  verdict.set("✗  No match. This is not the file you were promised. Don't open it.")
+  verdict.style("danger")
+}
+
+fn virustotal() {
+  if result.is_empty() {
+    gui.alert("Hash a file first.")
+    return
+  }
+  if not intel.has_key("virustotal") {
+    gui.alert(intel.key_help(), "VirusTotal needs an API key")
+    return
+  }
+  status.set("Asking VirusTotal…")
+  try {
+    let answer = intel.virustotal_file(result["sha256"])
+    vt_label.set(f"VirusTotal: {answer.verdict} (score {answer.score})")
+    if answer.verdict == "malicious" or answer.verdict == "suspicious" {
+      vt_label.style("danger")
+    } else if answer.verdict == "harmless" {
+      vt_label.style("success")
+    } else {
+      vt_label.style("normal")
+    }
+    status.set("VirusTotal answered.")
+  } catch err {
+    gui.alert(err.message, "VirusTotal lookup failed")
+    status.set("Ready")
+  }
+}
+
+if len(os.args) > 0 {
+  path_box.set(os.args[0])
+  check(os.args[0])
+}
+win.run()

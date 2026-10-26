@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TB: a tiny, friendly programming language</title>
-  <meta name="description" content="TB is a tiny, friendly programming language. Write a few plain lines, run them on Windows, macOS, Linux or in the browser.">
+  <title>TB: a friendly programming language for apps and security tools</title>
+  <meta name="description" content="TB is a friendly programming language for desktop apps, security tools and scripts, with 20 built-in libraries. Runs on Windows, macOS, Linux and in the browser.">
   <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -16,11 +16,11 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html">Learn</a>
-        <a href="docs.html#reference">Reference</a>
+        <a href="library.html">Library</a>
         <a href="examples.html">Examples</a>
         <a href="playground.html">Playground</a>
         <a href="download.html" class="nav-cta">Download</a>
@@ -34,67 +34,199 @@
       <section class="hero" aria-labelledby="hero-title">
         <div>
           <h1 class="hero-title" id="hero-title">TB<span class="cursor" aria-hidden="true"></span></h1>
-          <p class="hero-tagline">A tiny, friendly programming language.</p>
-          <p class="hero-sub">Write a few lines in plain words. TB runs them one at a time, and explains any mistake in a sentence you can actually read.</p>
+          <p class="hero-tagline">A friendly programming language for desktop apps, security tools and everything in between.</p>
+          <p class="hero-sub">Plain words, gentle error messages, and twenty libraries built in: windows and buttons, log parsing, detection rules, IOCs, hashing, networking, JSON and more.</p>
           <div class="button-row">
-            <a class="button button-primary button-big" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 1.0</a>
+            <a class="button button-primary button-big" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 2.0</a>
             <a class="button button-big" href="playground.html">Try it in your browser</a>
           </div>
-          <p class="hero-meta">Version <span data-version>1.0.0</span> for Windows, macOS and Linux. <a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></p>
+          <p class="hero-meta">Version <span data-version>2.0.0</span> for Windows, macOS and Linux. <a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">What's new in 2.0</a></p>
         </div>
 
         <div class="window" id="hero-window">
           <div class="window-bar">
             <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
             <div class="window-tabs" role="tablist" aria-label="Sample programs">
-          <button class="window-tab" type="button" role="tab" id="htab-hello" aria-controls="hpanel-hello" aria-selected="true" data-file="hello.tb">hello.tb</button>
-          <button class="window-tab" type="button" role="tab" id="htab-oops" aria-controls="hpanel-oops" aria-selected="false" tabindex="-1" data-file="oops.tb">oops.tb</button>
-          <button class="window-tab" type="button" role="tab" id="htab-kind" aria-controls="hpanel-kind" aria-selected="false" tabindex="-1" data-file="kind.tb">kind.tb</button>
+              <button class="window-tab" type="button" role="tab" id="htab-todo" aria-controls="hpanel-todo" aria-selected="true" data-file="todo.tb">todo.tb</button>
+              <button class="window-tab" type="button" role="tab" id="htab-hunt" aria-controls="hpanel-hunt" aria-selected="false" tabindex="-1" data-file="hunt.tb">hunt.tb</button>
+              <button class="window-tab" type="button" role="tab" id="htab-iocs" aria-controls="hpanel-iocs" aria-selected="false" tabindex="-1" data-file="iocs.tb">iocs.tb</button>
             </div>
           </div>
-      <div class="window-panel" id="hpanel-hello" role="tabpanel" aria-labelledby="htab-hello" data-output="Hello, Tanisha!&#10;I like tea.&#10;I like books.&#10;I like rain.&#10;3 favourite things">
-        <pre class="tb-code"><code>let name = "Tanisha"
-let favourites = ["tea", "books", "rain"]
+          <div class="window-panel" id="hpanel-todo" role="tabpanel" aria-labelledby="htab-todo" data-shot="assets/img/apps/todo.png" data-shot-alt="The To-do app, running on a Mac">
+            <pre class="tb-code"><code>import gui
 
-say("Hello, " + name + "!")
-for thing in favourites {
-  say("I like " + thing + ".")
-}
-say(len(favourites) + " favourite things")</code></pre>
-      </div>
-      <div class="window-panel" id="hpanel-oops" role="tabpanel" aria-labelledby="htab-oops" data-output="Oops! On line 3: I don&#x27;t know what &#x27;nmae&#x27; is. Did you mean &#x27;name&#x27;?" data-error hidden>
-        <pre class="tb-code"><code>let name = "Tanisha"
-let greeting = "Hello"
-say(greeting + ", " + nmae)</code></pre>
-      </div>
-      <div class="window-panel" id="hpanel-kind" role="tabpanel" aria-labelledby="htab-kind" data-output="♥ Tanisha, you make the world softer just by being in it.&#10;♥ Mum, be gentle with yourself today." hidden>
-        <pre class="tb-code"><code># care() says something kind, picked at random
-let friends = ["Tanisha", "Mum"]
-for friend in friends {
-  care(friend)
+let win = gui.window("To-do", {"width": 480, "height": 560})
+win.label("Things to do", {"style": "title"})
+
+let row = win.row()
+let box = row.input({"placeholder": "What needs doing?"})
+let list = win.table(["Done", "Task"])
+
+row.button("Add", fn() {
+  list.add_row(["", box.value()])
+  box.clear()
+}, {"primary": true})
+
+win.run()</code></pre>
+          </div>
+          <div class="window-panel" id="hpanel-hunt" role="tabpanel" aria-labelledby="htab-hunt" data-output="critical: 22 failed logins from 203.0.113.42&#10;  then logged in as deploy" hidden>
+            <pre class="tb-code"><code>import logs
+import detect
+
+let records = logs.read("apps/data/auth.log", "auth")
+
+for hit in detect.brute_force(records) {
+  say(f"{hit.level}: {hit.count} failed logins from {hit.by}")
+  if hit.success_after {
+    say(f"  then logged in as {hit.success_user}")
+  }
 }</code></pre>
-      </div>
+          </div>
+          <div class="window-panel" id="hpanel-iocs" role="tabpanel" aria-labelledby="htab-iocs" data-output="hxxps://login-paypa1[.]account-verify[.]example[.]net/secure/verify.php?id=8812&#10;hxxp://198[.]51[.]100[.]14/inv/INV-20817.zip&#10;hxxps://www[.]example[.]com/privacy&#10;8 domains, 4 IPs, 1 CVE" hidden>
+            <pre class="tb-code"><code>import fs
+import ioc
+
+let email = fs.read("apps/data/phishing_email.txt")
+let found = ioc.extract(email)
+
+for url in found.urls {
+  say(ioc.defang(url))
+}
+say(f"{len(found.domains)} domains, {len(found.ips)} IPs, {len(found.cves)} CVE")</code></pre>
+          </div>
           <div class="window-out">
             <div class="window-out-head">
               <span id="hero-out-label">Output</span>
               <button class="button button-run" type="button" id="hero-run"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Run</button>
             </div>
-            <pre id="hero-out" aria-live="polite" aria-labelledby="hero-out-label"><span class="prompt">$ tb hello.tb</span>
-Hello, Tanisha!
-I like tea.
-I like books.
-I like rain.
-3 favourite things</pre>
+            <div id="hero-out" class="hero-out" aria-live="polite" aria-labelledby="hero-out-label"><figure class="hero-shot"><img src="assets/img/apps/todo.png" alt="The To-do app, running on a Mac" width="960" height="1176"></figure></div>
           </div>
         </div>
       </section>
 
+      <section class="section" aria-labelledby="build-title">
+        <div class="section-head">
+          <h2 id="build-title">What you can build</h2>
+          <p>TB 2.0 grew up. The same gentle language now builds real tools, and every example on this site is a program you can download and run.</p>
+        </div>
+        <div class="builds">
+        <article class="build" id="build-desktop">
+          <div class="build-text">
+            <h3>Desktop apps</h3>
+            <p>Windows with buttons, tables, menus and dialogs, from a few lines of TB. They run on Windows, macOS and Linux with nothing else installed.</p>
+            <p class="build-apps">See it in: <a href="examples.html#app-todo">To-do list</a>, <a href="examples.html#app-care">Care check-in</a>, <a href="examples.html#app-notes">Notes</a>, <a href="examples.html#app-calculator">Calculator</a></p>
+          </div>
+          <div class="build-code">
+            <p class="ex-note">Desktop code: runs with the TB app, not in the browser.</p><pre class="tb-code"><code>import gui
+import hash
+
+let win = gui.window("Hash checker", {"theme": "dark"})
+let result = win.label("Pick a file to fingerprint it.")
+win.button("Choose file", fn() {
+  let path = gui.open_file()
+  if path != nil {
+    result.set(hash.file_sha256(path))
+  }
+}, {"primary": true})
+win.run()</code></pre>
+            <figure class="build-shot"><img src="assets/img/apps/hash-checker.png" alt="The Hash checker app showing a file's SHA-256" width="1800" height="1256" loading="lazy"></figure>
+          </div>
+        </article>
+        <article class="build" id="build-soc">
+          <div class="build-text">
+            <h3>SOC and detection</h3>
+            <p>Parse auth, web, firewall and Windows logs, describe what bad looks like as a rule (or load a Sigma rule), and get a ranked table of alerts.</p>
+            <p class="build-apps">See it in: <a href="examples.html#app-log-triage">Log triage</a>, <a href="examples.html#app-brute-force-hunter">Brute-force hunter</a>, <a href="examples.html#app-sigma-runner">Sigma runner</a>, <a href="examples.html#app-ioc-workbench">IOC workbench</a></p>
+          </div>
+          <div class="build-code">
+            <pre class="tb-code" data-runnable><code>import logs
+import detect
+import report
+
+let records = logs.read("apps/data/auth.log", "auth")
+let alerts = detect.brute_force(records)
+say(report.table(alerts, ["level", "rule", "by", "count", "success_user"]))</code></pre>
+            <figure class="build-shot"><img src="assets/img/apps/log-triage-gui.png" alt="The Log triage app listing alerts from auth.log" width="2160" height="1616" loading="lazy"></figure>
+          </div>
+        </article>
+        <article class="build" id="build-network">
+          <div class="build-text">
+            <h3>Network and intel</h3>
+            <p>Check the ports on machines you own, resolve names, call web APIs, and ask VirusTotal or AbuseIPDB about an indicator.</p>
+            <p class="build-apps">See it in: <a href="examples.html#app-port-check">Port check</a>, <a href="examples.html#app-ip-reputation">IP reputation</a>, <a href="examples.html#app-uptime-monitor">Uptime monitor</a></p>
+          </div>
+          <div class="build-code">
+            <p class="ex-note">Desktop code: runs with the TB app, not in the browser.</p><pre class="tb-code"><code>import net
+import intel
+
+# Only check computers you own or are allowed to test.
+let open = net.check_ports("127.0.0.1", [22, 80, 443])
+say(open)
+
+if intel.has_key("abuseipdb") {
+  let r = intel.abuseipdb("203.0.113.42")
+  say(f"{r.verdict} (score {r.score})")
+}</code></pre>
+            
+          </div>
+        </article>
+        <article class="build" id="build-scripts">
+          <div class="build-text">
+            <h3>Scripts and automation</h3>
+            <p>Read a CSV, reshape it, write JSON. Files, dates, regular expressions and reports are all built in.</p>
+            
+          </div>
+          <div class="build-code">
+            <pre class="tb-code" data-runnable><code>import csv
+import json
+
+let rows = csv.parse("name,cups\nTanisha,3\nMum,5\nDad,2")
+let total = rows.map(fn(r) { return num(r.cups) }).sum()
+let top = rows.sort_by(fn(r) { return num(r.cups) }).last()
+say(f"{total} cups of tea, most by {top.name}")
+say(json.stringify({"total": total, "top": top.name}))</code></pre>
+            
+          </div>
+        </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="libs-title">
+        <div class="section-head">
+          <h2 id="libs-title">Batteries included</h2>
+          <p>Twenty libraries ship inside the TB app. No package manager, no setup: write <code>import logs</code> and go.</p>
+        </div>
+        <ul class="lib-grid">
+          <li><a class="lib-card" href="lib/math.html"><span class="lib-card-name"><code>math</code></span><span class="lib-card-doc">Numbers beyond + - * /: square roots, powers, rounding, trigonometry.</span><span class="lib-card-meta"><span>Core</span></span></a></li>
+          <li><a class="lib-card" href="lib/text.html"><span class="lib-card-name"><code>text</code></span><span class="lib-card-doc">Text helpers: padding, wrapping, number formatting and random ids.</span><span class="lib-card-meta"><span>Core</span></span></a></li>
+          <li><a class="lib-card" href="lib/time.html"><span class="lib-card-name"><code>time</code></span><span class="lib-card-doc">Clocks and dates: the time now, timestamps, formatting, parsing and waiting.</span><span class="lib-card-meta"><span>Core</span></span></a></li>
+          <li><a class="lib-card" href="lib/random.html"><span class="lib-card-name"><code>random</code></span><span class="lib-card-doc">Random numbers, picks and shuffles (use seed(n) to repeat them).</span><span class="lib-card-meta"><span>Core</span></span></a></li>
+          <li><a class="lib-card" href="lib/re.html"><span class="lib-card-name"><code>re</code></span><span class="lib-card-doc">Regular expressions: search text with patterns like "\d+" (digits) or "\w+@\w+".</span><span class="lib-card-meta"><span>Core</span></span></a></li>
+          <li><a class="lib-card" href="lib/os.html"><span class="lib-card-name"><code>os</code></span><span class="lib-card-doc">The computer TB runs on: your program's arguments, environment variables, running other programs, and exiting.</span><span class="lib-card-meta"><span>Core</span></span></a></li>
+          <li><a class="lib-card" href="lib/fs.html"><span class="lib-card-name"><code>fs</code></span><span class="lib-card-doc">Files and folders: read, write, list, walk, copy and remove.</span><span class="lib-card-meta"><span>Files and data</span></span></a></li>
+          <li><a class="lib-card" href="lib/json.html"><span class="lib-card-name"><code>json</code></span><span class="lib-card-doc">Read and write JSON, the data format of the web and of most security tools.</span><span class="lib-card-meta"><span>Files and data</span></span></a></li>
+          <li><a class="lib-card" href="lib/csv.html"><span class="lib-card-name"><code>csv</code></span><span class="lib-card-doc">Read and write CSV files.</span><span class="lib-card-meta"><span>Files and data</span></span></a></li>
+          <li><a class="lib-card" href="lib/logs.html"><span class="lib-card-name"><code>logs</code></span><span class="lib-card-doc">Read log files into records (maps) you can search and count: syslog, Linux auth.log (SSH and sudo), Apache/nginx access logs, JSON lines, CSV and Windows Security event exports.</span><span class="lib-card-meta"><span>Security (SOC)</span></span></a></li>
+          <li><a class="lib-card" href="lib/detect.html"><span class="lib-card-name"><code>detect</code></span><span class="lib-card-doc">Detection rules for logs: describe what suspicious looks like as a map (or load a Sigma rule), run it over records from the logs library, and get alerts back.</span><span class="lib-card-meta"><span>Security (SOC)</span></span></a></li>
+          <li><a class="lib-card" href="lib/ioc.html"><span class="lib-card-name"><code>ioc</code></span><span class="lib-card-doc">Indicators of compromise (IOCs): pull IPs, domains, URLs, emails, file hashes and CVE IDs out of any text, check what something is, and defang them (1.2.3[.]4, hxxp://) so nobody clicks a bad link by accident.</span><span class="lib-card-meta"><span>Security (SOC)</span></span></a></li>
+          <li><a class="lib-card" href="lib/hash.html"><span class="lib-card-name"><code>hash</code></span><span class="lib-card-doc">Hashes (fingerprints) of text and files: MD5, SHA-1, SHA-256 and SHA-512, HMAC signatures, and a safe way to compare secrets.</span><span class="lib-card-meta"><span>Security (SOC)</span></span></a></li>
+          <li><a class="lib-card" href="lib/encode.html"><span class="lib-card-name"><code>encode</code></span><span class="lib-card-doc">Encodings attackers (and the web) use: base64, hex, URL encoding and ROT13, plus entropy to spot random-looking text such as packed code or generated domains.</span><span class="lib-card-meta"><span>Security (SOC)</span></span></a></li>
+          <li><a class="lib-card" href="lib/report.html"><span class="lib-card-name"><code>report</code></span><span class="lib-card-doc">Turn records and alerts into something to read or share: aligned text tables, Markdown, CSV, a self-contained HTML page, and a timeline.</span><span class="lib-card-meta"><span>Security (SOC)</span></span></a></li>
+          <li><a class="lib-card" href="lib/net.html"><span class="lib-card-name"><code>net</code></span><span class="lib-card-doc">IP addresses, CIDR ranges, DNS lookups and simple TCP checks.</span><span class="lib-card-meta"><span>Network and intel</span></span></a></li>
+          <li><a class="lib-card" href="lib/http.html"><span class="lib-card-name"><code>http</code></span><span class="lib-card-doc">Talk to websites and web APIs: get, post, request and download.</span><span class="lib-card-meta"><span>Network and intel</span></span></a></li>
+          <li><a class="lib-card" href="lib/intel.html"><span class="lib-card-name"><code>intel</code></span><span class="lib-card-doc">Threat-intelligence lookups for IPs, domains, URLs and file hashes using VirusTotal, AbuseIPDB and URLhaus.</span><span class="lib-card-meta"><span>Network and intel</span></span></a></li>
+          <li><a class="lib-card" href="lib/gui.html"><span class="lib-card-name"><code>gui</code></span><span class="lib-card-doc">Desktop windows: buttons, text boxes, tables, menus and dialogs.</span><span class="lib-card-meta"><span>Desktop GUI</span></span></a></li>
+          <li><a class="lib-card" href="lib/test.html"><span class="lib-card-name"><code>test</code></span><span class="lib-card-doc">Checks for your own tests.</span><span class="lib-card-meta"><span>Testing</span></span></a></li>
+        </ul>
+        <p><a href="library.html">Browse the library reference</a>, with every function and an example for each library.</p>
+      </section>
+
       <section class="section" aria-labelledby="features-title">
         <div class="section-head">
-          <h2 id="features-title">Small on purpose</h2>
-          <p>Eight built-in instructions and a handful of keywords. Enough to write real programs, little enough to hold in your head.</p>
+          <h2 id="features-title">Still gentle</h2>
+          <p>TB began as a gift, a language for someone who had never programmed. 2.0 kept every bit of that.</p>
         </div>
-        <div class="features">
+        <div class="features features-2">
           <article class="feature">
             <h3>Friendly errors</h3>
             <p>Every mistake names the line and says what went wrong, in plain English. Typos get a suggestion.</p>
@@ -106,47 +238,26 @@ say(greeting + ", " + nmae)</code></pre>
             </div>
           </article>
           <article class="feature">
-            <h3>No setup</h3>
-            <p>TB is one file. Nothing to install, no accounts. On Windows, drag a <code>.tb</code> file onto <code>tb.exe</code> and it runs.</p>
+            <h3>One download, no setup</h3>
+            <p>The Windows installer needs no admin rights and brings the whole standard library and the apps with it. Then just double-click a <code>.tb</code> file to run it.</p>
             <div class="specimen">
-              <pre><span class="tok-op">&gt;</span> tb hello.tb</pre>
-              <pre class="specimen-out">Hello, Tanisha!
-Press Enter to close</pre>
+              <pre><span class="tok-op">&gt;</span> tb --version</pre>
+              <pre class="specimen-out">TB 2.0.0</pre>
             </div>
           </article>
           <article class="feature">
             <h3>Runs everywhere</h3>
-            <p>The same program runs on a Windows laptop, a Mac, Linux, or right here in the browser.</p>
+            <p>The same program runs on a Windows laptop, a Mac, Linux, or right here in the browser (everything except windows and the network).</p>
             <ul class="platforms">
-              <li>Windows<small>tb-windows-x64.exe</small></li>
+              <li>Windows<small>installer or zip</small></li>
               <li>macOS<small>Apple silicon</small></li>
               <li>Linux<small>x64</small></li>
               <li>Browser<small>Playground</small></li>
             </ul>
           </article>
           <article class="feature">
-            <h3>Reads like a note</h3>
-            <p>Instructions are plain words: <code>let</code>, <code>say</code>, <code>ask</code>. No semicolons, no types to declare.</p>
-            <div class="specimen">
-              <pre class="tb-code"><code>let name = ask("Your name? ")
-say("Hi, " + name + "!")</code></pre>
-            </div>
-          </article>
-          <article class="feature">
-            <h3>Closures and recursion</h3>
-            <p>Small, but a real language: functions are values, remember their surroundings, and can call themselves.</p>
-            <div class="specimen">
-              <pre class="tb-code"><code>fn stars(n) {
-  if n &lt;= 0 { return "" }
-  return "*" + stars(n - 1)
-}
-say(stars(5))</code></pre>
-              <pre class="specimen-out">*****</pre>
-            </div>
-          </article>
-          <article class="feature">
             <h3>Built-in kindness</h3>
-            <p><code>care()</code> prints a kind message, chosen at random. Give it a name to make it personal.</p>
+            <p><code>care()</code> prints a kind message, chosen at random. Give it a name to make it personal. It's still there in 2.0.</p>
             <div class="specimen">
               <pre class="tb-code"><code>care("Tanisha")</code></pre>
               <pre class="specimen-out">♥ Tanisha, you make the world softer just by being in it.</pre>
@@ -162,81 +273,90 @@ say(stars(5))</code></pre>
         </div>
         <div class="tour">
           <div class="tour-tabs" role="tablist" aria-label="Tour topics" aria-orientation="vertical">
-        <button class="tour-tab" type="button" role="tab" id="ttab-values" aria-controls="tpanel-values" aria-selected="true"><strong>Values</strong><span>Numbers, text, true, false</span></button>
-        <button class="tour-tab" type="button" role="tab" id="ttab-lists" aria-controls="tpanel-lists" aria-selected="false" tabindex="-1"><strong>Lists</strong><span>Keep things in order</span></button>
-        <button class="tour-tab" type="button" role="tab" id="ttab-choices" aria-controls="tpanel-choices" aria-selected="false" tabindex="-1"><strong>Choices</strong><span>if, else if, else</span></button>
-        <button class="tour-tab" type="button" role="tab" id="ttab-loops" aria-controls="tpanel-loops" aria-selected="false" tabindex="-1"><strong>Loops</strong><span>for and while</span></button>
-        <button class="tour-tab" type="button" role="tab" id="ttab-functions" aria-controls="tpanel-functions" aria-selected="false" tabindex="-1"><strong>Functions</strong><span>fn, return, closures</span></button>
-        <button class="tour-tab" type="button" role="tab" id="ttab-questions" aria-controls="tpanel-questions" aria-selected="false" tabindex="-1"><strong>Questions</strong><span>ask() and care()</span></button>
+          <button class="tour-tab" type="button" role="tab" id="ttab-text" aria-controls="tpanel-text" aria-selected="true"><strong>Text</strong><span>f-strings and methods</span></button>
+          <button class="tour-tab" type="button" role="tab" id="ttab-lists" aria-controls="tpanel-lists" aria-selected="false" tabindex="-1"><strong>Lists</strong><span>map, filter, sort</span></button>
+          <button class="tour-tab" type="button" role="tab" id="ttab-maps" aria-controls="tpanel-maps" aria-selected="false" tabindex="-1"><strong>Maps</strong><span>keys and values</span></button>
+          <button class="tour-tab" type="button" role="tab" id="ttab-loops" aria-controls="tpanel-loops" aria-selected="false" tabindex="-1"><strong>Loops</strong><span>for, while, break</span></button>
+          <button class="tour-tab" type="button" role="tab" id="ttab-errors" aria-controls="tpanel-errors" aria-selected="false" tabindex="-1"><strong>Errors</strong><span>try, catch, throw</span></button>
+          <button class="tour-tab" type="button" role="tab" id="ttab-modules" aria-controls="tpanel-modules" aria-selected="false" tabindex="-1"><strong>Libraries</strong><span>import</span></button>
           </div>
           <div>
-      <div class="tour-panel" id="tpanel-values" role="tabpanel" aria-labelledby="ttab-values">
-        <p>Text goes in quotes. <code>+</code> adds numbers and joins text; if either side is text, TB joins.</p>
-        <pre class="tb-code" data-runnable><code>let cups = 2
-let drink = "tea"
-say("Cups of " + drink + ": " + cups)
-say(cups * 3, true, nil)</code></pre>
-      </div>
-      <div class="tour-panel" id="tpanel-lists" role="tabpanel" aria-labelledby="ttab-lists" hidden>
-        <p>Square brackets make a list. Positions start at 0, and <code>push</code> adds to the end.</p>
-        <pre class="tb-code" data-runnable><code>let snacks = ["mango", "chips"]
-push(snacks, "chocolate")
-say(snacks)
-say(snacks[0], len(snacks))</code></pre>
-      </div>
-      <div class="tour-panel" id="tpanel-choices" role="tabpanel" aria-labelledby="ttab-choices" hidden>
-        <p>Only <code>false</code> and <code>nil</code> count as no. Everything else is yes.</p>
-        <pre class="tb-code" data-runnable><code>let hour = 22
-if hour &gt;= 22 {
-  say("Time for bed.")
-} else if hour &gt;= 18 {
-  say("Evening!")
-} else {
-  say("Still daytime.")
+          <div class="tour-panel" id="tpanel-text" role="tabpanel" aria-labelledby="ttab-text">
+            <p>Put any expression inside <code>{ }</code> in an <code>f"..."</code> string. Text has methods you call with a dot.</p>
+            <pre class="tb-code" data-runnable><code>let name = "Tanisha"
+let mood = "  sunny  "
+say(f"Hello, {name}! Today feels {mood.trim()}.")
+say(name.upper(), name.len(), name.contains("tan"))
+say("a,b,c".split(","))</code></pre>
+          </div>
+          <div class="tour-panel" id="tpanel-lists" role="tabpanel" aria-labelledby="ttab-lists" hidden>
+            <p>Lists keep things in order. Methods like <code>map</code> and <code>filter</code> take a function.</p>
+            <pre class="tb-code" data-runnable><code>let scores = [7, 10, 4, 9]
+say(scores.sort(), scores.sum(), scores.max())
+say(scores.filter(fn(s) { return s &gt;= 7 }))
+say(scores.map(fn(s) { return s * 10 }))
+say(9 in scores)</code></pre>
+          </div>
+          <div class="tour-panel" id="tpanel-maps" role="tabpanel" aria-labelledby="ttab-maps" hidden>
+            <p>A map pairs keys with values. Read a field with a dot or with brackets.</p>
+            <pre class="tb-code" data-runnable><code>let alert = {"ip": "203.0.113.42", "tries": 22}
+alert.level = "critical"
+alert["tries"] += 1
+say(alert)
+for key in alert {
+  say(f"{key} = {alert[key]}")
 }</code></pre>
-      </div>
-      <div class="tour-panel" id="tpanel-loops" role="tabpanel" aria-labelledby="ttab-loops" hidden>
-        <p><code>for</code> walks through a list or text; <code>while</code> repeats while something is true.</p>
-        <pre class="tb-code" data-runnable><code>for i in range(1, 4) {
-  say("Hug number " + str(i))
-}
-let n = 3
-while n &gt; 0 {
-  say(str(n) + "...")
-  n = n - 1
-}</code></pre>
-      </div>
-      <div class="tour-panel" id="tpanel-functions" role="tabpanel" aria-labelledby="ttab-functions" hidden>
-        <p>Functions are values. A function made inside another remembers the boxes around it.</p>
-        <pre class="tb-code" data-runnable><code>fn make_counter() {
-  let count = 0
-  return fn() {
-    count = count + 1
-    return count
+          </div>
+          <div class="tour-panel" id="tpanel-loops" role="tabpanel" aria-labelledby="ttab-loops" hidden>
+            <p><code>for</code> walks through a list, text or map. <code>break</code> stops early, <code>continue</code> skips ahead.</p>
+            <pre class="tb-code" data-runnable><code>for n in range(1, 20) {
+  if n % 2 == 0 {
+    continue
   }
+  if n &gt; 9 {
+    break
+  }
+  say(f"{n} is odd")
+}</code></pre>
+          </div>
+          <div class="tour-panel" id="tpanel-errors" role="tabpanel" aria-labelledby="ttab-errors" hidden>
+            <p>Every mistake can be caught. The error is a map with a message and a line number.</p>
+            <pre class="tb-code" data-runnable><code>import json
+
+try {
+  json.parse("{not json")
+} catch err {
+  say(f"Couldn't read it: {err.message}")
 }
-let hugs = make_counter()
-hugs()
-say("Hugs so far: " + str(hugs()))</code></pre>
-      </div>
-      <div class="tour-panel" id="tpanel-questions" role="tabpanel" aria-labelledby="ttab-questions" hidden>
-        <p><code>ask</code> waits for an answer (in the browser, a little box pops up). <code>care</code> says something kind.</p>
-        <pre class="tb-code" data-runnable><code>let name = ask("What's your name? ")
-say("Nice to meet you, " + name + "!")
-care(name)</code></pre>
-      </div>
+
+fn check(age) {
+  if age &lt; 0 { throw "Age can't be negative" }
+  return age
+}
+try { check(-1) } catch err { say(err.message) }</code></pre>
+          </div>
+          <div class="tour-panel" id="tpanel-modules" role="tabpanel" aria-labelledby="ttab-modules" hidden>
+            <p>Twenty libraries come built in. <code>import</code> one and use it with a dot.</p>
+            <pre class="tb-code" data-runnable><code>import hash
+import encode
+import text
+
+say(hash.sha256("hello").slice(0, 16))
+say(encode.base64("TB loves you"))
+say(text.format_number(1234567.5, 1))</code></pre>
+          </div>
           </div>
         </div>
-        <p><a href="docs.html">Read the full guide</a>, eleven short lessons from your first <code>say</code> to closures.</p>
+        <p><a href="docs.html">Read the full guide</a>, from your first <code>say</code> to modules and errors, then try the <a href="docs.html#guides">tutorials</a>.</p>
       </section>
 
       <section class="section install" aria-labelledby="install-title">
         <div>
-          <h2 id="install-title" style="margin-top:0">Install</h2>
-          <p class="lead">Download one file for your computer and run your first program. The download page walks through every click, including the security prompts.</p>
+          <h2 id="install-title" class="flush">Install</h2>
+          <p class="lead">On Windows, run the installer; on a Mac or Linux, unzip one folder. The standard library and the apps come inside, and the download page walks through every click.</p>
           <div class="button-row">
-            <a class="button button-primary" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 1.0</a>
-            <a class="button" href="examples/for_tanisha.tb" download="for_tanisha.tb">Get a first program</a>
+            <a class="button button-primary" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 2.0</a>
+            <a class="button" href="examples.html#apps">See the example apps</a>
           </div>
         </div>
         <div class="terminal window">
@@ -249,21 +369,22 @@ care(name)</code></pre>
             </div>
           </div>
           <div class="window-panel" id="ipanel-windows" role="tabpanel" aria-labelledby="itab-windows">
-            <pre><span class="c"># Put tb.exe and hello.tb in one folder, then:</span>
+            <pre><span class="c"># After tb-windows-x64-setup.exe, open TB Prompt:</span>
+<span class="p">&gt; </span>tb --version
+TB 2.0.0
 <span class="p">&gt; </span>tb hello.tb
 Hello, Tanisha!
-
-<span class="c"># Or just drag hello.tb onto tb.exe.</span></pre>
+<span class="c"># Or double-click any .tb file.</span></pre>
           </div>
           <div class="window-panel" id="ipanel-mac" role="tabpanel" aria-labelledby="itab-mac" hidden>
-            <pre><span class="p">$ </span>unzip tb-macos-arm64.zip
-<span class="p">$ </span>./tb hello.tb
+            <pre><span class="c"># Unzip tb-macos-arm64.zip, move the tb folder home, then once:</span>
+<span class="p">$ </span>xattr -dr com.apple.quarantine ~/tb
+<span class="p">$ </span>~/tb/tb hello.tb
 Hello, Tanisha!</pre>
           </div>
           <div class="window-panel" id="ipanel-linux" role="tabpanel" aria-labelledby="itab-linux" hidden>
-            <pre><span class="p">$ </span>tar -xzf tb-linux-x64.tar.gz
-<span class="p">$ </span>chmod +x tb
-<span class="p">$ </span>./tb hello.tb
+            <pre><span class="p">$ </span>tar xzf tb-linux-x64.tar.gz
+<span class="p">$ </span>./tb/tb hello.tb
 Hello, Tanisha!</pre>
           </div>
         </div>
@@ -271,9 +392,9 @@ Hello, Tanisha!</pre>
 
       <section class="section why" id="why" aria-labelledby="why-title">
         <div>
-          <h2 id="why-title" style="margin-top:0">Why TB?</h2>
+          <h2 id="why-title" class="flush">Why TB?</h2>
           <p class="lead">TB was made as a gift, for one person. Its name is her initials.</p>
-          <p>It is small on purpose, so all of it fits in your head, and gentle on purpose, so learning it never feels like being told off. If you are not Tanisha, you are still very welcome here.</p>
+          <p>It started small and gentle, so learning it would never feel like being told off. Version 2.0 lets it do real work, from a to-do list to triaging an attack, without losing that voice. If you are not Tanisha, you are still very welcome here.</p>
         </div>
         <div class="letter">
 <!-- PERSONAL MESSAGE: START (edit freely) -->
@@ -289,7 +410,7 @@ Hello, Tanisha!</pre>
       <section class="cta-band" aria-labelledby="cta-title">
         <div>
           <h2 id="cta-title">Write your first program tonight</h2>
-          <p>It takes about five minutes, and the guide starts from zero.</p>
+          <p>The guide starts from zero; the tutorials end with a desktop app and a real investigation.</p>
         </div>
         <div class="button-row">
           <a class="button button-primary" href="docs.html">Start the guide</a>
@@ -303,14 +424,15 @@ Hello, Tanisha!</pre>
     <div class="footer-inner">
       <div class="footer-brand">
         <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-        <p>A tiny, friendly programming language.</p>
+        <p>A friendly programming language for desktop apps, security tools and everything in between.</p>
       </div>
       <nav aria-labelledby="footer-learn">
         <h2 id="footer-learn">Learn</h2>
         <ul>
           <li><a href="docs.html">Guide</a></li>
-          <li><a href="docs.html#reference">Reference</a></li>
-          <li><a href="examples.html">Examples</a></li>
+          <li><a href="docs.html#guides">Tutorials</a></li>
+          <li><a href="library.html">Library reference</a></li>
+          <li><a href="examples.html">Examples and apps</a></li>
         </ul>
       </nav>
       <nav aria-labelledby="footer-tools">
@@ -324,7 +446,7 @@ Hello, Tanisha!</pre>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
           <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
@@ -332,7 +454,7 @@ Hello, Tanisha!</pre>
     </div>
     <div class="footer-bottom">
       <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
-      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

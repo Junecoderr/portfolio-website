@@ -1,0 +1,61 @@
+# End-to-end checks: the triage must find the attacks hidden in the sample logs.
+# Run them with:  tb test apps/log-triage
+
+import test
+import fs
+import logs
+import "rules.tb"
+
+let data = fs.join(fs.here(), "..", "data")
+
+fn alerts_for(name) {
+  return rules.triage(logs.read(fs.join(data, name)))
+}
+
+fn find(alerts, rule) {
+  for a in alerts {
+    if a.rule == rule {
+      return a
+    }
+  }
+  return nil
+}
+
+test.case("auth.log: brute force from 203.0.113.42, and the attacker got in", fn() {
+  let alerts = alerts_for("auth.log")
+  let bf = find(alerts, "Brute force")
+  test.equal(bf.by, "203.0.113.42")
+  test.equal(bf.level, "critical")
+  test.true(bf.success_after)
+  test.equal(bf.success_user, "deploy")
+  test.true("root" in bf.users)
+})
+
+test.case("auth.log: the slow scanner stays under the threshold", fn() {
+  let ips = alerts_for("auth.log").map(fn(a) { return a.by })
+  test.false("198.51.100.23" in ips)
+})
+
+test.case("auth.log: the backdoor account is found", fn() {
+  test.equal(find(alerts_for("auth.log"), "New user account created").by, "sysupdate")
+})
+
+test.case("access.log: scanner and password spraying", fn() {
+  let alerts = alerts_for("access.log")
+  test.equal(find(alerts, "Web scanner: many 404s").by, "198.51.100.77")
+  test.equal(find(alerts, "Password spraying on a web login").by, "203.0.113.42")
+})
+
+test.case("firewall.log: the port scan", fn() {
+  let scan = find(alerts_for("firewall.log"), "Port scan")
+  test.equal(scan.by, "198.51.100.77")
+  test.true(scan.count >= 20)
+})
+
+test.case("windows_security.json: brute force, new admin and a cleared log", fn() {
+  let alerts = alerts_for("windows_security.json")
+  test.equal(find(alerts, "Brute force").by, "203.0.113.99")
+  test.equal(find(alerts, "New user account created").by, "helpdesk2")
+  test.equal(find(alerts, "User added to a group").by, "Administrators")
+  test.equal(find(alerts, "Security log cleared").level, "critical")
+})

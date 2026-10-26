@@ -1,0 +1,17 @@
+title: New Local Account Created
+id: 0b2d5c7e-6a8f-4e10-b0c4-9d1f2e3a4b52
+status: stable
+description: A user account was created (event 4720). Attackers create accounts to keep access.
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4720
+  filter_machine_accounts:
+    TargetUserName|endswith: '$'
+  condition: selection and not filter_machine_accounts
+level: medium
+tags:
+  - attack.persistence
+  - attack.t1136.001

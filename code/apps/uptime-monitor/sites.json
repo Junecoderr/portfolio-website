@@ -1,0 +1,8 @@
+{
+  "timeout": 10,
+  "slow_ms": 2000,
+  "sites": [
+    {"name": "TB website", "url": "https://code.tanisha.ceo"},
+    {"name": "Portfolio", "url": "https://tanisha.ceo"}
+  ]
+}

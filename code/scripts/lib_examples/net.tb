@@ -1,0 +1,7 @@
+import net
+
+say(net.is_ip("203.0.113.42"), net.is_private("192.168.1.20"))
+say(net.in_cidr("10.1.2.3", "10.0.0.0/8"))
+let info = net.cidr_info("192.168.1.0/24")
+say(info)
+say(net.common_ports[22], net.common_ports[443])

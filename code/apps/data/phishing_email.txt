@@ -1,0 +1,41 @@
+Return-Path: <billing@paypa1-secure.example.org>
+Received: from mail.paypa1-secure.example.org (mail.paypa1-secure.example.org [203.0.113.55])
+	by mx1.corp.example.com (Postfix) with ESMTPS id 4Tq8Xk2Lz9z1
+	for <finance-team@corp.example.com>; Thu, 12 Mar 2026 07:41:09 +0000 (UTC)
+Authentication-Results: mx1.corp.example.com; spf=fail smtp.mailfrom=paypa1-secure.example.org;
+	dkim=none; dmarc=fail header.from=paypa1-secure.example.org
+From: "PayPal Billing" <billing@paypa1-secure.example.org>
+Reply-To: refunds-desk@account-verify.example.net
+To: finance-team@corp.example.com
+Subject: [Action Required] Invoice INV-20817 payment failed - verify your account
+Date: Thu, 12 Mar 2026 07:41:02 +0000
+Message-ID: <20260312074102.5531@paypa1-secure.example.org>
+X-Mailer: PHPMailer 6.8.1
+X-Originating-IP: [198.51.100.14]
+Content-Type: multipart/mixed; boundary="b1_e4e8"
+
+Dear Customer,
+
+We were unable to process the payment for invoice INV-20817. Your account will be
+suspended within 24 hours unless you verify your billing details.
+
+Verify now: hxxps://login-paypa1[.]account-verify[.]example[.]net/secure/verify.php?id=8812
+Or copy this link: hxxp://198.51.100.14/inv/INV-20817.zip
+
+If you have questions, reply to refunds-desk[@]account-verify[.]example[.]net.
+
+Attachments:
+  INV-20817.pdf.exe  (412 KB)
+    MD5:    5d41402abc4b2a76b9719d911017c592
+    SHA1:   aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d
+    SHA256: 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+
+Analyst notes (SOC ticket 4471):
+- The dropper calls back to update-check(.)cdn-example(.)com and 203.0.113.200:8443.
+- The payload abuses CVE-2023-23397 (Outlook) and drops stage2.ps1 next to report.pdf and tb.py
+  as decoys; none of those file names are domains.
+- Same infrastructure seen in IPv6 range 2001:db8:4b::17.
+- Legitimate links in the footer (www.example.com, https://www.example.com/privacy) are noise.
+
+--
+PayPal Billing Team | https://www.example.com/privacy

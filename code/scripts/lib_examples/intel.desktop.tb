@@ -1,0 +1,9 @@
+import intel
+
+# Keys come from the VT_API_KEY and ABUSEIPDB_API_KEY environment variables.
+if not intel.has_key("virustotal") {
+  say(intel.key_help())
+} else {
+  let r = intel.virustotal_file("44d88612fea8a8f36de82e1278abb02f")
+  say(f"{r.source}: {r.verdict} (score {r.score})")
+}

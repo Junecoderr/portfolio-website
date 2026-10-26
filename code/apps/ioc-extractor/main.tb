@@ -1,0 +1,124 @@
+# ioc-extractor: pull indicators of compromise out of a text file
+# (an email, a threat report, a ticket) and print them defanged.
+#
+#   tb apps/ioc-extractor/main.tb                    the sample phishing email
+#   tb apps/ioc-extractor/main.tb report.txt         your own file
+#   tb apps/ioc-extractor/main.tb report.txt --json  JSON instead of Markdown
+#   options: --json, --md (default), --raw (don't defang), --out FILE
+
+import os
+import fs
+import ioc
+import json
+import report
+
+let path = fs.join(fs.here(), "..", "data", "phishing_email.txt")
+let style = "md"
+let defang = true
+let out_path = nil
+
+let i = 0
+while i < len(os.args) {
+  let arg = os.args[i]
+  if arg == "--json" {
+    style = "json"
+  } else if arg == "--md" {
+    style = "md"
+  } else if arg == "--raw" {
+    defang = false
+  } else if arg == "--out" {
+    if i + 1 >= len(os.args) {
+      say("--out needs a file name, like: --out iocs.md")
+      exit(2)
+    }
+    out_path = os.args[i + 1]
+    i += 1
+  } else if arg == "--help" or arg == "-h" {
+    say("Usage: tb main.tb [file] [--json | --md] [--raw] [--out FILE]")
+    exit(0)
+  } else if arg.starts_with("--") {
+    say(f"Unknown option {arg}. Usage: tb main.tb [file] [--json | --md] [--raw] [--out FILE]")
+    exit(2)
+  } else {
+    path = arg
+  }
+  i += 1
+}
+
+let text = ""
+try {
+  text = fs.read(path)
+} catch err {
+  say(err.message)
+  exit(1)
+}
+
+let found = ioc.extract(text)
+
+# Plain-English names for each kind of IOC (one, many), in the order to show them.
+let LABELS = {
+  "ips": ["IP address", "IP addresses"], "domains": ["domain", "domains"], "urls": ["URL", "URLs"],
+  "emails": ["email address", "email addresses"], "md5": ["MD5 hash", "MD5 hashes"],
+  "sha1": ["SHA-1 hash", "SHA-1 hashes"], "sha256": ["SHA-256 hash", "SHA-256 hashes"], "cves": ["CVE ID", "CVE IDs"],
+}
+
+# 1 -> "1 URL", 3 -> "3 URLs"
+fn count_of(n, kind) {
+  if n == 1 {
+    return f"1 {LABELS[kind][0]}"
+  }
+  return f"{n} {LABELS[kind][1]}"
+}
+
+fn shown(value) {
+  if defang {
+    return ioc.defang(value)
+  }
+  return value
+}
+
+let total = 0
+for kind in found {
+  total += len(found[kind])
+}
+
+let output = ""
+if style == "json" {
+  let safe = {}
+  for kind in found {
+    safe[kind] = found[kind].map(shown)
+  }
+  output = json.stringify({"source": fs.name(path), "total": total, "defanged": defang, "iocs": safe}, true)
+} else {
+  let rows = []
+  for kind in LABELS.keys() {
+    for value in found[kind] {
+      rows.push({"type": LABELS[kind][0], "value": shown(value)})
+    }
+  }
+  let lines = [f"# IOCs in {fs.name(path)}", ""]
+  let counts = []
+  for kind in LABELS.keys() {
+    if not found[kind].is_empty() {
+      counts.push(count_of(len(found[kind]), kind))
+    }
+  }
+  if total == 0 {
+    lines.push("No IOCs found.")
+  } else {
+    lines.push(f"Found {total} IOC" + (total == 1 and "" or "s") + ": " + counts.join(", ") + ".")
+    lines.push("")
+    lines.push(report.markdown(rows, ["type", "value"]))
+  }
+  if defang {
+    lines.push("")
+    lines.push("Values are defanged (hxxp, [.]) so they can't be clicked. Use --raw to see them as they are.")
+  }
+  output = lines.join("\n")
+}
+
+say(output)
+if out_path != nil {
+  say("")
+  say("Saved to " + report.save(out_path, output))
+}

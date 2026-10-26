@@ -1,0 +1,156 @@
+# IOC Workbench: paste an email, an alert or a report (or open a file) and
+# get every indicator of compromise in it: IPs, domains, URLs, emails,
+# hashes and CVEs. Defang or refang the text, and copy or save the IOCs as
+# Markdown, JSON or CSV for a ticket.
+# Run: tb apps/ioc-workbench/main.tb [file]
+
+import gui
+import ioc
+import json
+import report
+import fs
+import os
+
+let SAMPLE = fs.join(fs.here(), "..", "data", "phishing_email.txt")
+let TYPES = ["ips", "domains", "urls", "emails", "md5", "sha1", "sha256", "cves"]
+let NAMES = {"ips": "IP", "domains": "Domain", "urls": "URL", "emails": "Email",
+             "md5": "MD5", "sha1": "SHA-1", "sha256": "SHA-256", "cves": "CVE"}
+
+let found = []   # list of {"type", "value", "defanged"}
+
+let win = gui.window("IOC Workbench", {"width": 1100, "height": 720})
+win.label("IOC Workbench", {"style": "title"})
+win.label("Paste text (an email, an alert, a report), then Extract. Defanged IOCs like hxxp:// and 1.2.3[.]4 are found too.", {"style": "muted"})
+
+let tools = win.row()
+tools.button("Open file…", fn() { open_text() })
+tools.button("Paste", fn() { paste_text() })
+tools.button("Extract IOCs", fn() { extract() }, {"primary": true})
+tools.button("Defang text", fn() { text.set(ioc.defang(text.value())) })
+tools.button("Refang text", fn() { text.set(ioc.refang(text.value())) })
+
+let panes = win.row({"expand": true})
+let left = panes.column({"expand": true})
+left.label("Text", {"style": "heading"})
+let text = left.textarea({"height": 8})
+
+let right = panes.column({"expand": true})
+right.label("Indicators", {"style": "heading"})
+let table = right.table(["Type", "Value", "Defanged"], {"widths": [80, 260, 260], "height": 8,
+                                                        "on_open": fn(row) { copy_one(row) }})
+let counts = right.label(" ", {"style": "muted", "wrap": 560})
+
+let out = win.row()
+out.button("Copy as Markdown", fn() { copy_as("markdown") })
+out.button("Copy as JSON", fn() { copy_as("json") })
+out.button("Copy defanged list", fn() { copy_as("defanged") })
+out.button("Save…", fn() { save() })
+
+let status = win.status("Double-click an indicator to copy it (defanged).")
+
+fn extract() {
+  let got = ioc.extract(text.value())
+  found = []
+  let parts = []
+  for t in TYPES {
+    for value in got[t] {
+      found.push({"type": NAMES[t], "value": value, "defanged": ioc.defang(value)})
+    }
+    if len(got[t]) > 0 {
+      parts.push(f"{len(got[t])} {NAMES[t]}")
+    }
+  }
+  let rows = []
+  for f in found {
+    rows.push([f.type, f.value, f.defanged])
+  }
+  table.set_rows(rows)
+  if found.is_empty() {
+    counts.set("No indicators found.")
+  } else {
+    counts.set(parts.join("  ·  "))
+  }
+  status.set(f"{len(found)} indicators found.")
+}
+
+fn as_text(how) {
+  if how == "markdown" {
+    return report.markdown(found, ["type", "value", "defanged"])
+  }
+  if how == "json" {
+    return json.stringify(found, true)
+  }
+  if how == "csv" {
+    return report.csv(found, ["type", "value", "defanged"])
+  }
+  return found.map(fn(f) { return f.defanged }).join("\n")
+}
+
+fn copy_as(how) {
+  if found.is_empty() {
+    gui.alert("Extract some IOCs first.")
+    return
+  }
+  gui.copy(as_text(how))
+  status.set(f"Copied {len(found)} indicators ({how}).")
+}
+
+fn copy_one(row) {
+  gui.copy(row[2])
+  status.set(f"Copied {row[2]}")
+}
+
+fn save() {
+  if found.is_empty() {
+    gui.alert("Extract some IOCs first.")
+    return
+  }
+  let path = gui.save_file("iocs.md", {"Markdown": "*.md", "JSON": "*.json", "CSV": "*.csv", "Text": "*.txt"})
+  if path == nil {
+    return
+  }
+  let how = "defanged"
+  if fs.ext(path).lower() == ".md" {
+    how = "markdown"
+  } else if fs.ext(path).lower() == ".json" {
+    how = "json"
+  } else if fs.ext(path).lower() == ".csv" {
+    how = "csv"
+  }
+  try {
+    report.save(path, as_text(how))
+    status.set(f"Saved {len(found)} indicators to {path}")
+  } catch err {
+    gui.alert(err.message, "Couldn't save")
+  }
+}
+
+fn load(path) {
+  try {
+    text.set(fs.read(path))
+  } catch err {
+    gui.alert(err.message, "Couldn't open")
+    return
+  }
+  win.title(f"{fs.name(path)} - IOC Workbench")
+  extract()
+}
+
+fn open_text() {
+  let path = gui.open_file({"Text": "*.txt *.eml *.log *.md *.json *.csv", "All files": "*"})
+  if path != nil {
+    load(path)
+  }
+}
+
+fn paste_text() {
+  text.set(gui.paste())
+  extract()
+}
+
+if len(os.args) > 0 {
+  load(os.args[0])
+} else {
+  load(SAMPLE)
+}
+win.run()

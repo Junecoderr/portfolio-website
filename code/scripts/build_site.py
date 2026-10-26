@@ -12,6 +12,15 @@ What it does:
   * writes <out>/examples/index.json from the "# Title:" / "# About:" header
     comments of each example (for_tanisha first)
   * writes <out>/assets/js/config.js with the GitHub repo used for downloads
+  * copies the standard library (tblib/*.py, *.tb) and writes tblib/index.json,
+    so the browser playground can `import` every library
+  * copies apps/data/ (sample logs, the phishing email, Sigma rules) and writes
+    apps/data/index.json; the playground loads these into its pretend disk
+  * copies every app's source (apps/<name>/) so the site can link to it, and
+    fills the Apps gallery on examples.html from apps/*/main.tb + README.md
+  * adds the security examples in scripts/playground_examples/ to the playground
+  * generates the library reference (library.html, lib/<name>.html) with
+    scripts/gen_lib_docs.py
 
 Standard library only.
 """
@@ -28,6 +37,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 EXAMPLES = ROOT / "examples"
+TBLIB = ROOT / "tblib"
+APPS = ROOT / "apps"
+SCRIPTS = Path(__file__).resolve().parent
+PLAYGROUND_EXAMPLES = SCRIPTS / "playground_examples"
+APPS_MARKER = "<!-- APPS GALLERY (filled in by scripts/build_site.py) -->"
 VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.M)
 
 REQUIRED_PYODIDE = [
@@ -75,6 +89,58 @@ def example_entry(name: str, path: Path) -> dict:
     }
 
 
+def copy_tblib(out: Path) -> list[str]:
+    """Copy tblib's .py and .tb files; return their names for tblib/index.json."""
+    dest = out / "tblib"
+    dest.mkdir(parents=True, exist_ok=True)
+    names = []
+    for path in sorted(TBLIB.rglob("*")):
+        if path.is_file() and path.suffix in (".py", ".tb") and "__pycache__" not in path.parts:
+            rel = path.relative_to(TBLIB).as_posix()
+            (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, dest / rel)
+            names.append(rel)
+    (dest / "index.json").write_text(json.dumps(names, indent=2) + "\n", encoding="utf-8")
+    return names
+
+
+def copy_app_data(out: Path) -> list[str]:
+    src = APPS / "data"
+    dest = out / "apps" / "data"
+    names = []
+    if not src.is_dir():
+        return names
+    for path in sorted(src.rglob("*")):
+        if path.is_file() and path.name != ".DS_Store":
+            rel = path.relative_to(src).as_posix()
+            (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, dest / rel)
+            names.append(rel)
+    (dest / "index.json").write_text(json.dumps(names, indent=2) + "\n", encoding="utf-8")
+    return names
+
+
+# Files an app keeps for its user (to-do lists, journals) are not published.
+APP_PRIVATE = {"todo.json", "journal.json", "notes.txt"}
+
+
+def copy_app_sources(out: Path) -> list[str]:
+    names = []
+    if not APPS.is_dir():
+        return names
+    for folder in sorted(APPS.iterdir()):
+        if not folder.is_dir() or folder.name == "data" or not (folder / "main.tb").exists():
+            continue
+        for path in sorted(folder.rglob("*")):
+            if (path.is_file() and path.name not in APP_PRIVATE and path.name != ".DS_Store"
+                    and "__pycache__" not in path.parts and path.suffix in (".tb", ".md", ".json", ".yml", ".txt", ".log", ".csv")):
+                rel = path.relative_to(APPS)
+                (out / "apps" / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, out / "apps" / rel)
+        names.append(folder.name)
+    return names
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the TB website.")
     parser.add_argument("--repo", default=None, help="GitHub OWNER/REPO for download links")
@@ -104,12 +170,20 @@ def main(argv: list[str] | None = None) -> int:
     shutil.copytree(SITE, out, ignore=shutil.ignore_patterns(".DS_Store", "*.part"))
 
     shutil.copy2(ROOT / "tb.py", out / "tb.py")
+    lib_files = copy_tblib(out)
+    data_files = copy_app_data(out)
+    app_names = copy_app_sources(out)
     shutil.copy2(ROOT / "for_tanisha.tb", out / "for_tanisha.tb")
 
     ex_out = out / "examples"
     ex_out.mkdir(exist_ok=True)
     shutil.copy2(ROOT / "for_tanisha.tb", ex_out / "for_tanisha.tb")
     entries = [example_entry("for_tanisha", ROOT / "for_tanisha.tb")]
+    extra = []
+    if PLAYGROUND_EXAMPLES.is_dir():
+        for path in sorted(PLAYGROUND_EXAMPLES.glob("*.tb")):
+            shutil.copy2(path, ex_out / path.name)
+            extra.append(example_entry(path.stem, path))
     if EXAMPLES.is_dir():
         # "hello" is the natural first lesson, so it comes right after for_tanisha.
         for path in sorted(EXAMPLES.glob("*.tb"), key=lambda p: (p.stem != "hello", p.stem)):
@@ -117,10 +191,27 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             shutil.copy2(path, ex_out / path.name)
             entries.append(example_entry(path.stem, path))
+            if path.stem == "hello":
+                entries.extend(extra)  # the security examples come right after hello
+                extra = []
+    entries.extend(extra)
     (ex_out / "index.json").write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     match = VERSION_RE.search((ROOT / "tb.py").read_text(encoding="utf-8"))
-    version = match.group(1) if match else "1.0.0"
+    version = match.group(1) if match else "2.0.0"
+
+    sys.path.insert(0, str(SCRIPTS))
+    import gen_lib_docs  # noqa: E402  (imports tb, so only after the checks above)
+    import apps_gallery  # noqa: E402
+    lib_pages = gen_lib_docs.build(out, version)
+    gallery_page = out / "examples.html"
+    if gallery_page.exists():
+        page = gallery_page.read_text(encoding="utf-8")
+        if APPS_MARKER in page:
+            page = page.replace(APPS_MARKER, apps_gallery.render(APPS, out))
+            gallery_page.write_text(page, encoding="utf-8")
+        else:
+            print("  note: examples.html has no apps gallery marker; skipped the gallery")
     config_path = out / "assets" / "js" / "config.js"
     repo = args.repo
     if repo is None:
@@ -136,6 +227,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Built site in {out}")
     print(f"  {len(entries)} example(s): " + ", ".join(e["name"] for e in entries))
+    print(f"  standard library: {len(lib_files)} files; sample data: {len(data_files)} files")
+    print(f"  apps: {', '.join(app_names) or 'none'}; library pages: {len(lib_pages)}")
     print(f"  downloads point at github.com/{repo}")
     if repo == "OWNER/REPO":
         print("  note: pass --repo OWNER/REPO so the download buttons work")

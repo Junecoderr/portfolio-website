@@ -3,9 +3,12 @@ TB - run it with Python
 
 This folder has everything TB needs:
 
-  tb.py            the TB language itself
+  tb.py            the TB language itself (version 2.0)
+  tblib\           TB's standard library (keep it next to tb.py)
   for_tanisha.tb   a little program written in TB
-  examples\        more TB programs to try
+  examples\        small TB programs to try
+  apps\            bigger apps: desktop windows (calculator, to-do, notes,
+                   care) and security tools (log triage, IOC extractor...)
   README.txt       this file
 
 TB is written in Python, so your computer needs Python 3 first.
@@ -44,7 +47,11 @@ Mac:
 
 Linux:
   Python 3 is usually already installed. If not, install "python3"
-  with your system's software app.
+  with your system's software app. For the window apps also install
+  "python3-tk".
+
+Window apps (anything that uses  import gui ) need Python's "Tk" part.
+The python.org downloads for Windows and Mac include it already.
 
 
 STEP 3 - Open a terminal in this folder
@@ -84,6 +91,17 @@ To try another program, change the last part, for example:
     python3 tb.py examples/hello.tb       (Mac / Linux)
 
 (Look inside the examples folder to see which programs are there.)
+
+Try the apps (each folder in apps has a README.md that explains it):
+
+    python tb.py apps\calculator\main.tb       (a window opens - Windows)
+    python3 tb.py apps/calculator/main.tb      (Mac / Linux)
+    python tb.py apps\log-triage\main.tb       (security log triage)
+
+See every library TB comes with, and what one can do:
+
+    python tb.py doc
+    python tb.py doc gui
 
 To play with TB line by line, leave out the file name:
 
@@ -125,6 +143,13 @@ If that also fails, run the Python installer again and make sure the
 
 "can't open file 'tb.py'": the terminal is not in the tb-python folder,
 or you are still inside the zip. Do STEP 1 and STEP 3 again.
+
+"There's no library called ...": tb.py cannot see the tblib folder.
+Keep tb.py and tblib together in the same folder.
+
+A window app says it needs Tk / "No module named tkinter": your Python has
+no Tk. On Windows or Mac, install Python from python.org (STEP 2). On Linux,
+install "python3-tk".
 
 "I couldn't find the file 'mine.tb'": Notepad probably saved it as
 mine.tb.txt. Save it again with "Save as type: All files".

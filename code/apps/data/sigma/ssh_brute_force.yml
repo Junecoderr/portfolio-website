@@ -1,0 +1,21 @@
+title: SSH Brute Force From One Address
+id: 6f1e4d2a-1b9c-4b7e-9a51-2f0f1b7c3e01
+status: experimental
+description: |
+  Many failed SSH logins from the same address in a short time.
+  Often followed by a successful login if a weak password was guessed.
+author: TB samples
+logsource:
+  product: linux
+  service: auth
+detection:
+  selection:
+    action: failed_login
+  condition: selection | count() by ip > 10
+timeframe: 5m
+falsepositives:
+  - A user who forgot their password (usually far fewer attempts)
+level: high
+tags:
+  - attack.credential_access
+  - attack.t1110.001

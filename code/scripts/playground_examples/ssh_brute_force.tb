@@ -1,0 +1,20 @@
+# Title: Hunt an SSH brute force
+# About: Reads a real-looking auth.log, finds password guessing, and checks whether the attacker got in.
+import logs
+import detect
+import report
+
+let records = logs.read("apps/data/auth.log", "auth")
+say(f"Read {len(records)} log lines")
+
+let failed = detect.failed_logins(records)
+say(f"{len(failed)} failed logins. Busiest sources:")
+say(report.table(logs.top(failed, "ip", 3)))
+
+for alert in detect.brute_force(records) {
+  say(f"{alert.level}: {alert.count} failed logins from {alert.by}")
+  say(f"  users tried: {alert.users}")
+  if alert.success_after {
+    say(f"  then logged in as '{alert.success_user}' at {alert.success_when}")
+  }
+}

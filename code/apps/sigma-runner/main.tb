@@ -1,0 +1,127 @@
+# sigma-runner: run Sigma detection rules (YAML files) against log files.
+#
+#   tb apps/sigma-runner/main.tb                         sample rules on the sample logs
+#   tb apps/sigma-runner/main.tb my-rules/ auth.log      your rules on your log(s)
+#   tb apps/sigma-runner/main.tb rule.yml access.log     one rule
+
+import os
+import fs
+import logs
+import detect
+import report
+
+let data = fs.join(fs.here(), "..", "data")
+let rules_path = fs.join(data, "sigma")
+let files = []
+
+for arg in os.args {
+  if arg == "--help" or arg == "-h" {
+    say("Usage: tb main.tb [rules-folder-or-file] [log ...]")
+    exit(0)
+  }
+}
+for arg in os.args {
+  if arg.starts_with("--") {
+    say(f"Unknown option {arg}. Usage: tb main.tb [rules-folder-or-file] [log ...]")
+    exit(2)
+  }
+}
+if len(os.args) >= 1 {
+  rules_path = os.args[0]
+  files = os.args.slice(1)
+}
+if files.is_empty() {
+  for name in ["auth.log", "access.log", "windows_security.json"] {
+    files.push(fs.join(data, name))
+  }
+}
+
+# Load every rule file on its own, so one broken rule doesn't stop the rest.
+let rule_files = [rules_path]
+if fs.is_dir(rules_path) {
+  rule_files = fs.walk(rules_path).filter(fn(p) { return p.ends_with(".yml") or p.ends_with(".yaml") })
+}
+let rules = []
+let broken = 0
+for path in rule_files {
+  try {
+    rules.push(detect.sigma(path))
+  } catch err {
+    broken += 1
+    say(f"Skipping {fs.name(path)}: {err.message}")
+  }
+}
+if rules.is_empty() {
+  say("No Sigma rules loaded, so there is nothing to run.")
+  exit(1)
+}
+
+# What kind of logs a rule is for, from its logsource.
+fn source_of(rule) {
+  let parts = []
+  for key in ["product", "service", "category"] {
+    let value = rule.logsource.get(key, nil)
+    if value != nil {
+      parts.push(value)
+    }
+  }
+  if parts.is_empty() {
+    return "any"
+  }
+  return parts.join("/")
+}
+
+fn threshold_of(rule) {
+  if rule.count <= 1 {
+    return "every match"
+  }
+  let text = f"{rule.count}+"
+  if rule.by != nil {
+    text += f" per {rule.by}"
+  }
+  if rule.within != nil {
+    text += f" in {rule.within}s"
+  }
+  return text
+}
+
+say(f"Loaded {len(rules)} Sigma rule(s)" + (broken > 0 and f" ({broken} skipped)" or "") + ":")
+let rule_rows = rules.map(fn(r) {
+  return {"level": r.level, "title": r.name, "logs": source_of(r), "alerts on": threshold_of(r)}
+})
+say(report.table(rule_rows))
+
+let total = 0
+let files_read = 0
+for path in files {
+  say("")
+  let records = []
+  try {
+    records = logs.read(path)
+  } catch err {
+    say(f"Skipping {path}: {err.message}")
+    continue
+  }
+  files_read += 1
+  let alerts = detect.run(rules, records)
+  total += len(alerts)
+  say(f"== {fs.name(path)}: {len(records)} records, {len(alerts)} alert(s)")
+  if not alerts.is_empty() {
+    say(report.table(alerts, ["level", "rule", "by", "count", "first_when", "last_when"], {"max_width": 44}))
+    for a in alerts {
+      let example = a.records[0]
+      let detail = example.get("command_line", nil) or example.get("path", nil) or example.message
+      let who = example.get("user", nil)
+      if who != nil {
+        detail = f"{detail} (user {who})"
+      }
+      say(f"   e.g. {detail.slice(0, 110)}")
+    }
+  }
+}
+say("")
+if files_read == 0 {
+  say("None of the logs could be read, so no rules were run.")
+  exit(1)
+}
+say(f"{total} alert(s) from {len(rules)} rule(s) over {files_read} log(s).")

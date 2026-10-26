@@ -1,0 +1,21 @@
+import logs
+import detect
+
+let records = logs.read("apps/data/auth.log", "auth")
+
+# A rule is just a map: what to match, how many, how fast, grouped by what.
+let rule = detect.rule({
+  "name": "Root login attempts",
+  "level": "high",
+  "where": {"action": "failed_login", "user": "root"},
+  "count": 3,
+  "within": 300,
+  "by": "ip",
+})
+for alert in detect.run([rule], records) {
+  say(f"{alert.level}: {alert.rule} from {alert.by} ({alert.count} tries)")
+}
+
+for alert in detect.brute_force(records) {
+  say(f"{alert.rule}: {alert.by}, then logged in as {alert.success_user}")
+}

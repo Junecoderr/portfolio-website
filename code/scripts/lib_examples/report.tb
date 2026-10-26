@@ -1,0 +1,8 @@
+import report
+
+let rows = [
+  {"ip": "203.0.113.42", "tries": 22, "level": "critical"},
+  {"ip": "198.51.100.7", "tries": 6, "level": "medium"},
+]
+say(report.table(rows))
+say(report.markdown(rows, ["ip", "level"]))

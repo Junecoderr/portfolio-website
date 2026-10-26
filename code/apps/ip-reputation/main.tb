@@ -1,0 +1,191 @@
+# ip-reputation: is this IP, domain, URL or file hash known to be bad?
+#
+#   tb main.tb 185.220.101.1 example.com 44d88612fea8a8f36de82e1278abb02f
+#   tb main.tb --file indicators.txt
+#
+# Uses VirusTotal (VT_API_KEY), AbuseIPDB (ABUSEIPDB_API_KEY) and
+# URLhaus (URLHAUS_API_KEY, optional). Keys are read from the environment
+# and are never printed.
+
+import os
+import fs
+import net
+import intel
+import re
+import text
+
+# The worse a verdict, the higher its rank.
+let RANK = {"unknown": 0, "harmless": 1, "suspicious": 2, "malicious": 3}
+
+fn usage() {
+  say("Usage: tb main.tb INDICATOR [INDICATOR ...]")
+  say("       tb main.tb --file indicators.txt   (one per line, # for comments)")
+  say("An indicator is an IP address, a domain, a URL or an MD5/SHA-1/SHA-256 hash.")
+}
+
+# Analysts often share "defanged" indicators so nobody clicks them by
+# accident: hxxp://evil[.]example. Turn them back into normal text.
+fn refang(x) {
+  return x.trim().replace("[.]", ".").replace("(.)", ".").replace("hxxp", "http").replace("[:]", ":")
+}
+
+fn kind_of(x) {
+  if net.is_ip(x) {
+    return "ip"
+  }
+  if re.test("^([0-9a-fA-F]{32}|[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$", x) {
+    return "hash"
+  }
+  if x.lower().starts_with("http://") or x.lower().starts_with("https://") {
+    return "url"
+  }
+  if re.test("^([A-Za-z0-9-]+\\.)+[A-Za-z]{2,}$", x) {
+    return "domain"
+  }
+  return "unknown"
+}
+
+# One short line about a result, depending on where it came from.
+fn summary(r) {
+  let d = r.details
+  if r.source == "abuseipdb" {
+    return f"{d.reports} reports, {d.country or "?"}, {d.isp or "?"}"
+  }
+  if r.source == "urlhaus" {
+    if d.listed {
+      return f"listed as {d.threat or "malware"} ({d.status})"
+    }
+    return "not listed"
+  }
+  if not d.found {
+    return "no report yet"
+  }
+  let total = d.malicious + d.suspicious + d.harmless + d.undetected
+  return f"{d.malicious + d.suspicious} of {total} engines flagged it"
+}
+
+# Which lookups make sense for this kind of indicator (and have a key)?
+fn lookups(kind, have_vt, have_abuse) {
+  let todo = []
+  if kind == "ip" and have_abuse {
+    todo.push("abuseipdb")
+  }
+  if kind == "url" {
+    todo.push("urlhaus")
+  }
+  if have_vt and kind != "unknown" {
+    todo.push("virustotal")
+  }
+  return todo
+}
+
+fn look_up(source, kind, x) {
+  if source == "abuseipdb" {
+    return intel.abuseipdb(x)
+  }
+  if source == "urlhaus" {
+    return intel.urlhaus_url(x)
+  }
+  if kind == "ip" {
+    return intel.virustotal_ip(x)
+  }
+  if kind == "domain" {
+    return intel.virustotal_domain(x)
+  }
+  if kind == "url" {
+    return intel.virustotal_url(x)
+  }
+  return intel.virustotal_file(x)
+}
+
+# -- read the indicators ------------------------------------------------------
+
+let items = []
+let args = os.args
+let i = 0
+while i < len(args) {
+  let a = args[i]
+  if a == "--help" or a == "-h" {
+    usage()
+    exit(0)
+  }
+  if a == "--file" {
+    if i + 1 >= len(args) {
+      say("--file needs a file name after it.")
+      exit(2)
+    }
+    try {
+      for row in fs.lines(args[i + 1]) {
+        let clean = row.trim()
+        if clean != "" and not clean.starts_with("#") {
+          items.push(clean)
+        }
+      }
+    } catch err {
+      say(err.message)
+      exit(2)
+    }
+    i += 2
+    continue
+  }
+  items.push(a)
+  i += 1
+}
+
+if items.is_empty() {
+  usage()
+  exit(2)
+}
+
+let have_vt = intel.has_key("virustotal")
+let have_abuse = intel.has_key("abuseipdb")
+if not have_vt and not have_abuse {
+  say("No threat-intel API keys are set, so I can't look anything up yet.")
+  say("")
+  say(intel.key_help())
+  say("")
+  say("Then run this again. (Free keys are enough for this tool.)")
+  exit(1)
+}
+
+# -- look them up ---------------------------------------------------------------
+
+let worst_of_all = []
+for raw in items.unique() {
+  let x = refang(raw)
+  let kind = kind_of(x)
+  say(f"{x}  ({kind})")
+  if kind == "unknown" {
+    say("  I don't know what this is. Use an IP, domain, URL or hash.")
+    continue
+  }
+  if kind == "ip" and net.is_private(x) {
+    say("  private/internal address: not looked up online (no one outside your network knows it).")
+    continue
+  }
+  let worst = "unknown"
+  let todo = lookups(kind, have_vt, have_abuse)
+  if todo.is_empty() {
+    say("  no lookup available for this kind without a VirusTotal key (set VT_API_KEY).")
+  }
+  for source in todo {
+    try {
+      let r = look_up(source, kind, x)
+      say(f"  {text.pad_right(source, 11)} {text.pad_right(r.verdict, 11)} score {text.pad_left(r.score, 3)}   {summary(r)}")
+      if RANK[r.verdict] > RANK[worst] {
+        worst = r.verdict
+      }
+    } catch err {
+      say(f"  {text.pad_right(source, 11)} skipped: {err.message}")
+    }
+  }
+  worst_of_all.push([x, worst])
+}
+
+if not worst_of_all.is_empty() {
+  say("")
+  say("Summary (worst verdict per indicator):")
+  for pair in worst_of_all {
+    say(f"  {text.pad_right(pair[1], 11)} {pair[0]}")
+  }
+}

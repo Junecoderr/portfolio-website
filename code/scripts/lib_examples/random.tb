@@ -1,0 +1,6 @@
+import random
+
+random.seed(7)
+say(random.int(1, 6))
+say(random.choice(["tea", "coffee", "cocoa"]))
+say(random.shuffle([1, 2, 3, 4, 5]))

@@ -79,16 +79,43 @@
     });
   }
 
+  function fetchBytes(url) {
+    return fetch(url, { cache: "no-cache" }).then(function (r) {
+      if (!r.ok) throw new Error("Could not load " + url + " (HTTP " + r.status + ").");
+      return r.arrayBuffer();
+    }).then(function (b) { return new Uint8Array(b); });
+  }
+  function fetchJSON(url) {
+    return fetch(url, { cache: "no-cache" }).then(function (r) {
+      if (!r.ok) throw new Error("Could not load " + url + " (HTTP " + r.status + ").");
+      return r.json();
+    });
+  }
+
   function load() {
     if (loading) return loading;
     loading = (async function () {
       await addScript(PYODIDE_URL + "pyodide.js");
       var pyodide = await window.loadPyodide({ indexURL: PYODIDE_URL, stdout: function () {}, stderr: function () {} });
-      var res = await fetch(SITE_ROOT + "tb.py", { cache: "no-cache" });
-      if (!res.ok) throw new Error("Could not load tb.py (HTTP " + res.status + ").");
-      var source = await res.text();
-      pyodide.FS.writeFile("/home/pyodide/tb.py", source);
-      pyodide.runPython("import sys\nif '/home/pyodide' not in sys.path: sys.path.insert(0, '/home/pyodide')");
+      // tb.py, the standard library (tblib/) and the sample data the
+      // guides use (apps/data/) all go into Pyodide's in-memory file system,
+      // laid out like the real project, so `import logs` and
+      // logs.read("apps/data/auth.log") work just as on a laptop.
+      var HOME = "/home/pyodide/";
+      var lists = await Promise.all([
+        fetchJSON(SITE_ROOT + "tblib/index.json"),
+        fetchJSON(SITE_ROOT + "apps/data/index.json").catch(function () { return []; })
+      ]);
+      var files = ["tb.py"]
+        .concat(lists[0].map(function (f) { return "tblib/" + f; }))
+        .concat(lists[1].map(function (f) { return "apps/data/" + f; }));
+      var blobs = await Promise.all(files.map(function (f) { return fetchBytes(SITE_ROOT + f); }));
+      files.forEach(function (f, i) {
+        var dir = (HOME + f).replace(/\/[^\/]*$/, "");
+        pyodide.FS.mkdirTree(dir);
+        pyodide.FS.writeFile(HOME + f, blobs[i]);
+      });
+      pyodide.runPython("import os, sys\nos.chdir('/home/pyodide')\nif '/home/pyodide' not in sys.path: sys.path.insert(0, '/home/pyodide')");
       pyodide.runPython(PY_HELPER);
       pyRun = pyodide.globals.get("_tb_web_run");
       return pyodide;

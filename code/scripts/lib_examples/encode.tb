@@ -1,0 +1,9 @@
+import encode
+
+let b = encode.base64("powershell -nop -w hidden")
+say(b)
+say(encode.unbase64(b))
+say(encode.hex("TB"), encode.unhex("5442"))
+say(encode.url("a b&c=d"))
+say(encode.rot13("Uryyb, Gnavfun"))
+say(round(encode.entropy("aaaaaaaa"), 2), round(encode.entropy("x9$Kq!2zP#w"), 2))

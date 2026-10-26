@@ -49,15 +49,38 @@
     return e;
   }
 
+  // The output area holds either a <pre> (program output) or a screenshot
+  // (desktop apps can't open windows in the browser).
+  function freshPre(fileName) {
+    out.textContent = "";
+    var pre = el("pre", "");
+    pre.appendChild(el("span", "prompt", "$ tb " + fileName));
+    pre.appendChild(document.createTextNode("\n"));
+    out.appendChild(pre);
+    return pre;
+  }
+
   function showStatic(tab) {
     current = tab;
     var panel = document.getElementById(tab.getAttribute("aria-controls"));
-    out.textContent = "";
-    out.appendChild(el("span", "prompt", "$ tb " + tab.getAttribute("data-file")));
-    out.appendChild(document.createTextNode("\n"));
+    var shot = panel.getAttribute("data-shot");
+    if (shot) {
+      out.textContent = "";
+      var fig = el("figure", "hero-shot");
+      var img = document.createElement("img");
+      img.src = shot;
+      img.alt = panel.getAttribute("data-shot-alt") || "";
+      fig.appendChild(img);
+      fig.appendChild(el("figcaption", "", "Desktop app: run it with the TB app on your computer."));
+      out.appendChild(fig);
+      runBtn.hidden = true;
+      return;
+    }
+    runBtn.hidden = false;
+    var pre = freshPre(tab.getAttribute("data-file"));
     var text = panel.getAttribute("data-output") || "";
-    if (panel.hasAttribute("data-error")) out.appendChild(el("span", "out-error", text));
-    else out.appendChild(document.createTextNode(text));
+    if (panel.hasAttribute("data-error")) pre.appendChild(el("span", "out-error", text));
+    else pre.appendChild(document.createTextNode(text));
   }
 
   var tbLoading = null;
@@ -77,7 +100,7 @@
   if (hero && out && runBtn) {
     var heroTabs = hero.querySelector('[role="tablist"]');
     setupTabs(heroTabs, showStatic);
-    current = heroTabs.querySelector('[aria-selected="true"]');
+    showStatic(heroTabs.querySelector('[aria-selected="true"]'));
 
     runBtn.addEventListener("click", function () {
       if (runBtn.disabled || !current) return;
@@ -85,26 +108,24 @@
       var source = panel.querySelector("code").textContent;
       var label = runBtn.lastChild;
       runBtn.disabled = true;
-      out.textContent = "";
-      out.appendChild(el("span", "prompt", "$ tb " + current.getAttribute("data-file")));
-      out.appendChild(document.createTextNode("\n"));
+      var pre = freshPre(current.getAttribute("data-file"));
       var waiting = el("span", "prompt", (window.TB && window.TB.isLoaded()) ? "Running..." : "Starting TB in your browser (about 10 MB, first time only)...");
-      out.appendChild(waiting);
+      pre.appendChild(waiting);
       ensureTB()
         .then(function (TB) { return TB.load().then(function () { return TB; }); })
         .then(function (TB) {
           waiting.remove();
           return TB.run(source, {
-            onOutput: function (line) { out.appendChild(document.createTextNode(line + "\n")); },
+            onOutput: function (line) { pre.appendChild(document.createTextNode(line + "\n")); },
             onAsk: function (prompt, recent) { return TB.ask(prompt, recent); }
           });
         })
         .then(function (result) {
-          if (!result.ok) out.appendChild(el("span", "out-error", result.error));
+          if (!result.ok) pre.appendChild(el("span", "out-error", result.error));
         })
         .catch(function (e) {
           if (waiting.parentNode) waiting.remove();
-          out.appendChild(el("span", "out-error", "TB could not start: " + (e && e.message ? e.message : e)));
+          pre.appendChild(el("span", "out-error", "TB could not start: " + (e && e.message ? e.message : e)));
         })
         .then(function () { runBtn.disabled = false; if (label) label.textContent = "Run again"; });
     });

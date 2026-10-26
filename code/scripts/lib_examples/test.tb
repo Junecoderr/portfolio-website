@@ -1,0 +1,6 @@
+import test
+
+test.equal(1 + 1, 2, "maths still works")
+test.true("tb".upper() == "TB", "upper() works")
+test.raises(fn() { throw "boom" })
+say(test.results())

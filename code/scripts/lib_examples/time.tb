@@ -1,0 +1,7 @@
+import time
+
+let ts = time.parse("2026-10-26 09:30", "%Y-%m-%d %H:%M")
+say(time.format(ts, "%A %d %B %Y at %H:%M"))
+say(time.format(ts + 3600, "%H:%M"))
+let now = time.now()
+say(type(now.year), type(time.timestamp()))
