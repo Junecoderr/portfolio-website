@@ -212,7 +212,7 @@ def smoke_test(binary: Path, label: str) -> None:
 
         out = check(binary, [str(DEMO)], work)
         if "Welcome to TB" not in out:
-            fail(f"{DEMO.name} output did not say "Welcome to TB"")
+            fail(f"{DEMO.name} output did not say 'Welcome to TB'")
 
         out = check(binary, ["doc"], work, max_lines=8)
         for lib in ("gui", "json", "hash", "ioc", "logs", "detect"):
