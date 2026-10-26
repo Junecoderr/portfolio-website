@@ -1,0 +1,73 @@
+"""Build dist/tb-python.zip: the "run TB with your own Python" download.
+
+Usage (from the repo root):
+    uv run python packaging/make_fallback_zip.py [--dist dist]
+
+Contents (flat, so "Extract all" on Windows gives one tidy folder):
+    tb.py
+    for_tanisha.tb
+    examples/*.tb      (whatever exists at build time)
+    README.txt         (from packaging/README-python.txt, Windows line endings)
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+NAME = "tb-python.zip"
+FIXED_TIME = (2024, 1, 1, 0, 0, 0)  # stable timestamps -> reproducible zip
+
+
+def add(zf: zipfile.ZipFile, arcname: str, data: bytes) -> None:
+    info = zipfile.ZipInfo(arcname, date_time=FIXED_TIME)
+    info.create_system = 3
+    info.external_attr = 0o100644 << 16
+    info.compress_type = zipfile.ZIP_DEFLATED
+    zf.writestr(info, data)
+
+
+def crlf(text: str) -> bytes:
+    return text.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Build dist/tb-python.zip")
+    parser.add_argument("--dist", default=str(ROOT / "dist"))
+    args = parser.parse_args()
+    dist = Path(args.dist).resolve()
+    dist.mkdir(parents=True, exist_ok=True)
+    out = dist / NAME
+
+    required = [ROOT / "tb.py", ROOT / "for_tanisha.tb", ROOT / "packaging" / "README-python.txt"]
+    for path in required:
+        if not path.is_file():
+            print(f"missing {path}", file=sys.stderr)
+            return 1
+
+    examples = sorted((ROOT / "examples").glob("*.tb"))
+    with zipfile.ZipFile(out, "w") as zf:
+        add(zf, "tb.py", (ROOT / "tb.py").read_bytes())
+        add(zf, "for_tanisha.tb", (ROOT / "for_tanisha.tb").read_bytes())
+        for ex in examples:
+            add(zf, f"examples/{ex.name}", ex.read_bytes())
+        add(zf, "README.txt", crlf((ROOT / "packaging" / "README-python.txt").read_text(encoding="utf-8")))
+
+    print(f"wrote {out} ({len(examples)} examples)")
+    with zipfile.ZipFile(out) as zf:
+        for name in zf.namelist():
+            print(f"  {name}")
+
+    # Keep dist/SHA256SUMS.txt in step with the new zip.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build import write_checksums
+
+    write_checksums(dist)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

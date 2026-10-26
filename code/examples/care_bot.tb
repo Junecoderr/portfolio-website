@@ -1,0 +1,73 @@
+# Title: Care bot
+# About: A gentle little bot that asks how you are feeling and answers kindly.
+
+# Checks whether a word is in a list of words.
+fn is_one_of(word, options) {
+  for option in options {
+    if word == option {
+      return true
+    }
+  }
+  return false
+}
+
+say("Hi! I'm Care Bot. I'm here to check in on you.")
+let name = ask("What's your name? ")
+if name == "" {
+  name = "friend"
+}
+say("It's lovely to see you, " + name + ".")
+say("")
+
+say("How are you feeling right now?")
+say("  1. Happy")
+say("  2. Tired")
+say("  3. Sad")
+say("  4. Stressed")
+say("  5. Something else")
+let feeling = ask("Type a number (or the word): ")
+say("")
+
+if is_one_of(feeling, ["1", "happy", "Happy", "HAPPY", "good", "Good", "great", "Great"]) {
+  say("Yay! That makes me so happy to hear.")
+  say("Hold on to this feeling. You deserve every bit of it.")
+} else if is_one_of(feeling, ["2", "tired", "Tired", "TIRED", "sleepy", "Sleepy"]) {
+  say("Sounds like you've been working hard.")
+  say("Maybe a glass of water and a little rest? Even ten minutes helps.")
+} else if is_one_of(feeling, ["3", "sad", "Sad", "SAD", "down", "Down"]) {
+  say("I'm sorry today feels heavy. It's okay to feel sad.")
+  say("Wrap up in something cosy, and maybe talk to someone who loves you.")
+} else if is_one_of(feeling, ["4", "stressed", "Stressed", "STRESSED", "worried", "Worried"]) {
+  say("That sounds like a lot. Let's take one slow breath together.")
+  say("In... and out. You don't have to do everything at once.")
+} else {
+  say("Thank you for telling me. Whatever you're feeling is okay.")
+  say("Be gentle with yourself today.")
+}
+say("")
+
+# Ask for a score, but only accept whole numbers from 1 to 10.
+let answer = ask("On a scale of 1 to 10, how is your day going? ")
+let score = 0
+for n in range(1, 11) {
+  if answer == str(n) {
+    score = n
+  }
+}
+
+if score == 0 {
+  say("That's alright, numbers can be hard to pick. I'm still glad you're here.")
+} else if score <= 3 {
+  say(str(score) + " out of 10. I'm sending you the biggest hug.")
+  say("Please rest, drink some water, and reach out to someone you trust.")
+} else if score <= 6 {
+  say(str(score) + " out of 10. A middling day. Something small and nice might help.")
+} else if score <= 9 {
+  say(str(score) + " out of 10! That's a good day. I'm proud of you.")
+} else {
+  say("10 out of 10! Amazing! Your happiness is contagious.")
+}
+
+say("")
+say("One last thing before you go:")
+care(name)

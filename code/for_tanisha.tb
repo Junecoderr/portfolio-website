@@ -1,0 +1,70 @@
+# for_tanisha.tb
+# A little program, written in a little language, for Tanisha.
+# Run it with:  tb for_tanisha.tb
+
+let name = "Tanisha"
+say("Hello, " + name + "!")
+say("This language is called TB. Can you guess why?")
+say("")
+
+# Things I love about you (a list)
+let reasons = [
+  "your laugh",
+  "the way you care about everyone",
+  "how brave you are",
+  "your terrible puns",
+]
+
+say("A few reasons I love you:")
+let count = 1
+for reason in reasons {
+  say(str(count) + ". " + reason)
+  count = count + 1
+}
+say("...and " + str(len(reasons)) + " is nowhere near all of them.")
+say("")
+
+# A function that remembers things (a closure)
+fn make_counter() {
+  let days = 0
+  return fn() {
+    days = days + 1
+    return days
+  }
+}
+
+let together = make_counter()
+together()
+together()
+say("Days I've been happy today: " + str(together()))
+
+# A function that calls itself (recursion)
+fn hearts(n) {
+  if n <= 0 {
+    return ""
+  }
+  return "<3 " + hearts(n - 1)
+}
+say(hearts(5))
+say("")
+
+# Counting with while
+let i = 3
+while i > 0 {
+  say(str(i) + "...")
+  i = i - 1
+}
+
+if len(reasons) > 3 {
+  say("I love you more than " + str(len(reasons)) + " reasons can say.")
+} else if len(reasons) > 0 {
+  say("I love you.")
+} else {
+  say("Still loving you.")
+}
+
+say("")
+say("A note from TB, just for you:")
+care(name)
+say("")
+say("With love, always.")

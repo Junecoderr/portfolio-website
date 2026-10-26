@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+build/
+dist/
+*.spec.bak
+.DS_Store
+# Pyodide is downloaded by scripts/fetch_pyodide.py, not committed
+site/vendor/pyodide/
+
+# Local Claude/plugin state (contains chat snippets; never commit)
+.claude/
+.vercel/
+.vercel
+.env*

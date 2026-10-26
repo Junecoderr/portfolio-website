@@ -1,0 +1,35 @@
+# Title: Functions that call themselves
+# About: Recursion: Fibonacci numbers, factorials, and a staircase of stars.
+
+# Each Fibonacci number is the two before it added together.
+fn fib(n) {
+  if n < 2 {
+    return n
+  }
+  return fib(n - 1) + fib(n - 2)
+}
+
+let numbers = []
+for i in range(10) {
+  push(numbers, fib(i))
+}
+say("The first 10 Fibonacci numbers:", numbers)
+
+# 5 factorial means 5 * 4 * 3 * 2 * 1.
+fn factorial(n) {
+  if n <= 1 {
+    return 1
+  }
+  return n * factorial(n - 1)
+}
+say("5 factorial is", factorial(5))
+
+# Draw a staircase by calling stairs() with a smaller number each time.
+fn stairs(n) {
+  if n == 0 {
+    return
+  }
+  stairs(n - 1)
+  say("*" * n)
+}
+stairs(4)

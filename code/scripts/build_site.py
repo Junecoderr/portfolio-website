@@ -1,0 +1,147 @@
+"""Assemble the TB website into a folder you can serve as static files.
+
+Usage:
+    uv run python scripts/fetch_pyodide.py          # once, downloads Pyodide
+    uv run python scripts/build_site.py [--repo OWNER/REPO] [--out dist/site]
+    uv run python -m http.server -d dist/site 8000  # then open http://localhost:8000
+
+What it does:
+  * copies site/ (pages, assets, vendored Pyodide) to --out
+  * copies tb.py and for_tanisha.tb to the site root
+  * copies examples/*.tb into <out>/examples/ (plus for_tanisha.tb)
+  * writes <out>/examples/index.json from the "# Title:" / "# About:" header
+    comments of each example (for_tanisha first)
+  * writes <out>/assets/js/config.js with the GitHub repo used for downloads
+
+Standard library only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shutil
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SITE = ROOT / "site"
+EXAMPLES = ROOT / "examples"
+VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.M)
+
+REQUIRED_PYODIDE = [
+    "pyodide.js",
+    "pyodide.asm.js",
+    "pyodide.asm.wasm",
+    "python_stdlib.zip",
+    "pyodide-lock.json",
+]
+
+
+def fail(message: str) -> None:
+    print(f"build_site: error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def read_header(path: Path) -> tuple[str | None, str | None]:
+    """Return (title, about) from the leading comment lines of a .tb file."""
+    title = about = None
+    for line in path.read_text(encoding="utf-8").splitlines()[:10]:
+        stripped = line.strip()
+        if not stripped.startswith("#"):
+            if stripped:
+                break
+            continue
+        text = stripped.lstrip("#").strip()
+        low = text.lower()
+        if low.startswith("title:") and title is None:
+            title = text[len("title:"):].strip()
+        elif low.startswith("about:") and about is None:
+            about = text[len("about:"):].strip()
+    return title, about
+
+
+def example_entry(name: str, path: Path) -> dict:
+    title, about = read_header(path)
+    if name == "for_tanisha":
+        title = title or "For Tanisha"
+        about = about or "The very first TB program: a little letter, written in code."
+    return {
+        "name": name,
+        "title": title or name.replace("_", " ").capitalize(),
+        "description": about or "",
+        "interactive": "ask(" in path.read_text(encoding="utf-8"),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Build the TB website.")
+    parser.add_argument("--repo", default=None, help="GitHub OWNER/REPO for download links")
+    parser.add_argument("--out", default="dist/site", help="output folder (default: dist/site)")
+    args = parser.parse_args(argv)
+
+    if args.repo is not None and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repo):
+        fail(f"--repo must look like OWNER/REPO, got {args.repo!r}")
+
+    if not SITE.is_dir():
+        fail(f"{SITE} not found")
+    vendor = SITE / "vendor" / "pyodide"
+    missing = [name for name in REQUIRED_PYODIDE if not (vendor / name).is_file()]
+    if missing:
+        fail(
+            "Pyodide is not vendored yet (missing: " + ", ".join(missing) + ").\n"
+            "  Run:  uv run python scripts/fetch_pyodide.py"
+        )
+
+    out = Path(args.out)
+    if not out.is_absolute():
+        out = ROOT / out
+    if out.resolve() in (ROOT.resolve(), SITE.resolve()):
+        fail("--out must be a separate build folder")
+    if out.exists():
+        shutil.rmtree(out)
+    shutil.copytree(SITE, out, ignore=shutil.ignore_patterns(".DS_Store", "*.part"))
+
+    shutil.copy2(ROOT / "tb.py", out / "tb.py")
+    shutil.copy2(ROOT / "for_tanisha.tb", out / "for_tanisha.tb")
+
+    ex_out = out / "examples"
+    ex_out.mkdir(exist_ok=True)
+    shutil.copy2(ROOT / "for_tanisha.tb", ex_out / "for_tanisha.tb")
+    entries = [example_entry("for_tanisha", ROOT / "for_tanisha.tb")]
+    if EXAMPLES.is_dir():
+        # "hello" is the natural first lesson, so it comes right after for_tanisha.
+        for path in sorted(EXAMPLES.glob("*.tb"), key=lambda p: (p.stem != "hello", p.stem)):
+            if path.stem == "for_tanisha":
+                continue
+            shutil.copy2(path, ex_out / path.name)
+            entries.append(example_entry(path.stem, path))
+    (ex_out / "index.json").write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    match = VERSION_RE.search((ROOT / "tb.py").read_text(encoding="utf-8"))
+    version = match.group(1) if match else "1.0.0"
+    config_path = out / "assets" / "js" / "config.js"
+    repo = args.repo
+    if repo is None:
+        existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+        found = re.search(r'repo:\s*"([^"]+)"', existing)
+        repo = found.group(1) if found else "OWNER/REPO"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "// Generated by scripts/build_site.py. Edit the --repo flag, not this file.\n"
+        f"window.TB_CONFIG = {{ repo: {json.dumps(repo)}, version: {json.dumps(version)} }};\n",
+        encoding="utf-8",
+    )
+
+    print(f"Built site in {out}")
+    print(f"  {len(entries)} example(s): " + ", ".join(e["name"] for e in entries))
+    print(f"  downloads point at github.com/{repo}")
+    if repo == "OWNER/REPO":
+        print("  note: pass --repo OWNER/REPO so the download buttons work")
+    print(f"Serve it with:  uv run python -m http.server -d {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out} 8000")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

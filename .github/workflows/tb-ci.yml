@@ -1,0 +1,46 @@
+name: TB CI
+
+# Tests for the TB language in code/ on Windows, macOS and Linux.
+
+on:
+  push:
+    branches: [main]
+    paths: ["code/**", ".github/workflows/tb-*.yml"]
+  pull_request:
+    paths: ["code/**", ".github/workflows/tb-*.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tb-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    env:
+      # Use the Python from actions/setup-python, never a uv download.
+      UV_PYTHON_PREFERENCE: only-system
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        working-directory: code
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.2"
+
+      - name: Run tests
+        run: uv run --locked pytest

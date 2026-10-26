@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hello, Tanisha · TB</title>
+  <meta name="description" content="TB is a tiny, friendly programming language made for Tanisha. Write a few lines, and your computer writes back.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">TB</a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="download.html">Download</a>
+      <a href="playground.html">Playground</a>
+      <a href="docs.html">Learn</a>
+      <a href="examples.html">Examples</a>
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+  </header>
+  <main id="main">
+    <div class="container">
+
+      <section class="hero" aria-labelledby="hello">
+        <p class="hero-code" aria-hidden="true"><code><span class="tok-fn">say</span>(<span class="tok-str">"Hello, Tanisha!"</span>)</code></p>
+        <h1 class="hero-greeting" id="hello">Hello, Tanisha!</h1>
+        <p class="hero-sub">TB is a tiny programming language, made just for you. You write a few friendly lines, and your computer writes back.</p>
+        <div class="hero-actions">
+          <a class="button button-primary button-big" href="download.html">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+            Download TB
+          </a>
+          <a class="button button-big" href="playground.html">Try it in the browser</a>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="letter-title">
+        <h2 id="letter-title" class="visually-hidden">A note for you</h2>
+        <div class="letter">
+<!-- PERSONAL MESSAGE: START (edit freely) -->
+          <p class="salutation">Dear Tanisha,</p>
+          <p>I made you something a little unusual. It isn't flowers and it isn't a card. It's a whole language, small enough to fit in your pocket, and it carries your initials.</p>
+          <p>I know code can look like a wall of strange symbols. TB is my attempt to make it feel more like writing a note: you say something, and the computer says something kind back. You can't break anything, and every mistake comes with a gentle hint.</p>
+          <p>There's no rush to learn any of it. Open it on a quiet evening, run the first program, and know that every line was written thinking of you.</p>
+          <p class="signature">With love, always.</p>
+<!-- PERSONAL MESSAGE: END -->
+        </div>
+      </section>
+
+      <section class="section split" aria-labelledby="what-title">
+        <div class="prose">
+          <h2 id="what-title" style="margin-top:0">What is TB?</h2>
+          <p class="lead">TB is a small, gentle programming language. You type instructions in plain words like <code>say</code> and <code>ask</code>, and TB follows them, one line at a time.</p>
+          <p>It runs on your laptop as a single file, with nothing else to install. If you would rather not install anything yet, the <a href="playground.html">playground</a> runs TB right here in the browser.</p>
+          <p>When you're ready to learn, <a href="docs.html">the guide</a> starts from the very beginning.</p>
+        </div>
+        <div class="taste">
+          <h2 class="visually-hidden">A small taste of TB</h2>
+          <pre class="tb-code" data-runnable><code>let name = "Tanisha"
+say("Hello, " + name + "!")
+
+for word in ["kind", "brave", "funny"] {
+  say(name + " is " + word + ".")
+}
+
+care(name)</code></pre>
+        </div>
+      </section>
+
+      <section class="download-band" aria-labelledby="dl-title">
+        <div>
+          <h2 id="dl-title">Get TB on your laptop</h2>
+          <p>One small file for Windows, Mac or Linux. The download page walks you through every click.</p>
+        </div>
+        <a class="button button-primary button-big" href="download.html">Download TB</a>
+      </section>
+
+    </div>
+  </main>
+  <footer class="site-footer">Made with love, for Tanisha.</footer>
+  <script src="assets/js/hello.js"></script>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

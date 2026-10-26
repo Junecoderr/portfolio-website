@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Examples · TB</title>
+  <meta name="description" content="Little TB programs to read, run and play with: a care bot, a guessing game, compliments, countdowns and more.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">TB</a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="download.html">Download</a>
+      <a href="playground.html">Playground</a>
+      <a href="docs.html">Learn</a>
+      <a href="examples.html" aria-current="page">Examples</a>
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+  </header>
+  <main id="main">
+  <div class="container">
+    <h1>Examples</h1>
+    <p class="lead">Little TB programs to read, run and change. Press <strong>Run</strong> to see what one does,
+    or <strong>Open in playground</strong> to change it and try your own ideas. You can't break anything!</p>
+    <p class="note">Every example is also in the <code>examples</code> folder that comes with TB.
+    On your laptop, run one by typing <kbd>tb examples\care_bot.tb</kbd> (see <a href="download.html">Download</a>).</p>
+    <!-- The code blocks below must match examples/*.tb exactly (tests/test_examples.py checks this). -->
+    <nav class="toc" aria-label="Examples on this page">
+      <ul>
+        <li><a href="#for_tanisha">For Tanisha</a></li>
+        <li><a href="#hello">Hello, world</a></li>
+        <li><a href="#compliments">Compliment machine</a></li>
+        <li><a href="#countdown">Countdown to a hug</a></li>
+        <li><a href="#love_buzz">Love buzz</a></li>
+        <li><a href="#grocery_list">Grocery list</a></li>
+        <li><a href="#closures">Functions that remember</a></li>
+        <li><a href="#recursion">Functions that call themselves</a></li>
+        <li><a href="#guess_the_number">Guess the number</a></li>
+        <li><a href="#care_bot">Care bot</a></li>
+      </ul>
+    </nav>
+    <div>
+    <article class="card" id="for_tanisha">
+      <h2>For Tanisha</h2>
+      <p>The very first TB program, written just for you. Lists, loops, functions and a little note at the end.</p>
+      <pre class="tb-code" data-runnable id="code-for_tanisha"><code># for_tanisha.tb
+# A little program, written in a little language, for Tanisha.
+# Run it with:  tb for_tanisha.tb
+
+let name = "Tanisha"
+say("Hello, " + name + "!")
+say("This language is called TB. Can you guess why?")
+say("")
+
+# Things I love about you (a list)
+let reasons = [
+  "your laugh",
+  "the way you care about everyone",
+  "how brave you are",
+  "your terrible puns",
+]
+
+say("A few reasons I love you:")
+let count = 1
+for reason in reasons {
+  say(str(count) + ". " + reason)
+  count = count + 1
+}
+say("...and " + str(len(reasons)) + " is nowhere near all of them.")
+say("")
+
+# A function that remembers things (a closure)
+fn make_counter() {
+  let days = 0
+  return fn() {
+    days = days + 1
+    return days
+  }
+}
+
+let together = make_counter()
+together()
+together()
+say("Days I've been happy today: " + str(together()))
+
+# A function that calls itself (recursion)
+fn hearts(n) {
+  if n &lt;= 0 {
+    return ""
+  }
+  return "&lt;3 " + hearts(n - 1)
+}
+say(hearts(5))
+say("")
+
+# Counting with while
+let i = 3
+while i &gt; 0 {
+  say(str(i) + "...")
+  i = i - 1
+}
+
+if len(reasons) &gt; 3 {
+  say("I love you more than " + str(len(reasons)) + " reasons can say.")
+} else if len(reasons) &gt; 0 {
+  say("I love you.")
+} else {
+  say("Still loving you.")
+}
+
+say("")
+say("A note from TB, just for you:")
+care(name)
+say("")
+say("With love, always.")</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=for_tanisha">Open in playground</a>
+        <a class="button" href="for_tanisha.tb" download>Download for_tanisha.tb</a>
+      </p>
+    </article>
+    <article class="card" id="hello">
+      <h2>Hello, world</h2>
+      <p>Your very first TB program. It says hello and does a little maths.</p>
+      <pre class="tb-code" data-runnable id="code-hello"><code># Title: Hello, world
+# About: Your very first TB program. It says hello and does a little maths.
+
+# Lines that start with # are notes for people. TB skips them.
+
+say("Hello, world!")
+say("Hello, Tanisha!")
+
+# say() can show more than one thing at once, with spaces in between.
+say("Two plus two is", 2 + 2)
+
+# Text in quotes can be joined together with +
+let name = "Tanisha"
+say("Welcome to TB, " + name + ".")</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=hello">Open in playground</a>
+        <a class="button" href="examples/hello.tb" download>Download hello.tb</a>
+      </p>
+    </article>
+    <article class="card" id="compliments">
+      <h2>Compliment machine</h2>
+      <p>Mixes words from two lists to write lots of little compliments.</p>
+      <pre class="tb-code" data-runnable id="code-compliments"><code># Title: Compliment machine
+# About: Mixes words from two lists to write lots of little compliments.
+
+let things = ["smile", "laugh", "kindness"]
+let words = ["lights up the room", "makes my day"]
+
+fn compliment(thing, word) {
+  return "Your " + thing + " " + word + "."
+}
+
+# A loop inside a loop: every thing gets paired with every word.
+for thing in things {
+  for word in words {
+    say(compliment(thing, word))
+  }
+}
+say("")
+say("That's " + str(len(things) * len(words)) + " compliments, and every one is true.")</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=compliments">Open in playground</a>
+        <a class="button" href="examples/compliments.tb" download>Download compliments.tb</a>
+      </p>
+    </article>
+    <article class="card" id="countdown">
+      <h2>Countdown to a hug</h2>
+      <p>Counts down with a while loop, then counts by twos with range().</p>
+      <pre class="tb-code" data-runnable id="code-countdown"><code># Title: Countdown to a hug
+# About: Counts down with a while loop, then counts by twos with range().
+
+let seconds = 5
+say("Hug arriving in...")
+while seconds &gt; 0 {
+  say(str(seconds) + "...")
+  seconds = seconds - 1
+}
+say("Hug delivered! &lt;3")
+say("")
+
+# range(10, 0, -2) means: start at 10, stop before 0, go down 2 each time.
+say("Counting kisses by twos, backwards:")
+for n in range(10, 0, -2) {
+  say(n)
+}</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=countdown">Open in playground</a>
+        <a class="button" href="examples/countdown.tb" download>Download countdown.tb</a>
+      </p>
+    </article>
+    <article class="card" id="love_buzz">
+      <h2>Love buzz</h2>
+      <p>A playful pattern: every 3rd number says &quot;love&quot;, every 5th says &quot;hugs&quot;.</p>
+      <pre class="tb-code" data-runnable id="code-love_buzz"><code># Title: Love buzz
+# About: A playful pattern: every 3rd number says "love", every 5th says "hugs".
+
+# % gives the remainder after dividing. If n % 3 is 0, n is a multiple of 3.
+for n in range(1, 16) {
+  if n % 15 == 0 {
+    say("love and hugs!")
+  } else if n % 3 == 0 {
+    say("love")
+  } else if n % 5 == 0 {
+    say("hugs")
+  } else {
+    say(n)
+  }
+}
+say("")
+
+# Text times a number repeats the text. Here we draw a little heart triangle.
+for size in range(1, 6) {
+  say("&lt;3 " * size)
+}</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=love_buzz">Open in playground</a>
+        <a class="button" href="examples/love_buzz.tb" download>Download love_buzz.tb</a>
+      </p>
+    </article>
+    <article class="card" id="grocery_list">
+      <h2>Grocery list</h2>
+      <p>Builds a shopping list with push(), changes an item, and prints it with for.</p>
+      <pre class="tb-code" data-runnable id="code-grocery_list"><code># Title: Grocery list
+# About: Builds a shopping list with push(), changes an item, and prints it with for.
+
+let groceries = []
+push(groceries, "milk")
+push(groceries, "bread")
+push(groceries, "strawberries")
+push(groceries, "chocolate")
+
+say("My list has " + str(len(groceries)) + " things:")
+for item in groceries {
+  say("- " + item)
+}
+say("")
+
+# Lists start counting at 0, so groceries[0] is the first thing.
+say("First thing to buy: " + groceries[0])
+
+# Change an item in the list.
+groceries[1] = "fresh bread"
+say("Oops, make that: " + groceries[1])
+say("")
+
+# Two lists can be joined with +
+let treats = ["ice cream", "flowers"]
+let everything = groceries + treats
+say("With treats added:", everything)
+
+# Number each item, starting from 1 for humans.
+let number = 1
+for item in everything {
+  say(str(number) + ". " + item)
+  number = number + 1
+}</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=grocery_list">Open in playground</a>
+        <a class="button" href="examples/grocery_list.tb" download>Download grocery_list.tb</a>
+      </p>
+    </article>
+    <article class="card" id="closures">
+      <h2>Functions that remember</h2>
+      <p>Closures: little functions that keep their own memory, like a hug counter.</p>
+      <pre class="tb-code" data-runnable id="code-closures"><code># Title: Functions that remember
+# About: Closures: little functions that keep their own memory, like a hug counter.
+
+fn make_counter(label) {
+  let count = 0
+  return fn() {
+    count = count + 1
+    say(label + ": " + str(count))
+  }
+}
+
+let hugs = make_counter("Hugs today")
+let kisses = make_counter("Kisses today")
+
+hugs()
+hugs()
+kisses()
+hugs()
+
+# A function can also be kept in a 'let' and passed around like any value.
+let shout = fn(text) {
+  return text + "!!!"
+}
+
+fn twice(f, value) {
+  return f(f(value))
+}
+
+say(twice(shout, "I love you"))</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=closures">Open in playground</a>
+        <a class="button" href="examples/closures.tb" download>Download closures.tb</a>
+      </p>
+    </article>
+    <article class="card" id="recursion">
+      <h2>Functions that call themselves</h2>
+      <p>Recursion: Fibonacci numbers, factorials, and a staircase of stars.</p>
+      <pre class="tb-code" data-runnable id="code-recursion"><code># Title: Functions that call themselves
+# About: Recursion: Fibonacci numbers, factorials, and a staircase of stars.
+
+# Each Fibonacci number is the two before it added together.
+fn fib(n) {
+  if n &lt; 2 {
+    return n
+  }
+  return fib(n - 1) + fib(n - 2)
+}
+
+let numbers = []
+for i in range(10) {
+  push(numbers, fib(i))
+}
+say("The first 10 Fibonacci numbers:", numbers)
+
+# 5 factorial means 5 * 4 * 3 * 2 * 1.
+fn factorial(n) {
+  if n &lt;= 1 {
+    return 1
+  }
+  return n * factorial(n - 1)
+}
+say("5 factorial is", factorial(5))
+
+# Draw a staircase by calling stairs() with a smaller number each time.
+fn stairs(n) {
+  if n == 0 {
+    return
+  }
+  stairs(n - 1)
+  say("*" * n)
+}
+stairs(4)</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=recursion">Open in playground</a>
+        <a class="button" href="examples/recursion.tb" download>Download recursion.tb</a>
+      </p>
+    </article>
+    <article class="card" id="guess_the_number">
+      <h2>Guess the number</h2>
+      <p>A small guessing game. TB is thinking of a number from 1 to 20.</p>
+      <p class="note">This one asks you questions, so it works best in the playground or on your laptop. In the browser, the questions pop up in a little box.</p>
+      <pre class="tb-code" id="code-guess_the_number"><code># Title: Guess the number
+# About: A small guessing game. TB is thinking of a number from 1 to 20.
+
+let secret = 7
+let tries = 0
+let found = false
+
+say("I'm thinking of a number from 1 to 20. Can you guess it?")
+
+while not found and tries &lt; 5 {
+  let answer = ask("Your guess: ")
+  # Check the answer is a whole number from 1 to 20 before using num().
+  let ok = false
+  for n in range(1, 21) {
+    if answer == str(n) {
+      ok = true
+    }
+  }
+  if not ok {
+    say("Hmm, \"" + answer + "\" isn't a number from 1 to 20. Try again!")
+  } else {
+    tries = tries + 1
+    let guess = num(answer)
+    if guess == secret {
+      found = true
+    } else if guess &lt; secret {
+      say("A bit higher!")
+    } else {
+      say("A bit lower!")
+    }
+  }
+}
+
+if found {
+  say("Yes! It was " + str(secret) + ". You got it in " + str(tries) + " tries.")
+} else {
+  say("Out of tries! The number was " + str(secret) + ". Want to play again?")
+}</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=guess_the_number">Open in playground</a>
+        <a class="button" href="examples/guess_the_number.tb" download>Download guess_the_number.tb</a>
+      </p>
+    </article>
+    <article class="card" id="care_bot">
+      <h2>Care bot</h2>
+      <p>A gentle little bot that asks how you are feeling and answers kindly.</p>
+      <p class="note">This one asks you questions, so it works best in the playground or on your laptop. In the browser, the questions pop up in a little box.</p>
+      <pre class="tb-code" id="code-care_bot"><code># Title: Care bot
+# About: A gentle little bot that asks how you are feeling and answers kindly.
+
+# Checks whether a word is in a list of words.
+fn is_one_of(word, options) {
+  for option in options {
+    if word == option {
+      return true
+    }
+  }
+  return false
+}
+
+say("Hi! I'm Care Bot. I'm here to check in on you.")
+let name = ask("What's your name? ")
+if name == "" {
+  name = "friend"
+}
+say("It's lovely to see you, " + name + ".")
+say("")
+
+say("How are you feeling right now?")
+say("  1. Happy")
+say("  2. Tired")
+say("  3. Sad")
+say("  4. Stressed")
+say("  5. Something else")
+let feeling = ask("Type a number (or the word): ")
+say("")
+
+if is_one_of(feeling, ["1", "happy", "Happy", "HAPPY", "good", "Good", "great", "Great"]) {
+  say("Yay! That makes me so happy to hear.")
+  say("Hold on to this feeling. You deserve every bit of it.")
+} else if is_one_of(feeling, ["2", "tired", "Tired", "TIRED", "sleepy", "Sleepy"]) {
+  say("Sounds like you've been working hard.")
+  say("Maybe a glass of water and a little rest? Even ten minutes helps.")
+} else if is_one_of(feeling, ["3", "sad", "Sad", "SAD", "down", "Down"]) {
+  say("I'm sorry today feels heavy. It's okay to feel sad.")
+  say("Wrap up in something cosy, and maybe talk to someone who loves you.")
+} else if is_one_of(feeling, ["4", "stressed", "Stressed", "STRESSED", "worried", "Worried"]) {
+  say("That sounds like a lot. Let's take one slow breath together.")
+  say("In... and out. You don't have to do everything at once.")
+} else {
+  say("Thank you for telling me. Whatever you're feeling is okay.")
+  say("Be gentle with yourself today.")
+}
+say("")
+
+# Ask for a score, but only accept whole numbers from 1 to 10.
+let answer = ask("On a scale of 1 to 10, how is your day going? ")
+let score = 0
+for n in range(1, 11) {
+  if answer == str(n) {
+    score = n
+  }
+}
+
+if score == 0 {
+  say("That's alright, numbers can be hard to pick. I'm still glad you're here.")
+} else if score &lt;= 3 {
+  say(str(score) + " out of 10. I'm sending you the biggest hug.")
+  say("Please rest, drink some water, and reach out to someone you trust.")
+} else if score &lt;= 6 {
+  say(str(score) + " out of 10. A middling day. Something small and nice might help.")
+} else if score &lt;= 9 {
+  say(str(score) + " out of 10! That's a good day. I'm proud of you.")
+} else {
+  say("10 out of 10! Amazing! Your happiness is contagious.")
+}
+
+say("")
+say("One last thing before you go:")
+care(name)</code></pre>
+      <p>
+        <a class="button button-primary" href="playground.html?example=care_bot">Open in playground</a>
+        <a class="button" href="examples/care_bot.tb" download>Download care_bot.tb</a>
+      </p>
+    </article>
+    </div>
+  </div>
+  </main>
+  <footer class="site-footer">Made with love, for Tanisha.</footer>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

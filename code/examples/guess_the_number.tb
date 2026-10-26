@@ -1,0 +1,38 @@
+# Title: Guess the number
+# About: A small guessing game. TB is thinking of a number from 1 to 20.
+
+let secret = 7
+let tries = 0
+let found = false
+
+say("I'm thinking of a number from 1 to 20. Can you guess it?")
+
+while not found and tries < 5 {
+  let answer = ask("Your guess: ")
+  # Check the answer is a whole number from 1 to 20 before using num().
+  let ok = false
+  for n in range(1, 21) {
+    if answer == str(n) {
+      ok = true
+    }
+  }
+  if not ok {
+    say("Hmm, \"" + answer + "\" isn't a number from 1 to 20. Try again!")
+  } else {
+    tries = tries + 1
+    let guess = num(answer)
+    if guess == secret {
+      found = true
+    } else if guess < secret {
+      say("A bit higher!")
+    } else {
+      say("A bit lower!")
+    }
+  }
+}
+
+if found {
+  say("Yes! It was " + str(secret) + ". You got it in " + str(tries) + " tries.")
+} else {
+  say("Out of tries! The number was " + str(secret) + ". Want to play again?")
+}

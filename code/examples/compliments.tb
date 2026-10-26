@@ -1,0 +1,18 @@
+# Title: Compliment machine
+# About: Mixes words from two lists to write lots of little compliments.
+
+let things = ["smile", "laugh", "kindness"]
+let words = ["lights up the room", "makes my day"]
+
+fn compliment(thing, word) {
+  return "Your " + thing + " " + word + "."
+}
+
+# A loop inside a loop: every thing gets paired with every word.
+for thing in things {
+  for word in words {
+    say(compliment(thing, word))
+  }
+}
+say("")
+say("That's " + str(len(things) * len(words)) + " compliments, and every one is true.")

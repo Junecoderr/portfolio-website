@@ -1,0 +1,137 @@
+name: TB Release
+
+# Push a tag like tb-v1.0.0 to build the TB binaries for Windows, macOS and
+# Linux and publish them, with checksums, as a GitHub Release. The website at
+# code.tanisha.ceo links to the release whose tag matches tb.__version__.
+# "Run workflow" (workflow_dispatch) only builds and tests the binaries.
+
+on:
+  push:
+    tags: ["tb-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.2"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # PyInstaller cannot cross-compile, so every OS builds on its own runner.
+          - os: windows-latest
+            asset: tb-windows-x64.exe
+            binary: dist/tb.exe
+          - os: macos-14            # Apple Silicon (arm64)
+            asset: tb-macos-arm64.zip
+            binary: dist/tb
+          - os: ubuntu-22.04        # older glibc (2.35) so the binary runs on more Linux systems
+            asset: tb-linux-x64.tar.gz
+            binary: dist/tb
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    env:
+      UV_PYTHON_PREFERENCE: only-system
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+        working-directory: code
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Check tag matches tb.__version__
+        if: startsWith(github.ref, 'refs/tags/tb-v')
+        run: |
+          want="${GITHUB_REF_NAME#tb-v}"
+          have="$(uv run --locked python -c 'import tb; print(tb.__version__)')"
+          echo "tag: $want  tb.py: $have"
+          test "$want" = "$have"
+
+      - name: Run tests
+        run: uv run --locked pytest
+
+      - name: Build binary
+        run: uv run --locked --group build python packaging/build.py
+
+      - name: Run every example through the built binary
+        run: uv run --locked python packaging/run_examples.py "${{ matrix.binary }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: code/dist/${{ matrix.asset }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/tb-v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      UV_PYTHON_PREFERENCE: only-system
+    defaults:
+      run:
+        shell: bash
+        working-directory: code
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: code/dist
+          merge-multiple: true
+
+      - name: Build tb-python.zip
+        run: uv run --locked python packaging/make_fallback_zip.py
+
+      - name: Write SHA256SUMS.txt
+        run: |
+          uv run --locked python packaging/build.py --checksums-only
+          cd dist && sha256sum --check SHA256SUMS.txt
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          assets=(
+            dist/tb-windows-x64.exe
+            dist/tb-macos-arm64.zip
+            dist/tb-linux-x64.tar.gz
+            dist/tb-python.zip
+            dist/SHA256SUMS.txt
+          )
+          ls -l "${assets[@]}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            # --latest=false keeps TB releases from being shown as the site's "latest release".
+            gh release create "$TAG" "${assets[@]}" --title "TB ${TAG#tb-v}" --notes "Downloads for the TB programming language. See https://code.tanisha.ceo/download for install steps." --latest=false
+          fi

@@ -37,6 +37,7 @@ npm test           # playwright smoke test against the built site
 | `public/.well-known/security.txt` | RFC 9116 security contact |
 | `public/og/*` | Open Graph cards |
 | `vercel.json` | Clean URLs, cache headers, Content-Security-Policy |
+| `code/` | TB, the little programming language, served at https://code.tanisha.ceo (own Vercel project, Root Directory `code`; see `code/README.md`) |
 
 ## Environment
 

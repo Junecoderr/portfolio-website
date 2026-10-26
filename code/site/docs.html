@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Learn TB · TB</title>
+  <meta name="description" content="A gentle, step-by-step guide to TB, a tiny programming language. No experience needed.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">TB</a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="download.html">Download</a>
+      <a href="playground.html">Playground</a>
+      <a href="docs.html" aria-current="page">Learn</a>
+      <a href="examples.html">Examples</a>
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+  </header>
+  <main id="main">
+  <div class="container">
+
+    <h1>Learn TB</h1>
+    <p class="lead">A program is just a list of instructions for the computer, written down one after another.
+    TB is a small, friendly language for writing those instructions. You don't need to know anything about
+    programming to start. Go one lesson at a time, and press <strong>Run</strong> on any grey box to see it work.</p>
+
+    <p class="note">You can change the code in the <a href="playground.html">Playground</a> as much as you like.
+    Nothing you type can break your computer, and if something goes wrong TB just says
+    <strong>"Oops!"</strong> and explains what it didn't understand.</p>
+
+    <nav class="toc" aria-label="Lessons">
+      <h2>Lessons</h2>
+      <ol>
+        <li><a href="#first-program">Your first program: <code>say</code></a></li>
+        <li><a href="#values">Values: numbers, text, true and false</a></li>
+        <li><a href="#let">Remembering things with <code>let</code></a></li>
+        <li><a href="#maths">Maths and joining text</a></li>
+        <li><a href="#lists">Lists</a></li>
+        <li><a href="#if">Making choices with <code>if</code> and <code>else</code></a></li>
+        <li><a href="#loops">Doing things again and again: loops</a></li>
+        <li><a href="#functions">Making your own instructions: functions</a></li>
+        <li><a href="#closures">Functions that remember (and call themselves)</a></li>
+        <li><a href="#ask-care">Talking to your program: <code>ask</code> and <code>care</code></a></li>
+        <li><a href="#errors">Reading "Oops!" messages</a></li>
+      </ol>
+      <p><a href="#reference">Built-in instructions (quick reference)</a> ·
+      <a href="#cheat-sheet">Little reminders</a> ·
+      <a href="#windows">Running a .tb file on your Windows laptop</a></p>
+    </nav>
+
+    <!-- 1 -->
+    <section id="first-program">
+      <h2>1. Your first program: <code>say</code></h2>
+      <p><code>say</code> shows something on the screen. Put what you want to show inside the round brackets,
+      and put words inside quote marks <code>"like this"</code> so TB knows they are text.</p>
+      <pre class="tb-code" data-runnable><code>say("Hello, Tanisha!")
+say("This is my first program.")</code></pre>
+      <p>TB reads your program from top to bottom, one line at a time. Each line here is one instruction.</p>
+      <p>You can give <code>say</code> several things at once, separated by commas. It puts a space between them.
+      <code>say("")</code> with nothing in the quotes prints an empty line, which is nice for spacing things out.</p>
+      <pre class="tb-code" data-runnable><code>say("I have", 2, "cats")
+say("")
+say("The end!")</code></pre>
+      <p>Lines that start with <code>#</code> are <strong>comments</strong>: little notes for people.
+      TB skips them completely.</p>
+      <pre class="tb-code" data-runnable><code># This line is a note. TB ignores it.
+say("Only this line does something.")</code></pre>
+    </section>
+
+    <!-- 2 -->
+    <section id="values">
+      <h2>2. Values: numbers, text, true and false</h2>
+      <p>Everything a program works with is a <strong>value</strong>. TB has a few kinds:</p>
+      <ul>
+        <li><strong>Numbers</strong>, like <code>7</code>, <code>-3</code> or <code>2.5</code>.</li>
+        <li><strong>Text</strong>, inside double or single quotes: <code>"hello"</code> or <code>'hello'</code>.</li>
+        <li><strong>true</strong> and <strong>false</strong>, for yes and no.</li>
+        <li><strong>nil</strong>, which means "nothing here".</li>
+        <li><strong>Lists</strong> of other values, like <code>[1, 2, 3]</code> (more in <a href="#lists">lesson 5</a>).</li>
+      </ul>
+      <pre class="tb-code" data-runnable><code>say(42)
+say("forty-two")
+say(true)
+say(nil)
+say([1, 2, 3])</code></pre>
+      <p>To put a quote mark inside text, put a backslash in front of it: <code>\"</code>.
+      <code>\n</code> starts a new line inside the text.</p>
+      <pre class="tb-code" data-runnable><code>say("She said \"hi\" to me.")
+say("line one\nline two")</code></pre>
+    </section>
+
+    <!-- 3 -->
+    <section id="let">
+      <h2>3. Remembering things with <code>let</code></h2>
+      <p><code>let</code> gives a value a name, so you can use it again later. Think of it as a labelled box.</p>
+      <pre class="tb-code" data-runnable><code>let name = "Tanisha"
+let age = 25
+say(name)
+say(age)</code></pre>
+      <p>To change what's in the box later, use the name and <code>=</code> without <code>let</code>.
+      (<code>let</code> is only for making a new box.)</p>
+      <pre class="tb-code" data-runnable><code>let mood = "sleepy"
+say("This morning I felt " + mood)
+mood = "happy"
+say("After coffee I felt " + mood)</code></pre>
+      <p>Names can use letters, numbers and <code>_</code>, but can't start with a number:
+      <code>favourite_food</code>, <code>day2</code>. Capital letters matter: <code>Name</code> and <code>name</code>
+      are different boxes.</p>
+    </section>
+
+    <!-- 4 -->
+    <section id="maths">
+      <h2>4. Maths and joining text</h2>
+      <p>TB can do sums. <code>*</code> means times and <code>/</code> means divide.
+      <code>%</code> gives the remainder after dividing (so <code>7 % 2</code> is <code>1</code>).
+      Brackets work like in school maths.</p>
+      <pre class="tb-code" data-runnable><code>say(2 + 3)
+say(10 - 4)
+say(6 * 7)
+say(7 / 2)
+say(7 % 2)
+say((2 + 3) * 4)</code></pre>
+      <p><code>+</code> also <strong>joins text</strong> together. If either side is text, TB joins them as text.</p>
+      <pre class="tb-code" data-runnable><code>let first = "Tanisha"
+let last = "Brahma"
+say(first + " " + last)
+say("I have " + 3 + " plants")</code></pre>
+      <p>Text times a number repeats the text:</p>
+      <pre class="tb-code" data-runnable><code>say("ha" * 3)
+say("&lt;3 " * 5)</code></pre>
+      <p>Two helpers turn things into other things:</p>
+      <ul>
+        <li><code>str(x)</code> turns anything into text: <code>str(5)</code> is <code>"5"</code>.</li>
+        <li><code>num(text)</code> turns text like <code>"12"</code> into the number <code>12</code>,
+        so you can do maths with it.</li>
+      </ul>
+      <pre class="tb-code" data-runnable><code>let cups = num("2") + 1
+say("Cups of tea today: " + str(cups))</code></pre>
+    </section>
+
+    <!-- 5 -->
+    <section id="lists">
+      <h2>5. Lists</h2>
+      <p>A <strong>list</strong> keeps several values in order, inside square brackets, separated by commas.</p>
+      <pre class="tb-code" data-runnable><code>let snacks = ["chocolate", "mango", "chips"]
+say(snacks)
+say(len(snacks))</code></pre>
+      <p><code>len</code> tells you how many things are in a list (or how many letters are in some text).</p>
+      <p>To get one thing out, put its position in square brackets. Careful: <strong>positions start at 0</strong>,
+      so the first thing is at position 0, the second at 1, and so on. A negative position counts from the end.</p>
+      <pre class="tb-code" data-runnable><code>let snacks = ["chocolate", "mango", "chips"]
+say(snacks[0])
+say(snacks[1])
+say(snacks[-1])</code></pre>
+      <p>You can swap one thing for another, and add new things to the end with <code>push</code>:</p>
+      <pre class="tb-code" data-runnable><code>let snacks = ["chocolate", "mango", "chips"]
+snacks[2] = "popcorn"
+push(snacks, "ice cream")
+say(snacks)</code></pre>
+      <p>Two lists can be joined with <code>+</code>: <code>[1, 2] + [3]</code> is <code>[1, 2, 3]</code>.</p>
+    </section>
+
+    <!-- 6 -->
+    <section id="if">
+      <h2>6. Making choices with <code>if</code> and <code>else</code></h2>
+      <p><code>if</code> runs some lines only when something is true. The lines that belong to it go inside
+      curly brackets <code>{ }</code>. <code>else</code> says what to do otherwise.</p>
+      <pre class="tb-code" data-runnable><code>let hour = 22
+if hour &gt;= 22 {
+  say("Time for bed. Sleep well!")
+} else {
+  say("Still time to play.")
+}</code></pre>
+      <p>You can check several things in a row with <code>else if</code>. TB uses the first one that is true.</p>
+      <pre class="tb-code" data-runnable><code>let cups_of_water = 3
+if cups_of_water &gt;= 8 {
+  say("Amazing, so hydrated!")
+} else if cups_of_water &gt;= 4 {
+  say("Good going, keep sipping.")
+} else {
+  say("Maybe have a glass of water now?")
+}</code></pre>
+      <p>Ways to compare things:</p>
+      <ul>
+        <li><code>==</code> is the same as (two equals signs, because one <code>=</code> is for putting things in boxes)</li>
+        <li><code>!=</code> is not the same as</li>
+        <li><code>&lt;</code> less than, <code>&gt;</code> more than,
+        <code>&lt;=</code> less than or the same, <code>&gt;=</code> more than or the same</li>
+      </ul>
+      <p>Join checks together with <code>and</code> and <code>or</code>, and flip one with <code>not</code>.</p>
+      <pre class="tb-code" data-runnable><code>let sunny = true
+let weekend = false
+if sunny and not weekend {
+  say("Sunny, but it's a work day.")
+}
+if sunny or weekend {
+  say("Something nice is happening!")
+}</code></pre>
+      <p class="note">In TB only <code>false</code> and <code>nil</code> count as "no". Everything else,
+      even <code>0</code> and empty text <code>""</code>, counts as "yes".</p>
+    </section>
+
+    <!-- 7 -->
+    <section id="loops">
+      <h2>7. Doing things again and again: loops</h2>
+      <p><code>while</code> keeps repeating its lines as long as something is true.
+      Make sure something changes each time, or it will go on forever!</p>
+      <pre class="tb-code" data-runnable><code>let n = 3
+while n &gt; 0 {
+  say(str(n) + "...")
+  n = n - 1
+}
+say("Surprise!")</code></pre>
+      <p><code>for</code> goes through a list one thing at a time. Each time round, the name you choose
+      (here <code>flower</code>) holds the next thing.</p>
+      <pre class="tb-code" data-runnable><code>let flowers = ["rose", "tulip", "sunflower"]
+for flower in flowers {
+  say("I picked a " + flower)
+}</code></pre>
+      <p><code>range</code> makes a list of numbers to count with. <code>range(5)</code> is
+      <code>[0, 1, 2, 3, 4]</code> (it stops just before 5). <code>range(1, 4)</code> is <code>[1, 2, 3]</code>.
+      A third number sets the step: <code>range(10, 0, -5)</code> is <code>[10, 5]</code>.</p>
+      <pre class="tb-code" data-runnable><code>for i in range(1, 4) {
+  say("Hug number " + str(i))
+}</code></pre>
+      <p><code>for</code> also works on text, one letter at a time:</p>
+      <pre class="tb-code" data-runnable><code>for letter in "TB" {
+  say(letter)
+}</code></pre>
+    </section>
+
+    <!-- 8 -->
+    <section id="functions">
+      <h2>8. Making your own instructions: functions</h2>
+      <p>A <strong>function</strong> is a little recipe with a name. You write it once with <code>fn</code>,
+      then use it as many times as you like. The names in the round brackets are its <strong>inputs</strong>.</p>
+      <pre class="tb-code" data-runnable><code>fn greet(name) {
+  say("Hello, " + name + "! You look lovely today.")
+}
+
+greet("Tanisha")
+greet("Mum")</code></pre>
+      <p><code>return</code> hands a value back, so you can use the answer somewhere else.</p>
+      <pre class="tb-code" data-runnable><code>fn double(x) {
+  return x * 2
+}
+
+say(double(4))
+say(double(double(4)))</code></pre>
+      <p class="note">Write a function <em>above</em> the place where you use it, because TB reads from top to bottom.
+      A function with no <code>return</code> gives back <code>nil</code>.</p>
+    </section>
+
+    <!-- 9 -->
+    <section id="closures">
+      <h2>9. Functions that remember (and call themselves)</h2>
+      <p>A function can be a value too: <code>fn(x) { ... }</code> without a name makes one,
+      and you can keep it in a box with <code>let</code>.</p>
+      <pre class="tb-code" data-runnable><code>let shout = fn(text) {
+  return text + "!!!"
+}
+say(shout("I love you"))</code></pre>
+      <p>Here is something magical: a function made inside another function remembers the boxes around it,
+      even after the outer function has finished. This is called a <strong>closure</strong>.
+      Each counter below has its very own memory.</p>
+      <pre class="tb-code" data-runnable><code>fn make_counter() {
+  let count = 0
+  return fn() {
+    count = count + 1
+    return count
+  }
+}
+
+let hugs = make_counter()
+hugs()
+hugs()
+say("Hugs so far: " + str(hugs()))</code></pre>
+      <p>A function can also <strong>call itself</strong>, with a smaller problem each time.
+      This is called <strong>recursion</strong>. Just make sure there's a point where it stops!</p>
+      <pre class="tb-code" data-runnable><code>fn hearts(n) {
+  if n &lt;= 0 {
+    return ""
+  }
+  return "&lt;3 " + hearts(n - 1)
+}
+say(hearts(4))</code></pre>
+    </section>
+
+    <!-- 10 -->
+    <section id="ask-care">
+      <h2>10. Talking to your program: <code>ask</code> and <code>care</code></h2>
+      <p><code>ask</code> shows a question and waits for you to type an answer and press <kbd>Enter</kbd>.
+      The answer comes back as text. (In the browser, the question pops up in a little box.)</p>
+      <pre class="tb-code" data-runnable><code>let name = ask("What's your name? ")
+say("Nice to meet you, " + name + "!")</code></pre>
+      <p>The answer is always text, so if you want to do maths with it, turn it into a number with <code>num</code>:</p>
+      <pre class="tb-code" data-runnable><code>let cups = num(ask("How many cups of tea today? "))
+say("Only " + str(cups + 1) + " more and you'll be a professional.")</code></pre>
+      <p><code>care</code> is TB's special instruction. It prints a little heart and a kind message,
+      picked at random. Give it a name to make the message personal.</p>
+      <pre class="tb-code" data-runnable><code>care()
+care("Tanisha")</code></pre>
+      <p>Try the <a href="examples.html#care_bot">Care bot</a> example to see <code>ask</code> and
+      <code>care</code> working together.</p>
+    </section>
+
+    <!-- 11 -->
+    <section id="errors">
+      <h2>11. Reading "Oops!" messages</h2>
+      <p>Everyone who writes programs makes little mistakes all the time. It's completely normal!
+      When TB can't understand something, it stops and tells you <strong>which line</strong> to look at and
+      <strong>what</strong> confused it:</p>
+      <pre class="output">Oops! On line 2: I don't know what 'nmae' is. Did you mean 'name'?</pre>
+      <p>Try running this one. It has a typo on line 2:</p>
+      <pre class="tb-code" data-runnable data-expect-error><code>let name = "Tanisha"
+say(nmae)</code></pre>
+      <p>Some common "Oops!" messages and what they mean:</p>
+      <ul>
+        <li><strong>I don't know what 'x' is.</strong> You used a name that hasn't been made yet,
+        or there's a spelling mistake. Check the spelling, or add a <code>let</code>.</li>
+        <li><strong>'x' doesn't exist yet. Use 'let x = ...' first.</strong> You tried to change a box
+        before making it. Use <code>let</code> the first time.</li>
+        <li><strong>This text never ends. Did you forget a closing "?</strong> A quote mark is missing.</li>
+        <li><strong>... was never closed. Did you forget a ')'?</strong> (or a <code>}</code>) Every opening
+        bracket needs a closing one.</li>
+        <li><strong>Position 3 is outside the list.</strong> Remember positions start at 0, so a list of
+        3 things has positions 0, 1 and 2.</li>
+        <li><strong>I can only subtract numbers ...</strong> You tried to do maths with text.
+        Use <code>num()</code> to turn the text into a number first.</li>
+      </ul>
+      <pre class="tb-code" data-runnable data-expect-error><code># This one has a mistake too. Can you fix it?
+let snacks = ["cake", "chips", "mango"]
+say(snacks[3])</code></pre>
+      <p class="note">Tip: the line number is your best friend. Go to that line, read it slowly, and look for
+      a missing quote, bracket or spelling mistake. Sometimes the real mistake is on the line just above.</p>
+    </section>
+
+    <!-- Reference -->
+    <section id="reference">
+      <h2>Built-in instructions (quick reference)</h2>
+      <p>These come with TB, ready to use.</p>
+      <div class="table-wrap" role="region" tabindex="0" aria-label="Built-in instructions table (scrolls sideways on small screens)">
+      <table>
+        <thead>
+          <tr><th scope="col">Instruction</th><th scope="col">What it does</th><th scope="col">Example</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>say(a, b, ...)</code></td>
+            <td>Shows things on the screen, with a space between each one. <code>say()</code> on its own prints an empty line.</td>
+            <td><code>say("Hi", 2)</code> shows <code>Hi 2</code></td>
+          </tr>
+          <tr>
+            <td><code>len(x)</code></td>
+            <td>How many things are in a list, or how many letters are in some text.</td>
+            <td><code>len("TB")</code> is <code>2</code></td>
+          </tr>
+          <tr>
+            <td><code>str(x)</code></td>
+            <td>Turns any value into text.</td>
+            <td><code>str(5) + " cats"</code> is <code>"5 cats"</code></td>
+          </tr>
+          <tr>
+            <td><code>num(text)</code></td>
+            <td>Turns text like <code>"12"</code> or <code>"2.5"</code> into a number. Says "Oops!" if the text isn't a number.</td>
+            <td><code>num("12") + 1</code> is <code>13</code></td>
+          </tr>
+          <tr>
+            <td><code>range(n)</code><br><code>range(a, b)</code><br><code>range(a, b, step)</code></td>
+            <td>Makes a list of whole numbers: from 0 (or <code>a</code>) up to, but not including, <code>n</code> (or <code>b</code>), going up by <code>step</code>.</td>
+            <td><code>range(3)</code> is <code>[0, 1, 2]</code></td>
+          </tr>
+          <tr>
+            <td><code>push(list, value)</code></td>
+            <td>Adds a value to the end of a list.</td>
+            <td><code>push(snacks, "cake")</code></td>
+          </tr>
+          <tr>
+            <td><code>ask(question)</code></td>
+            <td>Shows the question, waits for an answer, and gives it back as text.</td>
+            <td><code>let name = ask("Name? ")</code></td>
+          </tr>
+          <tr>
+            <td><code>care()</code><br><code>care(name)</code></td>
+            <td>Prints <code>♥</code> and a random kind message, made personal if you give a name.</td>
+            <td><code>care("Tanisha")</code></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="cheat-sheet">
+      <h2>Little reminders</h2>
+      <ul>
+        <li>Text goes in quotes: <code>"hello"</code> or <code>'hello'</code>.</li>
+        <li><code>let</code> makes a new box; <code>=</code> on its own changes an existing one.</li>
+        <li><code>=</code> puts a value in a box; <code>==</code> checks if two things are the same.</li>
+        <li>Lists count from 0.</li>
+        <li>Blocks of lines (for <code>if</code>, <code>while</code>, <code>for</code>, <code>fn</code>) go inside <code>{ }</code>.</li>
+        <li>You don't need semicolons at the end of lines.</li>
+        <li><code>#</code> starts a note that TB ignores.</li>
+      </ul>
+    </section>
+
+    <section id="windows">
+      <h2>Running a .tb file on your Windows laptop</h2>
+      <p>The <a href="playground.html">Playground</a> works right here in your browser. To run TB programs on your
+      laptop, without the internet:</p>
+      <ol class="steps">
+        <li>Get <code>tb-windows-x64.exe</code> from the <a href="download.html">Download page</a>.</li>
+        <li>Write your program in Notepad and save it with a name ending in <code>.tb</code>, like <code>hello.tb</code>.
+        (In the save box, choose "All files" so Notepad doesn't add <code>.txt</code>.)</li>
+        <li>Drag your <code>.tb</code> file onto the TB program, and a window opens to run it.</li>
+      </ol>
+      <p>The <a href="download.html">Download page</a> has the full step-by-step guide, including what to
+      click if Windows asks whether it's safe.</p>
+    </section>
+
+  </div>
+  </main>
+  <footer class="site-footer">Made with love, for Tanisha.</footer>
+  <script src="assets/js/runner.js" defer></script>
+</body>
+</html>

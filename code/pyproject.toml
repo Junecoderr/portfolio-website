@@ -1,0 +1,16 @@
+[project]
+name = "tb-lang"
+version = "1.0.0"
+description = "TB - a small, friendly programming language"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest==8.3.4"]
+build = ["pyinstaller==6.11.1"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

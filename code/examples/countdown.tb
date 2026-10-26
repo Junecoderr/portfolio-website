@@ -1,0 +1,17 @@
+# Title: Countdown to a hug
+# About: Counts down with a while loop, then counts by twos with range().
+
+let seconds = 5
+say("Hug arriving in...")
+while seconds > 0 {
+  say(str(seconds) + "...")
+  seconds = seconds - 1
+}
+say("Hug delivered! <3")
+say("")
+
+# range(10, 0, -2) means: start at 10, stop before 0, go down 2 each time.
+say("Counting kisses by twos, backwards:")
+for n in range(10, 0, -2) {
+  say(n)
+}

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Playground · TB</title>
+  <meta name="description" content="Write and run TB programs right in your browser. Nothing to install.">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">TB</a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="index.html">Home</a>
+      <a href="download.html">Download</a>
+      <a href="playground.html" aria-current="page">Playground</a>
+      <a href="docs.html">Learn</a>
+      <a href="examples.html">Examples</a>
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+  </header>
+  <main id="main">
+    <div class="container">
+      <div class="page-head prose">
+        <h1>Playground</h1>
+        <p class="lead">Write TB here and press Run. Change anything you like; you can always go back to the original.</p>
+      </div>
+
+      <div class="pg-toolbar">
+        <label for="pg-example">Example</label>
+        <select id="pg-example">
+          <option value="for_tanisha">For Tanisha</option>
+        </select>
+        <button class="button button-primary" type="button" id="pg-run">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+          Run
+        </button>
+        <button class="button" type="button" id="pg-reset">Reset</button>
+        <span class="spacer"></span>
+        <span class="pg-hint">Shortcut: <kbd>Ctrl</kbd> + <kbd>Enter</kbd> runs the program</span>
+      </div>
+      <p class="pg-about" id="pg-about"></p>
+      <p class="note pg-edited" id="pg-edited" role="status" hidden>You're seeing your edited version. Press Reset to get the original back.</p>
+
+      <div class="pg">
+        <div>
+          <label for="pg-code" class="visually-hidden">TB program</label>
+          <div class="editor">
+            <div class="editor-gutter" id="pg-gutter" aria-hidden="true">1</div>
+            <textarea id="pg-code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-describedby="pg-editor-help"></textarea>
+          </div>
+          <p class="pg-hint" id="pg-editor-help" style="margin-top:0.5rem">The <kbd>Tab</kbd> key indents. To move on with the keyboard, press <kbd>Esc</kbd> first, then <kbd>Tab</kbd>.</p>
+        </div>
+        <div class="pg-out-wrap">
+          <div class="pg-out-head">
+            <h2 id="pg-out-title">Output</h2>
+            <button class="button" type="button" id="pg-clear" style="min-height:2.2rem;padding:0.3rem 0.85rem;font-size:0.9rem">Clear</button>
+          </div>
+          <div class="pg-loading" id="pg-status" role="status"></div>
+          <div class="output" id="pg-output" aria-labelledby="pg-out-title" aria-live="polite" data-empty="Press Run to see what your program says."></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer class="site-footer">Made with love, for Tanisha.</footer>
+  <script src="assets/js/tb-pyodide.js"></script>
+  <script src="assets/js/playground.js"></script>
+</body>
+</html>

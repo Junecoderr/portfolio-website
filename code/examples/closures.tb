@@ -1,0 +1,29 @@
+# Title: Functions that remember
+# About: Closures: little functions that keep their own memory, like a hug counter.
+
+fn make_counter(label) {
+  let count = 0
+  return fn() {
+    count = count + 1
+    say(label + ": " + str(count))
+  }
+}
+
+let hugs = make_counter("Hugs today")
+let kisses = make_counter("Kisses today")
+
+hugs()
+hugs()
+kisses()
+hugs()
+
+# A function can also be kept in a 'let' and passed around like any value.
+let shout = fn(text) {
+  return text + "!!!"
+}
+
+fn twice(f, value) {
+  return f(f(value))
+}
+
+say(twice(shout, "I love you"))
