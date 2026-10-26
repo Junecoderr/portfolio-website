@@ -1,4 +1,5 @@
-// The playground: a plain textarea editor with line numbers, an example
+// The playground: a textarea editor with line numbers and a highlighted
+// overlay (the textarea's own text is transparent and sits on top), an example
 // picker (examples/index.json), Run (button or Ctrl/Cmd+Enter) and an output
 // panel. Edits are kept per example in this browser so a refresh never loses
 // work; Reset brings back the original.
@@ -16,6 +17,13 @@
   var status = document.getElementById("pg-status");
   var about = document.getElementById("pg-about");
   var editedNote = document.getElementById("pg-edited");
+  var hl = document.getElementById("pg-highlight");
+  var area = document.getElementById("pg-area");
+  var shareBtn = document.getElementById("pg-share");
+  var shareOut = document.getElementById("pg-share-out");
+  var shareLink = document.getElementById("pg-share-link");
+  var shareMsg = document.getElementById("pg-share-msg");
+  if (!window.TBHighlight && area) area.classList.add("no-highlight");
 
   var examples = [];
   var current = null;      // name of the loaded example, or null for shared code
@@ -23,8 +31,8 @@
   var running = false;
 
   if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
-    var hint = document.querySelector(".pg-toolbar .pg-hint");
-    if (hint) hint.innerHTML = "Shortcut: <kbd>⌘</kbd> + <kbd>Enter</kbd> runs the program";
+    var hint = document.querySelector(".ide-hint-out");
+    if (hint) hint.innerHTML = "Press <kbd>⌘</kbd> + <kbd>Enter</kbd> to run.";
   }
 
   // ------------------------------------------------------------- drafts
@@ -58,12 +66,22 @@
     var el = gutter.querySelector('[data-line="' + line + '"]');
     if (el) el.classList.add("is-error");
   }
-  function syncScroll() { gutter.scrollTop = code.scrollTop; }
+  function syncScroll() {
+    gutter.scrollTop = code.scrollTop;
+    if (hl) { hl.scrollTop = code.scrollTop; hl.scrollLeft = code.scrollLeft; }
+  }
+  function paintHighlight() {
+    if (!hl || !window.TBHighlight) return;
+    // The extra newline keeps the overlay as tall as the textarea's content.
+    hl.innerHTML = window.TBHighlight.toHTML(code.value) + "\n";
+    syncScroll();
+  }
 
   // ------------------------------------------------------------- editing
   var saveTimer = null;
   code.addEventListener("input", function () {
     renderGutter();
+    paintHighlight();
     markError(null);
     updateEdited();
     clearTimeout(saveTimer);
@@ -116,6 +134,7 @@
     code.value = text;
     lastLines = -1;
     renderGutter();
+    paintHighlight();
     markError(null);
     code.scrollTop = 0;
   }
@@ -279,6 +298,27 @@
       });
   }
   runBtn.addEventListener("click", run);
+
+  // ------------------------------------------------------------- share
+  if (shareBtn) {
+    shareBtn.addEventListener("click", function () {
+      var url = new URL(location.href);
+      url.search = "";
+      url.hash = "code=" + encodeURIComponent(code.value);
+      var link = url.href;
+      shareOut.hidden = false;
+      shareLink.value = link;
+      var done = function (copied) {
+        shareMsg.textContent = copied ? "Link copied." : "Copy this link to share it.";
+        if (!copied) { shareLink.focus(); shareLink.select(); }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(function () { done(true); }, function () { done(false); });
+      } else {
+        done(false);
+      }
+    });
+  }
 
   // ------------------------------------------------------------- start
   var params = new URLSearchParams(location.search);

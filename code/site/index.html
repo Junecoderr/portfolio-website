@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hello, Tanisha · TB</title>
-  <meta name="description" content="TB is a tiny, friendly programming language made for Tanisha. Write a few lines, and your computer writes back.">
+  <title>TB: a tiny, friendly programming language</title>
+  <meta name="description" content="TB is a tiny, friendly programming language. Write a few plain lines, run them on Windows, macOS, Linux or in the browser.">
+  <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
   <script src="assets/js/config.js"></script>
@@ -13,34 +14,267 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
-    <a class="brand" href="index.html">TB</a>
-    <nav class="site-nav" aria-label="Main">
-      <a href="index.html" aria-current="page">Home</a>
-      <a href="download.html">Download</a>
-      <a href="playground.html">Playground</a>
-      <a href="docs.html">Learn</a>
-      <a href="examples.html">Examples</a>
-    </nav>
-    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html">Learn</a>
+        <a href="docs.html#reference">Reference</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
   </header>
   <main id="main">
     <div class="container">
 
-      <section class="hero" aria-labelledby="hello">
-        <p class="hero-code" aria-hidden="true"><code><span class="tok-fn">say</span>(<span class="tok-str">"Hello, Tanisha!"</span>)</code></p>
-        <h1 class="hero-greeting" id="hello">Hello, Tanisha!</h1>
-        <p class="hero-sub">TB is a tiny programming language, made just for you. You write a few friendly lines, and your computer writes back.</p>
-        <div class="hero-actions">
-          <a class="button button-primary button-big" href="download.html">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
-            Download TB
-          </a>
-          <a class="button button-big" href="playground.html">Try it in the browser</a>
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <h1 class="hero-title" id="hero-title">TB<span class="cursor" aria-hidden="true"></span></h1>
+          <p class="hero-tagline">A tiny, friendly programming language.</p>
+          <p class="hero-sub">Write a few lines in plain words. TB runs them one at a time, and explains any mistake in a sentence you can actually read.</p>
+          <div class="button-row">
+            <a class="button button-primary button-big" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 1.0</a>
+            <a class="button button-big" href="playground.html">Try it in your browser</a>
+          </div>
+          <p class="hero-meta">Version <span data-version>1.0.0</span> for Windows, macOS and Linux. <a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></p>
+        </div>
+
+        <div class="window" id="hero-window">
+          <div class="window-bar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div class="window-tabs" role="tablist" aria-label="Sample programs">
+          <button class="window-tab" type="button" role="tab" id="htab-hello" aria-controls="hpanel-hello" aria-selected="true" data-file="hello.tb">hello.tb</button>
+          <button class="window-tab" type="button" role="tab" id="htab-oops" aria-controls="hpanel-oops" aria-selected="false" tabindex="-1" data-file="oops.tb">oops.tb</button>
+          <button class="window-tab" type="button" role="tab" id="htab-kind" aria-controls="hpanel-kind" aria-selected="false" tabindex="-1" data-file="kind.tb">kind.tb</button>
+            </div>
+          </div>
+      <div class="window-panel" id="hpanel-hello" role="tabpanel" aria-labelledby="htab-hello" data-output="Hello, Tanisha!&#10;I like tea.&#10;I like books.&#10;I like rain.&#10;3 favourite things">
+        <pre class="tb-code"><code>let name = "Tanisha"
+let favourites = ["tea", "books", "rain"]
+
+say("Hello, " + name + "!")
+for thing in favourites {
+  say("I like " + thing + ".")
+}
+say(len(favourites) + " favourite things")</code></pre>
+      </div>
+      <div class="window-panel" id="hpanel-oops" role="tabpanel" aria-labelledby="htab-oops" data-output="Oops! On line 3: I don&#x27;t know what &#x27;nmae&#x27; is. Did you mean &#x27;name&#x27;?" data-error hidden>
+        <pre class="tb-code"><code>let name = "Tanisha"
+let greeting = "Hello"
+say(greeting + ", " + nmae)</code></pre>
+      </div>
+      <div class="window-panel" id="hpanel-kind" role="tabpanel" aria-labelledby="htab-kind" data-output="♥ Tanisha, you make the world softer just by being in it.&#10;♥ Mum, be gentle with yourself today." hidden>
+        <pre class="tb-code"><code># care() says something kind, picked at random
+let friends = ["Tanisha", "Mum"]
+for friend in friends {
+  care(friend)
+}</code></pre>
+      </div>
+          <div class="window-out">
+            <div class="window-out-head">
+              <span id="hero-out-label">Output</span>
+              <button class="button button-run" type="button" id="hero-run"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Run</button>
+            </div>
+            <pre id="hero-out" aria-live="polite" aria-labelledby="hero-out-label"><span class="prompt">$ tb hello.tb</span>
+Hello, Tanisha!
+I like tea.
+I like books.
+I like rain.
+3 favourite things</pre>
+          </div>
         </div>
       </section>
 
-      <section class="section" aria-labelledby="letter-title">
-        <h2 id="letter-title" class="visually-hidden">A note for you</h2>
+      <section class="section" aria-labelledby="features-title">
+        <div class="section-head">
+          <h2 id="features-title">Small on purpose</h2>
+          <p>Eight built-in instructions and a handful of keywords. Enough to write real programs, little enough to hold in your head.</p>
+        </div>
+        <div class="features">
+          <article class="feature">
+            <h3>Friendly errors</h3>
+            <p>Every mistake names the line and says what went wrong, in plain English. Typos get a suggestion.</p>
+            <div class="specimen">
+              <pre class="tb-code"><code>let name = "Tanisha"
+let greeting = "Hello"
+say(greeting + ", " + nmae)</code></pre>
+              <pre class="specimen-out"><span class="out-error">Oops! On line 3: I don't know what 'nmae' is. Did you mean 'name'?</span></pre>
+            </div>
+          </article>
+          <article class="feature">
+            <h3>No setup</h3>
+            <p>TB is one file. Nothing to install, no accounts. On Windows, drag a <code>.tb</code> file onto <code>tb.exe</code> and it runs.</p>
+            <div class="specimen">
+              <pre><span class="tok-op">&gt;</span> tb hello.tb</pre>
+              <pre class="specimen-out">Hello, Tanisha!
+Press Enter to close</pre>
+            </div>
+          </article>
+          <article class="feature">
+            <h3>Runs everywhere</h3>
+            <p>The same program runs on a Windows laptop, a Mac, Linux, or right here in the browser.</p>
+            <ul class="platforms">
+              <li>Windows<small>tb-windows-x64.exe</small></li>
+              <li>macOS<small>Apple silicon</small></li>
+              <li>Linux<small>x64</small></li>
+              <li>Browser<small>Playground</small></li>
+            </ul>
+          </article>
+          <article class="feature">
+            <h3>Reads like a note</h3>
+            <p>Instructions are plain words: <code>let</code>, <code>say</code>, <code>ask</code>. No semicolons, no types to declare.</p>
+            <div class="specimen">
+              <pre class="tb-code"><code>let name = ask("Your name? ")
+say("Hi, " + name + "!")</code></pre>
+            </div>
+          </article>
+          <article class="feature">
+            <h3>Closures and recursion</h3>
+            <p>Small, but a real language: functions are values, remember their surroundings, and can call themselves.</p>
+            <div class="specimen">
+              <pre class="tb-code"><code>fn stars(n) {
+  if n &lt;= 0 { return "" }
+  return "*" + stars(n - 1)
+}
+say(stars(5))</code></pre>
+              <pre class="specimen-out">*****</pre>
+            </div>
+          </article>
+          <article class="feature">
+            <h3>Built-in kindness</h3>
+            <p><code>care()</code> prints a kind message, chosen at random. Give it a name to make it personal.</p>
+            <div class="specimen">
+              <pre class="tb-code"><code>care("Tanisha")</code></pre>
+              <pre class="specimen-out">♥ Tanisha, you make the world softer just by being in it.</pre>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="tour-title">
+        <div class="section-head">
+          <h2 id="tour-title">A quick tour</h2>
+          <p>Six short programs cover most of the language. Press Run on any of them.</p>
+        </div>
+        <div class="tour">
+          <div class="tour-tabs" role="tablist" aria-label="Tour topics" aria-orientation="vertical">
+        <button class="tour-tab" type="button" role="tab" id="ttab-values" aria-controls="tpanel-values" aria-selected="true"><strong>Values</strong><span>Numbers, text, true, false</span></button>
+        <button class="tour-tab" type="button" role="tab" id="ttab-lists" aria-controls="tpanel-lists" aria-selected="false" tabindex="-1"><strong>Lists</strong><span>Keep things in order</span></button>
+        <button class="tour-tab" type="button" role="tab" id="ttab-choices" aria-controls="tpanel-choices" aria-selected="false" tabindex="-1"><strong>Choices</strong><span>if, else if, else</span></button>
+        <button class="tour-tab" type="button" role="tab" id="ttab-loops" aria-controls="tpanel-loops" aria-selected="false" tabindex="-1"><strong>Loops</strong><span>for and while</span></button>
+        <button class="tour-tab" type="button" role="tab" id="ttab-functions" aria-controls="tpanel-functions" aria-selected="false" tabindex="-1"><strong>Functions</strong><span>fn, return, closures</span></button>
+        <button class="tour-tab" type="button" role="tab" id="ttab-questions" aria-controls="tpanel-questions" aria-selected="false" tabindex="-1"><strong>Questions</strong><span>ask() and care()</span></button>
+          </div>
+          <div>
+      <div class="tour-panel" id="tpanel-values" role="tabpanel" aria-labelledby="ttab-values">
+        <p>Text goes in quotes. <code>+</code> adds numbers and joins text; if either side is text, TB joins.</p>
+        <pre class="tb-code" data-runnable><code>let cups = 2
+let drink = "tea"
+say("Cups of " + drink + ": " + cups)
+say(cups * 3, true, nil)</code></pre>
+      </div>
+      <div class="tour-panel" id="tpanel-lists" role="tabpanel" aria-labelledby="ttab-lists" hidden>
+        <p>Square brackets make a list. Positions start at 0, and <code>push</code> adds to the end.</p>
+        <pre class="tb-code" data-runnable><code>let snacks = ["mango", "chips"]
+push(snacks, "chocolate")
+say(snacks)
+say(snacks[0], len(snacks))</code></pre>
+      </div>
+      <div class="tour-panel" id="tpanel-choices" role="tabpanel" aria-labelledby="ttab-choices" hidden>
+        <p>Only <code>false</code> and <code>nil</code> count as no. Everything else is yes.</p>
+        <pre class="tb-code" data-runnable><code>let hour = 22
+if hour &gt;= 22 {
+  say("Time for bed.")
+} else if hour &gt;= 18 {
+  say("Evening!")
+} else {
+  say("Still daytime.")
+}</code></pre>
+      </div>
+      <div class="tour-panel" id="tpanel-loops" role="tabpanel" aria-labelledby="ttab-loops" hidden>
+        <p><code>for</code> walks through a list or text; <code>while</code> repeats while something is true.</p>
+        <pre class="tb-code" data-runnable><code>for i in range(1, 4) {
+  say("Hug number " + str(i))
+}
+let n = 3
+while n &gt; 0 {
+  say(str(n) + "...")
+  n = n - 1
+}</code></pre>
+      </div>
+      <div class="tour-panel" id="tpanel-functions" role="tabpanel" aria-labelledby="ttab-functions" hidden>
+        <p>Functions are values. A function made inside another remembers the boxes around it.</p>
+        <pre class="tb-code" data-runnable><code>fn make_counter() {
+  let count = 0
+  return fn() {
+    count = count + 1
+    return count
+  }
+}
+let hugs = make_counter()
+hugs()
+say("Hugs so far: " + str(hugs()))</code></pre>
+      </div>
+      <div class="tour-panel" id="tpanel-questions" role="tabpanel" aria-labelledby="ttab-questions" hidden>
+        <p><code>ask</code> waits for an answer (in the browser, a little box pops up). <code>care</code> says something kind.</p>
+        <pre class="tb-code" data-runnable><code>let name = ask("What's your name? ")
+say("Nice to meet you, " + name + "!")
+care(name)</code></pre>
+      </div>
+          </div>
+        </div>
+        <p><a href="docs.html">Read the full guide</a>, eleven short lessons from your first <code>say</code> to closures.</p>
+      </section>
+
+      <section class="section install" aria-labelledby="install-title">
+        <div>
+          <h2 id="install-title" style="margin-top:0">Install</h2>
+          <p class="lead">Download one file for your computer and run your first program. The download page walks through every click, including the security prompts.</p>
+          <div class="button-row">
+            <a class="button button-primary" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 1.0</a>
+            <a class="button" href="examples/for_tanisha.tb" download="for_tanisha.tb">Get a first program</a>
+          </div>
+        </div>
+        <div class="terminal window">
+          <div class="window-bar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div class="window-tabs" role="tablist" aria-label="Your computer">
+              <button class="window-tab" type="button" role="tab" id="itab-windows" aria-controls="ipanel-windows" aria-selected="true">Windows</button>
+              <button class="window-tab" type="button" role="tab" id="itab-mac" aria-controls="ipanel-mac" aria-selected="false" tabindex="-1">macOS</button>
+              <button class="window-tab" type="button" role="tab" id="itab-linux" aria-controls="ipanel-linux" aria-selected="false" tabindex="-1">Linux</button>
+            </div>
+          </div>
+          <div class="window-panel" id="ipanel-windows" role="tabpanel" aria-labelledby="itab-windows">
+            <pre><span class="c"># Put tb.exe and hello.tb in one folder, then:</span>
+<span class="p">&gt; </span>tb hello.tb
+Hello, Tanisha!
+
+<span class="c"># Or just drag hello.tb onto tb.exe.</span></pre>
+          </div>
+          <div class="window-panel" id="ipanel-mac" role="tabpanel" aria-labelledby="itab-mac" hidden>
+            <pre><span class="p">$ </span>unzip tb-macos-arm64.zip
+<span class="p">$ </span>./tb hello.tb
+Hello, Tanisha!</pre>
+          </div>
+          <div class="window-panel" id="ipanel-linux" role="tabpanel" aria-labelledby="itab-linux" hidden>
+            <pre><span class="p">$ </span>tar -xzf tb-linux-x64.tar.gz
+<span class="p">$ </span>chmod +x tb
+<span class="p">$ </span>./tb hello.tb
+Hello, Tanisha!</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section why" id="why" aria-labelledby="why-title">
+        <div>
+          <h2 id="why-title" style="margin-top:0">Why TB?</h2>
+          <p class="lead">TB was made as a gift, for one person. Its name is her initials.</p>
+          <p>It is small on purpose, so all of it fits in your head, and gentle on purpose, so learning it never feels like being told off. If you are not Tanisha, you are still very welcome here.</p>
+        </div>
         <div class="letter">
 <!-- PERSONAL MESSAGE: START (edit freely) -->
           <p class="salutation">Dear Tanisha,</p>
@@ -52,38 +286,57 @@
         </div>
       </section>
 
-      <section class="section split" aria-labelledby="what-title">
-        <div class="prose">
-          <h2 id="what-title" style="margin-top:0">What is TB?</h2>
-          <p class="lead">TB is a small, gentle programming language. You type instructions in plain words like <code>say</code> and <code>ask</code>, and TB follows them, one line at a time.</p>
-          <p>It runs on your laptop as a single file, with nothing else to install. If you would rather not install anything yet, the <a href="playground.html">playground</a> runs TB right here in the browser.</p>
-          <p>When you're ready to learn, <a href="docs.html">the guide</a> starts from the very beginning.</p>
-        </div>
-        <div class="taste">
-          <h2 class="visually-hidden">A small taste of TB</h2>
-          <pre class="tb-code" data-runnable><code>let name = "Tanisha"
-say("Hello, " + name + "!")
-
-for word in ["kind", "brave", "funny"] {
-  say(name + " is " + word + ".")
-}
-
-care(name)</code></pre>
-        </div>
-      </section>
-
-      <section class="download-band" aria-labelledby="dl-title">
+      <section class="cta-band" aria-labelledby="cta-title">
         <div>
-          <h2 id="dl-title">Get TB on your laptop</h2>
-          <p>One small file for Windows, Mac or Linux. The download page walks you through every click.</p>
+          <h2 id="cta-title">Write your first program tonight</h2>
+          <p>It takes about five minutes, and the guide starts from zero.</p>
         </div>
-        <a class="button button-primary button-big" href="download.html">Download TB</a>
+        <div class="button-row">
+          <a class="button button-primary" href="docs.html">Start the guide</a>
+          <a class="button" href="playground.html">Open the playground</a>
+        </div>
       </section>
 
     </div>
   </main>
-  <footer class="site-footer">Made with love, for Tanisha.</footer>
-  <script src="assets/js/hello.js"></script>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A tiny, friendly programming language.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#reference">Reference</a></li>
+          <li><a href="examples.html">Examples</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
+  <script src="assets/js/home.js" defer></script>
   <script src="assets/js/runner.js" defer></script>
 </body>
 </html>

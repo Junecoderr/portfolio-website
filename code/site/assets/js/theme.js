@@ -1,5 +1,7 @@
-// Light / dark mode. Runs in <head> so the page never flashes the wrong theme.
-// With no saved choice we follow the system setting (prefers-color-scheme).
+// Light / dark mode, plus the small bits of page chrome every page shares
+// (mobile menu, version badge, current nav link). Runs in <head> so the page
+// never flashes the wrong theme. With no saved choice we follow the system
+// setting (prefers-color-scheme).
 (function () {
   var KEY = "tb-theme";
   var root = document.documentElement;
@@ -34,6 +36,29 @@
     button.title = dark ? "Switch to light mode" : "Switch to dark mode";
   }
 
+  function setupMenu() {
+    var header = document.querySelector(".site-header");
+    var toggle = document.querySelector(".nav-toggle");
+    if (!header || !toggle) return;
+    function set(open) {
+      header.classList.toggle("nav-open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    toggle.addEventListener("click", function () { set(!header.classList.contains("nav-open")); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && header.classList.contains("nav-open")) { set(false); toggle.focus(); }
+    });
+    var links = header.querySelectorAll(".site-nav a");
+    for (var i = 0; i < links.length; i++) links[i].addEventListener("click", function () { set(false); });
+  }
+
+  function fillVersion() {
+    var cfg = window.TB_CONFIG;
+    if (!cfg || !cfg.version) return;
+    var els = document.querySelectorAll("[data-version]");
+    for (var i = 0; i < els.length; i++) els[i].textContent = cfg.version;
+  }
+
   function markCurrentNav() {
     var nav = document.querySelector(".site-nav");
     if (!nav || nav.querySelector('[aria-current="page"]')) return;
@@ -46,6 +71,8 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     markCurrentNav();
+    setupMenu();
+    fillVersion();
     var buttons = document.querySelectorAll(".theme-toggle");
     for (var i = 0; i < buttons.length; i++) {
       (function (button) {

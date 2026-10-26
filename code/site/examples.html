@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Examples · TB</title>
-  <meta name="description" content="Little TB programs to read, run and play with: a care bot, a guessing game, compliments, countdowns and more.">
+  <meta name="description" content="Small TB programs to read, run and change: loops, lists, functions, closures, recursion and a care bot.">
+  <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
   <script src="assets/js/config.js"></script>
@@ -13,43 +14,258 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
-    <a class="brand" href="index.html">TB</a>
-    <nav class="site-nav" aria-label="Main">
-      <a href="index.html">Home</a>
-      <a href="download.html">Download</a>
-      <a href="playground.html">Playground</a>
-      <a href="docs.html">Learn</a>
-      <a href="examples.html" aria-current="page">Examples</a>
-    </nav>
-    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html">Learn</a>
+        <a href="docs.html#reference">Reference</a>
+        <a href="examples.html" aria-current="page">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
   </header>
   <main id="main">
-  <div class="container">
-    <h1>Examples</h1>
-    <p class="lead">Little TB programs to read, run and change. Press <strong>Run</strong> to see what one does,
-    or <strong>Open in playground</strong> to change it and try your own ideas. You can't break anything!</p>
-    <p class="note">Every example is also in the <code>examples</code> folder that comes with TB.
-    On your laptop, run one by typing <kbd>tb examples\care_bot.tb</kbd> (see <a href="download.html">Download</a>).</p>
-    <!-- The code blocks below must match examples/*.tb exactly (tests/test_examples.py checks this). -->
-    <nav class="toc" aria-label="Examples on this page">
-      <ul>
-        <li><a href="#for_tanisha">For Tanisha</a></li>
-        <li><a href="#hello">Hello, world</a></li>
-        <li><a href="#compliments">Compliment machine</a></li>
-        <li><a href="#countdown">Countdown to a hug</a></li>
-        <li><a href="#love_buzz">Love buzz</a></li>
-        <li><a href="#grocery_list">Grocery list</a></li>
-        <li><a href="#closures">Functions that remember</a></li>
-        <li><a href="#recursion">Functions that call themselves</a></li>
-        <li><a href="#guess_the_number">Guess the number</a></li>
-        <li><a href="#care_bot">Care bot</a></li>
+    <div class="container">
+      <div class="page-head">
+        <h1>Examples</h1>
+        <p class="lead">Little TB programs to read, run and change. Every one is also in the <code>examples</code> folder that comes with TB: run it with <kbd>tb examples\care_bot.tb</kbd>.</p>
+      </div>
+      <!-- The code blocks below must match examples/*.tb exactly (tests/test_examples.py checks this). -->
+      <ul class="gallery" aria-label="All examples">
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code># for_tanisha.tb
+# A little program, written in a little language, for Tanisha.
+# Run it with:  tb for_tanisha.tb
+
+let name = "Tanisha"
+say("Hello, " + name + "!")
+say("This language is called TB. Can you guess why?")
+say("")
+</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#for_tanisha">For Tanisha</a></h3>
+                <p>The very first TB program, a little letter written in code. Lists, loops, functions and a note at the end.</p>
+                <ul class="ex-tags" aria-label="Topics"><li>functions</li><li>loops</li><li>lists</li><li>care()</li><li>70 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#for_tanisha">Read the code</a>
+                  <a class="button" href="playground.html?example=for_tanisha">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code># Lines that start with # are notes for people. TB skips them.
+
+say("Hello, world!")
+say("Hello, Tanisha!")
+
+# say() can show more than one thing at once, with spaces in between.
+say("Two plus two is", 2 + 2)
+
+# Text in quotes can be joined together with +</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#hello">Hello, world</a></h3>
+                <p>Your very first TB program. It says hello and does a little maths.</p>
+                <ul class="ex-tags" aria-label="Topics"><li>loops</li><li>14 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#hello">Read the code</a>
+                  <a class="button" href="playground.html?example=hello">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code>let things = ["smile", "laugh", "kindness"]
+let words = ["lights up the room", "makes my day"]
+
+fn compliment(thing, word) {
+  return "Your " + thing + " " + word + "."
+}
+
+# A loop inside a loop: every thing gets paired with every word.
+for thing in things {</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#compliments">Compliment machine</a></h3>
+                <p>Mixes words from two lists to write lots of little compliments.</p>
+                <ul class="ex-tags" aria-label="Topics"><li>functions</li><li>loops</li><li>lists</li><li>18 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#compliments">Read the code</a>
+                  <a class="button" href="playground.html?example=compliments">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code>let seconds = 5
+say("Hug arriving in...")
+while seconds &gt; 0 {
+  say(str(seconds) + "...")
+  seconds = seconds - 1
+}
+say("Hug delivered! &lt;3")
+say("")
+</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#countdown">Countdown to a hug</a></h3>
+                <p>Counts down with a while loop, then counts by twos with range().</p>
+                <ul class="ex-tags" aria-label="Topics"><li>loops</li><li>17 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#countdown">Read the code</a>
+                  <a class="button" href="playground.html?example=countdown">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code># % gives the remainder after dividing. If n % 3 is 0, n is a multiple of 3.
+for n in range(1, 16) {
+  if n % 15 == 0 {
+    say("love and hugs!")
+  } else if n % 3 == 0 {
+    say("love")
+  } else if n % 5 == 0 {
+    say("hugs")
+  } else {</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#love_buzz">Love buzz</a></h3>
+                <p>A playful pattern: every 3rd number says "love", every 5th says "hugs".</p>
+                <ul class="ex-tags" aria-label="Topics"><li>loops</li><li>21 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#love_buzz">Read the code</a>
+                  <a class="button" href="playground.html?example=love_buzz">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code>let groceries = []
+push(groceries, "milk")
+push(groceries, "bread")
+push(groceries, "strawberries")
+push(groceries, "chocolate")
+
+say("My list has " + str(len(groceries)) + " things:")
+for item in groceries {
+  say("- " + item)</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#grocery_list">Grocery list</a></h3>
+                <p>Builds a shopping list with push(), changes an item, and prints it with for.</p>
+                <ul class="ex-tags" aria-label="Topics"><li>loops</li><li>lists</li><li>34 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#grocery_list">Read the code</a>
+                  <a class="button" href="playground.html?example=grocery_list">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code>fn make_counter(label) {
+  let count = 0
+  return fn() {
+    count = count + 1
+    say(label + ": " + str(count))
+  }
+}
+
+let hugs = make_counter("Hugs today")</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#closures">Functions that remember</a></h3>
+                <p>Closures: little functions that keep their own memory, like a hug counter.</p>
+                <ul class="ex-tags" aria-label="Topics"><li>functions</li><li>29 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#closures">Read the code</a>
+                  <a class="button" href="playground.html?example=closures">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code># Each Fibonacci number is the two before it added together.
+fn fib(n) {
+  if n &lt; 2 {
+    return n
+  }
+  return fib(n - 1) + fib(n - 2)
+}
+
+let numbers = []</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#recursion">Functions that call themselves</a></h3>
+                <p>Recursion: Fibonacci numbers, factorials, and a staircase of stars.</p>
+                <ul class="ex-tags" aria-label="Topics"><li>functions</li><li>loops</li><li>lists</li><li>35 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#recursion">Read the code</a>
+                  <a class="button" href="playground.html?example=recursion">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code>let secret = 7
+let tries = 0
+let found = false
+
+say("I'm thinking of a number from 1 to 20. Can you guess it?")
+
+while not found and tries &lt; 5 {
+  let answer = ask("Your guess: ")
+  # Check the answer is a whole number from 1 to 20 before using num().</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#guess_the_number">Guess the number</a></h3>
+                <p>A small guessing game. TB is thinking of a number from 1 to 20.</p>
+                <ul class="ex-tags" aria-label="Topics"><li class="tag-ask">asks you things</li><li>loops</li><li>38 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#guess_the_number">Read the code</a>
+                  <a class="button" href="playground.html?example=guess_the_number">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="ex-card">
+              <pre class="tb-code-plain" aria-hidden="true"><code># Checks whether a word is in a list of words.
+fn is_one_of(word, options) {
+  for option in options {
+    if word == option {
+      return true
+    }
+  }
+  return false
+}</code></pre>
+              <div class="ex-card-body">
+                <h3><a href="#care_bot">Care bot</a></h3>
+                <p>A gentle little bot that asks how you are feeling and answers kindly.</p>
+                <ul class="ex-tags" aria-label="Topics"><li class="tag-ask">asks you things</li><li>functions</li><li>loops</li><li>lists</li><li>care()</li><li>73 lines</li></ul>
+                <div class="ex-card-actions">
+                  <a class="button" href="#care_bot">Read the code</a>
+                  <a class="button" href="playground.html?example=care_bot">Open in playground</a>
+                </div>
+              </div>
+            </article>
+          </li>
       </ul>
-    </nav>
-    <div>
-    <article class="card" id="for_tanisha">
-      <h2>For Tanisha</h2>
-      <p>The very first TB program, written just for you. Lists, loops, functions and a little note at the end.</p>
-      <pre class="tb-code" data-runnable id="code-for_tanisha"><code># for_tanisha.tb
+      <section class="example" id="for_tanisha" aria-labelledby="for_tanisha-title">
+        <div class="example-head">
+          <div>
+            <h2 id="for_tanisha-title">For Tanisha</h2>
+            <p>The very first TB program, a little letter written in code. Lists, loops, functions and a note at the end.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/for_tanisha.tb" download>Download for_tanisha.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="for_tanisha" id="code-for_tanisha"><code># for_tanisha.tb
 # A little program, written in a little language, for Tanisha.
 # Run it with:  tb for_tanisha.tb
 
@@ -119,15 +335,16 @@ say("A note from TB, just for you:")
 care(name)
 say("")
 say("With love, always.")</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=for_tanisha">Open in playground</a>
-        <a class="button" href="for_tanisha.tb" download>Download for_tanisha.tb</a>
-      </p>
-    </article>
-    <article class="card" id="hello">
-      <h2>Hello, world</h2>
-      <p>Your very first TB program. It says hello and does a little maths.</p>
-      <pre class="tb-code" data-runnable id="code-hello"><code># Title: Hello, world
+      </section>
+      <section class="example" id="hello" aria-labelledby="hello-title">
+        <div class="example-head">
+          <div>
+            <h2 id="hello-title">Hello, world</h2>
+            <p>Your very first TB program. It says hello and does a little maths.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/hello.tb" download>Download hello.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="hello" id="code-hello"><code># Title: Hello, world
 # About: Your very first TB program. It says hello and does a little maths.
 
 # Lines that start with # are notes for people. TB skips them.
@@ -141,15 +358,16 @@ say("Two plus two is", 2 + 2)
 # Text in quotes can be joined together with +
 let name = "Tanisha"
 say("Welcome to TB, " + name + ".")</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=hello">Open in playground</a>
-        <a class="button" href="examples/hello.tb" download>Download hello.tb</a>
-      </p>
-    </article>
-    <article class="card" id="compliments">
-      <h2>Compliment machine</h2>
-      <p>Mixes words from two lists to write lots of little compliments.</p>
-      <pre class="tb-code" data-runnable id="code-compliments"><code># Title: Compliment machine
+      </section>
+      <section class="example" id="compliments" aria-labelledby="compliments-title">
+        <div class="example-head">
+          <div>
+            <h2 id="compliments-title">Compliment machine</h2>
+            <p>Mixes words from two lists to write lots of little compliments.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/compliments.tb" download>Download compliments.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="compliments" id="code-compliments"><code># Title: Compliment machine
 # About: Mixes words from two lists to write lots of little compliments.
 
 let things = ["smile", "laugh", "kindness"]
@@ -167,15 +385,16 @@ for thing in things {
 }
 say("")
 say("That's " + str(len(things) * len(words)) + " compliments, and every one is true.")</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=compliments">Open in playground</a>
-        <a class="button" href="examples/compliments.tb" download>Download compliments.tb</a>
-      </p>
-    </article>
-    <article class="card" id="countdown">
-      <h2>Countdown to a hug</h2>
-      <p>Counts down with a while loop, then counts by twos with range().</p>
-      <pre class="tb-code" data-runnable id="code-countdown"><code># Title: Countdown to a hug
+      </section>
+      <section class="example" id="countdown" aria-labelledby="countdown-title">
+        <div class="example-head">
+          <div>
+            <h2 id="countdown-title">Countdown to a hug</h2>
+            <p>Counts down with a while loop, then counts by twos with range().</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/countdown.tb" download>Download countdown.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="countdown" id="code-countdown"><code># Title: Countdown to a hug
 # About: Counts down with a while loop, then counts by twos with range().
 
 let seconds = 5
@@ -192,15 +411,16 @@ say("Counting kisses by twos, backwards:")
 for n in range(10, 0, -2) {
   say(n)
 }</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=countdown">Open in playground</a>
-        <a class="button" href="examples/countdown.tb" download>Download countdown.tb</a>
-      </p>
-    </article>
-    <article class="card" id="love_buzz">
-      <h2>Love buzz</h2>
-      <p>A playful pattern: every 3rd number says &quot;love&quot;, every 5th says &quot;hugs&quot;.</p>
-      <pre class="tb-code" data-runnable id="code-love_buzz"><code># Title: Love buzz
+      </section>
+      <section class="example" id="love_buzz" aria-labelledby="love_buzz-title">
+        <div class="example-head">
+          <div>
+            <h2 id="love_buzz-title">Love buzz</h2>
+            <p>A playful pattern: every 3rd number says "love", every 5th says "hugs".</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/love_buzz.tb" download>Download love_buzz.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="love_buzz" id="code-love_buzz"><code># Title: Love buzz
 # About: A playful pattern: every 3rd number says "love", every 5th says "hugs".
 
 # % gives the remainder after dividing. If n % 3 is 0, n is a multiple of 3.
@@ -221,15 +441,16 @@ say("")
 for size in range(1, 6) {
   say("&lt;3 " * size)
 }</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=love_buzz">Open in playground</a>
-        <a class="button" href="examples/love_buzz.tb" download>Download love_buzz.tb</a>
-      </p>
-    </article>
-    <article class="card" id="grocery_list">
-      <h2>Grocery list</h2>
-      <p>Builds a shopping list with push(), changes an item, and prints it with for.</p>
-      <pre class="tb-code" data-runnable id="code-grocery_list"><code># Title: Grocery list
+      </section>
+      <section class="example" id="grocery_list" aria-labelledby="grocery_list-title">
+        <div class="example-head">
+          <div>
+            <h2 id="grocery_list-title">Grocery list</h2>
+            <p>Builds a shopping list with push(), changes an item, and prints it with for.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/grocery_list.tb" download>Download grocery_list.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="grocery_list" id="code-grocery_list"><code># Title: Grocery list
 # About: Builds a shopping list with push(), changes an item, and prints it with for.
 
 let groceries = []
@@ -263,15 +484,16 @@ for item in everything {
   say(str(number) + ". " + item)
   number = number + 1
 }</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=grocery_list">Open in playground</a>
-        <a class="button" href="examples/grocery_list.tb" download>Download grocery_list.tb</a>
-      </p>
-    </article>
-    <article class="card" id="closures">
-      <h2>Functions that remember</h2>
-      <p>Closures: little functions that keep their own memory, like a hug counter.</p>
-      <pre class="tb-code" data-runnable id="code-closures"><code># Title: Functions that remember
+      </section>
+      <section class="example" id="closures" aria-labelledby="closures-title">
+        <div class="example-head">
+          <div>
+            <h2 id="closures-title">Functions that remember</h2>
+            <p>Closures: little functions that keep their own memory, like a hug counter.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/closures.tb" download>Download closures.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="closures" id="code-closures"><code># Title: Functions that remember
 # About: Closures: little functions that keep their own memory, like a hug counter.
 
 fn make_counter(label) {
@@ -300,15 +522,16 @@ fn twice(f, value) {
 }
 
 say(twice(shout, "I love you"))</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=closures">Open in playground</a>
-        <a class="button" href="examples/closures.tb" download>Download closures.tb</a>
-      </p>
-    </article>
-    <article class="card" id="recursion">
-      <h2>Functions that call themselves</h2>
-      <p>Recursion: Fibonacci numbers, factorials, and a staircase of stars.</p>
-      <pre class="tb-code" data-runnable id="code-recursion"><code># Title: Functions that call themselves
+      </section>
+      <section class="example" id="recursion" aria-labelledby="recursion-title">
+        <div class="example-head">
+          <div>
+            <h2 id="recursion-title">Functions that call themselves</h2>
+            <p>Recursion: Fibonacci numbers, factorials, and a staircase of stars.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/recursion.tb" download>Download recursion.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="recursion" id="code-recursion"><code># Title: Functions that call themselves
 # About: Recursion: Fibonacci numbers, factorials, and a staircase of stars.
 
 # Each Fibonacci number is the two before it added together.
@@ -343,16 +566,16 @@ fn stairs(n) {
   say("*" * n)
 }
 stairs(4)</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=recursion">Open in playground</a>
-        <a class="button" href="examples/recursion.tb" download>Download recursion.tb</a>
-      </p>
-    </article>
-    <article class="card" id="guess_the_number">
-      <h2>Guess the number</h2>
-      <p>A small guessing game. TB is thinking of a number from 1 to 20.</p>
-      <p class="note">This one asks you questions, so it works best in the playground or on your laptop. In the browser, the questions pop up in a little box.</p>
-      <pre class="tb-code" id="code-guess_the_number"><code># Title: Guess the number
+      </section>
+      <section class="example" id="guess_the_number" aria-labelledby="guess_the_number-title">
+        <div class="example-head">
+          <div>
+            <h2 id="guess_the_number-title">Guess the number</h2>
+            <p>A small guessing game. TB is thinking of a number from 1 to 20.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/guess_the_number.tb" download>Download guess_the_number.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="guess_the_number" id="code-guess_the_number"><code># Title: Guess the number
 # About: A small guessing game. TB is thinking of a number from 1 to 20.
 
 let secret = 7
@@ -390,16 +613,16 @@ if found {
 } else {
   say("Out of tries! The number was " + str(secret) + ". Want to play again?")
 }</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=guess_the_number">Open in playground</a>
-        <a class="button" href="examples/guess_the_number.tb" download>Download guess_the_number.tb</a>
-      </p>
-    </article>
-    <article class="card" id="care_bot">
-      <h2>Care bot</h2>
-      <p>A gentle little bot that asks how you are feeling and answers kindly.</p>
-      <p class="note">This one asks you questions, so it works best in the playground or on your laptop. In the browser, the questions pop up in a little box.</p>
-      <pre class="tb-code" id="code-care_bot"><code># Title: Care bot
+      </section>
+      <section class="example" id="care_bot" aria-labelledby="care_bot-title">
+        <div class="example-head">
+          <div>
+            <h2 id="care_bot-title">Care bot</h2>
+            <p>A gentle little bot that asks how you are feeling and answers kindly.</p>
+          </div>
+          <div class="button-row"><a class="button" href="examples/care_bot.tb" download>Download care_bot.tb</a></div>
+        </div>
+        <pre class="tb-code" data-runnable data-example="care_bot" id="code-care_bot"><code># Title: Care bot
 # About: A gentle little bot that asks how you are feeling and answers kindly.
 
 # Checks whether a word is in a list of words.
@@ -472,15 +695,46 @@ if score == 0 {
 say("")
 say("One last thing before you go:")
 care(name)</code></pre>
-      <p>
-        <a class="button button-primary" href="playground.html?example=care_bot">Open in playground</a>
-        <a class="button" href="examples/care_bot.tb" download>Download care_bot.tb</a>
-      </p>
-    </article>
+      </section>
     </div>
-  </div>
   </main>
-  <footer class="site-footer">Made with love, for Tanisha.</footer>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A tiny, friendly programming language.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#reference">Reference</a></li>
+          <li><a href="examples.html">Examples</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
   <script src="assets/js/runner.js" defer></script>
 </body>
 </html>

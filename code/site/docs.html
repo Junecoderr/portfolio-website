@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Learn TB · TB</title>
-  <meta name="description" content="A gentle, step-by-step guide to TB, a tiny programming language. No experience needed.">
+  <title>Learn TB: guide and reference</title>
+  <meta name="description" content="A gentle, step-by-step guide to TB, a tiny programming language, plus a reference for every built-in instruction.">
+  <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
   <script src="assets/js/config.js"></script>
@@ -13,51 +14,74 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
-    <a class="brand" href="index.html">TB</a>
-    <nav class="site-nav" aria-label="Main">
-      <a href="index.html">Home</a>
-      <a href="download.html">Download</a>
-      <a href="playground.html">Playground</a>
-      <a href="docs.html" aria-current="page">Learn</a>
-      <a href="examples.html">Examples</a>
-    </nav>
-    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html" aria-current="page">Learn</a>
+        <a href="docs.html#reference">Reference</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
   </header>
   <main id="main">
-  <div class="container">
+    <div class="container docs">
+      <aside class="docs-sidebar" aria-label="Guide contents">
+        <button class="docs-nav-toggle" type="button" aria-expanded="false" aria-controls="docs-nav">Contents <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="docs-sidebar-inner" id="docs-nav">
+          <h2>Getting started</h2>
+          <ul>
+            <li><a href="#top">Introduction</a></li>
+            <li><a href="#windows">Running TB on Windows</a></li>
+          </ul>
+          <h2>Lessons</h2>
+          <ul>
+            <li><a href="#first-program">1. Your first program: say</a></li>
+            <li><a href="#values">2. Values: numbers, text, true and false</a></li>
+            <li><a href="#let">3. Remembering things with let</a></li>
+            <li><a href="#maths">4. Maths and joining text</a></li>
+            <li><a href="#lists">5. Lists</a></li>
+            <li><a href="#if">6. Making choices with if and else</a></li>
+            <li><a href="#loops">7. Doing things again and again: loops</a></li>
+            <li><a href="#functions">8. Making your own instructions: functions</a></li>
+            <li><a href="#closures">9. Functions that remember (and call themselves)</a></li>
+            <li><a href="#ask-care">10. Talking to your program: ask and care</a></li>
+            <li><a href="#errors">11. Reading "Oops!" messages</a></li>
+          </ul>
+          <h2>Reference</h2>
+          <ul>
+            <li><a href="#reference">Built-in instructions</a></li>
+            <li><a href="#ref-say"><code>say</code></a></li>
+            <li><a href="#ref-len"><code>len</code></a></li>
+            <li><a href="#ref-str"><code>str</code></a></li>
+            <li><a href="#ref-num"><code>num</code></a></li>
+            <li><a href="#ref-range"><code>range</code></a></li>
+            <li><a href="#ref-push"><code>push</code></a></li>
+            <li><a href="#ref-ask"><code>ask</code></a></li>
+            <li><a href="#ref-care"><code>care</code></a></li>
+            <li><a href="#keywords">Keywords</a></li>
+            <li><a href="#cheat-sheet">Little reminders</a></li>
+          </ul>
+        </div>
+      </aside>
 
+      <article class="docs-main" id="top">
     <h1>Learn TB</h1>
     <p class="lead">A program is just a list of instructions for the computer, written down one after another.
     TB is a small, friendly language for writing those instructions. You don't need to know anything about
-    programming to start. Go one lesson at a time, and press <strong>Run</strong> on any grey box to see it work.</p>
+    programming to start. Go one lesson at a time, and press <strong>Run</strong> under any code box to see it work.</p>
 
     <p class="note">You can change the code in the <a href="playground.html">Playground</a> as much as you like.
     Nothing you type can break your computer, and if something goes wrong TB just says
     <strong>"Oops!"</strong> and explains what it didn't understand.</p>
 
-    <nav class="toc" aria-label="Lessons">
-      <h2>Lessons</h2>
-      <ol>
-        <li><a href="#first-program">Your first program: <code>say</code></a></li>
-        <li><a href="#values">Values: numbers, text, true and false</a></li>
-        <li><a href="#let">Remembering things with <code>let</code></a></li>
-        <li><a href="#maths">Maths and joining text</a></li>
-        <li><a href="#lists">Lists</a></li>
-        <li><a href="#if">Making choices with <code>if</code> and <code>else</code></a></li>
-        <li><a href="#loops">Doing things again and again: loops</a></li>
-        <li><a href="#functions">Making your own instructions: functions</a></li>
-        <li><a href="#closures">Functions that remember (and call themselves)</a></li>
-        <li><a href="#ask-care">Talking to your program: <code>ask</code> and <code>care</code></a></li>
-        <li><a href="#errors">Reading "Oops!" messages</a></li>
-      </ol>
-      <p><a href="#reference">Built-in instructions (quick reference)</a> ·
-      <a href="#cheat-sheet">Little reminders</a> ·
-      <a href="#windows">Running a .tb file on your Windows laptop</a></p>
-    </nav>
-
     <!-- 1 -->
     <section id="first-program">
-      <h2>1. Your first program: <code>say</code></h2>
+      <h2><span class="chapter-num">1.</span>Your first program: <code>say</code></h2>
       <p><code>say</code> shows something on the screen. Put what you want to show inside the round brackets,
       and put words inside quote marks <code>"like this"</code> so TB knows they are text.</p>
       <pre class="tb-code" data-runnable><code>say("Hello, Tanisha!")
@@ -76,7 +100,7 @@ say("Only this line does something.")</code></pre>
 
     <!-- 2 -->
     <section id="values">
-      <h2>2. Values: numbers, text, true and false</h2>
+      <h2><span class="chapter-num">2.</span>Values: numbers, text, true and false</h2>
       <p>Everything a program works with is a <strong>value</strong>. TB has a few kinds:</p>
       <ul>
         <li><strong>Numbers</strong>, like <code>7</code>, <code>-3</code> or <code>2.5</code>.</li>
@@ -98,7 +122,7 @@ say("line one\nline two")</code></pre>
 
     <!-- 3 -->
     <section id="let">
-      <h2>3. Remembering things with <code>let</code></h2>
+      <h2><span class="chapter-num">3.</span>Remembering things with <code>let</code></h2>
       <p><code>let</code> gives a value a name, so you can use it again later. Think of it as a labelled box.</p>
       <pre class="tb-code" data-runnable><code>let name = "Tanisha"
 let age = 25
@@ -117,7 +141,7 @@ say("After coffee I felt " + mood)</code></pre>
 
     <!-- 4 -->
     <section id="maths">
-      <h2>4. Maths and joining text</h2>
+      <h2><span class="chapter-num">4.</span>Maths and joining text</h2>
       <p>TB can do sums. <code>*</code> means times and <code>/</code> means divide.
       <code>%</code> gives the remainder after dividing (so <code>7 % 2</code> is <code>1</code>).
       Brackets work like in school maths.</p>
@@ -147,7 +171,7 @@ say("Cups of tea today: " + str(cups))</code></pre>
 
     <!-- 5 -->
     <section id="lists">
-      <h2>5. Lists</h2>
+      <h2><span class="chapter-num">5.</span>Lists</h2>
       <p>A <strong>list</strong> keeps several values in order, inside square brackets, separated by commas.</p>
       <pre class="tb-code" data-runnable><code>let snacks = ["chocolate", "mango", "chips"]
 say(snacks)
@@ -169,7 +193,7 @@ say(snacks)</code></pre>
 
     <!-- 6 -->
     <section id="if">
-      <h2>6. Making choices with <code>if</code> and <code>else</code></h2>
+      <h2><span class="chapter-num">6.</span>Making choices with <code>if</code> and <code>else</code></h2>
       <p><code>if</code> runs some lines only when something is true. The lines that belong to it go inside
       curly brackets <code>{ }</code>. <code>else</code> says what to do otherwise.</p>
       <pre class="tb-code" data-runnable><code>let hour = 22
@@ -209,7 +233,7 @@ if sunny or weekend {
 
     <!-- 7 -->
     <section id="loops">
-      <h2>7. Doing things again and again: loops</h2>
+      <h2><span class="chapter-num">7.</span>Doing things again and again: loops</h2>
       <p><code>while</code> keeps repeating its lines as long as something is true.
       Make sure something changes each time, or it will go on forever!</p>
       <pre class="tb-code" data-runnable><code>let n = 3
@@ -238,7 +262,7 @@ for flower in flowers {
 
     <!-- 8 -->
     <section id="functions">
-      <h2>8. Making your own instructions: functions</h2>
+      <h2><span class="chapter-num">8.</span>Making your own instructions: functions</h2>
       <p>A <strong>function</strong> is a little recipe with a name. You write it once with <code>fn</code>,
       then use it as many times as you like. The names in the round brackets are its <strong>inputs</strong>.</p>
       <pre class="tb-code" data-runnable><code>fn greet(name) {
@@ -260,7 +284,7 @@ say(double(double(4)))</code></pre>
 
     <!-- 9 -->
     <section id="closures">
-      <h2>9. Functions that remember (and call themselves)</h2>
+      <h2><span class="chapter-num">9.</span>Functions that remember (and call themselves)</h2>
       <p>A function can be a value too: <code>fn(x) { ... }</code> without a name makes one,
       and you can keep it in a box with <code>let</code>.</p>
       <pre class="tb-code" data-runnable><code>let shout = fn(text) {
@@ -295,7 +319,7 @@ say(hearts(4))</code></pre>
 
     <!-- 10 -->
     <section id="ask-care">
-      <h2>10. Talking to your program: <code>ask</code> and <code>care</code></h2>
+      <h2><span class="chapter-num">10.</span>Talking to your program: <code>ask</code> and <code>care</code></h2>
       <p><code>ask</code> shows a question and waits for you to type an answer and press <kbd>Enter</kbd>.
       The answer comes back as text. (In the browser, the question pops up in a little box.)</p>
       <pre class="tb-code" data-runnable><code>let name = ask("What's your name? ")
@@ -313,7 +337,7 @@ care("Tanisha")</code></pre>
 
     <!-- 11 -->
     <section id="errors">
-      <h2>11. Reading "Oops!" messages</h2>
+      <h2><span class="chapter-num">11.</span>Reading "Oops!" messages</h2>
       <p>Everyone who writes programs makes little mistakes all the time. It's completely normal!
       When TB can't understand something, it stops and tells you <strong>which line</strong> to look at and
       <strong>what</strong> confused it:</p>
@@ -342,58 +366,123 @@ say(snacks[3])</code></pre>
       a missing quote, bracket or spelling mistake. Sometimes the real mistake is on the line just above.</p>
     </section>
 
-    <!-- Reference -->
+
     <section id="reference">
-      <h2>Built-in instructions (quick reference)</h2>
-      <p>These come with TB, ready to use.</p>
-      <div class="table-wrap" role="region" tabindex="0" aria-label="Built-in instructions table (scrolls sideways on small screens)">
-      <table>
-        <thead>
-          <tr><th scope="col">Instruction</th><th scope="col">What it does</th><th scope="col">Example</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code>say(a, b, ...)</code></td>
-            <td>Shows things on the screen, with a space between each one. <code>say()</code> on its own prints an empty line.</td>
-            <td><code>say("Hi", 2)</code> shows <code>Hi 2</code></td>
-          </tr>
-          <tr>
-            <td><code>len(x)</code></td>
-            <td>How many things are in a list, or how many letters are in some text.</td>
-            <td><code>len("TB")</code> is <code>2</code></td>
-          </tr>
-          <tr>
-            <td><code>str(x)</code></td>
-            <td>Turns any value into text.</td>
-            <td><code>str(5) + " cats"</code> is <code>"5 cats"</code></td>
-          </tr>
-          <tr>
-            <td><code>num(text)</code></td>
-            <td>Turns text like <code>"12"</code> or <code>"2.5"</code> into a number. Says "Oops!" if the text isn't a number.</td>
-            <td><code>num("12") + 1</code> is <code>13</code></td>
-          </tr>
-          <tr>
-            <td><code>range(n)</code><br><code>range(a, b)</code><br><code>range(a, b, step)</code></td>
-            <td>Makes a list of whole numbers: from 0 (or <code>a</code>) up to, but not including, <code>n</code> (or <code>b</code>), going up by <code>step</code>.</td>
-            <td><code>range(3)</code> is <code>[0, 1, 2]</code></td>
-          </tr>
-          <tr>
-            <td><code>push(list, value)</code></td>
-            <td>Adds a value to the end of a list.</td>
-            <td><code>push(snacks, "cake")</code></td>
-          </tr>
-          <tr>
-            <td><code>ask(question)</code></td>
-            <td>Shows the question, waits for an answer, and gives it back as text.</td>
-            <td><code>let name = ask("Name? ")</code></td>
-          </tr>
-          <tr>
-            <td><code>care()</code><br><code>care(name)</code></td>
-            <td>Prints <code>♥</code> and a random kind message, made personal if you give a name.</td>
-            <td><code>care("Tanisha")</code></td>
-          </tr>
-        </tbody>
-      </table>
+      <h2>Reference: built-in instructions</h2>
+      <p>These eight instructions come with TB, ready to use. Everything else you build yourself with <code>let</code> and <code>fn</code>.</p>
+      <div class="sig-list">
+        <article class="sig" id="ref-say">
+          <div class="sig-head">
+            <h3><span class="sig-name">say</span><span class="sig-args">(value, ...)</span></h3>
+            <span class="sig-returns">returns nil</span>
+          </div>
+          <div class="sig-body">
+            <p>Shows values on the screen, with a space between each one. <code>say()</code> on its own prints an empty line.</p>
+            <pre class="tb-code" data-runnable><code>say("Hi", 2)
+say()
+say([1, 2, 3])</code></pre>
+          </div>
+        </article>
+        <article class="sig" id="ref-len">
+          <div class="sig-head">
+            <h3><span class="sig-name">len</span><span class="sig-args">(list_or_text)</span></h3>
+            <span class="sig-returns">returns number</span>
+          </div>
+          <div class="sig-body">
+            <p>How many things are in a list, or how many letters are in some text.</p>
+            <pre class="tb-code" data-runnable><code>say(len("TB"))
+say(len([1, 2, 3]))</code></pre>
+          </div>
+        </article>
+        <article class="sig" id="ref-str">
+          <div class="sig-head">
+            <h3><span class="sig-name">str</span><span class="sig-args">(value)</span></h3>
+            <span class="sig-returns">returns text</span>
+          </div>
+          <div class="sig-body">
+            <p>Turns any value into text, so you can join it to other text.</p>
+            <pre class="tb-code" data-runnable><code>say(str(5) + " cats")</code></pre>
+          </div>
+        </article>
+        <article class="sig" id="ref-num">
+          <div class="sig-head">
+            <h3><span class="sig-name">num</span><span class="sig-args">(text)</span></h3>
+            <span class="sig-returns">returns number</span>
+          </div>
+          <div class="sig-body">
+            <p>Turns text like <code>"12"</code> or <code>"2.5"</code> into a number. Says "Oops!" if the text isn't a number.</p>
+            <pre class="tb-code" data-runnable><code>say(num("12") + 1)
+say(num("2.5") * 2)</code></pre>
+          </div>
+        </article>
+        <article class="sig" id="ref-range">
+          <div class="sig-head">
+            <h3><span class="sig-name">range</span><span class="sig-args">(n) / (a, b) / (a, b, step)</span></h3>
+            <span class="sig-returns">returns list</span>
+          </div>
+          <div class="sig-body">
+            <p>Makes a list of whole numbers: from 0 (or <code>a</code>) up to, but not including, <code>n</code> (or <code>b</code>), going up by <code>step</code>.</p>
+            <pre class="tb-code" data-runnable><code>say(range(3))
+say(range(1, 4))
+say(range(10, 0, -5))</code></pre>
+          </div>
+        </article>
+        <article class="sig" id="ref-push">
+          <div class="sig-head">
+            <h3><span class="sig-name">push</span><span class="sig-args">(list, value)</span></h3>
+            <span class="sig-returns">returns the list</span>
+          </div>
+          <div class="sig-body">
+            <p>Adds a value to the end of a list, and gives the same list back.</p>
+            <pre class="tb-code" data-runnable><code>let snacks = ["cake"]
+push(snacks, "mango")
+say(snacks)</code></pre>
+          </div>
+        </article>
+        <article class="sig" id="ref-ask">
+          <div class="sig-head">
+            <h3><span class="sig-name">ask</span><span class="sig-args">(question)</span></h3>
+            <span class="sig-returns">returns text</span>
+          </div>
+          <div class="sig-body">
+            <p>Shows the question, waits for an answer, and gives it back as text. Use <code>num()</code> to do maths with it.</p>
+            <pre class="tb-code" data-runnable><code>let name = ask("What's your name? ")
+say("Hello, " + name + "!")</code></pre>
+          </div>
+        </article>
+        <article class="sig" id="ref-care">
+          <div class="sig-head">
+            <h3><span class="sig-name">care</span><span class="sig-args">() / (name)</span></h3>
+            <span class="sig-returns">returns nil</span>
+          </div>
+          <div class="sig-body">
+            <p>Prints <code>♥</code> and a kind message, chosen at random. Give it a name to make it personal.</p>
+            <pre class="tb-code" data-runnable><code>care()
+care("Tanisha")</code></pre>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="keywords">
+      <h2>Keywords</h2>
+      <p>The words TB reserves for itself. You can't use them as names for your own boxes.</p>
+      <div class="table-wrap" role="region" tabindex="0" aria-label="Keywords table (scrolls sideways on small screens)">
+        <table class="kw-table">
+          <thead><tr><th scope="col">Keyword</th><th scope="col">What it does</th><th scope="col">Example</th></tr></thead>
+          <tbody>
+            <tr><td><code>let</code></td><td>Makes a new named box</td><td><code>let name = "Tanisha"</code></td></tr>
+            <tr><td><code>=</code></td><td>Changes a box that already exists</td><td><code>name = "Tani"</code></td></tr>
+            <tr><td><code>fn</code></td><td>Makes a function (named or not)</td><td><code>fn double(x) { return x * 2 }</code></td></tr>
+            <tr><td><code>return</code></td><td>Hands a value back from a function</td><td><code>return x * 2</code></td></tr>
+            <tr><td><code>if / else if / else</code></td><td>Chooses which lines to run</td><td><code>if x &gt; 3 { ... } else { ... }</code></td></tr>
+            <tr><td><code>while</code></td><td>Repeats while something is true</td><td><code>while n &gt; 0 { n = n - 1 }</code></td></tr>
+            <tr><td><code>for ... in</code></td><td>Goes through a list or text</td><td><code>for x in [1, 2, 3] { say(x) }</code></td></tr>
+            <tr><td><code>true / false / nil</code></td><td>Yes, no and nothing</td><td><code>let done = false</code></td></tr>
+            <tr><td><code>and / or / not</code></td><td>Combine or flip checks</td><td><code>if sunny and not raining { ... }</code></td></tr>
+            <tr><td><code>#</code></td><td>A note TB ignores</td><td><code># this is a comment</code></td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -423,10 +512,54 @@ say(snacks[3])</code></pre>
       <p>The <a href="download.html">Download page</a> has the full step-by-step guide, including what to
       click if Windows asks whether it's safe.</p>
     </section>
+      </article>
 
-  </div>
+      <nav class="on-this-page" aria-label="On this page">
+        <div class="on-this-page-inner">
+          <h2>On this page</h2>
+          <ul id="on-this-page-list"></ul>
+        </div>
+      </nav>
+    </div>
   </main>
-  <footer class="site-footer">Made with love, for Tanisha.</footer>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A tiny, friendly programming language.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#reference">Reference</a></li>
+          <li><a href="examples.html">Examples</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
+  <script src="assets/js/docs.js" defer></script>
   <script src="assets/js/runner.js" defer></script>
 </body>
 </html>

@@ -14,65 +14,9 @@
   var JS_DIR = new URL("./", here).href;
   var SITE_ROOT = new URL("../../", here).href;
 
-  // ------------------------------------------------------------ highlighter
-  var KEYWORDS = /^(let|fn|return|if|else|while|for|in|and|or|not|true|false|nil)$/;
-  var BUILTINS = /^(say|len|str|num|range|push|ask|care)$/;
-
-  function tokenize(src) {
-    var out = [];
-    var i = 0;
-    var n = src.length;
-    while (i < n) {
-      var c = src[i];
-      var start = i;
-      if (c === "#") {
-        while (i < n && src[i] !== "\n") i++;
-        out.push(["com", src.slice(start, i)]);
-      } else if (c === '"' || c === "'") {
-        i++;
-        while (i < n && src[i] !== c && src[i] !== "\n") {
-          if (src[i] === "\\") i++;
-          i++;
-        }
-        i = Math.min(n, i + 1);
-        out.push(["str", src.slice(start, i)]);
-      } else if (/[0-9]/.test(c)) {
-        while (i < n && /[0-9.]/.test(src[i])) i++;
-        out.push(["num", src.slice(start, i)]);
-      } else if (/[A-Za-z_]/.test(c)) {
-        while (i < n && /[A-Za-z0-9_]/.test(src[i])) i++;
-        var word = src.slice(start, i);
-        if (KEYWORDS.test(word)) out.push(["key", word]);
-        else if (BUILTINS.test(word)) out.push(["fn", word]);
-        else out.push(["", word]);
-      } else {
-        i++;
-        out.push(["", c]);
-      }
-    }
-    return out;
-  }
-
+  // Colouring lives in highlight.js (window.TBHighlight); use it if present.
   function highlight(codeEl) {
-    if (codeEl.getAttribute("data-highlighted")) return;
-    var src = codeEl.textContent;
-    var frag = document.createDocumentFragment();
-    var tokens = tokenize(src);
-    for (var t = 0; t < tokens.length; t++) {
-      var kind = tokens[t][0];
-      var text = tokens[t][1];
-      if (!kind) {
-        frag.appendChild(document.createTextNode(text));
-      } else {
-        var span = document.createElement("span");
-        span.className = "tok-" + kind;
-        span.textContent = text;
-        frag.appendChild(span);
-      }
-    }
-    codeEl.textContent = "";
-    codeEl.appendChild(frag);
-    codeEl.setAttribute("data-highlighted", "1");
+    if (window.TBHighlight) window.TBHighlight.highlight(codeEl);
   }
 
   // --------------------------------------------------------------- loader
@@ -194,7 +138,6 @@
     }
   }
 
-  window.TBHighlight = { tokenize: tokenize, highlight: highlight };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 })();

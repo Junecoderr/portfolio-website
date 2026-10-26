@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Playground · TB</title>
   <meta name="description" content="Write and run TB programs right in your browser. Nothing to install.">
+  <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
   <script src="assets/js/config.js"></script>
@@ -13,61 +14,108 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
-    <a class="brand" href="index.html">TB</a>
-    <nav class="site-nav" aria-label="Main">
-      <a href="index.html">Home</a>
-      <a href="download.html">Download</a>
-      <a href="playground.html" aria-current="page">Playground</a>
-      <a href="docs.html">Learn</a>
-      <a href="examples.html">Examples</a>
-    </nav>
-    <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0" aria-label="Version 1.0.0 release notes">v<span data-version>1.0.0</span></a>
+      <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="docs.html">Learn</a>
+        <a href="docs.html#reference">Reference</a>
+        <a href="examples.html">Examples</a>
+        <a href="playground.html" aria-current="page">Playground</a>
+        <a href="download.html" class="nav-cta">Download</a>
+      </nav>
+      <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
+    </div>
   </header>
   <main id="main">
-    <div class="container">
-      <div class="page-head prose">
-        <h1>Playground</h1>
-        <p class="lead">Write TB here and press Run. Change anything you like; you can always go back to the original.</p>
+    <div class="container pg-page">
+      <div class="pg-head">
+        <div>
+          <h1>Playground</h1>
+          <p>Write TB and run it right here. Nothing to install.</p>
+        </div>
+        <p class="ide-hint-out pg-help">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run.</p>
       </div>
 
-      <div class="pg-toolbar">
-        <label for="pg-example">Example</label>
-        <select id="pg-example">
-          <option value="for_tanisha">For Tanisha</option>
-        </select>
-        <button class="button button-primary" type="button" id="pg-run">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
-          Run
-        </button>
-        <button class="button" type="button" id="pg-reset">Reset</button>
-        <span class="spacer"></span>
-        <span class="pg-hint">Shortcut: <kbd>Ctrl</kbd> + <kbd>Enter</kbd> runs the program</span>
+      <div class="ide">
+        <div class="ide-bar">
+          <label for="pg-example">Example</label>
+          <select id="pg-example">
+            <option value="for_tanisha">For Tanisha</option>
+          </select>
+          <span class="spacer"></span>
+          <button class="button button-ghost" type="button" id="pg-reset">Reset</button>
+          <button class="button button-ghost" type="button" id="pg-share">Share</button>
+          <button class="button button-run" type="button" id="pg-run"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Run</button>
+        </div>
+        <div class="ide-body">
+          <div class="editor">
+            <div class="editor-gutter" id="pg-gutter" aria-hidden="true"><span>1</span></div>
+            <div class="editor-area" id="pg-area">
+              <pre class="editor-highlight" id="pg-highlight" aria-hidden="true"></pre>
+              <label for="pg-code" class="visually-hidden">TB program</label>
+              <textarea id="pg-code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-describedby="pg-editor-help"></textarea>
+            </div>
+          </div>
+          <div class="console">
+            <div class="console-head">
+              <h2 id="pg-out-title">Console</h2>
+              <button class="button" type="button" id="pg-clear">Clear</button>
+            </div>
+            <div class="output" id="pg-output" aria-labelledby="pg-out-title" aria-live="polite" data-empty="Press Run to see what your program says."></div>
+            <div class="console-status" id="pg-status" role="status"></div>
+          </div>
+        </div>
+      </div>
+      <div class="share-out" id="pg-share-out" hidden>
+        <label for="pg-share-link" class="visually-hidden">Link to this program</label>
+        <input id="pg-share-link" type="text" readonly>
+        <span id="pg-share-msg" role="status"></span>
       </div>
       <p class="pg-about" id="pg-about"></p>
       <p class="note pg-edited" id="pg-edited" role="status" hidden>You're seeing your edited version. Press Reset to get the original back.</p>
-
-      <div class="pg">
-        <div>
-          <label for="pg-code" class="visually-hidden">TB program</label>
-          <div class="editor">
-            <div class="editor-gutter" id="pg-gutter" aria-hidden="true">1</div>
-            <textarea id="pg-code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-describedby="pg-editor-help"></textarea>
-          </div>
-          <p class="pg-hint" id="pg-editor-help" style="margin-top:0.5rem">The <kbd>Tab</kbd> key indents. To move on with the keyboard, press <kbd>Esc</kbd> first, then <kbd>Tab</kbd>.</p>
-        </div>
-        <div class="pg-out-wrap">
-          <div class="pg-out-head">
-            <h2 id="pg-out-title">Output</h2>
-            <button class="button" type="button" id="pg-clear" style="min-height:2.2rem;padding:0.3rem 0.85rem;font-size:0.9rem">Clear</button>
-          </div>
-          <div class="pg-loading" id="pg-status" role="status"></div>
-          <div class="output" id="pg-output" aria-labelledby="pg-out-title" aria-live="polite" data-empty="Press Run to see what your program says."></div>
-        </div>
-      </div>
+      <p class="pg-help" id="pg-editor-help">The <kbd>Tab</kbd> key indents. To move on with the keyboard, press <kbd>Esc</kbd> first, then <kbd>Tab</kbd>. Share copies a link that opens this exact code.</p>
     </div>
   </main>
-  <footer class="site-footer">Made with love, for Tanisha.</footer>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
+        <p>A tiny, friendly programming language.</p>
+      </div>
+      <nav aria-labelledby="footer-learn">
+        <h2 id="footer-learn">Learn</h2>
+        <ul>
+          <li><a href="docs.html">Guide</a></li>
+          <li><a href="docs.html#reference">Reference</a></li>
+          <li><a href="examples.html">Examples</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-tools">
+        <h2 id="footer-tools">Tools</h2>
+        <ul>
+          <li><a href="playground.html">Playground</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="download.html#verify">Checksums</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="footer-project">
+        <h2 id="footer-project">Project</h2>
+        <ul>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v1.0.0">Release notes</a></li>
+          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="index.html#why">Why TB</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB <span data-version>1.0.0</span>, released 26 October 2026.</p>
+    </div>
+  </footer>
+  <script src="assets/js/highlight.js" defer></script>
   <script src="assets/js/tb-pyodide.js"></script>
-  <script src="assets/js/playground.js"></script>
+  <script src="assets/js/playground.js" defer></script>
 </body>
 </html>
