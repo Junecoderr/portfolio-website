@@ -1,6 +1,6 @@
 """Keep the author's name off the website without writing it down anywhere.
 
-The site is a gift, so the person who made it stays anonymous. This module
+TB does not credit any person, so the author stays anonymous. This module
 knows the name only as SHA-256 digests of its two lowercase parts, and checks
 every 4- and 6-letter run of letters in a text against them.
 """

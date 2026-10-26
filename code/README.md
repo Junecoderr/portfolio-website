@@ -1,9 +1,8 @@
 # TB
 
 TB is a friendly programming language for desktop apps, security tools and
-everything in between. It began as a gift for Tanisha Brahma (TB = her
-initials): a gentle first language whose mistakes come with a kind,
-plain-English "Oops!". Version 2.0 keeps that voice and adds what you need
+everything in between. It is a gentle first language whose mistakes come
+with a kind, plain-English "Oops!". Version 2.0 keeps that voice and adds what you need
 for real work: maps, methods, f-strings, modules, error handling, and a
 standard library of 20 libraries, from windows and buttons to log parsing,
 detection rules and IOC extraction.
@@ -34,7 +33,7 @@ You need [uv](https://docs.astral.sh/uv/). Python 3.12 is pinned in
 `.python-version`; uv fetches it if needed.
 
 ```sh
-uv run python tb.py for_tanisha.tb               # the first TB program
+uv run python tb.py welcome.tb                   # a short tour of TB
 uv run python tb.py apps/log-triage/main.tb apps/data/auth.log
 uv run python tb.py                              # interactive prompt (type `exit` to leave)
 uv run python tb.py doc                          # list the libraries
@@ -56,8 +55,8 @@ numbers, text, `true` / `false` / `nil`, lists, `and or not`, `#` comments,
 and the built-ins `say len str num range push ask care`. 2.0 adds:
 
 ```tb
-let me = {"name": "Tanisha", "plants": 4}          # maps
-me.city = "Guwahati"                               # dot access on maps
+let me = {"name": "Alex", "plants": 4}             # maps
+me.city = "Lisbon"                                 # dot access on maps
 say(f"{me.name} has {me.plants} plants")           # f-strings
 say("a,b".split(","), [3, 1, 2].sort(), me.keys()) # methods on text, lists, maps, numbers
 let big = [5, 12, 9].filter(fn(n) { return n > 8 })
@@ -148,7 +147,7 @@ itself on every start (about 4 s on macOS). Unused Tcl/Tk data (translations,
 time zones, most encodings, demos) is left out in the spec.
 
 `build.py` then smoke-tests `dist/tb/tb` from an empty folder (`--version`,
-`for_tanisha.tb`, `tb doc`, `tb doc gui`, a json/re/hash/ioc/logs program, and
+`welcome.tb`, `tb doc`, `tb doc gui`, a json/re/hash/ioc/logs program, and
 the calculator GUI app with `TB_GUI_AUTOCLOSE_MS=500` when Tk and a display are
 available; `TB_REQUIRE_GUI=1` makes that mandatory), packages the folder under
 the release name for the current OS, unpacks the archive and tests that copy,
@@ -177,13 +176,13 @@ the user PATH; `.tb` files run with a double-click (TB waits for Enter before
 the window closes) and have an Edit (Notepad) verb; Start menu folder "TB" with
 TB Prompt, TB website, TB Examples and the GUI apps (Care check-in, To-do, Notes,
 Calculator, Hash checker, Log triage, IOC workbench, started with `tbw.exe` so
-no console window flashes). `apps/`, `examples/` and `for_tanisha.tb` are
+no console window flashes). `apps/`, `examples/` and `welcome.tb` are
 installed too. Uninstall removes all of it again but keeps files the apps saved
 (the Care journal, the to-do list). The `AppId` GUID in `tb.iss` must never
 change. `python packaging/windows/test_installer.py dist/tb-windows-x64-setup.exe`
 installs silently into a temp folder, checks it and uninstalls (CI runs it).
 
-The fallback zip (`tb.py`, `tblib/`, `for_tanisha.tb`, `examples/*.tb`, `apps/`, `README.txt`):
+The fallback zip (`tb.py`, `tblib/`, `welcome.tb`, `examples/*.tb`, `apps/`, `README.txt`):
 
 ```sh
 uv run python packaging/make_fallback_zip.py   # -> dist/tb-python.zip
@@ -194,27 +193,29 @@ uv run python packaging/make_fallback_zip.py   # -> dist/tb-python.zip
 Tag the version and push the tag:
 
 ```sh
-git tag tb-v2.0.0 && git push origin tb-v2.0.0
+git tag tb-v2.0.1 && git push origin tb-v2.0.1
 ```
 
 `.github/workflows/tb-release.yml` (at the repo root) builds Windows, macOS
 and Linux on their own runners, tests each build (on Windows it also installs,
 tests and uninstalls the installer), and creates the GitHub release
-`tb-v2.0.0` with `--latest=false` (so it doesn't show as the portfolio's latest
+`tb-v2.0.1` with `--latest=false` (so it doesn't show as the portfolio's latest
 release). Assets:
 
 | Asset | What it is |
 |---|---|
 | `tb-windows-x64-setup.exe` | Recommended for Windows. Per-user installer, no admin |
-| `tb-windows-x64.zip` | Portable `tb\` folder: `tb.exe`, `tbw.exe`, `_internal\`, `apps\`, `examples\`, `for_tanisha.tb` |
-| `tb-macos-arm64.zip` | `tb/` folder: `tb`, `_internal/`, `apps/`, `examples/`, `for_tanisha.tb` |
+| `tb-windows-x64.zip` | Portable `tb\` folder: `tb.exe`, `tbw.exe`, `_internal\`, `apps\`, `examples\`, `welcome.tb` |
+| `tb-macos-arm64.zip` | `tb/` folder: `tb`, `_internal/`, `apps/`, `examples/`, `welcome.tb` |
 | `tb-linux-x64.tar.gz` | Same layout as macOS |
 | `tb-python.zip` | `tb.py`, `tblib/`, examples, apps, `README.txt` |
 | `SHA256SUMS.txt` | `sha256sum` lines for all of the above |
 
-The Download page links to `releases/download/tb-v<version>/<asset>`, with the
-version taken from `tb.__version__`, so release before deploying a version
-bump. Keep `tb.__version__`, `pyproject.toml` and the tag in step. If creating
+The Download page links to site-relative `/dl/<asset>` URLs (asset names
+above); a rewrite on the hosting side maps `/dl/:file` to the matching release
+asset, so update that rewrite when you release a new version, and release
+before deploying a version bump. The version shown on the site comes from
+`tb.__version__`. Keep `tb.__version__`, `pyproject.toml` and the tag in step. If creating
 the release fails with "Resource not accessible by integration": **Settings,
 Actions, General, Workflow permissions, "Read and write permissions"**.
 `.github/workflows/tb-ci.yml` runs the tests on Windows, macOS and Linux
@@ -256,13 +257,13 @@ vercel deploy --prod
 
 The portfolio's own Vercel project ignores `code/`.
 
-## Editing the personal message
+## The welcome program
 
-- **Website:** `site/index.html`, between `<!-- PERSONAL MESSAGE: START (edit freely) -->`
-  and `<!-- PERSONAL MESSAGE: END -->` (exactly once each).
-- **Demo program:** `for_tanisha.tb`. If its output changes, update
-  `tests/for_tanisha.out` and the copy of the code on `site/examples.html`
-  (`uv run pytest tests/test_examples.py` tells you if either is out of date).
+`welcome.tb` is the first program people run (the playground opens on it).
+If its output changes, update `tests/welcome.out`, the expected lines in
+`tests/test_welcome.py` and the copy of the code on `site/examples.html`
+(`uv run pytest tests/test_examples.py tests/test_welcome.py` tells you if
+any of them is out of date).
 
 The site never names its author; `scripts/name_guard.py` checks generated
 pages for that without spelling the name out.
@@ -283,7 +284,7 @@ tb.py                  the interpreter: lexer, parser, tree-walking interpreter,
 tblib/                 the standard library (native .py modules and .tb modules; _api.py helpers)
 apps/                  example applications (+ data/ sample logs, emails, Sigma rules)
 examples/              small example programs (+ .out expected output, .in answers)
-for_tanisha.tb         the first TB program
+welcome.tb             a short tour of TB, the first program to run
 tests/                 pytest suite (tests/lib/ for the libraries)
 scripts/               fetch_pyodide.py, build_site.py, gen_lib_docs.py, apps_gallery.py,
                        site_shell.py, name_guard.py, lib_examples/, playground_examples/

@@ -100,17 +100,17 @@ def test_button_click_runs_tb_callback(fake):
     src = '''import gui
 let win = gui.window("x")
 let count = 0
-let b = win.button("Hug", fn() {
+let b = win.button("Clap", fn() {
   count = count + 1
-  say("hugs:", count)
+  say("claps:", count)
 }, {"primary": true})
 '''
     out = run_tb(src)
-    btn = fake.window_.find("button", "Hug")
+    btn = fake.window_.find("button", "Clap")
     assert btn.spec["primary"] is True
     btn.click()
     btn.click()
-    assert out == ["hugs: 1", "hugs: 2"]
+    assert out == ["claps: 1", "claps: 2"]
 
 
 def test_button_programmatic_click_set_and_disable(fake):
@@ -139,11 +139,11 @@ def test_input_value_set_enter_change(fake):
 let win = gui.window("x")
 let box = win.input({"placeholder": "Your name", "value": "T", "on_enter": fn(text) { say("enter:", text) }, "on_change": fn() { say("changed") }})
 say(box.value())
-box.set("Tanisha")
+box.set("Alex")
 say(box.value())
 '''
     out = run_tb(src)
-    assert out == ["T", "Tanisha"]
+    assert out == ["T", "Alex"]
     field = fake.window_.find("input")
     assert field.spec["placeholder"] == "Your name"
     field.type("TB")
@@ -212,7 +212,7 @@ def test_table(fake):
     src = '''import gui
 let win = gui.window("x")
 let t = win.table(["Name", "Score"], {"on_select": fn(row, i) { say("selected", row, i) }, "on_open": fn(row) { say("open", row[0]) }})
-t.add_row(["Tanisha", 10])
+t.add_row(["Alex", 10])
 t.add_row(["TB", 2])
 t.add_row(["short"])
 say(t.rows(), t.count(), t.columns)
@@ -223,7 +223,7 @@ t.remove(0)
 say(t.rows())
 '''
     out = run_tb(src)
-    assert out[0] == '[["Tanisha", 10], ["TB", 2], ["short"]] 3 ["Name", "Score"]'
+    assert out[0] == '[["Alex", 10], ["TB", 2], ["short"]] 3 ["Name", "Score"]'
     assert out[1] == "nil"
     assert out[2] == '["TB", 2] 1'
     assert out[3] == '[["TB", 2], ["short"]]'
@@ -283,11 +283,11 @@ def test_progress_clamps(fake):
 
 def test_image(fake, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "heart.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (tmp_path / "star.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     (tmp_path / "photo.jpg").write_bytes(b"jpg")
-    out = run_tb('import gui\nlet w = gui.window("x")\nlet i = w.image("heart.png")\nsay(i.kind)')
+    out = run_tb('import gui\nlet w = gui.window("x")\nlet i = w.image("star.png")\nsay(i.kind)')
     assert out == ["image"]
-    assert fake.window_.find("image").text == "heart.png"
+    assert fake.window_.find("image").text == "star.png"
     err = tb_error('import gui\nlet w = gui.window("x")\nw.image("nope.png")')
     assert "I couldn't find the picture 'nope.png'." in str(err)
     err = tb_error('import gui\nlet w = gui.window("x")\nw.image("photo.jpg")')
@@ -480,7 +480,7 @@ def test_errors_can_be_caught(fake):
 
 
 def test_dialogs(fake):
-    fake.answers = [False, "Tanisha", None, "/tmp/a.txt", "/tmp/out.txt", "/tmp"]
+    fake.answers = [False, "Alex", None, "/tmp/a.txt", "/tmp/out.txt", "/tmp"]
     src = '''import gui
 gui.alert("Saved!")
 say(gui.confirm("Delete it?"))
@@ -490,7 +490,7 @@ say(gui.open_file([".txt", "md"]))
 say(gui.save_file("notes.txt", {"Text": "*.txt"}))
 say(gui.pick_folder())
 '''
-    assert run_tb(src) == ["false", "Tanisha", "nil", "/tmp/a.txt", "/tmp/out.txt", "/tmp"]
+    assert run_tb(src) == ["false", "Alex", "nil", "/tmp/a.txt", "/tmp/out.txt", "/tmp"]
     kinds = [d["kind"] for d in fake.dialogs]
     assert kinds == ["alert", "confirm", "ask", "ask", "open_file", "save_file", "pick_folder"]
     assert fake.dialogs[0]["message"] == "Saved!"
@@ -589,7 +589,7 @@ r.button("Add", fn() { say("clicked") }, {"primary": true})
 let c = win.checkbox("Done")
 let s = win.select(["a", "b"], {"value": "b"})
 let t = win.table(["Name", "Score"])
-t.add_row(["Tanisha", 10])
+t.add_row(["Alex", 10])
 t.select(0)
 let l = win.list_box(["x", "y"])
 let area = win.textarea({"value": "notes"})
@@ -610,7 +610,7 @@ win.run()
 say("closed", win.is_open(), ticks > 0)
 '''
     out = run_tb(src)
-    assert out == ['typed true b ["Tanisha", 10] notes! 40 ["x", "y"]', "closed false true"]
+    assert out == ['typed true b ["Alex", 10] notes! 40 ["x", "y"]', "closed false true"]
 
 
 @needs_tk

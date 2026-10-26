@@ -6,7 +6,7 @@ Usage (from code/):
 Steps:
 1. Silent per-user install into a fresh temp folder:
    setup.exe /VERYSILENT /SUPPRESSMSGBOXES /CURRENTUSER /NORESTART /DIR=<tmp>\\TB
-2. Checks: tb.exe, tbw.exe, apps\\, examples\\, for_tanisha.tb are there;
+2. Checks: tb.exe, tbw.exe, apps\\, examples\\, welcome.tb are there;
    `tb.exe --version` prints the version; the folder is on the user PATH
    (HKCU\\Environment); .tb is associated with TB.Program;
    packaging/run_examples.py passes against the installed tb.exe and the
@@ -83,7 +83,7 @@ def main() -> int:
         print(log_file.read_text(errors="replace") if log_file.exists() else "(no log)")
         fail(f"setup exited {res.returncode}")
 
-    for rel in ("tb.exe", "tbw.exe", "_internal", "apps", "examples", "for_tanisha.tb", "unins000.exe"):
+    for rel in ("tb.exe", "tbw.exe", "_internal", "apps", "examples", "welcome.tb", "unins000.exe"):
         if not (app / rel).exists():
             fail(f"{rel} missing from the install folder")
     step("installed files are there")

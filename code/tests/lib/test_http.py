@@ -38,7 +38,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/hello":
-            self.reply(200, "Hello, Tanisha!", extra={"X-Thing": "yes"})
+            self.reply(200, "Hello, Alex!", extra={"X-Thing": "yes"})
         elif self.path == "/json":
             self.reply(200, '{"a": 1, "b": [true, null, 2.0]}', "application/json")
         elif self.path == "/missing":
@@ -92,7 +92,7 @@ def closed_port():
 
 def test_get_text_and_headers(server):
     src = f'import http\nlet r = http.get("{server}/hello")\nsay(r.status, r.ok, r.text)\nsay(r.headers["x-thing"], r.headers["content-type"], r.json)\nsay(type(r.elapsed), r.url)'
-    assert run_tb(src) == ["200 true Hello, Tanisha!", "yes text/plain; charset=utf-8 nil", f"number {server}/hello"]
+    assert run_tb(src) == ["200 true Hello, Alex!", "yes text/plain; charset=utf-8 nil", f"number {server}/hello"]
 
 
 def test_get_json_is_parsed(server):
@@ -117,11 +117,11 @@ def test_custom_user_agent(server):
 
 
 def test_post_json_and_text(server):
-    src = (f'import http\nlet a = http.post("{server}/p", {{"name": "Tanisha"}})\nsay(a.json.method, a.json.body, a.json.ctype)\n'
+    src = (f'import http\nlet a = http.post("{server}/p", {{"name": "Alex"}})\nsay(a.json.method, a.json.body, a.json.ctype)\n'
            f'let b = http.post("{server}/p", "plain")\nsay(b.json.body, b.json.ctype)\n'
            f'let c = http.post("{server}/p", nil, {{"json": [1, 2]}})\nsay(c.json.body, c.json.ctype)')
     assert run_tb(src) == [
-        'POST {"name": "Tanisha"} application/json',
+        'POST {"name": "Alex"} application/json',
         "plain text/plain; charset=utf-8",
         "[1, 2] application/json",
     ]
@@ -136,7 +136,7 @@ def test_request_methods(server):
 
 def test_redirect_is_followed(server):
     assert run_tb(f'import http\nlet r = http.get("{server}/redirect")\nsay(r.status, r.text, r.url)') == [
-        f"200 Hello, Tanisha! {server}/hello"
+        f"200 Hello, Alex! {server}/hello"
     ]
 
 

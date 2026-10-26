@@ -1,0 +1,68 @@
+# welcome.tb
+# A short tour of TB: one small program, many features.
+# Run it with:  tb welcome.tb
+
+# Variables and f-strings
+let name = "Alex"
+say(f"Hello, {name}! Welcome to TB.")
+say("This program is a quick tour of the language.")
+say("")
+
+# Lists and loops
+let languages = ["TB", "Python", "JavaScript", "Go"]
+say("A few programming languages:")
+let count = 1
+for language in languages {
+  say(str(count) + ". " + language)
+  count = count + 1
+}
+say(f"That's {len(languages)} languages in one list.")
+say("")
+
+# Maps: named values that belong together
+let pet = {"name": "Biscuit", "kind": "cat", "age": 3}
+say(f"{pet.name} is a {pet.kind} who is {pet.age} years old.")
+say("")
+
+# A function that remembers things (a closure)
+fn make_counter() {
+  let steps = 0
+  return fn() {
+    steps = steps + 1
+    return steps
+  }
+}
+
+let walk = make_counter()
+walk()
+walk()
+say("Steps taken so far: " + str(walk()))
+
+# A function that calls itself (recursion)
+fn stars(n) {
+  if n <= 0 {
+    return ""
+  }
+  return "* " + stars(n - 1)
+}
+say(stars(5))
+say("")
+
+# Counting down with while
+let i = 3
+while i > 0 {
+  say(str(i) + "...")
+  i = i - 1
+}
+
+if len(languages) > 3 {
+  say("Lift-off! You have seen the basics of TB.")
+} else {
+  say("Lift-off!")
+}
+
+say("")
+say("A note from TB:")
+care(name)
+say("")
+say("Have fun writing your own programs.")

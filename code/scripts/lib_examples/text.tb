@@ -3,5 +3,5 @@ import text
 say(text.pad_left("7", 3, "0"))
 say(text.center("TB", 10, "*"))
 say(text.format_number(1234567.891, 2))
-say(text.title("hello there, tanisha"))
+say(text.title("hello there, alex"))
 say(text.count("banana", "a"))

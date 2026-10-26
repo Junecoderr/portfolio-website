@@ -9,13 +9,11 @@ from __future__ import annotations
 
 import html
 
-REPO = "Junecoderr/portfolio-website"
-SOURCE_URL = f"https://github.com/{REPO}/tree/main/code"
 RELEASE_DATE_HUMAN = "26 October 2026"
 
 
-def release_url(version: str) -> str:
-    return f"https://github.com/{REPO}/releases/tag/tb-v{version}"
+def whats_new_url(prefix: str = "") -> str:
+    return f"{prefix}download.html#whats-new"
 
 
 LOGO = ('<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
@@ -39,7 +37,7 @@ def esc(text: str) -> str:
     return html.escape(text, quote=False)
 
 
-def header(current: str = "", prefix: str = "", version: str = "2.0.0") -> str:
+def header(current: str = "", prefix: str = "", version: str = "2.0.1") -> str:
     links = []
     for href, label in NAV:
         attrs = f'href="{prefix}{href}"'
@@ -52,7 +50,7 @@ def header(current: str = "", prefix: str = "", version: str = "2.0.0") -> str:
     return f"""  <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="{prefix}index.html" aria-label="TB home">{LOGO}<span>TB</span></a>
-      <a class="version-badge" href="{release_url(version)}" aria-label="Version {version} release notes">v<span data-version>{version}</span></a>
+      <a class="version-badge" href="{whats_new_url(prefix)}" aria-label="Version {version}: what's new">v<span data-version>{version}</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu">{MENU_ICON}</button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
 {nav}
@@ -62,7 +60,7 @@ def header(current: str = "", prefix: str = "", version: str = "2.0.0") -> str:
   </header>"""
 
 
-def footer(prefix: str = "", version: str = "2.0.0") -> str:
+def footer(prefix: str = "", version: str = "2.0.1") -> str:
     p = prefix
     return f"""  <footer class="site-footer">
     <div class="footer-inner">
@@ -90,21 +88,20 @@ def footer(prefix: str = "", version: str = "2.0.0") -> str:
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="{release_url(version)}">Release notes</a></li>
-          <li><a href="{SOURCE_URL}">Source code</a></li>
+          <li><a href="{whats_new_url(p)}">What's new</a></li>
           <li><a href="{p}index.html#why">Why TB</a></li>
         </ul>
       </nav>
     </div>
     <div class="footer-bottom">
-      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
+      <p>TB — a friendly programming language.</p>
       <p>TB <span data-version>{version}</span>, released {RELEASE_DATE_HUMAN}.</p>
     </div>
   </footer>"""
 
 
 def page(title: str, description: str, main: str, *, current: str = "", prefix: str = "",
-         scripts: tuple[str, ...] = (), version: str = "2.0.0") -> str:
+         scripts: tuple[str, ...] = (), version: str = "2.0.1") -> str:
     tags = "\n".join(f'  <script src="{prefix}assets/js/{s}" defer></script>' for s in scripts)
     return f"""<!doctype html>
 <html lang="en">

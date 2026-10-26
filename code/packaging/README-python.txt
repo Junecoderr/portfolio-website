@@ -3,9 +3,9 @@ TB - run it with Python
 
 This folder has everything TB needs:
 
-  tb.py            the TB language itself (version 2.0)
+  tb.py            the TB language itself (version 2.0.1)
   tblib\           TB's standard library (keep it next to tb.py)
-  for_tanisha.tb   a little program written in TB
+  welcome.tb       a short tour of TB, written in TB
   examples\        small TB programs to try
   apps\            bigger apps: desktop windows (calculator, to-do, notes,
                    care) and security tools (log triage, IOC extractor...)
@@ -79,11 +79,11 @@ STEP 4 - Run a TB program
 
 Windows - type this and press Enter:
 
-    python tb.py for_tanisha.tb
+    python tb.py welcome.tb
 
 Mac or Linux - type this and press Enter:
 
-    python3 tb.py for_tanisha.tb
+    python3 tb.py welcome.tb
 
 To try another program, change the last part, for example:
 
@@ -137,7 +137,7 @@ A tiny program to start with:
 If something goes wrong
 -----------------------
 
-"python is not recognized" (Windows): try  py tb.py for_tanisha.tb  instead.
+"python is not recognized" (Windows): try  py tb.py welcome.tb  instead.
 If that also fails, run the Python installer again and make sure the
 "Add ... to PATH" box is ticked, then close and reopen the black window.
 
@@ -154,4 +154,4 @@ install "python3-tk".
 "I couldn't find the file 'mine.tb'": Notepad probably saved it as
 mine.tb.txt. Save it again with "Save as type: All files".
 
-Made with love, for Tanisha.
+TB - a friendly programming language.

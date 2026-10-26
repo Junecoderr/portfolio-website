@@ -21,7 +21,7 @@ tb main.tb --every 60         # keep checking every 60 seconds (Ctrl+C to stop)
 ```
 
 The list is JSON. The sample `sites.json` checks https://code.tanisha.ceo
-and https://tanisha.ceo:
+and https://example.com:
 
 ```json
 {
@@ -29,7 +29,7 @@ and https://tanisha.ceo:
   "slow_ms": 2000,
   "sites": [
     {"name": "TB website", "url": "https://code.tanisha.ceo"},
-    {"name": "Portfolio", "url": "https://tanisha.ceo"}
+    {"name": "Example site", "url": "https://example.com"}
   ]
 }
 ```

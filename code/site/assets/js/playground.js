@@ -162,7 +162,7 @@
   function loadExample(name, pushUrl) {
     // Only ask the server for examples we know exist (no failing requests).
     if (!describe(name)) {
-      var fallback = examples[0] ? examples[0].name : "for_tanisha";
+      var fallback = examples[0] ? examples[0].name : "welcome";
       var message = "There's no example called \"" + name + "\", so here is \"" + (describe(fallback) || { title: fallback }).title + "\" instead.";
       if (name === fallback) {
         about.textContent = "The example programs couldn't be loaded. You can still type your own program.";
@@ -331,7 +331,7 @@
     .then(function (r) { return r.ok ? r.json() : []; })
     .catch(function () { return []; })
     .then(function (list) {
-      examples = Array.isArray(list) && list.length ? list : [{ name: "for_tanisha", title: "For Tanisha", description: "", interactive: false }];
+      examples = Array.isArray(list) && list.length ? list : [{ name: "welcome", title: "Welcome to TB", description: "", interactive: false }];
     });
 
   indexReady.then(function () {
@@ -343,7 +343,7 @@
       about.textContent = "This is the code you opened from another page. Pick an example to load something else.";
     } else {
       fillPicker(examples);
-      return loadExample(wanted || "for_tanisha", false);
+      return loadExample(wanted || "welcome", false);
     }
   });
 

@@ -1,6 +1,6 @@
 import csv
 
-let rows = csv.parse("name,score\nTanisha,10\nMum,9")
+let rows = csv.parse("name,score\nAlex,10\nSam,9")
 for row in rows {
   say(f"{row.name} scored {row.score}")
 }

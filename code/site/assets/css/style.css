@@ -364,7 +364,6 @@ a.version-badge:hover { color: var(--ink); border-color: var(--accent); }
   font-size: 0.875rem;
 }
 .footer-bottom p { margin: 0; }
-.footer-heart { color: var(--accent-text); }
 
 /* ================================================================ layout */
 .container { width: 100%; max-width: var(--wide); margin: 0 auto; padding: 0 var(--gutter); }
@@ -742,22 +741,22 @@ pre.cmd code::before { content: "> "; color: var(--ink-faint); user-select: none
 .terminal .p { color: var(--marigold); user-select: none; }
 .terminal .c { color: var(--code-com); }
 
-/* why TB / letter */
+/* why TB: design goals */
 .why { display: grid; gap: 2rem 4rem; }
 @media (min-width: 56rem) { .why { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); } }
 .why > * { min-width: 0; }
-.letter {
-  border-left: 3px solid var(--accent);
+.goals {
+  list-style: none;
+  margin: 0;
   padding: 0.25rem 0 0.25rem clamp(1.25rem, 0.8rem + 1.5vw, 2rem);
+  border-left: 3px solid var(--accent);
   max-width: 40rem;
+  display: grid;
+  gap: 1.1rem;
 }
-.letter p {
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  font-size: 1.15rem;
-  line-height: 1.75;
-}
-.letter .salutation { font-style: italic; }
-.letter .signature { font-style: italic; font-size: 1.3rem; margin: 1.25rem 0 0; color: var(--accent-text); }
+.goals li { margin: 0; }
+.goals h3 { margin: 0 0 0.25rem; font-size: 1.05rem; }
+.goals p { margin: 0; line-height: 1.65; }
 
 /* closing call to action */
 .cta-band {

@@ -9,9 +9,9 @@ def test_parse_values():
 
 
 def test_stringify_compact_and_pretty():
-    src = 'import json\nlet v = {"name": "Tanisha", "tags": ["a", "é"], "n": nil, "ok": true, 1: 2}\nsay(json.stringify(v))\nsay(json.stringify([1, {"a": 1}], true))'
+    src = 'import json\nlet v = {"name": "Alex", "tags": ["a", "é"], "n": nil, "ok": true, 1: 2}\nsay(json.stringify(v))\nsay(json.stringify([1, {"a": 1}], true))'
     assert run_tb(src) == [
-        '{"name": "Tanisha", "tags": ["a", "é"], "n": null, "ok": true, "1": 2}',
+        '{"name": "Alex", "tags": ["a", "é"], "n": null, "ok": true, "1": 2}',
         '[\n  1,\n  {\n    "a": 1\n  }\n]',
     ]
 

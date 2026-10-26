@@ -22,8 +22,8 @@ import os
 import sys
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))  # noqa: F821 (SPECPATH is set by PyInstaller)
-VERSION = (2, 0, 0, 0)
-VERSION_TEXT = "2.0.0"
+VERSION = (2, 0, 1, 0)
+VERSION_TEXT = "2.0.1"
 
 # Windows "Details" tab (right-click tb.exe > Properties). Ignored elsewhere.
 version_info = None
@@ -47,7 +47,7 @@ if sys.platform == "win32":
                     StringStruct("FileDescription", "TB - a small, friendly programming language"),
                     StringStruct("FileVersion", VERSION_TEXT),
                     StringStruct("InternalName", "tb"),
-                    StringStruct("LegalCopyright", "Made with love, for Tanisha."),
+                    StringStruct("LegalCopyright", "TB - a friendly programming language."),
                     StringStruct("OriginalFilename", "tb.exe"),
                     StringStruct("ProductName", "TB"),
                     StringStruct("ProductVersion", VERSION_TEXT),

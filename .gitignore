@@ -7,3 +7,6 @@ test-results/
 playwright-report/
 src/data/writing.generated.json
 .lighthouseci/
+
+# Local Claude Code state (notes; never publish)
+.claude/

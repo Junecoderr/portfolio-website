@@ -6,10 +6,10 @@ from conftest import run_tb, tb_error
 def test_test_and_match():
     src = r'''import re
 say(re.test("\d+", "abc 123"), re.test("^\d+$", "abc"))
-let m = re.match("user=(\w+) ip=(?P<ip>[\d.]+)", "x user=tanisha ip=10.0.0.5 y")
+let m = re.match("user=(\w+) ip=(?P<ip>[\d.]+)", "x user=alex ip=10.0.0.5 y")
 say(m[0], m[1], m[2], m.ip, m.start, m.end)
 say(re.match("zzz", "abc"))'''
-    assert run_tb(src) == ["true false", "user=tanisha ip=10.0.0.5 tanisha 10.0.0.5 10.0.0.5 2 26", "nil"]
+    assert run_tb(src) == ["true false", "user=alex ip=10.0.0.5 alex 10.0.0.5 10.0.0.5 2 23", "nil"]
 
 
 def test_find_all_shapes():

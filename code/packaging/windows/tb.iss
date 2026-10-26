@@ -2,12 +2,12 @@
 ;
 ; Built by packaging/build.py on Windows (CI: windows-latest), from the
 ; PyInstaller one-folder build in dist\tb\. By hand, from code\:
-;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2.0.0 ^
+;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2.0.1 ^
 ;       /DSourceDir=dist\tb /DRepoDir=. /DOutputDir=dist packaging\windows\tb.iss
 ;
 ; What it does (per-user by default, no admin rights needed):
 ;   - installs dist\tb\ (tb.exe, tbw.exe = no console window for the GUI apps,
-;     _internal\, apps\, examples\, for_tanisha.tb) into %LOCALAPPDATA%\Programs\TB
+;     _internal\, apps\, examples\, welcome.tb) into %LOCALAPPDATA%\Programs\TB
 ;   - adds that folder to the user's PATH (removed again on uninstall)
 ;   - .tb files: double-click runs them in a console (TB waits for Enter
 ;     before the window closes); right-click > Edit opens Notepad
@@ -16,7 +16,7 @@
 ; list, saved next to their app) are left in place on uninstall.
 
 #ifndef AppVersion
-  #define AppVersion "2.0.0"
+  #define AppVersion "2.0.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\..\dist\tb"
@@ -40,7 +40,7 @@ AppVerName={#AppName} {#AppVersion}
 AppPublisher=TB
 AppPublisherURL={#AppUrl}
 AppSupportURL={#AppUrl}
-AppComments=TB, a small, friendly programming language. Made with love, for Tanisha.
+AppComments=TB, a small, friendly programming language.
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany=TB
 VersionInfoProductName=TB
@@ -71,11 +71,11 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-FinishedLabel=TB is installed.%n%nOpen "TB Prompt" from the Start menu and type:%n%n    tb for_tanisha.tb%n%nor double-click any .tb file. The apps are in the Start menu too, in the TB folder.
+FinishedLabel=TB is installed.%n%nOpen "TB Prompt" from the Start menu and type:%n%n    tb welcome.tb%n%nor double-click any .tb file. The apps are in the Start menu too, in the TB folder.
 
 [Files]
 ; dist\tb\ already holds tb.exe, tbw.exe, _internal\, apps\, examples\ and
-; for_tanisha.tb (build.py copies them in), the same as the portable zip.
+; welcome.tb (build.py copies them in), the same as the portable zip.
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "todo.json,journal.json"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Registry]

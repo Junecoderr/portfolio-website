@@ -1,9 +1,9 @@
-"""Run every examples/*.tb, for_tanisha.tb and the non-GUI apps through a built TB binary.
+"""Run every examples/*.tb, welcome.tb and the non-GUI apps through a built TB binary.
 
 Usage:
     uv run python packaging/run_examples.py dist/tb/tb        # or dist/tb/tb.exe
     python packaging/run_examples.py <TB>/tb.exe --root <TB>  # an installed copy:
-        use the examples/, apps/ and for_tanisha.tb found in <TB>
+        use the examples/, apps/ and welcome.tb found in <TB>
 
 - An example with a matching <name>.in file gets that file on stdin (for ask()).
 - An example with a matching <name>.out file has its output compared, unless it
@@ -50,7 +50,7 @@ def main() -> int:
         print(f"binary not found: {binary}")
         return 2
 
-    programs = sorted((ROOT / "examples").glob("*.tb")) + [ROOT / "for_tanisha.tb"]
+    programs = sorted((ROOT / "examples").glob("*.tb")) + [ROOT / "welcome.tb"]
     failures = 0
     for prog in programs:
         src = prog.read_text(encoding="utf-8")

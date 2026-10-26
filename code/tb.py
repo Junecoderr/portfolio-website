@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """TB - a small, friendly programming language.
 
-Made with love for Tanisha Brahma (TB = her initials).
-
 This single file is the core of the language: a lexer, a parser that builds a
 tree, an interpreter that walks that tree, the module loader and the command
 line. The standard library lives next to it, in the tblib/ folder. It needs
@@ -36,7 +34,7 @@ import os  # noqa: E402
 import random  # noqa: E402
 import re  # noqa: E402
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 # How many TB function calls may be "open" at once before TB says the program
 # is probably calling itself forever. Deep enough for countdown(2000) and fib.
@@ -953,7 +951,7 @@ class Parser:
                 found = self.peek()
                 raise TBError(
                     "I expected ':' between a key and its value in this map "
-                    f'(like {{"name": "Tanisha"}}), but found {describe(found)}.',
+                    f'(like {{"name": "Alex"}}), but found {describe(found)}.',
                     found.line,
                 )
             self.advance()
@@ -1250,14 +1248,14 @@ CARE_MESSAGES = [
     "You are doing better than you think.",
     "Drink some water and take a deep breath.",
     "It's okay to rest. Rest is part of the work.",
-    "You make the world softer just by being in it.",
+    "One step at a time is still progress.",
     "Be gentle with yourself today.",
-    "Whatever happens today, you are loved.",
+    "You are doing well. Keep going.",
     "Small steps still move you forward.",
     "You don't have to be perfect to be wonderful.",
     "Remember to eat something nice today.",
-    "Your smile is someone's favourite thing.",
-    "Proud of you, always.",
+    "Step outside for a minute of fresh air.",
+    "Well done for showing up today.",
     "Take a break, stretch, and look at the sky for a moment.",
 ]
 
@@ -2994,7 +2992,7 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     except (AttributeError, ValueError, OSError):
         pass  # Windows has no SIGPIPE; not the main thread
-    # Never crash on a console that can't show characters like the heart.
+    # Never crash on a console that can't show characters like the care() symbol.
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(errors="replace")

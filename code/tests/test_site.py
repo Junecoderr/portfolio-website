@@ -116,8 +116,8 @@ def test_home_page_lists_every_library():
     text = (SITE / "index.html").read_text(encoding="utf-8")
     for lib in tb.list_libraries():
         assert f'href="lib/{lib}.html"' in text, lib
-    assert text.count("<!-- PERSONAL MESSAGE: START (edit freely) -->") == 1
-    assert text.count("<!-- PERSONAL MESSAGE: END -->") == 1
+    assert "PERSONAL MESSAGE" not in text
+    assert 'id="why"' in text  # the footer's "Why TB" link lands here
 
 
 @pytest.mark.parametrize("page", PAGES, ids=lambda p: p.name)
@@ -146,7 +146,7 @@ def test_full_build(tmp_path):
     data_index = json.loads((out / "apps" / "data" / "index.json").read_text())
     assert "auth.log" in data_index and "sigma/ssh_brute_force.yml" in data_index
     names = [e["name"] for e in json.loads((out / "examples" / "index.json").read_text())]
-    assert names[:2] == ["for_tanisha", "hello"] and "ssh_brute_force" in names
+    assert names[:2] == ["welcome", "hello"] and "ssh_brute_force" in names
     gallery = (out / "examples.html").read_text(encoding="utf-8")
     assert "APPS GALLERY" not in gallery
     for app in (ROOT / "apps").iterdir():
@@ -156,12 +156,23 @@ def test_full_build(tmp_path):
     assert (out / "lib" / "ioc.html").exists()
     for page in out.rglob("*.html"):
         assert not name_guard.contains_name(page.read_text(encoding="utf-8")), page
+    config = (out / "assets" / "js" / "config.js").read_text(encoding="utf-8")
+    assert f'version: "{tb.__version__}"' in config and "repo" not in config
+    # Downloads and links stay on this site: no GitHub links, no release URLs.
+    for path in out.rglob("*"):
+        if not path.is_file() or "vendor" in path.relative_to(out).parts:
+            continue
+        if path.suffix not in (".html", ".js", ".css", ".json", ".tb", ".md", ".txt"):
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        assert "github.com" not in text.lower(), f"{path.relative_to(out)} links to GitHub"
+        assert "/releases/" not in text, f"{path.relative_to(out)} has a release URL"
 
 
 def test_name_guard_catches_the_name():
     # Built from the digests' own inputs would spell the name; instead check
     # that the guard is wired up and quiet on ordinary text.
-    assert not name_guard.contains_name("Made with love, for Tanisha. TB 2.0 brute force raid amond")
+    assert not name_guard.contains_name("A friendly programming language. TB 2.0 brute force raid amond")
     assert set(name_guard._DIGESTS) == {4, 6}
 
 
@@ -179,3 +190,12 @@ def test_release_assets_exist():
         assert name in workflow, f"the site links to {name}, but tb-release.yml doesn't upload it"
     for path in SITE.rglob("*.html"):
         assert "tb-windows-x64.exe" not in path.read_text(encoding="utf-8"), f"{path.name} links the old Windows asset"
+    # Every download link is site-relative (/dl/<asset>); the host serves the files.
+    for path in list(SITE.rglob("*.html")) + list(SITE.rglob("*.js")):
+        if "vendor" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "github.com" not in text.lower(), f"{path.name} links to GitHub"
+        assert "/releases/" not in text, f"{path.name} has a release URL"
+        for name, href in re.findall(r'data-download="([^"]+)"(?: data-primary-link)? href="([^"]+)"', text):
+            assert href == f"/dl/{name}", (path.name, name, href)

@@ -111,11 +111,11 @@ def test_todo_survives_a_broken_file(fake, tmp_path):
 def test_care_check_in(fake, tmp_path):
     folder, lines = run_app("care", tmp_path)
     win = fake.window_
-    assert win.find("label", "How are you today, Tanisha?")
+    assert win.find("label", "How are you today?")
     assert win.status_text == "0 check-ins in your journal"
     # Saving before picking a mood asks gently.
     win.find("button", "Save today's check-in").click()
-    assert fake.dialogs[-1]["message"] == "Pick how you feel first ♥"
+    assert fake.dialogs[-1]["message"] == "Pick how you feel first."
 
     win.find("button", "✿  Calm").click()
     assert win.find("label", "✿  Feeling calm today")
@@ -156,14 +156,14 @@ def test_notes_type_count_save_open(fake, tmp_path):
     assert [m[0] for m in win.menu] == ["File", "Help"]
     assert win.status_text == "0 words, 0 characters"
     editor = win.find("textarea")
-    editor.type("Hello there Tanisha")
-    assert win.status_text == "3 words, 19 characters"
+    editor.type("Hello there Alex")
+    assert win.status_text == "3 words, 16 characters"
     assert win.title == "Untitled • - Notes"
 
     target = str(tmp_path / "hello.txt")
     fake.answers = [target]
     win.press("Mod+S")
-    assert open(target).read() == "Hello there Tanisha"
+    assert open(target).read() == "Hello there Alex"
     assert fake.dialogs[-1]["kind"] == "save_file" and fake.dialogs[-1]["name"] == "Untitled.txt"
     assert win.title == "hello.txt - Notes"
 
@@ -193,7 +193,7 @@ def test_notes_open_from_args_and_quit(fake, tmp_path):
     assert win.find("textarea").text == "one two"
     assert win.status_text == "2 words, 7 characters"
     win.choose_menu("Help", "About Notes")
-    assert "Made with love, for Tanisha." in fake.dialogs[-1]["message"]
+    assert "a tiny editor written in TB." in fake.dialogs[-1]["message"]
     win.choose_menu("File", "Quit")
     assert not win.open
 

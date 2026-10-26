@@ -10,7 +10,7 @@ from conftest import run_tb, tb_error
 # -- maps ---------------------------------------------------------------------
 
 def test_map_literal_and_display():
-    assert run_tb('let m = {"name": "Tanisha", "age": 21}\nsay(m)') == ['{"name": "Tanisha", "age": 21}']
+    assert run_tb('let m = {"name": "Alex", "age": 21}\nsay(m)') == ['{"name": "Alex", "age": 21}']
     assert run_tb("say({})") == ["{}"]
     assert run_tb('say({1: "one", 2.5: [1, "a"], "n": nil, "b": true})') == [
         '{1: "one", 2.5: [1, "a"], "n": nil, "b": true}'
@@ -109,8 +109,8 @@ def test_old_index_errors_mention_maps_gently():
 # -- dot access -----------------------------------------------------------------
 
 def test_dot_reads_and_sets_map_fields():
-    src = 'let p = {"name": "T"}\np.name = "Tanisha"\np.age = 21\nsay(p.name, p.age, p)'
-    assert run_tb(src) == ['Tanisha 21 {"name": "Tanisha", "age": 21}']
+    src = 'let p = {"name": "T"}\np.name = "Alex"\np.age = 21\nsay(p.name, p.age, p)'
+    assert run_tb(src) == ['Alex 21 {"name": "Alex", "age": 21}']
 
 
 def test_dot_missing_field_error_with_hint():
@@ -330,8 +330,8 @@ def test_methods_are_values():
 # -- f-text -------------------------------------------------------------------------
 
 def test_fstring_basics():
-    src = 'let name = "Tanisha"\nlet xs = [1, 2, 3]\nsay(f"Hello {name}, you have {len(xs)} items, {xs[0] + 10}.")'
-    assert run_tb(src) == ["Hello Tanisha, you have 3 items, 11."]
+    src = 'let name = "Alex"\nlet xs = [1, 2, 3]\nsay(f"Hello {name}, you have {len(xs)} items, {xs[0] + 10}.")'
+    assert run_tb(src) == ["Hello Alex, you have 3 items, 11."]
 
 
 def test_fstring_values_use_say_formatting():

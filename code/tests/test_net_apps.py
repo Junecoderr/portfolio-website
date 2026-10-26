@@ -239,4 +239,4 @@ def test_uptime_bad_config(tmp_path):
 def test_uptime_sample_config_lists_the_sites():
     data = json.loads((APPS / "uptime-monitor" / "sites.json").read_text())
     urls = [s["url"] for s in data["sites"]]
-    assert urls == ["https://code.tanisha.ceo", "https://tanisha.ceo"]
+    assert urls == ["https://code.tanisha.ceo", "https://example.com"]

@@ -1,6 +1,6 @@
 """Run every example program and check its output.
 
-For each ``examples/<name>.tb`` (plus ``for_tanisha.tb`` at the repo root):
+For each ``examples/<name>.tb`` (plus ``welcome.tb`` at the repo root):
 
 * ``examples/<name>.in`` (optional) holds the answers typed into ``ask()``,
   one per line. Programs that call ``ask(`` must have one.
@@ -8,7 +8,7 @@ For each ``examples/<name>.tb`` (plus ``for_tanisha.tb`` at the repo root):
   ``care()`` call, exactly as ``tb.run`` passes it to ``output``. The prompts
   given to ``ask()`` are not part of it (they go to ``input_fn``), so for
   interactive programs it differs slightly from what a terminal shows.
-  The expected output for ``for_tanisha.tb`` lives in ``tests/for_tanisha.out``.
+  The expected output for ``welcome.tb`` lives in ``tests/welcome.out``.
 
 ``care()`` picks a random message, so its lines can't be compared exactly.
 Instead of seeding the random generator (which would break whenever the list
@@ -80,7 +80,7 @@ def run_program(program: Path) -> list[str]:
     return lines
 
 
-ALL_PROGRAMS = EXAMPLE_FILES + [ROOT / "for_tanisha.tb"]
+ALL_PROGRAMS = EXAMPLE_FILES + [ROOT / "welcome.tb"]
 
 
 def test_there_are_enough_examples():
@@ -126,7 +126,7 @@ def site_code_blocks() -> dict[str, str]:
 
 def test_examples_page_has_every_example():
     blocks = site_code_blocks()
-    names = {p.stem for p in EXAMPLE_FILES} | {"for_tanisha"}
+    names = {p.stem for p in EXAMPLE_FILES} | {"welcome"}
     assert set(blocks) == names
 
 

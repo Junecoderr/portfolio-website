@@ -70,8 +70,8 @@ def test_push_returns_list():
 
 
 def test_ask_uses_input_fn_and_returns_text():
-    out = run_tb('let name = ask("Name? ")\nsay("Hi " + name)\nsay(ask())', inputs=["Tanisha", "42"])
-    assert out == ["Hi Tanisha", "42"]
+    out = run_tb('let name = ask("Name? ")\nsay("Hi " + name)\nsay(ask())', inputs=["Alex", "42"])
+    assert out == ["Hi Alex", "42"]
     assert run_tb.last_prompts == ["Name? ", ""]
 
 
@@ -106,7 +106,7 @@ def test_care_matches_rng_choice():
 
 def test_care_with_name_personalises():
     msg = random.Random(5).choice(tb.CARE_MESSAGES)
-    assert run_tb('care("Tanisha")', seed=5) == ["♥ Tanisha, " + msg[0].lower() + msg[1:]]
+    assert run_tb('care("Alex")', seed=5) == ["♥ Alex, " + msg[0].lower() + msg[1:]]
 
 
 def test_care_returns_nil():

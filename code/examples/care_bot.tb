@@ -16,7 +16,7 @@ let name = ask("What's your name? ")
 if name == "" {
   name = "friend"
 }
-say("It's lovely to see you, " + name + ".")
+say("It's good to see you, " + name + ".")
 say("")
 
 say("How are you feeling right now?")
@@ -36,7 +36,7 @@ if is_one_of(feeling, ["1", "happy", "Happy", "HAPPY", "good", "Good", "great", 
   say("Maybe a glass of water and a little rest? Even ten minutes helps.")
 } else if is_one_of(feeling, ["3", "sad", "Sad", "SAD", "down", "Down"]) {
   say("I'm sorry today feels heavy. It's okay to feel sad.")
-  say("Wrap up in something cosy, and maybe talk to someone who loves you.")
+  say("Wrap up in something cosy, and maybe talk to someone you trust.")
 } else if is_one_of(feeling, ["4", "stressed", "Stressed", "STRESSED", "worried", "Worried"]) {
   say("That sounds like a lot. Let's take one slow breath together.")
   say("In... and out. You don't have to do everything at once.")
@@ -58,12 +58,12 @@ for n in range(1, 11) {
 if score == 0 {
   say("That's alright, numbers can be hard to pick. I'm still glad you're here.")
 } else if score <= 3 {
-  say(str(score) + " out of 10. I'm sending you the biggest hug.")
+  say(str(score) + " out of 10. I'm sorry it's been a hard day.")
   say("Please rest, drink some water, and reach out to someone you trust.")
 } else if score <= 6 {
   say(str(score) + " out of 10. A middling day. Something small and nice might help.")
 } else if score <= 9 {
-  say(str(score) + " out of 10! That's a good day. I'm proud of you.")
+  say(str(score) + " out of 10! That's a good day. Well done.")
 } else {
   say("10 out of 10! Amazing! Your happiness is contagious.")
 }

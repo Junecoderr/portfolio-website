@@ -1,9 +1,9 @@
-// Download page: point every link at the GitHub release for this version (tag tb-vX.Y.Z), show the
-// file for this computer first, and open the matching install steps.
+// Download page: point every link at /dl/<asset> on this site (the host serves the files for the
+// current version), show the file for this computer first, and open the matching install steps.
 (function () {
   "use strict";
-  var cfg = window.TB_CONFIG || { repo: "OWNER/REPO", version: "1.0.0" };
-  var base = "https://github.com/" + cfg.repo + "/releases/download/tb-v" + cfg.version + "/";
+  var cfg = window.TB_CONFIG || { version: "2.0.1", downloads: "/dl/" };
+  var base = cfg.downloads || "/dl/";
 
   var OS = {
     windows: { name: "Windows", file: "tb-windows-x64-setup.exe", note: "The Windows installer for Windows 10 and 11 (64-bit): no admin needed, adds TB to the Start menu.", tab: "windows" },

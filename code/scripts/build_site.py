@@ -2,16 +2,17 @@
 
 Usage:
     uv run python scripts/fetch_pyodide.py          # once, downloads Pyodide
-    uv run python scripts/build_site.py [--repo OWNER/REPO] [--out dist/site]
+    uv run python scripts/build_site.py [--out dist/site]
     uv run python -m http.server -d dist/site 8000  # then open http://localhost:8000
 
 What it does:
   * copies site/ (pages, assets, vendored Pyodide) to --out
-  * copies tb.py and for_tanisha.tb to the site root
-  * copies examples/*.tb into <out>/examples/ (plus for_tanisha.tb)
+  * copies tb.py and welcome.tb to the site root
+  * copies examples/*.tb into <out>/examples/ (plus welcome.tb)
   * writes <out>/examples/index.json from the "# Title:" / "# About:" header
-    comments of each example (for_tanisha first)
-  * writes <out>/assets/js/config.js with the GitHub repo used for downloads
+    comments of each example (welcome first)
+  * writes <out>/assets/js/config.js with the version; downloads are
+    site-relative /dl/<asset> links (a rewrite on the host serves them)
   * copies the standard library (tblib/*.py, *.tb) and writes tblib/index.json,
     so the browser playground can `import` every library
   * copies apps/data/ (sample logs, the phishing email, Sigma rules) and writes
@@ -78,9 +79,9 @@ def read_header(path: Path) -> tuple[str | None, str | None]:
 
 def example_entry(name: str, path: Path) -> dict:
     title, about = read_header(path)
-    if name == "for_tanisha":
-        title = title or "For Tanisha"
-        about = about or "The very first TB program: a little letter, written in code."
+    if name == "welcome":
+        title = title or "Welcome to TB"
+        about = about or "A short tour of TB: variables, lists, loops, functions, maps and care()."
     return {
         "name": name,
         "title": title or name.replace("_", " ").capitalize(),
@@ -143,12 +144,9 @@ def copy_app_sources(out: Path) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the TB website.")
-    parser.add_argument("--repo", default=None, help="GitHub OWNER/REPO for download links")
+    parser.add_argument("--repo", default=None, help=argparse.SUPPRESS)  # ignored; kept so old commands still work
     parser.add_argument("--out", default="dist/site", help="output folder (default: dist/site)")
     args = parser.parse_args(argv)
-
-    if args.repo is not None and not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repo):
-        fail(f"--repo must look like OWNER/REPO, got {args.repo!r}")
 
     if not SITE.is_dir():
         fail(f"{SITE} not found")
@@ -173,21 +171,21 @@ def main(argv: list[str] | None = None) -> int:
     lib_files = copy_tblib(out)
     data_files = copy_app_data(out)
     app_names = copy_app_sources(out)
-    shutil.copy2(ROOT / "for_tanisha.tb", out / "for_tanisha.tb")
+    shutil.copy2(ROOT / "welcome.tb", out / "welcome.tb")
 
     ex_out = out / "examples"
     ex_out.mkdir(exist_ok=True)
-    shutil.copy2(ROOT / "for_tanisha.tb", ex_out / "for_tanisha.tb")
-    entries = [example_entry("for_tanisha", ROOT / "for_tanisha.tb")]
+    shutil.copy2(ROOT / "welcome.tb", ex_out / "welcome.tb")
+    entries = [example_entry("welcome", ROOT / "welcome.tb")]
     extra = []
     if PLAYGROUND_EXAMPLES.is_dir():
         for path in sorted(PLAYGROUND_EXAMPLES.glob("*.tb")):
             shutil.copy2(path, ex_out / path.name)
             extra.append(example_entry(path.stem, path))
     if EXAMPLES.is_dir():
-        # "hello" is the natural first lesson, so it comes right after for_tanisha.
+        # "hello" is the natural first lesson, so it comes right after welcome.
         for path in sorted(EXAMPLES.glob("*.tb"), key=lambda p: (p.stem != "hello", p.stem)):
-            if path.stem == "for_tanisha":
+            if path.stem == "welcome":
                 continue
             shutil.copy2(path, ex_out / path.name)
             entries.append(example_entry(path.stem, path))
@@ -198,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     (ex_out / "index.json").write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     match = VERSION_RE.search((ROOT / "tb.py").read_text(encoding="utf-8"))
-    version = match.group(1) if match else "2.0.0"
+    version = match.group(1) if match else "2.0.1"
 
     sys.path.insert(0, str(SCRIPTS))
     import gen_lib_docs  # noqa: E402  (imports tb, so only after the checks above)
@@ -213,15 +211,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("  note: examples.html has no apps gallery marker; skipped the gallery")
     config_path = out / "assets" / "js" / "config.js"
-    repo = args.repo
-    if repo is None:
-        existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
-        found = re.search(r'repo:\s*"([^"]+)"', existing)
-        repo = found.group(1) if found else "OWNER/REPO"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
-        "// Generated by scripts/build_site.py. Edit the --repo flag, not this file.\n"
-        f"window.TB_CONFIG = {{ repo: {json.dumps(repo)}, version: {json.dumps(version)} }};\n",
+        "// Generated by scripts/build_site.py from tb.__version__.\n"
+        "// Downloads are served from /dl/<asset> on this site.\n"
+        f"window.TB_CONFIG = {{ version: {json.dumps(version)}, downloads: \"/dl/\" }};\n",
         encoding="utf-8",
     )
 
@@ -229,9 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  {len(entries)} example(s): " + ", ".join(e["name"] for e in entries))
     print(f"  standard library: {len(lib_files)} files; sample data: {len(data_files)} files")
     print(f"  apps: {', '.join(app_names) or 'none'}; library pages: {len(lib_pages)}")
-    print(f"  downloads point at github.com/{repo}")
-    if repo == "OWNER/REPO":
-        print("  note: pass --repo OWNER/REPO so the download buttons work")
+    print("  downloads point at /dl/<asset> (TB " + version + ")")
     print(f"Serve it with:  uv run python -m http.server -d {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out} 8000")
     return 0
 

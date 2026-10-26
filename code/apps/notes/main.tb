@@ -33,7 +33,7 @@ win.menu({
     "Quit": fn() { quit() },
   },
   "Help": {
-    "About Notes": fn() { gui.alert("Notes, a tiny editor written in TB.\nMade with love, for Tanisha.", "About") },
+    "About Notes": fn() { gui.alert("Notes, a tiny editor written in TB.", "About") },
   },
 })
 win.key("Mod+N", fn() { new_note() })

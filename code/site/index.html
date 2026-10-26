@@ -16,7 +16,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
+      <a class="version-badge" href="download.html#whats-new" aria-label="Version 2.0.1: what's new">v<span data-version>2.0.1</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html">Learn</a>
@@ -40,7 +40,7 @@
             <a class="button button-primary button-big" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 2.0</a>
             <a class="button button-big" href="playground.html">Try it in your browser</a>
           </div>
-          <p class="hero-meta">Version <span data-version>2.0.0</span> for Windows, macOS and Linux. <a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">What's new in 2.0</a></p>
+          <p class="hero-meta">Version <span data-version>2.0.1</span> for Windows, macOS and Linux. <a href="download.html#whats-new">What's new in 2.0.1</a></p>
         </div>
 
         <div class="window" id="hero-window">
@@ -180,7 +180,7 @@ if intel.has_key("abuseipdb") {
             <pre class="tb-code" data-runnable><code>import csv
 import json
 
-let rows = csv.parse("name,cups\nTanisha,3\nMum,5\nDad,2")
+let rows = csv.parse("name,cups\nAlex,3\nSam,5\nPriya,2")
 let total = rows.map(fn(r) { return num(r.cups) }).sum()
 let top = rows.sort_by(fn(r) { return num(r.cups) }).last()
 say(f"{total} cups of tea, most by {top.name}")
@@ -224,14 +224,14 @@ say(json.stringify({"total": total, "top": top.name}))</code></pre>
       <section class="section" aria-labelledby="features-title">
         <div class="section-head">
           <h2 id="features-title">Still gentle</h2>
-          <p>TB began as a gift, a language for someone who had never programmed. 2.0 kept every bit of that.</p>
+          <p>TB is designed for people who have never programmed, and it stays that way when the programs get bigger.</p>
         </div>
         <div class="features features-2">
           <article class="feature">
             <h3>Friendly errors</h3>
             <p>Every mistake names the line and says what went wrong, in plain English. Typos get a suggestion.</p>
             <div class="specimen">
-              <pre class="tb-code"><code>let name = "Tanisha"
+              <pre class="tb-code"><code>let name = "Alex"
 let greeting = "Hello"
 say(greeting + ", " + nmae)</code></pre>
               <pre class="specimen-out"><span class="out-error">Oops! On line 3: I don't know what 'nmae' is. Did you mean 'name'?</span></pre>
@@ -242,7 +242,7 @@ say(greeting + ", " + nmae)</code></pre>
             <p>The Windows installer needs no admin rights and brings the whole standard library and the apps with it. Then just double-click a <code>.tb</code> file to run it.</p>
             <div class="specimen">
               <pre><span class="tok-op">&gt;</span> tb --version</pre>
-              <pre class="specimen-out">TB 2.0.0</pre>
+              <pre class="specimen-out">TB 2.0.1</pre>
             </div>
           </article>
           <article class="feature">
@@ -259,8 +259,8 @@ say(greeting + ", " + nmae)</code></pre>
             <h3>Built-in kindness</h3>
             <p><code>care()</code> prints a kind message, chosen at random. Give it a name to make it personal. It's still there in 2.0.</p>
             <div class="specimen">
-              <pre class="tb-code"><code>care("Tanisha")</code></pre>
-              <pre class="specimen-out">♥ Tanisha, you make the world softer just by being in it.</pre>
+              <pre class="tb-code"><code>care("Alex")</code></pre>
+              <pre class="specimen-out">♥ Alex, one step at a time is still progress.</pre>
             </div>
           </article>
         </div>
@@ -283,10 +283,10 @@ say(greeting + ", " + nmae)</code></pre>
           <div>
           <div class="tour-panel" id="tpanel-text" role="tabpanel" aria-labelledby="ttab-text">
             <p>Put any expression inside <code>{ }</code> in an <code>f"..."</code> string. Text has methods you call with a dot.</p>
-            <pre class="tb-code" data-runnable><code>let name = "Tanisha"
+            <pre class="tb-code" data-runnable><code>let name = "Alex"
 let mood = "  sunny  "
 say(f"Hello, {name}! Today feels {mood.trim()}.")
-say(name.upper(), name.len(), name.contains("tan"))
+say(name.upper(), name.len(), name.contains("le"))
 say("a,b,c".split(","))</code></pre>
           </div>
           <div class="tour-panel" id="tpanel-lists" role="tabpanel" aria-labelledby="ttab-lists" hidden>
@@ -342,7 +342,7 @@ import encode
 import text
 
 say(hash.sha256("hello").slice(0, 16))
-say(encode.base64("TB loves you"))
+say(encode.base64("Hello from TB"))
 say(text.format_number(1234567.5, 1))</code></pre>
           </div>
           </div>
@@ -371,21 +371,21 @@ say(text.format_number(1234567.5, 1))</code></pre>
           <div class="window-panel" id="ipanel-windows" role="tabpanel" aria-labelledby="itab-windows">
             <pre><span class="c"># After tb-windows-x64-setup.exe, open TB Prompt:</span>
 <span class="p">&gt; </span>tb --version
-TB 2.0.0
+TB 2.0.1
 <span class="p">&gt; </span>tb hello.tb
-Hello, Tanisha!
+Hello, world!
 <span class="c"># Or double-click any .tb file.</span></pre>
           </div>
           <div class="window-panel" id="ipanel-mac" role="tabpanel" aria-labelledby="itab-mac" hidden>
             <pre><span class="c"># Unzip tb-macos-arm64.zip, move the tb folder home, then once:</span>
 <span class="p">$ </span>xattr -dr com.apple.quarantine ~/tb
 <span class="p">$ </span>~/tb/tb hello.tb
-Hello, Tanisha!</pre>
+Hello, world!</pre>
           </div>
           <div class="window-panel" id="ipanel-linux" role="tabpanel" aria-labelledby="itab-linux" hidden>
             <pre><span class="p">$ </span>tar xzf tb-linux-x64.tar.gz
 <span class="p">$ </span>./tb/tb hello.tb
-Hello, Tanisha!</pre>
+Hello, world!</pre>
           </div>
         </div>
       </section>
@@ -393,18 +393,27 @@ Hello, Tanisha!</pre>
       <section class="section why" id="why" aria-labelledby="why-title">
         <div>
           <h2 id="why-title" class="flush">Why TB?</h2>
-          <p class="lead">TB was made as a gift, for one person. Its name is her initials.</p>
-          <p>It started small and gentle, so learning it would never feel like being told off. Version 2.0 lets it do real work, from a to-do list to triaging an attack, without losing that voice. If you are not Tanisha, you are still very welcome here.</p>
+          <p class="lead">TB is a small language with a few firm design goals.</p>
+          <p>It starts gentle, so learning it never feels like being told off, and it grows into real work: a to-do app, a log triage tool or a quick script.</p>
         </div>
-        <div class="letter">
-<!-- PERSONAL MESSAGE: START (edit freely) -->
-          <p class="salutation">Dear Tanisha,</p>
-          <p>I made you something a little unusual. It isn't flowers and it isn't a card. It's a whole language, small enough to fit in your pocket, and it carries your initials.</p>
-          <p>I know code can look like a wall of strange symbols. TB is my attempt to make it feel more like writing a note: you say something, and the computer says something kind back. You can't break anything, and every mistake comes with a gentle hint.</p>
-          <p>There's no rush to learn any of it. Open it on a quiet evening, run the first program, and know that every line was written thinking of you.</p>
-          <p class="signature">With love, always.</p>
-<!-- PERSONAL MESSAGE: END -->
-        </div>
+        <ul class="goals">
+          <li>
+            <h3>Friendly errors</h3>
+            <p>Every mistake names the line and says what went wrong in plain English, with a suggestion when it looks like a typo.</p>
+          </li>
+          <li>
+            <h3>Batteries included</h3>
+            <p>Twenty libraries ship with the language: windows and buttons, files, JSON, logs, detection rules, hashing and networking. No package manager needed.</p>
+          </li>
+          <li>
+            <h3>Runs everywhere</h3>
+            <p>The same program runs on Windows, macOS and Linux, and in the browser playground.</p>
+          </li>
+          <li>
+            <h3>Small and readable</h3>
+            <p>Plain words like <code>say</code>, <code>let</code> and <code>for</code>, and a syntax small enough to learn in an afternoon.</p>
+          </li>
+        </ul>
       </section>
 
       <section class="cta-band" aria-labelledby="cta-title">
@@ -446,15 +455,14 @@ Hello, Tanisha!</pre>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="download.html#whats-new">What's new</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
       </nav>
     </div>
     <div class="footer-bottom">
-      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
-      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
+      <p>TB — a friendly programming language.</p>
+      <p>TB <span data-version>2.0.1</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

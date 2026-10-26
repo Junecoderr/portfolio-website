@@ -16,7 +16,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
+      <a class="version-badge" href="download.html#whats-new" aria-label="Version 2.0.1: what's new">v<span data-version>2.0.1</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html">Learn</a>
@@ -41,22 +41,22 @@
       <ul class="gallery" aria-label="All examples">
           <li>
             <article class="ex-card">
-              <pre class="tb-code-plain" aria-hidden="true"><code># for_tanisha.tb
-# A little program, written in a little language, for Tanisha.
-# Run it with:  tb for_tanisha.tb
+              <pre class="tb-code-plain" aria-hidden="true"><code># welcome.tb
+# A short tour of TB: one small program, many features.
+# Run it with:  tb welcome.tb
 
-let name = "Tanisha"
-say("Hello, " + name + "!")
-say("This language is called TB. Can you guess why?")
-say("")
-</code></pre>
+# Variables and f-strings
+let name = "Alex"
+say(f"Hello, {name}! Welcome to TB.")
+say("This program is a quick tour of the language.")
+say("")</code></pre>
               <div class="ex-card-body">
-                <h3><a href="#for_tanisha">For Tanisha</a></h3>
-                <p>The very first TB program, a little letter written in code. Lists, loops, functions and a note at the end.</p>
-                <ul class="ex-tags" aria-label="Topics"><li>functions</li><li>loops</li><li>lists</li><li>care()</li><li>70 lines</li></ul>
+                <h3><a href="#welcome">Welcome to TB</a></h3>
+                <p>A short tour of TB: variables, lists, loops, functions, maps and care().</p>
+                <ul class="ex-tags" aria-label="Topics"><li>functions</li><li>loops</li><li>lists</li><li>maps</li><li>care()</li><li>68 lines</li></ul>
                 <div class="ex-card-actions">
-                  <a class="button" href="#for_tanisha">Read the code</a>
-                  <a class="button" href="playground.html?example=for_tanisha">Open in playground</a>
+                  <a class="button" href="#welcome">Read the code</a>
+                  <a class="button" href="playground.html?example=welcome">Open in playground</a>
                 </div>
               </div>
             </article>
@@ -66,7 +66,7 @@ say("")
               <pre class="tb-code-plain" aria-hidden="true"><code># Lines that start with # are notes for people. TB skips them.
 
 say("Hello, world!")
-say("Hello, Tanisha!")
+say("Hello, Sam!")
 
 # say() can show more than one thing at once, with spaces in between.
 say("Two plus two is", 2 + 2)
@@ -85,8 +85,8 @@ say("Two plus two is", 2 + 2)
           </li>
           <li>
             <article class="ex-card">
-              <pre class="tb-code-plain" aria-hidden="true"><code>let things = ["smile", "laugh", "kindness"]
-let words = ["lights up the room", "makes my day"]
+              <pre class="tb-code-plain" aria-hidden="true"><code>let things = ["idea", "effort", "kindness"]
+let words = ["makes a difference", "is noticed"]
 
 fn compliment(thing, word) {
   return "Your " + thing + " " + word + "."
@@ -108,16 +108,16 @@ for thing in things {</code></pre>
           <li>
             <article class="ex-card">
               <pre class="tb-code-plain" aria-hidden="true"><code>let seconds = 5
-say("Hug arriving in...")
+say("Lift-off in...")
 while seconds &gt; 0 {
   say(str(seconds) + "...")
   seconds = seconds - 1
 }
-say("Hug delivered! &lt;3")
+say("Lift-off! The rocket is away.")
 say("")
 </code></pre>
               <div class="ex-card-body">
-                <h3><a href="#countdown">Countdown to a hug</a></h3>
+                <h3><a href="#countdown">Countdown to lift-off</a></h3>
                 <p>Counts down with a while loop, then counts by twos with range().</p>
                 <ul class="ex-tags" aria-label="Topics"><li>loops</li><li>17 lines</li></ul>
                 <div class="ex-card-actions">
@@ -132,19 +132,19 @@ say("")
               <pre class="tb-code-plain" aria-hidden="true"><code># % gives the remainder after dividing. If n % 3 is 0, n is a multiple of 3.
 for n in range(1, 16) {
   if n % 15 == 0 {
-    say("love and hugs!")
+    say("fizz buzz!")
   } else if n % 3 == 0 {
-    say("love")
+    say("fizz")
   } else if n % 5 == 0 {
-    say("hugs")
+    say("buzz")
   } else {</code></pre>
               <div class="ex-card-body">
-                <h3><a href="#love_buzz">Love buzz</a></h3>
-                <p>A playful pattern: every 3rd number says "love", every 5th says "hugs".</p>
+                <h3><a href="#fizz_stars">Fizz stars</a></h3>
+                <p>A playful pattern: every 3rd number says "fizz", every 5th says "buzz".</p>
                 <ul class="ex-tags" aria-label="Topics"><li>loops</li><li>21 lines</li></ul>
                 <div class="ex-card-actions">
-                  <a class="button" href="#love_buzz">Read the code</a>
-                  <a class="button" href="playground.html?example=love_buzz">Open in playground</a>
+                  <a class="button" href="#fizz_stars">Read the code</a>
+                  <a class="button" href="playground.html?example=fizz_stars">Open in playground</a>
                 </div>
               </div>
             </article>
@@ -181,10 +181,10 @@ for item in groceries {
   }
 }
 
-let hugs = make_counter("Hugs today")</code></pre>
+let cups = make_counter("Cups of tea today")</code></pre>
               <div class="ex-card-body">
                 <h3><a href="#closures">Functions that remember</a></h3>
-                <p>Closures: little functions that keep their own memory, like a hug counter.</p>
+                <p>Closures: little functions that keep their own memory, like a step counter.</p>
                 <ul class="ex-tags" aria-label="Topics"><li>functions</li><li>29 lines</li></ul>
                 <div class="ex-card-actions">
                   <a class="button" href="#closures">Read the code</a>
@@ -260,84 +260,82 @@ fn is_one_of(word, options) {
             </article>
           </li>
       </ul>
-      <section class="example" id="for_tanisha" aria-labelledby="for_tanisha-title">
+      <section class="example" id="welcome" aria-labelledby="welcome-title">
         <div class="example-head">
           <div>
-            <h3 id="for_tanisha-title">For Tanisha</h3>
-            <p>The very first TB program, a little letter written in code. Lists, loops, functions and a note at the end.</p>
+            <h3 id="welcome-title">Welcome to TB</h3>
+            <p>A short tour of TB: variables, lists, loops, functions, maps and care().</p>
           </div>
-          <div class="button-row"><a class="button" href="examples/for_tanisha.tb" download>Download for_tanisha.tb</a></div>
+          <div class="button-row"><a class="button" href="examples/welcome.tb" download>Download welcome.tb</a></div>
         </div>
-        <pre class="tb-code" data-runnable data-example="for_tanisha" id="code-for_tanisha"><code># for_tanisha.tb
-# A little program, written in a little language, for Tanisha.
-# Run it with:  tb for_tanisha.tb
+        <pre class="tb-code" data-runnable data-example="welcome" id="code-welcome"><code># welcome.tb
+# A short tour of TB: one small program, many features.
+# Run it with:  tb welcome.tb
 
-let name = "Tanisha"
-say("Hello, " + name + "!")
-say("This language is called TB. Can you guess why?")
+# Variables and f-strings
+let name = "Alex"
+say(f"Hello, {name}! Welcome to TB.")
+say("This program is a quick tour of the language.")
 say("")
 
-# Things I love about you (a list)
-let reasons = [
-  "your laugh",
-  "the way you care about everyone",
-  "how brave you are",
-  "your terrible puns",
-]
-
-say("A few reasons I love you:")
+# Lists and loops
+let languages = ["TB", "Python", "JavaScript", "Go"]
+say("A few programming languages:")
 let count = 1
-for reason in reasons {
-  say(str(count) + ". " + reason)
+for language in languages {
+  say(str(count) + ". " + language)
   count = count + 1
 }
-say("...and " + str(len(reasons)) + " is nowhere near all of them.")
+say(f"That's {len(languages)} languages in one list.")
+say("")
+
+# Maps: named values that belong together
+let pet = {"name": "Biscuit", "kind": "cat", "age": 3}
+say(f"{pet.name} is a {pet.kind} who is {pet.age} years old.")
 say("")
 
 # A function that remembers things (a closure)
 fn make_counter() {
-  let days = 0
+  let steps = 0
   return fn() {
-    days = days + 1
-    return days
+    steps = steps + 1
+    return steps
   }
 }
 
-let together = make_counter()
-together()
-together()
-say("Days I've been happy today: " + str(together()))
+let walk = make_counter()
+walk()
+walk()
+say("Steps taken so far: " + str(walk()))
 
 # A function that calls itself (recursion)
-fn hearts(n) {
+fn stars(n) {
   if n &lt;= 0 {
     return ""
   }
-  return "&lt;3 " + hearts(n - 1)
+  return "* " + stars(n - 1)
 }
-say(hearts(5))
+say(stars(5))
 say("")
 
-# Counting with while
+# Counting down with while
 let i = 3
 while i &gt; 0 {
   say(str(i) + "...")
   i = i - 1
 }
 
-if len(reasons) &gt; 3 {
-  say("I love you more than " + str(len(reasons)) + " reasons can say.")
-} else if len(reasons) &gt; 0 {
-  say("I love you.")
+if len(languages) &gt; 3 {
+  say("Lift-off! You have seen the basics of TB.")
 } else {
-  say("Still loving you.")
+  say("Lift-off!")
 }
 
 say("")
-say("A note from TB, just for you:")
+say("A note from TB:")
 care(name)
 say("")
-say("With love, always.")</code></pre>
+say("Have fun writing your own programs.")</code></pre>
       </section>
       <section class="example" id="hello" aria-labelledby="hello-title">
         <div class="example-head">
@@ -353,13 +351,13 @@ say("With love, always.")</code></pre>
 # Lines that start with # are notes for people. TB skips them.
 
 say("Hello, world!")
-say("Hello, Tanisha!")
+say("Hello, Sam!")
 
 # say() can show more than one thing at once, with spaces in between.
 say("Two plus two is", 2 + 2)
 
 # Text in quotes can be joined together with +
-let name = "Tanisha"
+let name = "Priya"
 say("Welcome to TB, " + name + ".")</code></pre>
       </section>
       <section class="example" id="compliments" aria-labelledby="compliments-title">
@@ -373,8 +371,8 @@ say("Welcome to TB, " + name + ".")</code></pre>
         <pre class="tb-code" data-runnable data-example="compliments" id="code-compliments"><code># Title: Compliment machine
 # About: Mixes words from two lists to write lots of little compliments.
 
-let things = ["smile", "laugh", "kindness"]
-let words = ["lights up the room", "makes my day"]
+let things = ["idea", "effort", "kindness"]
+let words = ["makes a difference", "is noticed"]
 
 fn compliment(thing, word) {
   return "Your " + thing + " " + word + "."
@@ -392,57 +390,57 @@ say("That's " + str(len(things) * len(words)) + " compliments, and every one is 
       <section class="example" id="countdown" aria-labelledby="countdown-title">
         <div class="example-head">
           <div>
-            <h3 id="countdown-title">Countdown to a hug</h3>
+            <h3 id="countdown-title">Countdown to lift-off</h3>
             <p>Counts down with a while loop, then counts by twos with range().</p>
           </div>
           <div class="button-row"><a class="button" href="examples/countdown.tb" download>Download countdown.tb</a></div>
         </div>
-        <pre class="tb-code" data-runnable data-example="countdown" id="code-countdown"><code># Title: Countdown to a hug
+        <pre class="tb-code" data-runnable data-example="countdown" id="code-countdown"><code># Title: Countdown to lift-off
 # About: Counts down with a while loop, then counts by twos with range().
 
 let seconds = 5
-say("Hug arriving in...")
+say("Lift-off in...")
 while seconds &gt; 0 {
   say(str(seconds) + "...")
   seconds = seconds - 1
 }
-say("Hug delivered! &lt;3")
+say("Lift-off! The rocket is away.")
 say("")
 
 # range(10, 0, -2) means: start at 10, stop before 0, go down 2 each time.
-say("Counting kisses by twos, backwards:")
+say("Counting by twos, backwards:")
 for n in range(10, 0, -2) {
   say(n)
 }</code></pre>
       </section>
-      <section class="example" id="love_buzz" aria-labelledby="love_buzz-title">
+      <section class="example" id="fizz_stars" aria-labelledby="fizz_stars-title">
         <div class="example-head">
           <div>
-            <h3 id="love_buzz-title">Love buzz</h3>
-            <p>A playful pattern: every 3rd number says "love", every 5th says "hugs".</p>
+            <h3 id="fizz_stars-title">Fizz stars</h3>
+            <p>A playful pattern: every 3rd number says "fizz", every 5th says "buzz".</p>
           </div>
-          <div class="button-row"><a class="button" href="examples/love_buzz.tb" download>Download love_buzz.tb</a></div>
+          <div class="button-row"><a class="button" href="examples/fizz_stars.tb" download>Download fizz_stars.tb</a></div>
         </div>
-        <pre class="tb-code" data-runnable data-example="love_buzz" id="code-love_buzz"><code># Title: Love buzz
-# About: A playful pattern: every 3rd number says "love", every 5th says "hugs".
+        <pre class="tb-code" data-runnable data-example="fizz_stars" id="code-fizz_stars"><code># Title: Fizz stars
+# About: A playful pattern: every 3rd number says "fizz", every 5th says "buzz".
 
 # % gives the remainder after dividing. If n % 3 is 0, n is a multiple of 3.
 for n in range(1, 16) {
   if n % 15 == 0 {
-    say("love and hugs!")
+    say("fizz buzz!")
   } else if n % 3 == 0 {
-    say("love")
+    say("fizz")
   } else if n % 5 == 0 {
-    say("hugs")
+    say("buzz")
   } else {
     say(n)
   }
 }
 say("")
 
-# Text times a number repeats the text. Here we draw a little heart triangle.
+# Text times a number repeats the text. Here we draw a little triangle of stars.
 for size in range(1, 6) {
-  say("&lt;3 " * size)
+  say("* " * size)
 }</code></pre>
       </section>
       <section class="example" id="grocery_list" aria-labelledby="grocery_list-title">
@@ -492,12 +490,12 @@ for item in everything {
         <div class="example-head">
           <div>
             <h3 id="closures-title">Functions that remember</h3>
-            <p>Closures: little functions that keep their own memory, like a hug counter.</p>
+            <p>Closures: little functions that keep their own memory, like a step counter.</p>
           </div>
           <div class="button-row"><a class="button" href="examples/closures.tb" download>Download closures.tb</a></div>
         </div>
         <pre class="tb-code" data-runnable data-example="closures" id="code-closures"><code># Title: Functions that remember
-# About: Closures: little functions that keep their own memory, like a hug counter.
+# About: Closures: little functions that keep their own memory, like a step counter.
 
 fn make_counter(label) {
   let count = 0
@@ -507,13 +505,13 @@ fn make_counter(label) {
   }
 }
 
-let hugs = make_counter("Hugs today")
-let kisses = make_counter("Kisses today")
+let cups = make_counter("Cups of tea today")
+let pages = make_counter("Pages read today")
 
-hugs()
-hugs()
-kisses()
-hugs()
+cups()
+cups()
+pages()
+cups()
 
 # A function can also be kept in a 'let' and passed around like any value.
 let shout = fn(text) {
@@ -524,7 +522,7 @@ fn twice(f, value) {
   return f(f(value))
 }
 
-say(twice(shout, "I love you"))</code></pre>
+say(twice(shout, "Hello there"))</code></pre>
       </section>
       <section class="example" id="recursion" aria-labelledby="recursion-title">
         <div class="example-head">
@@ -643,7 +641,7 @@ let name = ask("What's your name? ")
 if name == "" {
   name = "friend"
 }
-say("It's lovely to see you, " + name + ".")
+say("It's good to see you, " + name + ".")
 say("")
 
 say("How are you feeling right now?")
@@ -663,7 +661,7 @@ if is_one_of(feeling, ["1", "happy", "Happy", "HAPPY", "good", "Good", "great", 
   say("Maybe a glass of water and a little rest? Even ten minutes helps.")
 } else if is_one_of(feeling, ["3", "sad", "Sad", "SAD", "down", "Down"]) {
   say("I'm sorry today feels heavy. It's okay to feel sad.")
-  say("Wrap up in something cosy, and maybe talk to someone who loves you.")
+  say("Wrap up in something cosy, and maybe talk to someone you trust.")
 } else if is_one_of(feeling, ["4", "stressed", "Stressed", "STRESSED", "worried", "Worried"]) {
   say("That sounds like a lot. Let's take one slow breath together.")
   say("In... and out. You don't have to do everything at once.")
@@ -685,12 +683,12 @@ for n in range(1, 11) {
 if score == 0 {
   say("That's alright, numbers can be hard to pick. I'm still glad you're here.")
 } else if score &lt;= 3 {
-  say(str(score) + " out of 10. I'm sending you the biggest hug.")
+  say(str(score) + " out of 10. I'm sorry it's been a hard day.")
   say("Please rest, drink some water, and reach out to someone you trust.")
 } else if score &lt;= 6 {
   say(str(score) + " out of 10. A middling day. Something small and nice might help.")
 } else if score &lt;= 9 {
-  say(str(score) + " out of 10! That's a good day. I'm proud of you.")
+  say(str(score) + " out of 10! That's a good day. Well done.")
 } else {
   say("10 out of 10! Amazing! Your happiness is contagious.")
 }
@@ -745,15 +743,14 @@ care(name)</code></pre>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="download.html#whats-new">What's new</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
       </nav>
     </div>
     <div class="footer-bottom">
-      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
-      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
+      <p>TB — a friendly programming language.</p>
+      <p>TB <span data-version>2.0.1</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

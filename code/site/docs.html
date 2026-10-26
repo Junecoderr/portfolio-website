@@ -16,7 +16,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0" aria-label="Version 2.0.0 release notes">v<span data-version>2.0.0</span></a>
+      <a class="version-badge" href="download.html#whats-new" aria-label="Version 2.0.1: what's new">v<span data-version>2.0.1</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html" aria-current="page">Learn</a>
@@ -99,7 +99,7 @@
       <h2><span class="chapter-num">1.</span>Your first program: <code>say</code></h2>
       <p><code>say</code> shows something on the screen. Put what you want to show inside the round brackets,
       and put words inside quote marks <code>"like this"</code> so TB knows they are text.</p>
-      <pre class="tb-code" data-runnable><code>say("Hello, Tanisha!")
+      <pre class="tb-code" data-runnable><code>say("Hello, world!")
 say("This is my first program.")</code></pre>
       <p>TB reads your program from top to bottom, one line at a time. Each line here is one instruction.</p>
       <p>You can give <code>say</code> several things at once, separated by commas. It puts a space between them.
@@ -139,7 +139,7 @@ say("line one\nline two")</code></pre>
     <section id="let">
       <h2><span class="chapter-num">3.</span>Remembering things with <code>let</code></h2>
       <p><code>let</code> gives a value a name, so you can use it again later. Think of it as a labelled box.</p>
-      <pre class="tb-code" data-runnable><code>let name = "Tanisha"
+      <pre class="tb-code" data-runnable><code>let name = "Alex"
 let age = 25
 say(name)
 say(age)</code></pre>
@@ -167,13 +167,13 @@ say(7 / 2)
 say(7 % 2)
 say((2 + 3) * 4)</code></pre>
       <p><code>+</code> also <strong>joins text</strong> together. If either side is text, TB joins them as text.</p>
-      <pre class="tb-code" data-runnable><code>let first = "Tanisha"
-let last = "Brahma"
+      <pre class="tb-code" data-runnable><code>let first = "Priya"
+let last = "Shah"
 say(first + " " + last)
 say("I have " + 3 + " plants")</code></pre>
       <p>Text times a number repeats the text:</p>
       <pre class="tb-code" data-runnable><code>say("ha" * 3)
-say("&lt;3 " * 5)</code></pre>
+say("* " * 5)</code></pre>
       <p>Two helpers turn things into other things:</p>
       <ul>
         <li><code>str(x)</code> turns anything into text: <code>str(5)</code> is <code>"5"</code>.</li>
@@ -267,7 +267,7 @@ for flower in flowers {
       <code>[0, 1, 2, 3, 4]</code> (it stops just before 5). <code>range(1, 4)</code> is <code>[1, 2, 3]</code>.
       A third number sets the step: <code>range(10, 0, -5)</code> is <code>[10, 5]</code>.</p>
       <pre class="tb-code" data-runnable><code>for i in range(1, 4) {
-  say("Hug number " + str(i))
+  say("Step number " + str(i))
 }</code></pre>
       <p><code>for</code> also works on text, one letter at a time:</p>
       <pre class="tb-code" data-runnable><code>for letter in "TB" {
@@ -281,11 +281,11 @@ for flower in flowers {
       <p>A <strong>function</strong> is a little recipe with a name. You write it once with <code>fn</code>,
       then use it as many times as you like. The names in the round brackets are its <strong>inputs</strong>.</p>
       <pre class="tb-code" data-runnable><code>fn greet(name) {
-  say("Hello, " + name + "! You look lovely today.")
+  say("Hello, " + name + "! Have a nice day.")
 }
 
-greet("Tanisha")
-greet("Mum")</code></pre>
+greet("Alex")
+greet("Sam")</code></pre>
       <p><code>return</code> hands a value back, so you can use the answer somewhere else.</p>
       <pre class="tb-code" data-runnable><code>fn double(x) {
   return x * 2
@@ -305,7 +305,7 @@ say(double(double(4)))</code></pre>
       <pre class="tb-code" data-runnable><code>let shout = fn(text) {
   return text + "!!!"
 }
-say(shout("I love you"))</code></pre>
+say(shout("Hello there"))</code></pre>
       <p>Here is something magical: a function made inside another function remembers the boxes around it,
       even after the outer function has finished. This is called a <strong>closure</strong>.
       Each counter below has its very own memory.</p>
@@ -317,19 +317,19 @@ say(shout("I love you"))</code></pre>
   }
 }
 
-let hugs = make_counter()
-hugs()
-hugs()
-say("Hugs so far: " + str(hugs()))</code></pre>
+let steps = make_counter()
+steps()
+steps()
+say("Steps so far: " + str(steps()))</code></pre>
       <p>A function can also <strong>call itself</strong>, with a smaller problem each time.
       This is called <strong>recursion</strong>. Just make sure there's a point where it stops!</p>
-      <pre class="tb-code" data-runnable><code>fn hearts(n) {
+      <pre class="tb-code" data-runnable><code>fn stars(n) {
   if n &lt;= 0 {
     return ""
   }
-  return "&lt;3 " + hearts(n - 1)
+  return "* " + stars(n - 1)
 }
-say(hearts(4))</code></pre>
+say(stars(4))</code></pre>
     </section>
 
     <!-- 10 -->
@@ -342,10 +342,10 @@ say("Nice to meet you, " + name + "!")</code></pre>
       <p>The answer is always text, so if you want to do maths with it, turn it into a number with <code>num</code>:</p>
       <pre class="tb-code" data-runnable><code>let cups = num(ask("How many cups of tea today? "))
 say("Only " + str(cups + 1) + " more and you'll be a professional.")</code></pre>
-      <p><code>care</code> is TB's special instruction. It prints a little heart and a kind message,
-      picked at random. Give it a name to make the message personal.</p>
+      <p><code>care</code> is TB's special instruction. It prints a kind message, picked at random,
+      after a ♥ symbol. Give it a name to make the message personal.</p>
       <pre class="tb-code" data-runnable><code>care()
-care("Tanisha")</code></pre>
+care("Alex")</code></pre>
       <p>Try the <a href="examples.html#care_bot">Care bot</a> example to see <code>ask</code> and
       <code>care</code> working together.</p>
     </section>
@@ -358,7 +358,7 @@ care("Tanisha")</code></pre>
       <strong>what</strong> confused it:</p>
       <pre class="output">Oops! On line 2: I don't know what 'nmae' is. Did you mean 'name'?</pre>
       <p>Try running this one. It has a typo on line 2:</p>
-      <pre class="tb-code" data-runnable data-expect-error><code>let name = "Tanisha"
+      <pre class="tb-code" data-runnable data-expect-error><code>let name = "Alex"
 say(nmae)</code></pre>
       <p>Some common "Oops!" messages and what they mean:</p>
       <ul>
@@ -387,7 +387,7 @@ say(snacks[3])</code></pre>
       <h2><span class="chapter-num">12.</span>Maps: things with names</h2>
       <p>A list keeps things in order. A <strong>map</strong> keeps things by name: each <strong>key</strong> points to a
       <strong>value</strong>. Write it with curly brackets, a colon between each key and its value.</p>
-      <pre class="tb-code" data-runnable><code>let me = {"name": "Tanisha", "city": "Guwahati", "plants": 4}
+      <pre class="tb-code" data-runnable><code>let me = {"name": "Alex", "city": "Lisbon", "plants": 4}
 say(me["name"])
 say(me.city)
 say(len(me), "keys")</code></pre>
@@ -409,7 +409,7 @@ for key in tea {
       <h2><span class="chapter-num">13.</span>Methods: asking a value to do something</h2>
       <p>Text, lists, maps and numbers come with <strong>methods</strong>: little built-in functions you call with a dot
       after the value. <code>"hi".upper()</code> asks the text <code>"hi"</code> for its capital-letter version.</p>
-      <pre class="tb-code" data-runnable><code>let name = "  Tanisha  "
+      <pre class="tb-code" data-runnable><code>let name = "  Alex  "
 say(name.trim().upper())
 say("apple,mango,kiwi".split(","))
 say("Hello".contains("ell"), "Hello".starts_with("He"))
@@ -428,7 +428,7 @@ say(["b", "a", "c"].sort().join(" &lt; "))</code></pre>
       <h2><span class="chapter-num">14.</span>Text with holes: f-strings</h2>
       <p>Joining text with <code>+</code> gets fiddly. Put an <code>f</code> before the quotes and you can drop any
       value straight into the text inside <code>{ }</code>. TB fills in each hole when the line runs.</p>
-      <pre class="tb-code" data-runnable><code>let name = "Tanisha"
+      <pre class="tb-code" data-runnable><code>let name = "Alex"
 let cups = 3
 say(f"{name} has had {cups} cups of tea.")
 say(f"That's {cups * 250} ml, or {round(cups * 0.25, 2)} litres.")
@@ -613,7 +613,7 @@ say("Hello, " + name + "!")</code></pre>
           <div class="sig-body">
             <p>Prints <code>♥</code> and a kind message, chosen at random. Give it a name to make it personal.</p>
             <pre class="tb-code" data-runnable><code>care()
-care("Tanisha")</code></pre>
+care("Alex")</code></pre>
           </div>
         </article>
       </div>
@@ -626,7 +626,7 @@ care("Tanisha")</code></pre>
         <table class="kw-table">
           <thead><tr><th scope="col">Keyword</th><th scope="col">What it does</th><th scope="col">Example</th></tr></thead>
           <tbody>
-            <tr><td><code>let</code></td><td>Makes a new named box</td><td><code>let name = "Tanisha"</code></td></tr>
+            <tr><td><code>let</code></td><td>Makes a new named box</td><td><code>let name = "Alex"</code></td></tr>
             <tr><td><code>=</code></td><td>Changes a box that already exists</td><td><code>name = "Tani"</code></td></tr>
             <tr><td><code>fn</code></td><td>Makes a function (named or not)</td><td><code>fn double(x) { return x * 2 }</code></td></tr>
             <tr><td><code>return</code></td><td>Hands a value back from a function</td><td><code>return x * 2</code></td></tr>
@@ -710,15 +710,14 @@ care("Tanisha")</code></pre>
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/releases/tag/tb-v2.0.0">Release notes</a></li>
-          <li><a href="https://github.com/Junecoderr/portfolio-website/tree/main/code">Source code</a></li>
+          <li><a href="download.html#whats-new">What's new</a></li>
           <li><a href="index.html#why">Why TB</a></li>
         </ul>
       </nav>
     </div>
     <div class="footer-bottom">
-      <p><span class="footer-heart" aria-hidden="true">♥</span> Made with love, for Tanisha.</p>
-      <p>TB <span data-version>2.0.0</span>, released 26 October 2026.</p>
+      <p>TB — a friendly programming language.</p>
+      <p>TB <span data-version>2.0.1</span>, released 26 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

@@ -1,0 +1,21 @@
+# Title: Fizz stars
+# About: A playful pattern: every 3rd number says "fizz", every 5th says "buzz".
+
+# % gives the remainder after dividing. If n % 3 is 0, n is a multiple of 3.
+for n in range(1, 16) {
+  if n % 15 == 0 {
+    say("fizz buzz!")
+  } else if n % 3 == 0 {
+    say("fizz")
+  } else if n % 5 == 0 {
+    say("buzz")
+  } else {
+    say(n)
+  }
+}
+say("")
+
+# Text times a number repeats the text. Here we draw a little triangle of stars.
+for size in range(1, 6) {
+  say("* " * size)
+}

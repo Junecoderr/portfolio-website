@@ -84,7 +84,7 @@ jobs:
             choco install innosetup -y --no-progress
           fi
 
-      # build.py builds dist/tb/, smoke-tests it (--version, for_tanisha.tb,
+      # build.py builds dist/tb/, smoke-tests it (--version, welcome.tb,
       # `tb doc`, `tb doc gui`, a json/re/hash/ioc/logs program and a GUI app
       # that closes itself), packages it, unpacks the archive and tests that
       # copy too, and on Windows builds the installer.

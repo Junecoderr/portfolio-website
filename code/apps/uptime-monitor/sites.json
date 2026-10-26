@@ -3,6 +3,6 @@
   "slow_ms": 2000,
   "sites": [
     {"name": "TB website", "url": "https://code.tanisha.ceo"},
-    {"name": "Portfolio", "url": "https://tanisha.ceo"}
+    {"name": "Example site", "url": "https://example.com"}
   ]
 }

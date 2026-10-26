@@ -5,7 +5,7 @@ Usage (from the repo root):
 
 Contents (flat, so "Extract all" on Windows gives one tidy folder):
     tb.py
-    for_tanisha.tb
+    welcome.tb
     examples/*.tb      (whatever exists at build time)
     tblib/...          the standard library (needed by `import ...`)
     apps/...           the example apps and their sample data
@@ -60,7 +60,7 @@ def main() -> int:
     dist.mkdir(parents=True, exist_ok=True)
     out = dist / NAME
 
-    required = [ROOT / "tb.py", ROOT / "for_tanisha.tb", ROOT / "packaging" / "README-python.txt",
+    required = [ROOT / "tb.py", ROOT / "welcome.tb", ROOT / "packaging" / "README-python.txt",
                 ROOT / "tblib" / "__init__.py"]
     for path in required:
         if not path.is_file():
@@ -70,7 +70,7 @@ def main() -> int:
     examples = sorted((ROOT / "examples").glob("*.tb"))
     with zipfile.ZipFile(out, "w") as zf:
         add(zf, "tb.py", (ROOT / "tb.py").read_bytes())
-        add(zf, "for_tanisha.tb", (ROOT / "for_tanisha.tb").read_bytes())
+        add(zf, "welcome.tb", (ROOT / "welcome.tb").read_bytes())
         for ex in examples:
             add(zf, f"examples/{ex.name}", ex.read_bytes())
         for folder in ("tblib", "apps"):

@@ -4,7 +4,7 @@ TB 1.0 was a teaching language. TB 2.0 makes it a small but real
 general-purpose language: you can build desktop GUI apps, security (SOC)
 tools, scripts and command-line apps with it, using a standard library that
 ships inside `tb`. Every 1.0 program must keep working unchanged
-(`for_tanisha.tb`, `examples/*.tb`, the docs snippets).
+(the first demo program, `examples/*.tb`, the docs snippets).
 
 This file is the contract between the agents building 2.0. If you need to
 change a contract, say so in your report; never silently diverge.
@@ -17,7 +17,7 @@ change a contract, say so in your report; never silently diverge.
   `code/` (a shell hook blocks bare `python3`). Tk is NOT available in that
   Python; for GUI tests use `/opt/homebrew/bin/python3.13` (has Tk 9).
 - Never put the author's name anywhere (code, docs, site). The project is
-  "TB", made "with love, for Tanisha".
+  simply "TB", a friendly programming language; it credits no person.
 - Errors keep the 1.0 voice: `Oops! On line N: <plain English>`.
 - Do not git commit; the lead commits.
 
@@ -41,13 +41,13 @@ code/
 
 All additive; nothing in 1.0 changes meaning.
 
-1. **Maps**: `{"name": "Tanisha", "age": 21}`. Keys are text or numbers.
+1. **Maps**: `{"name": "Alex", "age": 21}`. Keys are text or numbers.
    Empty map `{}`. Trailing comma allowed. Insertion-ordered (Python dict).
    `m["k"]`, `m["k"] = v`. Missing key read is an error
    ("There's no key "k" in this map. It has: a, b.") — use `.get(k, default)`.
    A `{` at the start of an expression is a map; blocks only follow
    `if/else/while/for/fn/try/catch`, so there is no ambiguity.
-   `to_text` shows maps as `{"name": "Tanisha", "age": 21}`. `==` compares deeply.
+   `to_text` shows maps as `{"name": "Alex", "age": 21}`. `==` compares deeply.
    `for k in map` iterates keys. `len(map)` is the key count.
 2. **Dot access**: `x.name`.
    - On a map: `m.name` reads key `"name"`; `m.name = v` sets it.
@@ -178,7 +178,7 @@ net-agent:
 gui-agent:
 - `gui` (tkinter): `gui.window(title, {"width", "height", "theme": "light"/"dark"})` returns a window object (map with methods); widgets added in order with simple layout helpers `row()`/`column()` containers: `label(text)`, `button(text, on_click)`, `input({"placeholder","on_enter"})` (`.value`/`.set()`), `textarea()`, `checkbox(text)`, `select(options)`, `table(columns)` (`.add_row(list)`, `.clear()`, `.selected()`), `list_box(items)`, `image(path)` (PNG/GIF), `progress()`, `separator()`, `menu({"File": {"Open": fn, ...}})`, `status(text)`; dialogs: `gui.alert(msg)`, `gui.confirm(msg)`, `gui.ask(msg)`, `gui.open_file(filters?)`, `gui.save_file()`, `gui.pick_folder()`; timers `win.every(ms, fn)`, `win.after(ms, fn)`; `win.run()` (blocks until closed), `win.close()`. Nice default styling (ttk, padding, a consistent font, light/dark).
   Must be testable without a display: keep tkinter use behind a thin layer with a fake backend for tests; real smoke test with python3.13 locally.
-- Example apps in `apps/` that use gui: a to-do app, a "hash checker" (pick file, show SHA-256, compare), a "log triage" desktop app (open log, table of alerts using logs+detect), a mood journal / care app for Tanisha.
+- Example apps in `apps/` that use gui: a to-do app, a "hash checker" (pick file, show SHA-256, compare), a "log triage" desktop app (open log, table of alerts using logs+detect), a mood journal / care app.
 
 ## Browser (site-agent later)
 
@@ -188,4 +188,4 @@ gui-agent:
 
 ## Version
 
-`2.0.0`; release tag `tb-v2.0.0`. Site shows 2.0.
+`2.0.0`; release tag `tb-v2.0.0`. Site shows 2.0. (2.0.1: neutral sample programs and docs, no language changes; the first demo program is now `welcome.tb`.)

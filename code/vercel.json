@@ -6,6 +6,12 @@
   "outputDirectory": "dist/site",
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/dl/:file",
+      "destination": "https://github.com/Junecoderr/portfolio-website/releases/download/tb-v2.0.1/:file"
+    }
+  ],
   "headers": [
     {
       "source": "/vendor/pyodide/(.*)",

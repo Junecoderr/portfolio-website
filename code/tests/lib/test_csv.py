@@ -2,8 +2,8 @@ from conftest import run_tb, tb_error
 
 
 def test_parse_with_header():
-    src = 'import csv\nlet rows = csv.parse("name,age\\nTanisha,21\\n\\n\\"Smith, J\\",30\\n")\nsay(rows)\nsay(rows[1].name)'
-    assert run_tb(src) == ['[{"name": "Tanisha", "age": "21"}, {"name": "Smith, J", "age": "30"}]', "Smith, J"]
+    src = 'import csv\nlet rows = csv.parse("name,age\\nAlex,21\\n\\n\\"Smith, J\\",30\\n")\nsay(rows)\nsay(rows[1].name)'
+    assert run_tb(src) == ['[{"name": "Alex", "age": "21"}, {"name": "Smith, J", "age": "30"}]', "Smith, J"]
 
 
 def test_parse_ragged_rows_and_options():

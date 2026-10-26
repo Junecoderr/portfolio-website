@@ -10,21 +10,21 @@ What it does:
      dist/tb/tb  (tb.exe on Windows, plus tbw.exe = no console window)
      dist/tb/_internal/...
 2. Smoke-tests dist/tb/tb from a folder outside the repo (so the bundled
-   standard library is what gets used): `tb --version`, `tb for_tanisha.tb`,
+   standard library is what gets used): `tb --version`, `tb welcome.tb`,
    `tb doc`, `tb doc gui`, a program importing json/re/hash/ioc/logs, and a GUI
    app (apps/calculator, closed after 0.5 s via TB_GUI_AUTOCLOSE_MS) when the
    build Python has Tk and a display is available. Set TB_REQUIRE_GUI=1 to make
    a missing Tk/display an error instead of a skip (CI does this).
 3. Packages the folder into dist/ under the release asset name(s):
      Windows x64  -> tb-windows-x64.zip         (folder tb\ with tb.exe, tbw.exe, _internal\,
-                                                 apps\, examples\, for_tanisha.tb)
+                                                 apps\, examples\, welcome.tb)
                      tb-windows-x64-setup.exe   (Inno Setup installer, packaging/windows/tb.iss;
                                                  needs ISCC.exe; --no-installer skips it)
      macOS arm64  -> tb-macos-arm64.zip         (folder tb/ with tb, _internal/, apps/, examples/,
-                                                 for_tanisha.tb; exec bits and symlinks kept)
+                                                 welcome.tb; exec bits and symlinks kept)
      macOS Intel  -> tb-macos-x64.zip           (local builds only; CI builds arm64)
      Linux x64    -> tb-linux-x64.tar.gz        (folder tb/, same layout as macOS)
-   apps/, examples/ and for_tanisha.tb are copied into dist/tb/ first, so they
+   apps/, examples/ and welcome.tb are copied into dist/tb/ first, so they
    ship next to the launcher. Each archive is unpacked again into a temp
    folder, smoke-tested, and every example/app is run from the unpacked copy
    (packaging/run_examples.py --root <unpacked tb/>).
@@ -56,8 +56,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging" / "tb.spec"
-DEMO = ROOT / "for_tanisha.tb"
-VERSION = "2.0.0"
+DEMO = ROOT / "welcome.tb"
+VERSION = "2.0.1"
 GUI_APP = ROOT / "apps" / "calculator" / "main.tb"
 
 # A program that touches several native libraries, with its exact output.
@@ -211,8 +211,8 @@ def smoke_test(binary: Path, label: str) -> None:
             fail(f"--version printed {out!r}, expected 'TB {VERSION}'")
 
         out = check(binary, [str(DEMO)], work)
-        if "Tanisha" not in out:
-            fail(f"{DEMO.name} output did not mention Tanisha")
+        if "Welcome to TB" not in out:
+            fail(f"{DEMO.name} output did not say "Welcome to TB"")
 
         out = check(binary, ["doc"], work, max_lines=8)
         for lib in ("gui", "json", "hash", "ioc", "logs", "detect"):
@@ -307,12 +307,12 @@ def unpack_and_test(archive: Path, exe_name: str) -> None:
 
 
 # Copied next to the launcher, so the apps and examples run right after unzipping.
-EXTRAS = ["apps", "examples", "for_tanisha.tb"]
+EXTRAS = ["apps", "examples", "welcome.tb"]
 SKIP_NAMES = {"__pycache__", ".pytest_cache", "todo.json", "journal.json", ".DS_Store"}
 
 
 def add_extras(folder: Path) -> None:
-    """Copy apps/, examples/ and for_tanisha.tb into the built tb/ folder
+    """Copy apps/, examples/ and welcome.tb into the built tb/ folder
     (skipping caches and data an app saved while being tried out)."""
     def ignore(_dir, names):
         return [n for n in names if n in SKIP_NAMES or n.startswith(".") or n.endswith((".pyc", ".pyo"))]

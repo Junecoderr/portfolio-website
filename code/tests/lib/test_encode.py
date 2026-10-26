@@ -29,8 +29,8 @@ def test_hex_url_rot13():
     src = r'''import encode
 say(encode.hex("hi"), encode.unhex("6869"), encode.unhex("68 69"), encode.unhex("\x68\x69"), encode.unhex("0x68:0x69"))
 say(encode.url("a b&c=d/é"), encode.unurl("a%20b%26c+d"), encode.unurl(encode.unurl("%252e%252e%252f")))
-say(encode.rot13("Hello, World"), encode.rot13(encode.rot13("Tanisha")))'''
-    assert run_tb(src) == ["6869 hi hi hi hi", "a%20b%26c%3Dd%2F%C3%A9 a b&c d ../", "Uryyb, Jbeyq Tanisha"]
+say(encode.rot13("Hello, World"), encode.rot13(encode.rot13("Alex")))'''
+    assert run_tb(src) == ["6869 hi hi hi hi", "a%20b%26c%3Dd%2F%C3%A9 a b&c d ../", "Uryyb, Jbeyq Alex"]
 
 
 def test_entropy():
