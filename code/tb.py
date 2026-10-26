@@ -2854,7 +2854,10 @@ def first_sentence(text: str) -> str:
 
 
 def shown_path(path: str) -> str:
-    rel = os.path.relpath(path)
+    try:
+        rel = os.path.relpath(path)
+    except ValueError:  # Windows: path is on another drive
+        return path
     return path if rel.startswith("..") else rel
 
 

@@ -32,7 +32,8 @@ def test_run_list_has_no_shell():
 
 def test_run_text_uses_shell():
     out = run_tb('import os\nlet r = os.run("echo one && echo two")\nsay(r.code, r.out.lines())')
-    assert out == ['0 ["one", "two"]']
+    # cmd.exe keeps the space before && ("one "); other shells don't.
+    assert out in (['0 ["one", "two"]'], ['0 ["one ", "two"]'])
 
 
 def test_run_input_cwd_and_stderr(tmp_path):

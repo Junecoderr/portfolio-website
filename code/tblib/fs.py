@@ -42,7 +42,8 @@ def load(api):
         path = path_arg(line, path, "read")
         need_file(line, path, "read")
         try:
-            return read_text(path)
+            # Windows files end lines with \r\n; TB text always uses \n.
+            return read_text(path).replace("\r\n", "\n")
         except OSError as err:
             fail_os(line, err, path, "read")
 
@@ -132,6 +133,11 @@ def load(api):
         source = path_arg(line, source, "copy", "from")
         target = path_arg(line, target, "copy", "to")
         need_file(line, source, "copy")
+        try:
+            if os.path.exists(target) and os.path.samefile(source, target):
+                fail(line, "fs.copy() can't copy a file onto itself.")
+        except OSError:
+            pass
         try:
             shutil.copy2(source, target)
         except shutil.SameFileError:

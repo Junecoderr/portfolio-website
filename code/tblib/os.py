@@ -85,6 +85,8 @@ def load(api):
         cwd = options.get("cwd")
         if cwd is not None:
             check_type(line, cwd, "text", "os.run", "the cwd")
+            if not _os.path.isdir(cwd):
+                fail(line, f"os.run() couldn't find the folder '{cwd}'.")
         given = options.get("input")
         if given is not None:
             given = _tb.to_text(given)

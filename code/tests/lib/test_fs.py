@@ -34,7 +34,9 @@ def test_list_walk_mkdir(tmp_path):
     src = 'import fs\nfs.mkdir("x/y/z")\nfs.mkdir("x/y/z")\nfs.write("x/b.txt", "")\nfs.write("x/y/a.txt", "")\nsay(fs.list("x"))\nsay(fs.walk("x"))'
     out = run_tb(src)
     assert out[0] == '["b.txt", "y"]'
-    assert out[1] == "[" + ", ".join(f'"{p}"' for p in [os.path.join("x", "b.txt"), os.path.join("x", "y", "a.txt")]) + "]"
+    shown = [os.path.join("x", "b.txt"), os.path.join("x", "y", "a.txt")]
+    # Inside a list, text is shown the way you'd type it, so \ is doubled.
+    assert out[1] == "[" + ", ".join('"' + p.replace("\\", "\\\\") + '"' for p in shown) + "]"
     assert run_tb('import fs\nsay(len(fs.list()) > 0)') == ["true"]
 
 

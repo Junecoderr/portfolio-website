@@ -1,6 +1,7 @@
 """net library: IP helpers, DNS (monkeypatched), TCP checks against local sockets."""
 
 import socket
+import sys
 import threading
 import types
 
@@ -197,7 +198,9 @@ def test_banner_silent_service_gives_empty_text(listener):
 
 def test_banner_refused():
     err = tb_error(f'import net\nnet.banner("127.0.0.1", {closed_port()}, 0.5)')
-    assert "Nothing is listening on 127.0.0.1 port" in str(err) and err.fields["reason"] == "refused"
+    # Windows retries a refused connection until the timeout runs out.
+    assert ("Nothing is listening on 127.0.0.1 port" in str(err) and err.fields["reason"] == "refused") or (
+        sys.platform == "win32" and "didn't answer in time" in str(err))
 
 
 def test_common_ports_and_docs():

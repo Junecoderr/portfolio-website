@@ -38,7 +38,8 @@ def test_double_dash_passes_tb_file_names(capsys, script):
     path = script("import os\nsay(os.args)")
     other = script("say(1)", "other.tb")
     assert tb.main([path, "--", other, "x"]) == 0
-    assert capsys.readouterr().out == f'["{other}", "x"]\n'
+    shown = other.replace("\\", "\\\\")  # lists show text as you'd type it
+    assert capsys.readouterr().out == f'["{shown}", "x"]\n'
 
 
 def test_extra_tb_file_still_refused_without_double_dash(capsys, script):
