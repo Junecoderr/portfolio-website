@@ -90,10 +90,13 @@ details.fn-visual[open] .fv-sum-sub { color: inherit; }
 
 /* sliders */
 .fv-controls { display: grid; gap: 0.5rem; margin-top: 0.7rem; }
+/* Name and value on one line, the slider under them at full width, so the
+   track never gets squeezed down to just its knob in a narrow column. */
 .fv-range {
-  display: grid; grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) minmax(3.5rem, auto);
-  align-items: center; gap: 0.6rem; font-size: 0.85rem;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: 0.25rem 0.6rem; font-size: 0.85rem;
 }
+.fv-range > input[type="range"] { grid-column: 1 / -1; grid-row: 2; min-width: 8rem; }
 .fv-range-name { display: inline-flex; align-items: center; gap: 0.35rem; }
 .fv-range code { color: var(--pc); font-weight: 700; background: none; border: 0; padding: 0; }
 .fv-range input[type="range"] { width: 100%; min-width: 0; accent-color: var(--pc); margin: 0; height: 1.6rem; }
