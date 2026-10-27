@@ -253,7 +253,7 @@ def test_footer_shows_the_totals():
     footer = site_shell.footer("", tb.__version__)
     assert set(STAT_SLOT.findall(footer)) == {"downloads", "visits"}
     assert 'data-stats hidden' in footer
-    assert "without cookies or personal data" in footer
+    assert "without cookies" not in footer
     page = site_shell.page("T", "D", "<h1>x</h1>", prefix="../")
     assert '<script src="../assets/js/stats.js" defer></script>' in page.split("</head>")[0]
 
