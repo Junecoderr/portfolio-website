@@ -107,7 +107,7 @@ def footer(prefix: str = "", version: str = "3.0.0") -> str:
     </div>
     <div class="footer-bottom">
       <p>TB — a friendly programming language.</p>
-      <p class="footer-stats" data-stats hidden><span data-stat-wrap hidden><span data-stat="downloads"></span> downloads</span><span data-stat-wrap hidden><span data-stat="visits"></span> visits</span><span class="footer-stats-note">Counted without cookies or personal data.</span></p>
+      <p class="footer-stats" data-stats hidden><span data-stat-wrap hidden><span data-stat="downloads"></span> downloads</span><span data-stat-wrap hidden><span data-stat="visits"></span> visits since 27 Oct 2026</span><span class="footer-stats-note">Counted without cookies or personal data.</span></p>
       <p>TB <span data-version>{version}</span>, released {RELEASE_DATE_HUMAN}.</p>
     </div>
   </footer>"""

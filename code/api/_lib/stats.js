@@ -19,7 +19,7 @@ export const PAGES_KEY = "tb:pages";
 export const RELEASES_URL = "https://api.github.com/repos/Junecoderr/portfolio-website/releases?per_page=100";
 export const TAG_PREFIX = "tb-v";
 export const DOWNLOADS_TTL_MS = 10 * 60 * 1000;
-export const STATS_CACHE_CONTROL = "public, s-maxage=600, stale-while-revalidate=3600";
+export const STATS_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300";
 export const MAX_BODY_BYTES = 1024;
 export const MAX_PATH_LENGTH = 200;
 const USER_AGENT = "tb-website-stats (code.tanisha.ceo)";

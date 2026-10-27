@@ -174,7 +174,7 @@ served.
   Downloads are the GitHub release assets' own `download_count`, summed over
   every `tb-v*` release and fetched on the server (browsers never contact
   GitHub), cached in memory for 10 minutes; the response is cached by the CDN
-  (`s-maxage=600, stale-while-revalidate=3600`). Only the visit total is
+  for 30 seconds (`s-maxage=30, stale-while-revalidate=300`), and each visitor sees the count returned by their own `/api/hit`. Only the visit total is
   shown on the site; the per-page counts stay in Redis.
 - Environment variables (Vercel project settings): `KV_REST_API_URL` and
   `KV_REST_API_TOKEN`, or `UPSTASH_REDIS_REST_URL` and

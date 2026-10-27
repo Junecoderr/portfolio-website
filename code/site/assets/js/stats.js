@@ -16,6 +16,7 @@
   var local = location.protocol === "file:" || host === "localhost" || host === "127.0.0.1" ||
     host === "[::1]" || host === "" || /\.localhost$/.test(host);
   var robot = !!navigator.webdriver;
+  var fresh = null;
 
   function countView() {
     if (robot || local) return Promise.resolve();
@@ -24,6 +25,11 @@
       keepalive: true,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: location.pathname })
+    }).then(function (r) {
+      return r.ok ? r.json() : null;
+    }).then(function (hit) {
+      // The count right after this view; /api/stats may be a few seconds older.
+      fresh = hit && typeof hit.visits === "number" ? hit.visits : null;
     }).catch(function () { /* counting is best effort */ });
   }
 
@@ -58,6 +64,7 @@
       return r.ok ? r.json() : null;
     });
   }).then(function (stats) {
+    if (stats && typeof fresh === "number" && !(stats.visits >= fresh)) stats.visits = fresh;
     if (stats) fill(stats);
   }).catch(function () { /* no numbers: the page looks the same without them */ });
 })();

@@ -180,7 +180,7 @@ test("stats combine visits and downloads, with CDN caching", async () => {
   };
   const res = await handleStats(new Request("https://code.tanisha.ceo/api/stats"), { ...KV, GITHUB_TOKEN: "gh" }, fetchImpl);
   assert.equal(res.status, 200);
-  assert.equal(res.headers.get("cache-control"), "public, s-maxage=600, stale-while-revalidate=3600");
+  assert.equal(res.headers.get("cache-control"), "public, s-maxage=30, stale-while-revalidate=300");
   const body = await res.json();
   assert.equal(body.visits, 51200);
   assert.equal(body.downloads.total, 43);
