@@ -6,6 +6,7 @@ The real-Tk smoke tests at the bottom are skipped when tkinter or a display
 is missing (run them with a Python that has Tk, e.g. python3.13 on macOS).
 """
 
+import json
 import os
 import sys
 
@@ -946,7 +947,7 @@ def test_window_extras(fake, tmp_path):
     (tmp_path / "icon.png").write_bytes(b"\x89PNG")
     src = f'''import gui
 let win = gui.window("x", {{"accent": "#2a7de1"}})
-win.icon("{tmp_path / 'icon.png'}")
+win.icon({json.dumps(str(tmp_path / 'icon.png'))})
 win.always_on_top()
 win.fullscreen(true)
 say(win.is_fullscreen())

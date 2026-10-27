@@ -208,6 +208,7 @@ def test_documented():
         assert name in text
 
 
+@pytest.mark.skipif(not hasattr(__import__("signal"), "SIGPIPE"), reason="no SIGPIPE on this OS (Windows)")
 def test_server_survives_sigpipe_default_from_tb_main():
     """tb.main() sets SIGPIPE to SIG_DFL; a server must switch it off, or a
     browser hanging up mid-response would kill the program."""

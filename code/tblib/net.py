@@ -421,8 +421,11 @@ def load(api):
                 reply, _addr = sock.recvfrom(MAX_UDP)
             except (TimeoutError, socket.timeout):
                 return None
-            except ConnectionRefusedError:
-                return None  # ICMP port unreachable: nothing is listening
+            except ConnectionError:
+                # ICMP port unreachable: nothing is listening. Linux and macOS
+                # report it as ConnectionRefusedError, Windows as
+                # ConnectionResetError (WSAECONNRESET).
+                return None
             except OSError as err:
                 fail(line, f"Waiting for a reply from {host} port {port} failed: {err.strerror or err}.",
                      reason="receive", host=host, port=port)
@@ -453,17 +456,19 @@ def load(api):
                 host = host_arg(line, options["host"], "udp_listen")
         ip = resolve_one(line, host, "udp_listen") if parse_ip(host) is None else host
         sock = udp_socket(ip)
+        # No SO_REUSEADDR: for UDP it lets two listeners share a port (Linux,
+        # macOS) or steal it (Windows). On Windows ask for the port exclusively.
+        from tblib import _sockets
         try:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            _sockets.exclusive(sock)
             sock.bind((ip, port))
-        except PermissionError:
-            sock.close()
-            fail(line, f"I'm not allowed to listen on port {port} (ports below 1024 need administrator rights).",
-                 reason="permission", port=port)
         except OSError as err:
             sock.close()
-            if getattr(err, "errno", None) in (48, 98, 10048) or "in use" in str(err).lower():
+            if _sockets.port_in_use(err, port):
                 fail(line, f"Port {port} is already in use by another program.", reason="in_use", port=port)
+            if isinstance(err, PermissionError):
+                fail(line, f"I'm not allowed to listen on port {port} (ports below 1024 need administrator "
+                     "rights).", reason="permission", port=port)
             fail(line, f"I couldn't listen on {host} port {port}: {err.strerror or err}.", reason="bind", port=port)
         sock.settimeout(0.2)
         from tblib._threads import guarded_call
@@ -478,6 +483,10 @@ def load(api):
                     try:
                         data, addr = sock.recvfrom(MAX_UDP)
                     except (TimeoutError, socket.timeout):
+                        continue
+                    except ConnectionResetError:
+                        # Windows: an earlier reply hit a closed port (ICMP
+                        # port unreachable). The listener itself is fine.
                         continue
                     except OSError:
                         break

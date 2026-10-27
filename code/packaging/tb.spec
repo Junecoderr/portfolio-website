@@ -102,6 +102,18 @@ for mod in ("sqlite3", "zoneinfo", "tomllib", "ssl", "decimal", "difflib", "cale
             "textwrap", "pkgutil", "concurrent.futures"):
     if importlib.util.find_spec(mod) is not None:
         HIDDEN.add(mod)
+
+# The IANA time-zone database (the tzdata package, a runtime dependency in
+# pyproject.toml). Windows has no zone database of its own, so without it the
+# datetime library knows only UTC and fixed offsets. zoneinfo finds the zone
+# files through importlib.resources, so the package's data files and its
+# (empty) subpackages must both be in the bundle.
+from PyInstaller.utils.hooks import collect_data_files
+
+if importlib.util.find_spec("tzdata") is None:
+    raise SystemExit("tb.spec: the tzdata package is missing; run `uv sync` first.")
+HIDDEN.update(collect_submodules("tzdata"))
+TZDATA = collect_data_files("tzdata")
 HIDDEN = sorted(HIDDEN)
 
 DATAS = [
@@ -113,6 +125,7 @@ for folder, _dirs, files in os.walk(os.path.join(TBLIB, "data")):
     _dirs[:] = [d for d in _dirs if not d.startswith((".", "__"))]
     rel = os.path.relpath(folder, ROOT)
     DATAS += [(os.path.join(folder, f), rel) for f in sorted(files) if not f.startswith(".")]
+DATAS += TZDATA
 
 # tkinter stays in: the gui library needs it, and PyInstaller's tkinter hook
 # then bundles the Tcl/Tk runtime and its data on Windows, macOS and Linux.

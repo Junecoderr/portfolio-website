@@ -323,6 +323,10 @@ def _string_prefix(source: str, i: int) -> int:
 
 
 def tokenize(source: str, line: int = 1) -> list[Token]:
+    if "\r\n" in source:
+        # Windows line endings: a text literal that spans lines holds "\n",
+        # never "\r\n", whichever editor saved the file.
+        source = source.replace("\r\n", "\n")
     tokens: list[Token] = []
     i = 0
     n = len(source)

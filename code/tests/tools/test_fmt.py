@@ -133,3 +133,18 @@ def test_cli_check_write_and_stdin(tmp_path):
     assert piped.returncode == 0 and piped.stdout == "say(1)\n"
     broken = subprocess.run(tb + ["-"], input="let = 1", capture_output=True, text=True)
     assert broken.returncode == 1 and "Oops" in broken.stderr and broken.stdout == ""
+
+
+def test_crlf_files_keep_their_line_endings(tmp_path):
+    """On Windows, git and editors save CRLF: a tidy CRLF file is tidy, and
+    tb fmt rewrites a messy one with CRLF still."""
+    tidy = tmp_path / "tidy.tb"
+    tidy.write_bytes(b"let x = 1\r\nsay(x)\r\n")
+    messy = tmp_path / "messy.tb"
+    messy.write_bytes(b"let   x=1\r\nsay( x )\r\n")
+    tb = [sys.executable, str(ROOT / "tb.py"), "fmt"]
+    check = subprocess.run(tb + ["--check", str(tmp_path)], capture_output=True, text=True)
+    assert check.returncode == 1 and "messy.tb" in check.stdout and "tidy.tb" not in check.stdout
+    assert subprocess.run(tb + [str(tmp_path)], capture_output=True).returncode == 0
+    assert messy.read_bytes() == b"let x = 1\r\nsay(x)\r\n"
+    assert tidy.read_bytes() == b"let x = 1\r\nsay(x)\r\n"

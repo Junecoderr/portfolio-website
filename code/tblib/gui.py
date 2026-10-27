@@ -1577,18 +1577,34 @@ def combo_from_event(event):
     return "+".join(mods + [key])
 
 
+def _file_url_path(url):
+    """The local path in a file:// link, in this OS's own form.
+
+    Handles file:///home/me/a.txt, file://localhost/..., the Windows forms
+    file:///C:/Users/me/a.txt and file://server/share/a.txt, and the
+    not-quite-URLs some programs paste (file://C:\\Users\\me\\a.txt)."""
+    from urllib.parse import unquote
+    rest = unquote(url[7:])
+    if rest[:10].lower() == "localhost/":
+        rest = rest[9:]
+    if sys.platform != "win32":
+        return rest
+    if rest.startswith("/") and rest[2:3] == ":":   # /C:/Users/...
+        rest = rest[1:]
+    elif not rest.startswith("/") and rest[1:2] != ":":   # server/share/... (UNC)
+        rest = "//" + rest
+    return os.path.normpath(rest)
+
+
 def paths_in_text(text):
     """File paths found in pasted text (one per line, or file:// links)."""
-    from urllib.parse import unquote, urlparse
     found = []
     for raw in (text or "").replace("\r", "\n").split("\n"):
         line = raw.strip().strip('"').strip("'")
         if not line:
             continue
-        if line.startswith("file://"):
-            line = unquote(urlparse(line).path)
-            if sys.platform == "win32" and line.startswith("/") and ":" in line[:4]:
-                line = line[1:]
+        if line[:7].lower() == "file://":
+            line = _file_url_path(line)
         if os.path.exists(line):
             found.append(line)
     return found

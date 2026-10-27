@@ -99,3 +99,13 @@ def test_non_ascii_digits_are_not_numbers():
 def test_unicode_letters_in_names():
     from conftest import run_tb
     assert run_tb("let café = 2\nsay(café)") == ["2"]
+
+
+def test_windows_line_endings_are_plain_newlines():
+    """A file saved with CRLF (Windows editors, git autocrlf) means the same
+    program: text spanning lines holds "\\n", line numbers stay right."""
+    from conftest import run_tb
+    assert kinds('"""two\r\nlines"""') == [("STRING", "two\nlines"), ("EOF", None)]
+    assert run_tb('let a = 1\r\nsay(a)\r\nsay(len("""x\r\ny"""))\r\n') == ["1", "3"]
+    err = tb_error("let a = 1\r\n\r\nsay(b)\r\n")
+    assert err.line == 3

@@ -23,6 +23,8 @@ import tb as _tb
 MIN_INTERVAL = 0.05
 MAX_INTERVAL = 3600
 MAX_ENTRIES = 20_000          # files tracked under one watched folder
+SETTLE = 0.02                 # seconds between re-checks while files are still changing
+SETTLE_TRIES = 5              # at most this many re-checks before reporting anyway
 WATCHERS: list = []           # every live watcher, so fs.watch_stop() and tests can stop them
 
 
@@ -74,7 +76,7 @@ class Watcher:
 
     def run(self):
         while not self.stop_event.wait(self.interval):
-            now = snapshot(self.path)
+            now = self.settled(snapshot(self.path))
             for event in changes(self.state, now):
                 if self.stop_event.is_set():
                     break
@@ -86,6 +88,24 @@ class Watcher:
                     self.stop_event.set()
             self.state = now
         self.finish()
+
+    def settled(self, now: dict) -> dict:
+        """A snapshot taken once writes in progress have finished.
+
+        Writing a file is several steps (create or truncate, then write), and
+        a poll that lands between them would report one write as two events
+        ("created" + "changed", or "changed" twice). When something changed,
+        look again a moment later until two looks agree."""
+        if now == self.state:
+            return now
+        for _ in range(SETTLE_TRIES):
+            if self.stop_event.wait(SETTLE):
+                break
+            again = snapshot(self.path)
+            if again == now:
+                break
+            now = again
+        return now
 
     def finish(self):
         if self in WATCHERS:

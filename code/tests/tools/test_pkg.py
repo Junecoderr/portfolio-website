@@ -512,3 +512,20 @@ def test_find_project_root_walks_up(tmp_path):
     deep.mkdir(parents=True)
     assert pkg.find_project_root(str(deep)) == str(tmp_path)
     assert pkg.find_project_root(str(tmp_path / "a")) == str(tmp_path)
+
+
+def test_package_name_from_windows_path_and_url():
+    assert pkg._name_from_url("C:\\Users\\me\\Downloads\\flat.zip") == "flat"
+    assert pkg._name_from_url("https://example.com/a/helpers.git") == "helpers"
+    assert pkg._name_from_url("git@github.com:me/tb-colors.git") == "tb-colors"
+
+
+def test_rmtree_removes_read_only_files(tmp_path):
+    """git makes its object files read-only; Windows won't delete those."""
+    import stat
+    obj = tmp_path / "pkg" / ".git" / "objects" / "2e" / "74df"
+    obj.parent.mkdir(parents=True)
+    obj.write_text("x")
+    obj.chmod(stat.S_IREAD)
+    pkg._rmtree(str(tmp_path / "pkg" / ".git"))
+    assert not (tmp_path / "pkg" / ".git").exists()

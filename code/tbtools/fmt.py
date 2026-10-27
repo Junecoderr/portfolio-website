@@ -1582,6 +1582,11 @@ def main(args: list[str] | None = None) -> int:
             print(f"Oops! I couldn't read '{path}': {err.strerror or err}.", file=sys.stderr)
             failed += 1
             continue
+        # Keep the file's own line endings: a Windows file saved with CRLF
+        # is tidy when only its line endings differ from the canonical text.
+        crlf = "\r\n" in source
+        if crlf:
+            source = source.replace("\r\n", "\n")
         try:
             text = format_source(source)
         except TBError as err:
@@ -1600,7 +1605,7 @@ def main(args: list[str] | None = None) -> int:
             print(f"would reformat {path}")
         else:
             with open(path, "w", encoding="utf-8", newline="") as f:
-                f.write(text)
+                f.write(text.replace("\n", "\r\n") if crlf else text)
             print(f"formatted {path}")
     total = len(files)
     if check:

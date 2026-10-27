@@ -1,6 +1,7 @@
 """fs.watch / fs.watch_stop (tblib/_watch.py): polling watcher on a temp folder."""
 
 import json
+import os
 import time
 
 import pytest
@@ -25,7 +26,9 @@ def test_snapshot_and_changes(tmp_path):
     (tmp_path / "a.log").write_text("12")
     (tmp_path / "b.log").write_text("x")
     after = watchlib.snapshot(str(tmp_path))
-    kinds = [(e["kind"], e["path"].rsplit("/", 1)[-1]) for e in watchlib.changes(before, after)]
+    # events carry the full, OS-native path of the file
+    kinds = [(e["kind"], os.path.basename(e["path"])) for e in watchlib.changes(before, after)]
+    assert all(os.path.dirname(e["path"]) == str(tmp_path) for e in watchlib.changes(before, after))
     assert kinds == [("changed", "a.log"), ("created", "b.log")]
     assert watchlib.changes(after, {}) [0]["kind"] == "deleted"
 

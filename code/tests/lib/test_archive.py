@@ -1,6 +1,7 @@
 """archive library: zip/tar/gzip round trips and safe extraction."""
 
 import io
+import json
 import os
 import tarfile
 import zipfile
@@ -81,7 +82,8 @@ def test_zip_slip_is_refused(tmp_path, name, why):
     assert why in str(err) and err.fields["reason"] == "unsafe"
     assert not (tmp_path / "evil.txt").exists() and not (tmp_path / "out" / "fine.txt").exists()
     out = run_tb(f'import archive\nsay(archive.unzip("{p(tmp_path / "evil.zip")}", "{p(tmp_path / "out")}", {{"safe": false}}))')
-    assert out == [f'["{p(tmp_path / "out" / "fine.txt")}"]'.replace(p(tmp_path), p(os.path.realpath(tmp_path)))]
+    # unzip gives the real, OS-native paths of the files it wrote
+    assert len(out) == 1 and json.loads(out[0]) == [os.path.join(os.path.realpath(tmp_path), "out", "fine.txt")]
     assert not (tmp_path / "evil.txt").exists()
 
 

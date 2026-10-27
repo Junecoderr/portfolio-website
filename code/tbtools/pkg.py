@@ -37,8 +37,10 @@ import hashlib
 import io
 import json
 import os
+import pathlib
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -402,7 +404,8 @@ def resolve_spec(spec: str, index: dict | None = None) -> dict:
         raise PkgError("Which package? Like: tb add tb-colors")
     base, tag = _split_tag(spec)
     if os.path.isfile(base) and base.lower().endswith(".zip"):
-        return {"name": _name_from_url(base), "kind": "zip", "url": "file://" + urllib.request.pathname2url(os.path.abspath(base))}
+        # as_uri gives file:///C:/... on Windows and file:///home/... elsewhere
+        return {"name": _name_from_url(base), "kind": "zip", "url": pathlib.Path(os.path.abspath(base)).as_uri()}
     if _looks_like_url(base) or base.endswith(".zip") or base.endswith(".git"):
         name = _name_from_url(base)
         if base.lower().endswith(".zip"):
@@ -439,8 +442,26 @@ def resolve_spec(spec: str, index: dict | None = None) -> dict:
     return source
 
 
+def _rmtree(path: str, ignore_errors: bool = False) -> None:
+    """shutil.rmtree that also removes read-only files. git marks its object
+    files read-only, and Windows refuses to delete a read-only file."""
+    def retry(func, target, _exc):
+        try:
+            os.chmod(target, stat.S_IWRITE)
+            func(target)
+        except OSError:
+            if not ignore_errors:
+                raise
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=retry)
+    else:
+        shutil.rmtree(path, onerror=retry)
+
+
 def _name_from_url(url: str) -> str:
-    tail = url.rstrip("/").split("/")[-1].split(":")[-1]
+    # a URL, or a local path: C:\\Users\\me\\flat.zip on Windows
+    tail = re.split(r"[/\\]", url.rstrip("/\\"))[-1].split(":")[-1]
     tail = re.sub(r"\.(git|zip)$", "", tail, flags=re.IGNORECASE)
     tail = re.sub(r"[^A-Za-z0-9_-]", "-", tail).strip("-")
     if not tail or not NAME_RE.match(tail):
@@ -532,7 +553,7 @@ def _clone(source: dict, dest: str) -> dict:
             ) from None
         raise
     commit = _run_git(["rev-parse", "HEAD"], cwd=dest)
-    shutil.rmtree(os.path.join(dest, ".git"), ignore_errors=True)
+    _rmtree(os.path.join(dest, ".git"), ignore_errors=True)
     info = {"commit": commit}
     if source.get("tag"):
         info["tag"] = source["tag"]
@@ -631,12 +652,12 @@ def install(root: str, source: dict, *, quiet: bool = False) -> dict:
                 "A TB package is a folder with tb.toml and lib.tb.",
             )
         if os.path.isdir(final):
-            shutil.rmtree(final)
+            _rmtree(final)
         elif os.path.exists(final):
             os.remove(final)
         os.replace(dest, final)
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        _rmtree(staging, ignore_errors=True)
     meta = _installed_meta(final)
     lock = {"source": source["kind"], "entry": entry}
     if source["kind"] == "path":
@@ -767,16 +788,16 @@ def _install_locked_git(root: str, source: dict) -> dict:
         except PkgError:
             print(f"  (the locked commit {source['commit'][:12]} for {name} is gone; using the newest)")
         commit = _run_git(["rev-parse", "HEAD"], cwd=dest)
-        shutil.rmtree(os.path.join(dest, ".git"), ignore_errors=True)
+        _rmtree(os.path.join(dest, ".git"), ignore_errors=True)
         entry = package_entry(dest, name)
         if entry is None:
             raise PkgError(f"'{name}' doesn't look like a TB package (no lib.tb).")
         final = os.path.join(packages, name)
         if os.path.isdir(final):
-            shutil.rmtree(final)
+            _rmtree(final)
         os.replace(dest, final)
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        _rmtree(staging, ignore_errors=True)
     lock = {"source": "git", "entry": entry, "url": source["url"], "commit": commit}
     meta = _installed_meta(final)
     if meta.get("version") is not None:
@@ -799,7 +820,7 @@ def cmd_remove(args: list[str]) -> int:
             hint = f"Installed: {', '.join(installed)}" if installed else "Nothing is installed yet."
             raise PkgError(f"'{name}' isn't installed.", hint)
         if os.path.isdir(folder):
-            shutil.rmtree(folder)
+            _rmtree(folder)
         manifest["dependencies"].pop(name, None)
         lock.pop(name, None)
         print(f"  - {name} removed")

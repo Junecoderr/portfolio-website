@@ -150,22 +150,32 @@ class App:
             def do_HEAD(self): app.dispatch(self)
             def do_OPTIONS(self): app.dispatch(self)
 
+        from tblib import _sockets
+
         class Server(ThreadingHTTPServer):
             daemon_threads = True
-            allow_reuse_address = True
+            # SO_REUSEADDR lets a restarted server reuse a port whose old
+            # connections linger (Linux, macOS). On Windows it would let the
+            # server share a port another program is using, so there the
+            # socket asks for the port exclusively instead.
+            allow_reuse_address = not _sockets.WINDOWS
             request_queue_size = 64
             address_family = socket.AF_INET6 if ":" in host else socket.AF_INET
 
+            def server_bind(self):
+                _sockets.exclusive(self.socket)
+                super().server_bind()
+
         try:
             self.server = Server((host, port), Handler)
-        except PermissionError:
-            fail(line, f"I'm not allowed to listen on port {port} (ports below 1024 need administrator rights).",
-                 reason="permission", port=port)
         except OSError as err:
-            if getattr(err, "errno", None) in (48, 98, 10048) or "in use" in str(err).lower():
+            if _sockets.port_in_use(err, port):
                 fail(line, f"Port {port} is already in use by another program. Pick another port, or stop it.",
                      reason="in_use", port=port)
-            if getattr(err, "errno", None) in (49, 99, 10049) or "assign" in str(err).lower():
+            if isinstance(err, PermissionError):
+                fail(line, f"I'm not allowed to listen on port {port} (ports below 1024 need administrator "
+                     "rights).", reason="permission", port=port)
+            if _sockets.no_such_address(err):
                 fail(line, f"This computer has no address '{host}' to listen on.", reason="bind", host=host)
             fail(line, f"I couldn't listen on {host} port {port}: {err.strerror or err}.", reason="bind", port=port)
         self.server.timeout = 0.5

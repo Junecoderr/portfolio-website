@@ -59,6 +59,15 @@ Linux:
 Window apps (anything that uses  import gui ) need Python's "Tk" part.
 The python.org downloads for Windows and Mac include it already.
 
+Time zones (Windows only): Windows has no time-zone database that Python
+can read, so the datetime library knows only UTC and offsets like "+05:30"
+until you add the official one from the Python team. In the black window
+of STEP 3, type this once and press Enter:
+
+    python -m pip install tzdata
+
+(Mac and Linux already have it.)
+
 
 STEP 3 - Open a terminal in this folder
 ---------------------------------------
@@ -167,6 +176,10 @@ than 3.10. Install a newer one (STEP 2), then check with  python --version
 A window app says it needs Tk / "No module named tkinter": your Python has
 no Tk. On Windows or Mac, install Python from python.org (STEP 2). On Linux,
 install "python3-tk".
+
+"This computer has no time-zone database; install the 'tzdata' package"
+(Windows): type  python -m pip install tzdata  and press Enter (see the
+"Time zones" note in STEP 2).
 
 "I couldn't find the file 'mine.tb'": Notepad probably saved it as
 mine.tb.txt. Save it again with "Save as type: All files".
