@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tools · TB</title>
-  <meta name="description" content="TB 3.0.0 tools: tb fmt, check, test --coverage, debug, doc, build, packages, the language server and the VS Code extension.">
+  <meta name="description" content="TB 3.0.0 tools: tb fmt, check, test --coverage, debug, doc, build, packages (tb add, search, publish), the language server and the VS Code extension.">
   <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -43,7 +43,7 @@
             <li><a href="#debug">tb debug</a></li>
             <li><a href="#doc">tb doc</a></li>
             <li><a href="#build">tb build</a></li>
-            <li><a href="#packages">tb init, add, remove, update, packages</a></li>
+            <li><a href="#packages">tb init, add, search, publish</a></li>
             <li><a href="#lsp">tb lsp</a></li>
             <li><a href="#vscode">VS Code extension</a></li>
           </ul>
@@ -68,6 +68,7 @@
             <tr><td><a href="#doc"><code>tb doc</code></a></td><td>Show a library's help, or make docs from your own comments</td></tr>
             <tr><td><a href="#build"><code>tb build</code></a></td><td>Pack an app into a folder that runs without TB installed</td></tr>
             <tr><td><a href="#packages"><code>tb init / add / remove / update / packages</code></a></td><td>Manage a project's packages</td></tr>
+            <tr><td><a href="#publish"><code>tb search / info / login / publish / yank</code></a></td><td>Find packages and publish your own to the TB Package Index</td></tr>
             <tr><td><a href="#lsp"><code>tb lsp</code></a></td><td>The language server editors talk to</td></tr>
             <tr><td><code>tb --engine tree file.tb</code></td><td>Run with the 2.x-style interpreter instead of the virtual machine</td></tr>
             </tbody>
@@ -164,18 +165,26 @@ notes  notes.tb  README.txt  ...</code></pre>
         </section>
         <section id="packages">
           <h2>tb init, add, remove, update, packages</h2>
-        <p>A project is a folder with a <code>tb.toml</code>. <code>tb add</code> installs a package into <code>tb_packages/</code> and pins the exact version in <code>tb.lock</code>; commit both files and everyone gets the same code. Browse what's available on the <a href="packages.html">Packages</a> page.</p>
+        <p>A project is a folder with a <code>tb.toml</code>. <code>tb add</code> installs a package from the <a href="packages.html">TB Package Index</a> into <code>tb_packages/</code> and pins the exact version and its sha256 in <code>tb.lock</code>; commit both files and everyone gets the same code. Add <code>@</code> and a range to choose versions: <code>^1.2</code> (any 1.x from 1.2), <code>~1.2.3</code> (1.2.x), <code>&gt;=1.0 &lt;2</code> or an exact <code>1.2.3</code>.</p>
         <pre class="md-code"><code>$ tb init
 Started the TB project 'report' (tb.toml written).
 $ tb add tb-tables
 Adding tb-tables...
-  + tb-tables 1.0.0 -&gt; tb_packages/tb-tables/
+  + tb-tables 1.0.0 (TB Package Index) -&gt; tb_packages/tb-tables/
+$ tb search tables      # find packages
+$ tb info tb-tables     # versions, owner and checksums
 $ tb packages           # what this project uses
-$ tb packages --index   # everything in the index
-$ tb update             # newer versions, within tb.toml's limits
+$ tb update             # newer versions, within tb.toml's ranges
 $ tb remove tb-tables</code></pre>
         <pre class="tb-code"><code>import "tb-tables" as tables
 say(tables.table([{"host": "web01", "status": "up"}]))</code></pre>
+        <h3 id="publish">Publishing: tb login, publish, yank</h3>
+        <p>Sign in on the <a href="packages/publish.html">Publish page</a> with GitHub and make an API token, then <code>tb login</code> once and <code>tb publish</code> in your package's folder. It checks the package with the index's rules, zips it the same way every time and uploads it. The first version of a new package is reviewed before it is listed; after that your new versions appear at once. <code>tb yank</code> takes a broken version out of version ranges without breaking projects that pinned it.</p>
+        <pre class="md-code"><code>$ tb login              # paste the token from the website
+$ tb publish --dry-run  # what would be uploaded
+$ tb publish
+Submitted tb-greet 1.0.0 for review.
+$ tb yank tb-greet@1.0.1 --reason "breaks on Windows"</code></pre>
         </section>
         <section id="lsp">
           <h2>tb lsp: the language server</h2>

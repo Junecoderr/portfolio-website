@@ -26,10 +26,14 @@ What it does:
   * generates the library reference (library.html, lib/<name>.html) with
     scripts/gen_lib_docs.py
   * renders spec.html (spec/SPEC.md) and migration.html (MIGRATION-3.0.md)
-    with scripts/md2html.py, and packages.html from packages/index.json and
-    each package's README.md
+    with scripts/md2html.py
+  * writes the TB Package Index pages (packages.html, packages/view.html,
+    publish.html, account.html, admin.html, bundled.json) with
+    scripts/registry_pages.py; the API behind them is api/registry.js
   * zips every example package (packages/<name>/) into packages/<name>.zip and
-    copies packages/index.json, the index `tb add` reads
+    copies packages/index.json, the static index TB 3.0.0's `tb add` reads
+  * refuses to build if api/_lib/registry/seed.js (the bundled packages the
+    API serves) is out of date: run scripts/gen_registry_seed.py
   * refuses to finish if a served text file mentions github.com (downloads
     and links stay on this site)
 
@@ -45,7 +49,6 @@ import json
 import re
 import shutil
 import sys
-import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -188,32 +191,17 @@ def copy_app_sources(out: Path) -> list[str]:
     return names
 
 
-# Package zips are reproducible: fixed timestamps, sorted members.
-ZIP_DATE = (2026, 10, 26, 0, 0, 0)
-PACKAGE_SKIP = {".DS_Store", "tb.lock"}
-
-
 def build_packages(out: Path) -> list[str]:
     """Zip packages/<name>/ into <out>/packages/<name>.zip (one top folder,
-    <name>/, which tb add strips) and copy packages/index.json."""
+    <name>/, which tb add strips) and copy packages/index.json (the static
+    index TB 3.0.0 reads). The zips are byte-identical to the bundled archives
+    the package index API serves (scripts/gen_registry_seed.py)."""
+    import gen_registry_seed
     dest = out / "packages"
     dest.mkdir(parents=True, exist_ok=True)
     names = []
-    if not PACKAGES.is_dir():
-        return names
-    for folder in sorted(PACKAGES.iterdir()):
-        if not folder.is_dir() or not (folder / "tb.toml").exists():
-            continue
-        with zipfile.ZipFile(dest / f"{folder.name}.zip", "w", zipfile.ZIP_DEFLATED) as zf:
-            for path in sorted(folder.rglob("*")):
-                parts = path.relative_to(folder).parts
-                if (not path.is_file() or path.name in PACKAGE_SKIP or "__pycache__" in parts
-                        or "tb_packages" in parts or any(p.startswith(".") for p in parts)):
-                    continue
-                info = zipfile.ZipInfo(f"{folder.name}/" + "/".join(parts), ZIP_DATE)
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o644 << 16
-                zf.writestr(info, path.read_bytes())
+    for folder in gen_registry_seed.example_packages():
+        (dest / f"{folder.name}.zip").write_bytes(gen_registry_seed.package_zip(folder))
         names.append(folder.name)
     if (PACKAGES / "index.json").exists():
         shutil.copy2(PACKAGES / "index.json", dest / "index.json")
@@ -293,92 +281,6 @@ def render_migration(out: Path, version: str) -> None:
     (out / "migration.html").write_text(page, encoding="utf-8")
 
 
-def render_packages(out: Path, version: str) -> None:
-    import md2html
-    import site_shell as shell
-    index = {}
-    if (PACKAGES / "index.json").exists():
-        index = json.loads((PACKAGES / "index.json").read_text(encoding="utf-8"))
-    cards, docs = [], []
-    for name, info in index.items():
-        esc_name = html.escape(name, quote=False)
-        desc = html.escape(info.get("description", ""), quote=False)
-        ver = html.escape(str(info.get("version", "")), quote=False)
-        has_zip = (out / "packages" / f"{name}.zip").exists()
-        zip_link = f' <a href="packages/{html.escape(name, quote=True)}.zip" download>Download {esc_name}.zip</a>' if has_zip else ""
-        cards.append(f"""          <li class="pkg-card">
-            <h3><a href="#pkg-{html.escape(name, quote=True)}"><code>{esc_name}</code></a> <span class="pkg-version">{ver}</span></h3>
-            <p>{desc}</p>
-          </li>""")
-        readme = PACKAGES / name / "README.md"
-        body = ""
-        if readme.exists():
-            body, _t, _h = md2html.convert(readme.read_text(encoding="utf-8"), shift=2, drop_title=True,
-                                          id_prefix=f"{name}-")
-        docs.append(f"""      <section class="pkg" id="pkg-{html.escape(name, quote=True)}" aria-labelledby="pkg-{html.escape(name, quote=True)}-title">
-        <h2 id="pkg-{html.escape(name, quote=True)}-title"><code>{esc_name}</code> <span class="pkg-version">{ver}</span></h2>
-        <p class="lead">{desc}</p>
-        <pre class="md-code"><code>tb add {esc_name}</code></pre>
-        <p class="pkg-links">Then <code>import "{esc_name}" as {html.escape(name.replace("tb-", "").replace("-", "_"), quote=False)}</code> in your program.{zip_link}</p>
-        <div class="pkg-readme">
-{body}
-        </div>
-      </section>""")
-    main = f"""    <div class="container docs docs-wide">
-      <article class="docs-main md-page">
-        <h1>Packages</h1>
-        <p class="lead">Packages are TB code other people wrote, installed into your project with one command. The index below is what <code>tb add</code> searches.</p>
-        <section id="install" aria-labelledby="install-title">
-          <h2 id="install-title">Install a package</h2>
-          <ol>
-            <li>In your project folder, make a <code>tb.toml</code> once: <code>tb init</code>.</li>
-            <li>Add the package: <code>tb add tb-tables</code>. It lands in <code>tb_packages/</code> and is pinned in <code>tb.lock</code>.</li>
-            <li>Import it by name: <code>import "tb-tables" as tables</code>.</li>
-          </ol>
-          <pre class="md-code"><code>tb init
-tb add tb-tables
-tb packages            # what this project uses
-tb packages --index    # everything in the index
-tb update              # newer versions, within what tb.toml allows
-tb remove tb-tables</code></pre>
-          <p>Commit <code>tb.toml</code> and <code>tb.lock</code>; anyone who runs <code>tb add</code> with no arguments gets the same versions. You can also install straight from a zip or a git URL: <code>tb add https://example.com/my-package.zip</code>.</p>
-        </section>
-        <section id="index" aria-labelledby="index-title">
-          <h2 id="index-title">The index</h2>
-          <p>{len(index)} packages. The machine-readable index is <a href="packages/index.json">packages/index.json</a>.</p>
-          <ul class="pkg-grid">
-{chr(10).join(cards)}
-          </ul>
-        </section>
-{chr(10).join(docs)}
-        <section id="publish" aria-labelledby="publish-title">
-          <h2 id="publish-title">Publish your own</h2>
-          <ol>
-            <li>Start a project with <code>tb init</code> and give <code>[package]</code> in <code>tb.toml</code> a name, a version and a one-line description.</li>
-            <li>Put the code people import in <code>lib.tb</code> (or set <code>main = "file.tb"</code>). Mark the public names with <code>export</code> and write a doc comment (<code>##</code>) above each.</li>
-            <li>Add tests in <code>lib_test.tb</code> and run <code>tb test</code>; run <code>tb fmt</code> and <code>tb check</code>.</li>
-            <li>Host the folder as a public zip or git repository, then run <code>tb publish --zip URL</code> (or <code>--git URL</code>). It prints the entry for the index.</li>
-            <li>Send that entry to the TB maintainers to have it listed here. For a private index, serve your own <code>index.json</code> and set <code>TB_PACKAGE_INDEX</code> to its URL.</li>
-          </ol>
-          <pre class="md-code"><code>$ tb publish --zip https://example.com/tb-greet.zip
-Index entry for 'tb-greet' (entry file: lib.tb):
-
-{{
-  "tb-greet": {{
-    "description": "Friendly greetings.",
-    "version": "1.0.0",
-    "zip": "https://example.com/tb-greet.zip"
-  }}
-}}</code></pre>
-          <p>Packages are plain TB (no Python), so they run wherever TB runs. Only install packages you trust: a package's code runs with the same rights as your program.</p>
-        </section>
-      </article>
-    </div>"""
-    page = shell.page("Packages · TB", "TB packages: install them with tb add, browse the index and publish your own.",
-                      main, current="", scripts=("highlight.js", "docs.js"), version=version)
-    (out / "packages.html").write_text(page, encoding="utf-8")
-
-
 SERVED_TEXT = (".html", ".js", ".css", ".json", ".tb", ".md", ".txt", ".yml", ".toml", ".csv", ".log")
 
 
@@ -410,6 +312,12 @@ def main(argv: list[str] | None = None) -> int:
             "Pyodide is not vendored yet (missing: " + ", ".join(missing) + ").\n"
             "  Run:  uv run python scripts/fetch_pyodide.py"
         )
+
+    sys.path.insert(0, str(SCRIPTS))
+    import gen_registry_seed  # noqa: E402
+    if not gen_registry_seed.SEED_JS.exists() or gen_registry_seed.SEED_JS.read_text(encoding="utf-8") != gen_registry_seed.render():
+        fail("api/_lib/registry/seed.js is out of date (packages/ or the library list changed).\n"
+             "  Run:  uv run python scripts/gen_registry_seed.py")
 
     out = Path(args.out)
     if not out.is_absolute():
@@ -467,7 +375,8 @@ def main(argv: list[str] | None = None) -> int:
             print("  note: examples.html has no apps gallery marker; skipped the gallery")
     render_spec(out, version)
     render_migration(out, version)
-    render_packages(out, version)
+    import registry_pages  # noqa: E402
+    registry_pages.render(out, version)
     config_path = out / "assets" / "js" / "config.js"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(

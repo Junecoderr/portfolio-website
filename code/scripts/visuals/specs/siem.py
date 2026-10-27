@@ -1,0 +1,83 @@
+# Pictures for the siem library (read with ast.literal_eval; never run).
+# Formatting runs through TB while the site builds (on a real alert from
+# detect.brute_force over apps/data/auth.log). The Splunk, Elastic and
+# Sentinel clients run in dry-run mode, which builds the request without
+# sending it; send_syslog really sends, so its picture is an illustration.
+SPEC = {
+    "_default": {"imports": ["detect", "logs"], "setup": 'let alert = detect.brute_force(logs.read("apps/data/auth.log"))[0]',
+                 "mode": "lines"},
+    "cef": {
+        "args": {"event": "alert", "options": '{"keep_names": false}'},
+        "nodes": [{"param": "event", "icon": "alert", "lines": ["Brute force (critical)", "by 203.0.113.42, 22 failures"]}, {"param": "options"},
+                  {"arrow": "siem.cef"}, {"result": True, "label": "result · one CEF line for ArcSight"}],
+        "roles": {"event": "an alert from detect.run() or any map", "options": "keep_names, keys (rename fields); vendor, product, id, severity go in the event"},
+    },
+    "leef": {
+        "args": {"event": '{"name": "Brute force", "level": "high", "ip": "203.0.113.42", "user": "root"}', "options": '{"delimiter": "^"}'},
+        "nodes": [{"param": "event", "mode": "tree"}, {"param": "options"}, {"arrow": "siem.leef"},
+                  {"result": True, "label": "result · one LEEF 2.0 line for QRadar"}],
+        "vary": {"param": "options", "values": ['{"delimiter": "^"}', "{}"], "labels": ["delimiter ^", "tab (default)"]},
+        "roles": {"event": "an alert or any map", "options": "delimiter, keys"},
+    },
+    "syslog_line": {
+        "args": {"message_or_event": '{"name": "Brute force", "level": "high", "ip": "203.0.113.42"}',
+                 "options": '{"host": "web01", "app": "tb", "time": 1773300131}'},
+        "nodes": [{"param": "message_or_event", "mode": "tree"}, {"param": "options"}, {"arrow": "siem.syslog_line"},
+                  {"result": True, "label": "result · a syslog line (RFC 5424)"}],
+        "vary": {"param": "options", "values": ['{"host": "web01", "app": "tb", "time": 1773300131}',
+                                               '{"host": "web01", "app": "tb", "time": 1773300131, "format": "rfc3164"}'],
+                 "labels": ["RFC 5424", "rfc3164 (classic)"]},
+        "roles": {"message_or_event": "text, or an alert whose fields go into structured data",
+                  "options": "format, facility, severity, host, app, time"},
+    },
+    "send_syslog": {
+        "t": "net", "run": False, "host_title": "syslog server", "port_title": "udp", "icon": "server",
+        "args": {"host": '"10.0.0.5"', "port": "514", "text_or_lines": "siem.cef(alert)", "proto": '"udp"'},
+        "request": "one line per message", "response": None,
+        "extra": ["text_or_lines", "proto"],
+        "static": '{"sent": 1, "bytes": 318}',
+        "roles": {"host": "the syslog server (only ones you run)", "port": "its port (514 is usual)",
+                  "text_or_lines": "one line, or a list of lines", "proto": "udp (default) or tcp"},
+    },
+    "event": {
+        "args": {"alert": "alert"},
+        "keys": ["name", "severity", "level", "ip", "count", "user", "host"],
+        "mode": None,
+        "nodes": [{"param": "alert", "icon": "alert", "lines": ["detect.brute_force(...)[0]", "nested: records, users ..."]},
+                  {"arrow": "siem.event"}, {"result": True, "label": "result · the flat event the senders use"}],
+        "roles": {"alert": "an alert from detect.run()"},
+    },
+    "splunk": {
+        "t": "net", "port_param": None, "host_param": "url", "host_title": "Splunk HEC", "icon": "db",
+        "args": {"url": '"https://splunk.example:8088"', "token": '"TOKEN"', "options": '{"dry_run": true, "index": "security"}'},
+        "call": 'siem.splunk("https://splunk.example:8088", "TOKEN", {"dry_run": true, "index": "security"}).send([alert])',
+        "request": "POST /services/collector", "response": "200 OK",
+        "extra": ["token", "options"],
+        "keys": ["dry_run", "url", "count", "body"],
+        "result_node": {"label": "sender.send([alert]) with dry_run gives back"},
+        "roles": {"url": "the HTTP Event Collector address", "token": "the HEC token (never printed)",
+                  "options": "index, sourcetype, source, host, dry_run, timeout"},
+    },
+    "elastic": {
+        "t": "net", "port_param": None, "host_param": "url", "host_title": "Elasticsearch", "icon": "db",
+        "args": {"url": '"https://es.example:9200"', "auth": '{"user": "tb", "password": "…"}', "options": '{"dry_run": true}'},
+        "call": 'siem.elastic("https://es.example:9200", {"user": "tb", "password": "x"}, {"dry_run": true}).index("alerts-tb", [alert])',
+        "request": "POST /_bulk", "response": "items indexed",
+        "extra": ["auth", "options"],
+        "keys": ["dry_run", "url", "count"],
+        "result_node": {"label": "es.index(\"alerts-tb\", [alert]) with dry_run gives back"},
+        "roles": {"url": "the Elasticsearch / OpenSearch address", "auth": "{user, password}, {api_key} or a bearer token",
+                  "options": "dry_run, timeout"},
+    },
+    "sentinel": {
+        "t": "net", "port_param": None, "host_param": "workspace_id", "host_title": "Log Analytics", "icon": "cloud",
+        "args": {"workspace_id": '"0b1d2c3e-workspace"', "key": '"c2hhcmVkLWtleQ=="', "options": '{"dry_run": true}'},
+        "call": 'siem.sentinel("0b1d2c3e-workspace", "c2hhcmVkLWtleQ==", {"dry_run": true}).send("TBAlerts", [alert])',
+        "request": "POST signed records", "response": "table TBAlerts_CL",
+        "extra": ["key", "options"],
+        "keys": ["dry_run", "url", "count"],
+        "result_node": {"label": "s.send(\"TBAlerts\", [alert]) with dry_run gives back"},
+        "roles": {"workspace_id": "the Log Analytics workspace id", "key": "the workspace's shared key (base64)",
+                  "options": "dry_run, timeout, url, time_field"},
+    },
+}

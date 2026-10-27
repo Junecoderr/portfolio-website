@@ -3,5 +3,7 @@ name = "tb-tables"
 version = "1.0.0"
 description = "Pretty text tables, Markdown tables and CSV from lists of maps or lists."
 main = "lib.tb"
+license = "MIT"
+keywords = ["table", "markdown", "csv", "cli"]
 
 [dependencies]

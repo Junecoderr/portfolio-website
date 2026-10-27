@@ -1,0 +1,80 @@
+# Pictures for the attack library (read with ast.literal_eval; never run).
+# Every example runs through TB on the bundled MITRE ATT&CK table while the site builds.
+SPEC = {
+    "_default": {"modes": {"id": "lines", "name": "lines", "words": "lines", "path": "lines"}},
+    "technique": {
+        "args": {"id": '"T1110.001"'},
+        "keys": ["id", "full_name", "tactics", "parent", "url"],
+        "nodes": [{"param": "id", "icon": "tag"}, {"box": "the ATT&CK table", "icon": "db", "lines": ["201 techniques, 423 sub-techniques"]},
+                  {"arrow": "attack.technique"}, {"result": True}],
+        "vary": {"param": "id", "values": ['"T1110.001"', '"attack.t1059.001"', '"T9999"'], "labels": ["T1110.001", "attack.t1059.001", "T9999 (unknown)"]},
+        "roles": {"id": "a technique id like T1110 or T1110.001, or a Sigma tag"},
+    },
+    "search": {
+        "args": {"words": '"brute"', "limit": "3"},
+        "keys": ["id", "name"],
+        "nodes": [{"row": [{"param": "words", "icon": "search"}, {"param": "limit"}]}, {"arrow": "attack.search"},
+                  {"result": True, "label": "result · best matches first"}],
+        "vary": {"param": "words", "values": ['"brute"', '"powershell"', '"credential dump"'], "labels": ["brute", "powershell", "credential dump"]},
+        "roles": {"words": "words that must all appear", "limit": "at most this many"},
+    },
+    "tactic": {
+        "args": {"name": '"credential-access"', "platform": '"Linux"'},
+        "call": 'attack.tactic($name, $platform).map(t => t.id + " " + t.name)',
+        "first": 6,
+        "nodes": [{"row": [{"param": "name"}, {"param": "platform"}]}, {"arrow": "attack.tactic"},
+                  {"result": True, "label": "result · techniques under the tactic (id + name shown)"}],
+        "vary": {"param": "platform", "values": ['"Linux"', '"Windows"', '"IaaS"'], "labels": ["Linux", "Windows", "IaaS"]},
+        "roles": {"name": "the tactic: credential-access, Credential Access or TA0006",
+                  "platform": "keep only techniques for this platform"},
+    },
+    "tactics": {
+        "call": "attack.tactics().map(t => t.shortname)",
+        "nodes": [{"arrow": "attack.tactics"}, {"result": True, "label": "result · the 14 tactics in kill-chain order (short names shown)"}],
+    },
+    "techniques": {
+        "args": {"all": "false"},
+        "call": "attack.techniques($all).len()",
+        "nodes": [{"param": "all"}, {"arrow": "attack.techniques"}, {"result": True, "label": "result · how many techniques the list holds"}],
+        "vary": {"param": "all", "values": ["false", "true"], "labels": ["false: top level", "true: with sub-techniques"]},
+        "roles": {"all": "true to include sub-techniques"},
+    },
+    "map": {
+        "imports": ["detect", "logs"],
+        "setup": 'let alerts = detect.run(detect.sigma("apps/data/sigma/ssh_brute_force.yml"), logs.read("apps/data/auth.log"))',
+        "args": {"alerts": "alerts"},
+        "keys": ["techniques", "tactics"],
+        "mode": "tree",
+        "nodes": [{"param": "alerts", "icon": "alert", "lines": ["SSH Brute Force (Sigma) alert", "tags: attack.t1110.001"]},
+                  {"arrow": "attack.map"}, {"result": True, "label": "result · techniques and tactics hit", "mode": "tree"}],
+        "roles": {"alerts": "alerts from detect.run() (or rules)"},
+    },
+    "tags": {
+        "args": {"alert": '{"rule": "SSH brute force", "tags": ["attack.credential_access", "attack.t1110.001"]}'},
+        "nodes": [{"param": "alert", "mode": "tree"}, {"arrow": "attack.tags"}, {"result": True, "label": "result · technique ids (tactic tags left out)"}],
+        "roles": {"alert": "an alert, rule, or a list of tags"},
+    },
+    "tag": {
+        "args": {"id": '"T1110.001"'},
+        "vary": {"param": "id", "values": ['"T1110.001"', '"T1059"'], "labels": ["T1110.001", "T1059"]},
+        "roles": {"id": "a technique id"},
+    },
+    "url": {"args": {"id": '"T1110.001"'}, "roles": {"id": "a technique id"}},
+    "load": {
+        "setup": 'attack.save("attack-table.json")',
+        "args": {"path": '"attack-table.json"'},
+        "nodes": [{"param": "path", "icon": "file", "lines": ["enterprise-attack.json from MITRE,", "or a file from attack.save()"]},
+                  {"arrow": "attack.load"}, {"result": True, "label": "result · how many techniques were loaded"}],
+        "roles": {"path": "the ATT&CK table file to use from now on"},
+    },
+    "save": {
+        "args": {"path": '"attack-table.json"'},
+        "nodes": [{"box": "the table in use", "icon": "db", "lines": ["bundled, or from attack.load()"]}, {"arrow": "attack.save"},
+                  {"param": "path", "icon": "file"}, {"result": True, "label": "result · nil: the file is written"}],
+        "roles": {"path": "where to write TB's compact JSON table"},
+    },
+    "info": {
+        "nodes": [{"arrow": "attack.info"}, {"result": True, "label": "result · about the table in use"}],
+        "call": "attack.info()",
+    },
+}

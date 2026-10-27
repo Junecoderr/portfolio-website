@@ -47,6 +47,10 @@ TB_ENGINE=tree uv run pytest           # the suite on the tree-walking engine
   page header/footer, that pages have no inline scripts (the CSP forbids
   them), that every download the site links to is produced by the release
   workflow, and does a full site build when Pyodide has been fetched.
+- `tests/tools/test_pkg.py` and `tests/tools/test_registry_cli.py` cover the
+  package manager (local git repos, zips, a static index and a fake TB Package
+  Index); `tests/api/*.test.mjs` are the Vercel Functions' Node tests (run by
+  `tests/test_site.py` when `node` is installed).
 - `spec/*_test.tb` are conformance tests: `tb test spec`.
 
 ## Examples and the welcome program
@@ -147,13 +151,34 @@ from `tb.describe_library()` with one example per library in
 `scripts/lib_examples/`; and fills the apps gallery. Hand-written pages share
 the header and footer in `scripts/site_shell.py`; after changing the shell, adding a
 library or bumping the version, run `uv run python scripts/sync_pages.py` to update
-`site/*.html` (it also fills the home page's libraries grid). `spec.html`,
-`migration.html` and `packages.html` are generated from Markdown by
-`scripts/md2html.py`; the playground loads extra Pyodide packages (sqlite3,
+`site/*.html` (it also fills the home page's libraries grid). `spec.html` and
+`migration.html` are generated from Markdown by `scripts/md2html.py`, and the
+package index pages by `scripts/registry_pages.py` (see "Package index" below); the playground loads extra Pyodide packages (sqlite3,
 hashlib/openssl, ssl, tzdata) vendored by `fetch_pyodide.py` on demand. Code is highlighted at
 runtime by `site/assets/js/highlight.js`. The site's CSP allows no inline
 scripts or event handlers, and the site never links to the source
 repository.
+
+### "Visualize" pictures in the library reference
+
+Every function, value, widget, window method, built-in function and method in
+the reference has a collapsed "Visualize" drop-down: an SVG of what it does,
+a legend chip per parameter (chip and drawing share a colour and light up
+together) and, where a parameter is a size, count, width or similar, a
+slider. `scripts/visuals/` draws them from declarative specs:
+`scripts/visuals/specs/<lib>.py` (plus `methods.py`, `builtins.py`) each hold
+one dict literal read with `ast.literal_eval`, mapping a function to a
+template (`flow`, `list_op`, `net`, `lanes`, `threshold`, `timeline`, `gui`,
+`generic`), example arguments and parameter roles; see the docstring in
+`scripts/visuals/__init__.py` for the keys. Results are real: the examples run
+through TB while the site builds (in a scratch folder, seeded, paths
+scrubbed); functions that need the network, other programs or windows use
+`"run": False` with a `"static"` example result, which the page labels as an
+illustration. Slider positions are each run for real and drawn as variants.
+`site/assets/css/visuals.css` and `site/assets/js/visuals.js` style and drive
+them (no inline scripts). `tests/test_site.py` checks every entry has a
+picture whose legend names every parameter, the SVGs are well-formed, and no
+template fell back (`visuals.PROBLEMS`).
 
 ### Visit and download counters
 
@@ -193,6 +218,132 @@ previews (`localhost`, `127.0.0.1`) and automated browsers never count; add
 `vercel dev`). The functions' unit tests are `tests/api/stats.test.mjs`
 (`node --test tests/api/stats.test.mjs`; `tests/test_site.py` runs them when
 `node` is installed).
+
+### Package index (TB Package Index)
+
+https://code.tanisha.ceo/packages is a reviewed package registry. Authors sign
+in with GitHub, make an API token and run `tb publish`; an admin approves the
+first version of every new package; `tb add` installs from it.
+
+**Pieces.** The API is one Vercel Function, `api/registry.js` (code in
+`api/_lib/registry/`: `app.js` routes and storage, `rules.js` names, versions,
+limits and the tb.toml reader, `zip.js` archive checks, `services.js` cookies,
+HMAC, Upstash and Blob over REST, `seed.js` generated). `vercel.json` rewrites
+`/api/registry/<route>` to it (`?route=<route>`). Still no npm dependencies.
+The pages are written by `scripts/registry_pages.py` during the site build:
+`packages.html` (search and list), `packages/view.html?name=x` (README rendered
+by a small Markdown-to-DOM renderer that never uses HTML strings, versions,
+install command, sha256, Report), `packages/publish.html` (how to publish,
+sign-in, tokens), `packages/account.html` (your packages and their review
+status) and `packages/admin.html` (review queue, reports, yank/remove, audit
+log), all filled by `site/assets/js/registry.js` and styled by
+`site/assets/css/registry.css`. Without the API they fall back to
+`packages/bundled.json` (list and package pages) or say the index isn't
+reachable.
+
+**Routes** (all under `/api/registry/`):
+
+| Route | Who | What |
+|---|---|---|
+| `GET index` | anyone | approved packages for `tb`: `{format: "tb-registry-1", packages: {name: {description, version, keywords, owner, downloads, versions: {v: {sha256, yanked?}}, zip}}}` (CDN-cached 60 s) |
+| `GET search?q=` | anyone | ranked matches on name, keywords, description |
+| `GET packages/<name>` / `packages/<name>/<version>` | anyone (owner/admin also see pending ones) | metadata, versions, README |
+| `GET packages/<name>/<version>/download` | anyone | the zip (counted per version); yanked versions stay downloadable |
+| `POST packages/<name>/<version>` | API token | publish (`Content-Type: application/zip`, at most 4 MB) |
+| `POST packages/<name>/<version>/yank` / `unyank` | owner or admin | yank (`{reason}`); owners can't undo an admin's yank |
+| `POST packages/<name>/report` | signed in | report a package to the admins (5 an hour) |
+| `GET me` | anyone | `{signedIn, user, admin, setup}` |
+| `GET auth/login?next=` / `GET auth/callback` / `POST auth/logout` | browser | GitHub sign-in |
+| `GET tokens` / `POST tokens` / `DELETE tokens/<id>` | signed in (creating needs the website session) | API tokens, at most 10 per account |
+| `GET account/packages` | signed in | your packages with every version's status and review reason |
+| `GET admin/queue` | admin | pending versions (files, flags, README), reports, audit log |
+| `POST admin/packages/<name>/<version>/approve` / `reject` (`{reason}` required) / `remove` | admin | review |
+| `POST admin/packages/<name>/remove` / `admin/reports/<id>/dismiss` | admin | remove a package (frees the name) / close a report |
+
+**Review rules.** A new package's first version is `pending` and invisible to
+everyone but its owner and the admins until an admin approves it; then the
+package is `approved` and later versions from its owner are published at once.
+A rejected version's archive is deleted and its owner sees the reason on
+`/packages/account`; they keep the name and may upload the same version again.
+Versions are immutable (a published or removed version number is never reused).
+Yanked versions leave version ranges and "latest" but stay installable when
+pinned exactly or locked. Names close to an existing name or a standard library
+name (edit distance 1, or equal without dashes) and names starting with `tb-`
+are flagged for the reviewer. The three bundled packages (`packages/<name>/`)
+are approved packages owned by the system owner `tb`; admins may publish new
+versions of them.
+
+**Publishing checks** (server side, and by `tb publish` before it uploads):
+names `^[a-z][a-z0-9-]{1,38}[a-z0-9]$` without `--`, not a standard library
+name or a reserved word (`RESERVED_WORDS` in `rules.js` and `tbtools/pkg.py`,
+kept equal by a test); semantic versions; a zip of at most 4 MB (Vercel
+Functions accept bodies up to 4.5 MB) with at most 200 files, 1 MB per file and
+10 MB unpacked; no absolute paths, `..`, backslashes, hidden files, symlinks or
+other special files, ZIP64 or encryption; `tb.toml` whose name and version match
+the upload; an entry `.tb` file; only UTF-8 text files plus README images whose
+bytes match their extension; 10 uploads an hour per account.
+
+**Storage.** Upstash Redis (the counters' database), every key prefixed `pkg:`:
+`pkg:pkg:<name>` package summary (JSON), `pkg:versions:<name>` hash of version
+records (status, sha256, size, publisher, dependencies, flags, reasons),
+`pkg:readme:<name>:<version>`, `pkg:owner:<name>` and `pkg:claim:<name>:<version>`
+(set with NX, so names and versions can't be taken twice), `pkg:names`,
+`pkg:listed`, `pkg:queue` (`name@version`), `pkg:owned:<user>`,
+`pkg:downloads` (total per package) and `pkg:dl:<name>` (per version),
+`pkg:user:<github id>`, `pkg:session:<hmac>` (expires after 7 days),
+`pkg:token:<hmac>` and `pkg:tokens:<user>`, `pkg:reports`, `pkg:audit`,
+`pkg:rl:<kind>:<user>:<hour>`. Archives live in the private Vercel Blob store
+at `packages/<name>/<version>.zip`, read and written with the Blob REST API
+(the same requests `@vercel/blob` makes) and only ever served through the
+download route. The bundled packages' archives are embedded in `seed.js` and
+are byte-identical to the static `packages/<name>.zip` downloads.
+
+**Security.** Sign-in is GitHub's OAuth web flow with a random `state` and
+PKCE (S256), both kept in a short-lived signed cookie, and no scopes (public
+profile only); the GitHub access token is used once to read the user id and
+login, then dropped. The session is one cookie, `__Host-tb_registry` (HMAC
+signed, `HttpOnly; Secure; SameSite=Lax; Path=/`, 7 days), holding a random
+session id that Redis maps to the user, so signing out ends it on the server.
+It is the site's only cookie and is set only for people who sign in. Writes
+made with the cookie must come from this site (`Sec-Fetch-Site` / `Origin`
+checks, JSON bodies). API tokens (`tbr_` + 43 random characters) are shown
+once and stored only as HMAC-SHA256 hashes; tokens act as you in the API (an
+admin.s token can review) but can't make new tokens. Package data is shown on the pages with
+`textContent` only, links in READMEs are limited to http(s)/mailto/anchors and
+images are not loaded. The site's CSP is unchanged (`connect-src 'self'`).
+
+**Setting it up** (Vercel project `tanisha-code`, Settings, Environment
+Variables, Production):
+
+1. `KV_REST_API_URL` / `KV_REST_API_TOKEN` (already there for the counters) and
+   `BLOB_READ_WRITE_TOKEN` (a *private* Blob store connected to the project).
+2. Create a GitHub OAuth App under the project's own GitHub account or
+   organisation, not a personal account: GitHub's consent screen shows the
+   app's owner to everyone who signs in. In that account: Settings, Developer
+   settings, OAuth Apps, New OAuth App. Homepage URL
+   `https://code.tanisha.ceo/packages`, Authorization callback URL
+   `https://code.tanisha.ceo/api/registry/auth/callback`; leave "Enable Device
+   Flow" off. Generate a client secret, then set `GITHUB_CLIENT_ID` and
+   `GITHUB_CLIENT_SECRET`.
+3. `REGISTRY_SESSION_SECRET`: at least 32 random characters, for example
+   `openssl rand -base64 48`. It signs cookies and hashes tokens, so changing it
+   signs everyone out and invalidates every API token.
+4. `REGISTRY_ADMINS`: comma-separated numeric GitHub user ids of the reviewers
+   (ids never change, unlike user names). Find one with
+   `curl -s https://api.github.com/users/<login>` (the `id` field), or sign in
+   once and read `user.id` from `/api/registry/me`.
+5. Optional: `REGISTRY_SITE_URL` (default: the request's origin) if the site
+   moves; the OAuth callback must match it.
+
+Until a variable is set the API says what's missing (`503` with the variable's
+name, or `/packages/publish?error=signin-unavailable`) and the public index
+still lists the bundled packages. Redeploy after changing variables.
+
+**When packages/ or the standard library changes**, regenerate the seed:
+`uv run python scripts/gen_registry_seed.py` (the build refuses to run with a
+stale `seed.js`). Tests: `tests/api/registry.test.mjs` (the API, with fake
+Redis, Blob and GitHub), `tests/tools/test_registry_cli.py` (the CLI against a
+fake registry) and `tests/test_registry_site.py` (the pages).
 
 ### Deploying
 

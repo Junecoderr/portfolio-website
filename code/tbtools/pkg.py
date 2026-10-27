@@ -1,5 +1,6 @@
 """The TB package manager: `tb init`, `tb add`, `tb remove`, `tb update`,
-`tb packages`, `tb publish`.
+`tb packages`, `tb publish`, `tb login`, `tb logout`, `tb search`, `tb info`,
+`tb yank`.
 
 A TB project is a folder with a `tb.toml`:
 
@@ -20,20 +21,36 @@ Packages are TB-only: a folder with its own `tb.toml` and a `lib.tb` (or
 in `tb.lock` (git commit or zip sha256), so `tb add` with no arguments
 re-creates the same `tb_packages/` folder on another machine.
 
-Names are looked up in the package index, a JSON document
-`{ "<name>": {"description": "...", "git": "<url>" | "zip": "<url>", "version"?: "...",
-"tags"?: [...]} }` served at https://code.tanisha.ceo/packages/index.json.
-The environment variable TB_PACKAGE_INDEX overrides that URL (the tests point
-it at a local server). Git sources need the `git` command; zip sources only
-need Python.
+Names are looked up in the TB Package Index (https://code.tanisha.ceo/packages),
+whose machine-readable index is https://code.tanisha.ceo/api/registry/index:
+`{"format": "tb-registry-1", "packages": {"<name>": {"description", "version",
+"versions": {"1.2.0": {"sha256": "...", "yanked"?: true}}, ...}}}`. `tb add
+name@range` picks the newest version that matches the range (`^1.2`, `~1.2.3`,
+`>=1.0 <2`, `1.2.3`), skipping yanked versions unless pinned exactly, downloads
+it from <registry>/packages/<name>/<version>/download, checks its sha256 and
+records it in tb.lock.
 
-Everything here is stdlib only and prints friendly messages; it never
-touches credentials (use git's own credential helpers for private repos).
+The older static format `{ "<name>": {"description": "...", "git": "<url>" |
+"zip": "<url>", "version"?: "..."} }` (https://code.tanisha.ceo/packages/index.json)
+still works. TB_PACKAGE_INDEX overrides the index URL (the tests point it at
+local servers); TB_REGISTRY overrides the registry API used by publish, search,
+info, yank and login (by default the index URL without its trailing /index).
+Git sources need the `git` command; zip sources only need Python.
+
+Publishing: `tb login` stores an API token made on the website (in
+~/.config/tb/credentials.toml, or %APPDATA%\\TB\\credentials.toml on Windows,
+readable only by you; TB_TOKEN overrides it), and `tb publish` checks the
+package with the index's rules, zips it reproducibly and uploads it. The first
+version of a new package is reviewed before it is listed.
+
+Everything here is stdlib only and prints friendly messages. Tokens are only
+sent to the registry; git credentials stay with git's own helpers.
 """
 
 from __future__ import annotations
 
 import hashlib
+import getpass
 import io
 import json
 import os
@@ -47,11 +64,14 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+import webbrowser
 import zipfile
 
 __all__ = ["main", "PkgError", "DEFAULT_INDEX", "parse_toml", "dump_toml"]
 
-DEFAULT_INDEX = "https://code.tanisha.ceo/packages/index.json"
+DEFAULT_REGISTRY = "https://code.tanisha.ceo/api/registry"
+DEFAULT_INDEX = DEFAULT_REGISTRY + "/index"
+LEGACY_INDEX = "https://code.tanisha.ceo/packages/index.json"
 PACKAGES_DIR = "tb_packages"
 MANIFEST = "tb.toml"
 LOCKFILE = "tb.lock"
@@ -59,19 +79,48 @@ NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 MAX_ZIP_BYTES = 50 * 1024 * 1024
 HTTP_TIMEOUT = 30
 
+# The index's publishing rules (api/_lib/registry/rules.js has the same ones).
+REGISTRY_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,38}[a-z0-9]$")
+VERSION_RE = re.compile(
+    r"^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$")
+RESERVED_WORDS = (
+    "tb", "tbcore", "tblib", "tbtools", "std", "stdlib", "core", "builtin", "builtins",
+    "admin", "api", "registry", "packages", "package", "index", "official", "system", "root",
+    "null", "none", "nil", "true", "false", "login", "logout", "search", "publish",
+)
+TEXT_EXTENSIONS = (".tb", ".toml", ".md", ".txt", ".json", ".csv", ".tsv", ".yml", ".yaml", ".xml", ".ini", ".cfg", ".log")
+TEXT_NAMES = ("license", "licence", "copying", "notice", "authors", "changelog", "readme", "contributors")
+IMAGE_MAGIC = {".png": (b"\x89PNG",), ".jpg": (b"\xff\xd8\xff",), ".jpeg": (b"\xff\xd8\xff",),
+               ".gif": (b"GIF8",), ".webp": (b"RIFF",)}
+MAX_ARCHIVE_BYTES = 4 * 1024 * 1024
+MAX_FILES = 200
+MAX_FILE_BYTES = 1024 * 1024
+MAX_TOTAL_BYTES = 10 * 1024 * 1024
+MAX_PATH_LENGTH = 200
+PUBLISH_SKIP_DIRS = {PACKAGES_DIR, "__pycache__", "node_modules"}
+PUBLISH_SKIP_FILES = {LOCKFILE, ".DS_Store", "Thumbs.db"}
+ZIP_DATE = (2026, 1, 1, 0, 0, 0)
+TOKEN_RE = re.compile(r"^tbr_[A-Za-z0-9_-]{43}$")
+
 USAGE = """\
 TB packages
 
   tb init [name]                 start a project here (writes tb.toml)
-  tb add <name>[@tag]            install a package from the index
+  tb add <name>[@range]          install from the TB Package Index (tb add tb-tables@^1.0)
   tb add <git-url>[@tag]         install from any git repository
   tb add <zip-url>               install from a .zip download
-  tb add                         install everything listed in tb.toml
+  tb add                         install everything listed in tb.toml (as tb.lock pins it)
   tb remove <name>               uninstall a package
-  tb update [name]               re-install packages at their newest version
-  tb packages                    list installed packages (--index: the index)
-  tb publish [--git URL|--zip URL]  print the index entry for this package
+  tb update [name]               re-install packages at their newest allowed version
+  tb packages                    list installed packages (--index: the whole index)
+  tb search <words>              find packages in the index
+  tb info <name>                 versions, owner and checksums of a package
+  tb login                       store an API token from the website for publishing
+  tb logout                      forget the stored token
+  tb publish [--dry-run]         check, zip and upload this package to the index
+  tb yank <name>@<version> [--reason TEXT] [--undo]   hide a version from ranges
 
+Ranges: ^1.2 (1.x from 1.2), ~1.2.3 (1.2.x from 1.2.3), >=1.0 <2, 1.2.3 (exactly).
 Packages live in tb_packages/<name>/ next to tb.toml; tb.lock records exactly
 what was installed. Index: TB_PACKAGE_INDEX or """ + DEFAULT_INDEX
 
@@ -342,6 +391,158 @@ def index_url() -> str:
     return os.environ.get("TB_PACKAGE_INDEX") or DEFAULT_INDEX
 
 
+def registry_base() -> str:
+    """The registry API: TB_REGISTRY, else the index URL without /index, else the default."""
+    explicit = os.environ.get("TB_REGISTRY")
+    if explicit:
+        return explicit.rstrip("/")
+    url = index_url().rstrip("/")
+    if url.endswith("/index"):
+        return url[: -len("/index")]
+    return DEFAULT_REGISTRY
+
+
+def site_url(base: str | None = None) -> str:
+    """The website that goes with a registry (where tokens are made)."""
+    base = (base or registry_base()).rstrip("/")
+    return base[: -len("/api/registry")] if base.endswith("/api/registry") else base
+
+
+# ---------------------------------------------------------------------------
+# Versions and ranges (semantic versioning)
+# ---------------------------------------------------------------------------
+
+def parse_version(text) -> tuple | None:
+    """'1.2.3-beta.1' -> (1, 2, 3, ('beta', '1')), or None."""
+    m = VERSION_RE.match(str(text)) if text is not None else None
+    if not m or len(str(text)) > 64:
+        return None
+    pre = tuple(m.group(4).split(".")) if m.group(4) else ()
+    return int(m.group(1)), int(m.group(2)), int(m.group(3)), pre
+
+
+def version_key(text):
+    """A sort key with semver precedence (pre-releases before the release)."""
+    v = parse_version(text)
+    if v is None:
+        return (-1, -1, -1, 0, ())
+    pre = tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in v[3])
+    return (v[0], v[1], v[2], 0 if v[3] else 1, pre)
+
+
+_COMPARATOR_RE = re.compile(
+    r"^(\^|~|>=|<=|>|<|=)?v?(\d+|[xX*])(?:\.(\d+|[xX*]))?(?:\.(\d+|[xX*]))?(?:-([0-9A-Za-z.-]+))?$")
+
+
+def _comparators(token: str, text: str) -> list[tuple[str, tuple]]:
+    m = _COMPARATOR_RE.match(token)
+    if not m:
+        raise PkgError(f"'{text}' isn't a version range I understand.",
+                       "Use ^1.2, ~1.2.3, >=1.0 <2, 1.2.3 or * (any version).")
+    op = m.group(1) or ""
+    parts = [None if p is None or p in "xX*" else int(p) for p in m.group(2, 3, 4)]
+    major, minor, patch = parts
+    pre = tuple(m.group(5).split(".")) if m.group(5) else ()
+    if major is None:
+        return []
+    base = (major, minor or 0, patch or 0, pre)
+    if op == "^":
+        if major > 0 or minor is None:
+            upper = (major + 1, 0, 0, ("0",))
+        elif minor > 0 or patch is None:
+            upper = (0, minor + 1, 0, ("0",))
+        else:
+            upper = (0, 0, patch + 1, ("0",))
+        return [(">=", base), ("<", upper)]
+    if op == "~":
+        upper = (major + 1, 0, 0, ("0",)) if minor is None else (major, minor + 1, 0, ("0",))
+        return [(">=", base), ("<", upper)]
+    if op in ("", "="):
+        if minor is None:
+            return [(">=", base), ("<", (major + 1, 0, 0, ("0",)))]
+        if patch is None:
+            return [(">=", base), ("<", (major, minor + 1, 0, ("0",)))]
+        return [("=", base)]
+    if op == ">" and (minor is None or patch is None):
+        nxt = (major + 1, 0, 0, ()) if minor is None else (major, minor + 1, 0, ())
+        return [(">=", nxt)]
+    if op == "<=" and (minor is None or patch is None):
+        nxt = (major + 1, 0, 0, ("0",)) if minor is None else (major, minor + 1, 0, ("0",))
+        return [("<", nxt)]
+    return [(op, base)]
+
+
+def parse_range(text: str) -> list[list[tuple[str, tuple]]]:
+    """A range as alternatives (||) of comparator lists (all must hold)."""
+    text = str(text or "").strip()
+    if text in ("", "*", "latest", "x", "X"):
+        return [[]]
+    alternatives = []
+    for part in text.split("||"):
+        tokens = part.split()
+        merged, i = [], 0
+        while i < len(tokens):
+            token = tokens[i]
+            if token in (">=", "<=", ">", "<", "=", "^", "~") and i + 1 < len(tokens):
+                token += tokens[i + 1]
+                i += 1
+            merged.append(token)
+            i += 1
+        comps = []
+        for token in merged:
+            comps.extend(_comparators(token, text))
+        alternatives.append(comps)
+    return alternatives
+
+
+def _tuple_key(t: tuple):
+    return version_key(f"{t[0]}.{t[1]}.{t[2]}" + ("-" + ".".join(t[3]) if t[3] else ""))
+
+
+def satisfies(version: str, range_text: str) -> bool:
+    """Does `version` match the range? Pre-releases only match a range that
+    names a pre-release of the same major.minor.patch (as npm does)."""
+    v = parse_version(version)
+    if v is None:
+        return False
+    key = version_key(version)
+    for comps in parse_range(range_text):
+        ok = True
+        for op, bound in comps:
+            b = _tuple_key(bound)
+            ok = {"=": key == b, ">=": key >= b, "<=": key <= b, ">": key > b, "<": key < b}[op]
+            if not ok:
+                break
+        if not ok:
+            continue
+        if v[3] and not any(bound[3] and bound[:3] == v[:3] for _op, bound in comps):
+            continue
+        return True
+    return False
+
+
+def is_exact(range_text: str) -> bool:
+    alternatives = parse_range(range_text)
+    return len(alternatives) == 1 and len(alternatives[0]) == 1 and alternatives[0][0][0] == "="
+
+
+def pick_version(name: str, versions: dict, range_text: str | None, prefer: str | None = None) -> str:
+    """The newest version in `versions` ({version: {sha256, yanked?}}) that
+    matches the range; yanked versions only when pinned exactly (or locked)."""
+    wanted = range_text or "*"
+    parse_range(wanted)  # friendly error for a bad range
+    if prefer and prefer in versions and satisfies(prefer, wanted):
+        return prefer
+    exact = is_exact(wanted)
+    candidates = [v for v, info in versions.items()
+                  if satisfies(v, wanted) and (exact or not (isinstance(info, dict) and info.get("yanked")))]
+    if not candidates:
+        available = sorted((v for v, i in versions.items() if not (isinstance(i, dict) and i.get("yanked"))), key=version_key)
+        hint = f"Available: {', '.join(available[-8:])}" if available else "Every version of it has been yanked."
+        raise PkgError(f"No version of '{name}' matches '{wanted}'.", hint)
+    return max(candidates, key=version_key)
+
+
 def _fetch(url: str, what: str, limit: int = MAX_ZIP_BYTES) -> bytes:
     """Download `url` (http/https/file) with a size limit and friendly errors."""
     scheme = urllib.parse.urlparse(url).scheme
@@ -396,9 +597,10 @@ def _looks_like_url(text: str) -> bool:
     return bool(re.match(r"^[a-z][a-z0-9+.-]*://", text)) or bool(re.match(r"^[\w.-]+@[\w.-]+:", text))
 
 
-def resolve_spec(spec: str, index: dict | None = None) -> dict:
+def resolve_spec(spec: str, index: dict | None = None, prefer: str | None = None) -> dict:
     """Turn what the user typed into a source description:
-    {name, kind: git|zip|path, url|path, tag?, description?}."""
+    {name, kind: registry|git|zip|path, url|path, tag?, description?}.
+    `prefer` is the version tb.lock has; it wins while it still matches."""
     spec = spec.strip()
     if not spec:
         raise PkgError("Which package? Like: tb add tb-colors")
@@ -431,6 +633,16 @@ def resolve_spec(spec: str, index: dict | None = None) -> dict:
     if not isinstance(entry, dict):
         raise PkgError(f"The index entry for '{base}' is malformed.")
     source = {"name": base, "description": entry.get("description", ""), "version": entry.get("version")}
+    if isinstance(entry.get("versions"), dict) and entry["versions"]:
+        version = pick_version(base, entry["versions"], tag, prefer)
+        info = entry["versions"][version] if isinstance(entry["versions"][version], dict) else {}
+        registry = registry_base()
+        source.update(
+            kind="registry", version=version, sha256=info.get("sha256"), range=tag, registry=registry,
+            url=f"{registry}/packages/{urllib.parse.quote(base)}/{urllib.parse.quote(version)}/download",
+            yanked=bool(info.get("yanked")),
+        )
+        return source
     if entry.get("git"):
         source.update(kind="git", url=entry["git"], tag=tag or entry.get("tag"))
     elif entry.get("zip"):
@@ -473,6 +685,8 @@ def _manifest_source(source: dict) -> object:
     """What to record under [dependencies] in tb.toml."""
     if source["kind"] == "path":
         return {"path": source["path"]}
+    if source["kind"] == "registry":
+        return source.get("range") or f"^{source['version']}"
     if source.get("from_index"):
         return source.get("tag") and {"version": source["tag"]} or "*"
     entry = {source["kind"]: source["url"]}
@@ -481,16 +695,17 @@ def _manifest_source(source: dict) -> object:
     return entry
 
 
-def _source_from_manifest(name: str, value) -> dict:
-    """The reverse of _manifest_source, for `tb add` (no args) and `tb update`."""
+def _source_from_manifest(name: str, value, prefer: str | None = None, index: dict | None = None) -> dict:
+    """The reverse of _manifest_source, for `tb add` (no args) and `tb update`.
+    `prefer`: the version tb.lock pins, kept while it matches the range."""
     if isinstance(value, str):
         tag = None if value in ("*", "", "latest") else value
-        source = resolve_spec(name if tag is None else f"{name}@{tag}")
+        source = resolve_spec(name if tag is None else f"{name}@{tag}", index, prefer)
         source["from_index"] = True
         return source
     if isinstance(value, dict):
         if "version" in value and not any(k in value for k in ("git", "zip", "path")):
-            source = resolve_spec(f"{name}@{value['version']}")
+            source = resolve_spec(f"{name}@{value['version']}", index, prefer)
             source["from_index"] = True
             return source
         if "git" in value:
@@ -563,6 +778,12 @@ def _clone(source: dict, dest: str) -> dict:
 def _unzip(source: dict, dest: str) -> dict:
     data = _fetch(source["url"], f"the package '{source['name']}'")
     digest = hashlib.sha256(data).hexdigest()
+    expected = source.get("sha256")
+    if expected and digest != expected:
+        raise PkgError(
+            f"The download of {source['name']} {source.get('version', '')} doesn't match the index's checksum; refusing to install it.",
+            f"Expected sha256 {expected}, got {digest}. Try again later, and tell the index admins if it keeps happening.",
+        )
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
         members = [m for m in archive.infolist()]
@@ -639,7 +860,7 @@ def install(root: str, source: dict, *, quiet: bool = False) -> dict:
     try:
         if source["kind"] == "git":
             info = _clone(source, dest)
-        elif source["kind"] == "zip":
+        elif source["kind"] in ("zip", "registry"):
             info = _unzip(source, dest)
         elif source["kind"] == "path":
             info = _copy_path(source, dest)
@@ -667,9 +888,13 @@ def install(root: str, source: dict, *, quiet: bool = False) -> dict:
     lock.update(info)
     if meta.get("version") is not None:
         lock["version"] = str(meta["version"])
+    if source["kind"] == "registry":
+        lock["version"] = source["version"]
+        lock["registry"] = source["registry"]
     if not quiet:
         version = f" {lock['version']}" if lock.get("version") else ""
-        where = {"git": lock.get("commit", "")[:12], "zip": "zip", "path": "local folder"}[source["kind"]]
+        where = {"git": lock.get("commit", "")[:12], "zip": "zip", "path": "local folder",
+                 "registry": "TB Package Index" + (", yanked" if source.get("yanked") else "")}[source["kind"]]
         print(f"  + {name}{version} ({where}) -> {PACKAGES_DIR}/{name}/")
     return lock
 
@@ -761,8 +986,9 @@ def _install_all(root: str, manifest: dict, lock: dict) -> int:
         return 0
     print(f"Installing {len(deps)} package{'s' if len(deps) != 1 else ''} from {MANIFEST}...")
     for name, value in deps.items():
-        source = _source_from_manifest(name, value)
         locked = lock.get(name, {})
+        prefer = locked.get("version") if locked.get("source") == "registry" else None
+        source = _source_from_manifest(name, value, prefer)
         if source["kind"] == "git" and not source.get("tag") and locked.get("commit") and locked.get("url") == source["url"]:
             # Reproduce the lock: fetch the recorded commit.
             source = dict(source, tag=None, commit=locked["commit"])
@@ -886,6 +1112,8 @@ def cmd_packages(args: list[str]) -> int:
         version = str(meta.get("version") or entry.get("version") or "")
         if not os.path.isdir(folder):
             status = "missing - run: tb add"
+        elif entry.get("source") == "registry":
+            status = "index"
         elif entry.get("commit"):
             status = f"git {entry['commit'][:12]}"
         elif entry.get("sha256"):
@@ -898,18 +1126,8 @@ def cmd_packages(args: list[str]) -> int:
     return 0
 
 
-def cmd_publish(args: list[str]) -> int:
-    rest = list(args)
-    overrides = {}
-    while rest:
-        item = rest.pop(0)
-        if item in ("--git", "--zip"):
-            if not rest:
-                raise PkgError(f"{item} needs a URL after it.")
-            overrides[item[2:]] = rest.pop(0)
-        else:
-            raise PkgError(f"I don't know the option '{item}' for tb publish.", "Usage: tb publish [--git URL | --zip URL]")
-    root = require_project()
+def _print_index_entry(root: str, overrides: dict) -> int:
+    """`tb publish --print/--git/--zip`: the entry for a self-hosted static index."""
     manifest = read_manifest(root)
     package = manifest["package"]
     name = package.get("name")
@@ -939,10 +1157,469 @@ def cmd_publish(args: list[str]) -> int:
     print()
     print(json.dumps({name: info}, indent=2))
     print()
-    print("Add this to the package index (see the Packages page on the TB site) and")
+    print("Add this to your own static index.json (served anywhere, used with TB_PACKAGE_INDEX) and")
     print(f"people can install it with: tb add {name}")
+    print("To list it in the TB Package Index instead, run: tb publish")
     if "git" in info and info["git"].startswith("https://example.com"):
         print("Replace the git URL with your repository's public URL (or pass --git URL / --zip URL).")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Publishing to the TB Package Index
+# ---------------------------------------------------------------------------
+
+def reserved_names() -> set[str]:
+    """Names no package may take: the index's words and every standard library name."""
+    names = set(RESERVED_WORDS)
+    try:
+        import tb  # the language itself, next to tbtools/
+
+        names.update(tb.list_libraries())
+    except Exception:
+        pass  # the index checks again
+    return names
+
+
+def check_registry_name(name) -> str | None:
+    if not isinstance(name, str) or not REGISTRY_NAME_RE.match(name):
+        return ("Package names are 3 to 40 characters: lower-case letters, digits and -, "
+                "starting with a letter and not ending with -.")
+    if "--" in name:
+        return "Package names can't contain two - in a row."
+    if name in reserved_names():
+        return f"'{name}' is reserved (a TB standard library name or a word the index uses)."
+    return None
+
+
+def _publish_files(root: str) -> list[tuple[str, str]]:
+    """(archive path, file path) for every file `tb publish` sends, sorted.
+    Leaves out tb_packages/, tb.lock, hidden files and caches; refuses links."""
+    found = []
+    for folder, dirs, files in os.walk(root):
+        rel_dir = os.path.relpath(folder, root)
+        rel_parts = [] if rel_dir == "." else rel_dir.split(os.sep)
+        keep = []
+        for d in sorted(dirs):
+            full = os.path.join(folder, d)
+            if os.path.islink(full):
+                raise PkgError(f"'{'/'.join(rel_parts + [d])}' is a symbolic link; packages can't contain links.")
+            if d.startswith(".") or d in PUBLISH_SKIP_DIRS:
+                continue
+            keep.append(d)
+        dirs[:] = keep
+        for f in sorted(files):
+            if f.startswith(".") or f in PUBLISH_SKIP_FILES:
+                continue
+            full = os.path.join(folder, f)
+            rel = "/".join(rel_parts + [f])
+            if os.path.islink(full):
+                raise PkgError(f"'{rel}' is a symbolic link; packages can't contain links.")
+            found.append((rel, full))
+    return sorted(found)
+
+
+def _is_text_name(rel: str) -> bool:
+    base = rel.rsplit("/", 1)[-1].lower()
+    ext = os.path.splitext(base)[1]
+    if ext in TEXT_EXTENSIONS:
+        return True
+    stem = base[: -len(ext)] if ext else base
+    return stem in TEXT_NAMES and ext in ("", ".md", ".txt")
+
+
+def check_package(root: str) -> dict:
+    """Check a package folder with the index's rules (the same ones the server
+    applies). Returns {name, version, entry, files, warnings}; raises PkgError."""
+    manifest = read_manifest(root)
+    package = manifest["package"]
+    name = package.get("name")
+    if not name:
+        raise PkgError(f"[package] in {MANIFEST} needs a name before you can publish.")
+    entry = package_entry(root, str(name))
+    if entry is None:
+        raise PkgError(
+            f"'{name}' has no lib.tb (or [package] main = ...) so other programs couldn't import it.",
+            "Put your package's code in lib.tb.",
+        )
+    problem = check_registry_name(name)
+    if problem:
+        raise PkgError(problem, f"Change [package] name in {MANIFEST}.")
+    version = package.get("version")
+    if not isinstance(version, str) or parse_version(version) is None:
+        raise PkgError(f"[package] version in {MANIFEST} must be a version like \"1.0.0\" (semantic versioning), not {version!r}.")
+    main = package.get("main")
+    if main is not None and (not isinstance(main, str) or not main.endswith(".tb")
+                             or not os.path.isfile(os.path.join(root, main))):
+        raise PkgError(f"[package] main in {MANIFEST} must name a .tb file in the package.")
+    description = package.get("description", "")
+    if not isinstance(description, str) or len(description) > 300:
+        raise PkgError("[package] description must be text of at most 300 characters.")
+    keywords = package.get("keywords", [])
+    if not isinstance(keywords, list) or len(keywords) > 10 or not all(
+            isinstance(k, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,29}", k) for k in keywords):
+        raise PkgError("[package] keywords must be a list of at most 10 short lower-case words.")
+    files = _publish_files(root)
+    if len(files) > MAX_FILES:
+        raise PkgError(f"The package has {len(files)} files; the index takes at most {MAX_FILES}.")
+    total = 0
+    seen = set()
+    for rel, full in files:
+        if len(rel) > MAX_PATH_LENGTH or re.search(r'[<>:"|?*\\\x00-\x1f]', rel):
+            raise PkgError(f"'{rel}' has a name the index won't accept (too long, or characters like : * ?).")
+        if rel.lower() in seen:
+            raise PkgError(f"'{rel}' clashes with another file whose name differs only in case.")
+        seen.add(rel.lower())
+        size = os.path.getsize(full)
+        if size > MAX_FILE_BYTES:
+            raise PkgError(f"'{rel}' is bigger than 1 MB; the index won't take it.")
+        total += size
+        ext = os.path.splitext(rel)[1].lower()
+        with open(full, "rb") as fh:
+            data = fh.read()
+        if ext in IMAGE_MAGIC:
+            if not data.startswith(IMAGE_MAGIC[ext]):
+                raise PkgError(f"'{rel}' isn't the image its name says.")
+            continue
+        if not _is_text_name(rel):
+            raise PkgError(
+                f"'{rel}' can't go in a package: packages hold TB code and text files "
+                f"({' '.join(TEXT_EXTENSIONS)}, LICENSE, README) plus images for the README.",
+                "Move it out of the package folder.",
+            )
+        if b"\x00" in data:
+            raise PkgError(f"'{rel}' looks like a binary file; only text is allowed.")
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            raise PkgError(f"'{rel}' isn't UTF-8 text.") from None
+    if total > MAX_TOTAL_BYTES:
+        raise PkgError("The package is bigger than 10 MB unpacked.")
+    names = {rel for rel, _ in files}
+    warnings = []
+    if not any(re.fullmatch(r"(?i)readme(\.md|\.txt)?", n) for n in names):
+        warnings.append("there's no README.md (the package page shows it)")
+    if not description:
+        warnings.append(f"[package] description in {MANIFEST} is empty")
+    if not any(n.endswith("_test.tb") for n in names):
+        warnings.append("there are no *_test.tb tests")
+    return {"name": name, "version": version, "entry": entry, "files": files, "warnings": warnings}
+
+
+def build_archive(root: str, name: str, files: list[tuple[str, str]]) -> bytes:
+    """A reproducible zip: sorted, fixed timestamps and modes, under <name>/."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for rel, full in files:
+            info = zipfile.ZipInfo(f"{name}/{rel}", ZIP_DATE)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            with open(full, "rb") as fh:
+                zf.writestr(info, fh.read())
+    return buffer.getvalue()
+
+
+def credentials_path() -> str:
+    """Where `tb login` keeps tokens (TB_CREDENTIALS overrides it)."""
+    if os.environ.get("TB_CREDENTIALS"):
+        return os.environ["TB_CREDENTIALS"]
+    if os.name == "nt":
+        base = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+        return os.path.join(base, "TB", "credentials.toml")
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "tb", "credentials.toml")
+
+
+def _read_credentials() -> dict:
+    path = credentials_path()
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = parse_toml(fh.read())
+    except (OSError, PkgError):
+        return {}
+    return {k: v for k, v in data.items() if isinstance(v, dict)}
+
+
+def _write_credentials(data: dict) -> None:
+    path = credentials_path()
+    folder = os.path.dirname(path)
+    try:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        text = dump_toml(dict(sorted(data.items())), "TB Package Index tokens, written by `tb login`. Keep this file private.")
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+        os.chmod(path, 0o600)
+    except OSError as err:
+        raise PkgError(f"I couldn't write {path}: {err.strerror}.") from None
+
+
+def stored_token(base: str | None = None) -> str | None:
+    """TB_TOKEN, or the token `tb login` stored for this registry."""
+    env = os.environ.get("TB_TOKEN", "").strip()
+    if env:
+        return env
+    entry = _read_credentials().get(base or registry_base(), {})
+    token = entry.get("token") if isinstance(entry, dict) else None
+    return token if isinstance(token, str) and token else None
+
+
+def _api(method: str, path: str, *, token: str | None = None, body: bytes | None = None,
+         content_type: str | None = None, base: str | None = None) -> dict:
+    """Call the registry API; returns its JSON, or raises PkgError with its message."""
+    url = (base or registry_base()) + path
+    headers = {"User-Agent": "tb-pkg", "Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if content_type:
+        headers["Content-Type"] = content_type
+    request = urllib.request.Request(url, data=body, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT * 4) as response:
+            raw = response.read(10 * 1024 * 1024)
+    except urllib.error.HTTPError as err:
+        try:
+            message = json.loads(err.read(64 * 1024).decode("utf-8")).get("error")
+        except Exception:
+            message = None
+        hint = None
+        if err.code == 401:
+            hint = "Make a token on the website and run: tb login"
+        elif err.code == 429:
+            hint = "Wait a while before trying again."
+        raise PkgError(message or f"The package index said {err.code} for {path}.", hint) from None
+    except (urllib.error.URLError, OSError, ValueError) as err:
+        reason = getattr(err, "reason", err)
+        raise PkgError(f"I couldn't reach the package index at {url}: {reason}",
+                       "Check your internet connection, or set TB_REGISTRY.") from None
+    try:
+        return json.loads(raw.decode("utf-8")) if raw else {}
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise PkgError(f"The package index at {url} sent something that isn't JSON.") from None
+
+
+def cmd_publish(args: list[str]) -> int:
+    rest = list(args)
+    overrides = {}
+    dry_run = False
+    print_entry = False
+    out_file = None
+    while rest:
+        item = rest.pop(0)
+        if item in ("--git", "--zip"):
+            if not rest:
+                raise PkgError(f"{item} needs a URL after it.")
+            overrides[item[2:]] = rest.pop(0)
+        elif item == "--print":
+            print_entry = True
+        elif item in ("--dry-run", "-n"):
+            dry_run = True
+        elif item == "--out":
+            if not rest:
+                raise PkgError("--out needs a file name after it.")
+            out_file = rest.pop(0)
+        else:
+            raise PkgError(f"I don't know the option '{item}' for tb publish.",
+                           "Usage: tb publish [--dry-run] [--out FILE.zip]   (or --print / --git URL / --zip URL for a static index)")
+    root = require_project()
+    if overrides or print_entry:
+        return _print_index_entry(root, overrides)
+    checked = check_package(root)
+    name, version = checked["name"], checked["version"]
+    archive = build_archive(root, name, checked["files"])
+    if len(archive) > MAX_ARCHIVE_BYTES:
+        raise PkgError(f"The zipped package is {len(archive) // 1024} KB; the index takes at most 4 MB.")
+    digest = hashlib.sha256(archive).hexdigest()
+    print(f"Checked {name} {version}: {len(checked['files'])} files, {len(archive) // 1024 or 1} KB zipped, entry {checked['entry']}.")
+    for warning in checked["warnings"]:
+        print(f"  note: {warning}")
+    if out_file:
+        with open(out_file, "wb") as fh:
+            fh.write(archive)
+        print(f"Wrote {out_file} (sha256 {digest}).")
+    if dry_run:
+        print(f"Dry run: nothing uploaded. sha256 {digest}")
+        return 0
+    base = registry_base()
+    token = stored_token(base)
+    if not token:
+        raise PkgError("You're not signed in to the TB Package Index.",
+                       f"Make a token at {site_url(base)}/packages/publish and run: tb login")
+    print(f"Uploading to {base} ...")
+    result = _api("POST", f"/packages/{urllib.parse.quote(name)}/{urllib.parse.quote(version)}",
+                  token=token, body=archive, content_type="application/zip", base=base)
+    status = result.get("status")
+    if result.get("sha256") and result["sha256"] != digest:
+        raise PkgError("The index stored a different checksum than the one I uploaded; try again.")
+    if status == "approved":
+        print(f"Published {name} {version}. Install it with: tb add {name}")
+    else:
+        print(f"Submitted {name} {version} for review. It is listed once an admin approves it;")
+        print(f"see its status at {site_url(base)}/packages/account")
+    for flag in result.get("flags") or []:
+        print(f"  reviewer note: {flag}")
+    print(f"sha256 {digest}")
+    return 0
+
+
+def cmd_login(args: list[str]) -> int:
+    rest = list(args)
+    token = None
+    open_browser = not os.environ.get("TB_NO_BROWSER")
+    while rest:
+        item = rest.pop(0)
+        if item == "--token":
+            if not rest:
+                raise PkgError("--token needs the token after it.")
+            token = rest.pop(0)
+        elif item == "--no-browser":
+            open_browser = False
+        else:
+            raise PkgError(f"I don't know the option '{item}' for tb login.", "Usage: tb login [--token TOKEN] [--no-browser]")
+    base = registry_base()
+    page = f"{site_url(base)}/packages/publish#tokens"
+    if token is None:
+        print("Sign in on the website with GitHub, make an API token, then paste it here.")
+        print(f"  {page}")
+        if open_browser and sys.stdin.isatty():
+            try:
+                webbrowser.open(page)
+            except Exception:
+                pass
+        try:
+            token = getpass.getpass("Token: ") if sys.stdin.isatty() else sys.stdin.readline()
+        except (EOFError, KeyboardInterrupt):
+            token = ""
+    token = (token or "").strip()
+    if not TOKEN_RE.match(token):
+        raise PkgError("That doesn't look like a TB Package Index token (they start with tbr_).",
+                       f"Make one at {page}")
+    me = _api("GET", "/me", token=token, base=base)
+    if not me.get("signedIn"):
+        raise PkgError("The index doesn't accept that token (revoked or mistyped?).", f"Make a new one at {page}")
+    data = _read_credentials()
+    data[base] = {"token": token, "user": str((me.get("user") or {}).get("login", ""))}
+    _write_credentials(data)
+    print(f"Signed in to {base} as {data[base]['user']}. The token is in {credentials_path()} (only you can read it).")
+    print("Publish a package with: tb publish")
+    return 0
+
+
+def cmd_logout(args: list[str]) -> int:
+    if args:
+        raise PkgError(f"I don't know the option '{args[0]}' for tb logout.")
+    base = registry_base()
+    data = _read_credentials()
+    if base in data:
+        del data[base]
+        _write_credentials(data)
+        print(f"Forgot the token for {base}. Revoke it on {site_url(base)}/packages/publish if you won't use it again.")
+    else:
+        print(f"There's no stored token for {base}.")
+    if os.environ.get("TB_TOKEN"):
+        print("Note: TB_TOKEN is still set in your environment.")
+    return 0
+
+
+def cmd_search(args: list[str]) -> int:
+    query = " ".join(args).strip()
+    if not query:
+        raise PkgError("What should I look for? Like: tb search tables")
+    index = load_index()
+    if any(isinstance(e, dict) and isinstance(e.get("versions"), dict) for e in index.values()):
+        results = _api("GET", "/search?" + urllib.parse.urlencode({"q": query})).get("results", [])
+    else:
+        terms = query.lower().split()
+        results = [dict(name=n, **e) for n, e in sorted(index.items()) if isinstance(e, dict) and all(
+            t in n.lower() or t in str(e.get("description", "")).lower() or t in [str(k) for k in e.get("keywords", [])]
+            for t in terms)]
+    if not results:
+        print(f"No packages match '{query}'. See everything with: tb packages --index")
+        return 0
+    width = max(len(r["name"]) for r in results)
+    for r in results:
+        downloads = r.get("downloads")
+        count = f"  {downloads} downloads" if isinstance(downloads, int) else ""
+        print(f"  {r['name'].ljust(width)}  {str(r.get('version') or '').ljust(8)}  {r.get('description', '')}{count}".rstrip())
+    print("\nInstall one with: tb add <name>   More about one: tb info <name>")
+    return 0
+
+
+def cmd_info(args: list[str]) -> int:
+    if len(args) != 1:
+        raise PkgError("Which package? Like: tb info tb-tables")
+    name = args[0]
+    if not NAME_RE.match(name):
+        raise PkgError(f"'{name}' isn't a package name.")
+    index = load_index()
+    entry = index.get(name)
+    registry = isinstance(entry, dict) and isinstance(entry.get("versions"), dict)
+    if entry is None and not any(isinstance(e, dict) and isinstance(e.get("versions"), dict) for e in index.values()):
+        raise PkgError(f"I couldn't find a package called '{name}' in the index at {index_url()}.")
+    if entry is not None and not registry:
+        print(f"{name} {entry.get('version', '')}".rstrip())
+        print(f"  {entry.get('description', '')}")
+        print(f"  source: {entry.get('git') or entry.get('zip') or '?'}")
+        print(f"\nInstall: tb add {name}")
+        return 0
+    data = _api("GET", f"/packages/{urllib.parse.quote(name)}", token=stored_token())
+    print(f"{data['name']} {data.get('latest') or ''}".rstrip())
+    if data.get("description"):
+        print(f"  {data['description']}")
+    print(f"  owner: {data.get('owner', '?')}   license: {data.get('license') or 'not given'}   downloads: {data.get('downloads', 0)}")
+    if data.get("keywords"):
+        print(f"  keywords: {', '.join(data['keywords'])}")
+    if data.get("status") and data["status"] != "approved":
+        print(f"  status: {data['status']} (only you and the admins can see it)")
+    print("  versions:")
+    for v in data.get("versions", []):
+        note = ""
+        if v.get("status") == "yanked":
+            note = "  yanked" + (f": {v['yankReason']}" if v.get("yankReason") else "")
+        elif v.get("status") != "approved":
+            note = f"  {v.get('status')}" + (f": {v['reason']}" if v.get("reason") else "")
+        print(f"    {v['version'].ljust(12)} sha256 {v.get('sha256', '')[:16]}...  {v.get('downloads', 0)} downloads{note}")
+    print(f"\nInstall: tb add {name}")
+    return 0
+
+
+def cmd_yank(args: list[str]) -> int:
+    rest = list(args)
+    undo = False
+    reason = ""
+    spec = None
+    while rest:
+        item = rest.pop(0)
+        if item == "--undo":
+            undo = True
+        elif item == "--reason":
+            if not rest:
+                raise PkgError("--reason needs some text after it.")
+            reason = rest.pop(0)
+        elif item.startswith("-"):
+            raise PkgError(f"I don't know the option '{item}' for tb yank.")
+        elif spec is None:
+            spec = item
+        else:
+            raise PkgError("Yank one version at a time.")
+    if not spec or "@" not in spec:
+        raise PkgError("Which version? Like: tb yank my-package@1.2.0 --reason \"breaks on Windows\"")
+    name, _, version = spec.rpartition("@")
+    if parse_version(version) is None:
+        raise PkgError(f"'{version}' isn't a version like 1.2.3.")
+    token = stored_token()
+    if not token:
+        raise PkgError("You're not signed in to the TB Package Index.", "Run: tb login")
+    action = "unyank" if undo else "yank"
+    body = json.dumps({"reason": reason}).encode("utf-8")
+    result = _api("POST", f"/packages/{urllib.parse.quote(name)}/{urllib.parse.quote(version)}/{action}",
+                  token=token, body=body, content_type="application/json")
+    print(result.get("message") or f"{action} {name} {version}: done")
+    if not undo:
+        print("Ranges skip it now; projects that pin it exactly (or in tb.lock) still install it.")
     return 0
 
 
@@ -956,6 +1633,11 @@ COMMANDS = {
     "packages": cmd_packages,
     "list": cmd_packages,
     "publish": cmd_publish,
+    "login": cmd_login,
+    "logout": cmd_logout,
+    "search": cmd_search,
+    "info": cmd_info,
+    "yank": cmd_yank,
 }
 
 

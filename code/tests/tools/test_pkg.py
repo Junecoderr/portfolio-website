@@ -405,7 +405,7 @@ def test_publish_prints_index_entry(tmp_path, monkeypatch, capsys):
     assert pkg.main(["publish"]) == 1  # no lib.tb yet
     assert "no lib.tb" in capsys.readouterr().err
     write(tmp_path / "lib.tb", "fn x() { return 1 }\n")
-    assert pkg.main(["publish"]) == 0
+    assert pkg.main(["publish", "--print"]) == 0  # plain `tb publish` uploads to the index now
     assert "Replace the git URL" in capsys.readouterr().out
 
 
@@ -439,7 +439,7 @@ def test_help_and_unknown_command(capsys):
 def test_tbtools_dispatch_aliases(project, index_server, capsys):
     import tbtools
 
-    assert tbtools.available_commands() == ["add", "init", "packages", "pkg", "publish", "remove", "update"]
+    assert tbtools.available_commands() == ["add", "info", "init", "login", "logout", "packages", "pkg", "publish", "remove", "search", "update", "yank"]
     add = importlib.import_module("tbtools.add")
     assert add.main(["tb-colors"]) == 0
     assert (project / "tb_packages" / "tb-colors" / "lib.tb").is_file()

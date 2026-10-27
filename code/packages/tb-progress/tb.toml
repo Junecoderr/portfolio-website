@@ -3,5 +3,7 @@ name = "tb-progress"
 version = "1.0.0"
 description = "Progress bars, spinners, step counters and ETA text for command-line programs."
 main = "lib.tb"
+license = "MIT"
+keywords = ["progress", "spinner", "terminal", "cli"]
 
 [dependencies]

@@ -1,0 +1,62 @@
+# Pictures for the xml library (read with ast.literal_eval; never run).
+SPEC = {
+    "parse": {
+        "args": {"text": '"<feed><item id=\\"1\\">Hello</item><item id=\\"2\\">Bye</item></feed>"'},
+        "modes": {"text": "lines"},
+        "keys": ["tag", "attrs", "children"],
+        "nodes": [{"param": "text", "icon": "doc"}, {"arrow": True},
+                  {"result": True, "label": "a node: tag, attrs, children, text",
+                   "sub": "nodes also have find(path), find_all(path), value(), attr()"}],
+        "roles": {"text": "XML text (a DOCTYPE is refused, for safety)"},
+    },
+    "stringify": {
+        "args": {"node": 'xml.node("feed", {}, [xml.node("item", {"id": 1}, ["Hello"])])', "options": "{}"},
+        "call": 'xml.stringify(xml.node("feed", {}, [xml.node("item", {"id": 1}, ["Hello"])]), $options)',
+        "nodes": [{"param": "node"}, {"param": "options"}, {"arrow": True},
+                  {"result": True, "label": "XML text, escaped for you", "mode": "lines"}],
+        "vary": {"param": "options", "values": ["{}", '{"indent": false}', '{"declaration": true}'],
+                 "labels": ["indented (default)", "indent: false", "declaration: true"]},
+        "roles": {"node": "a node from parse() or xml.node()", "options": "indent, declaration"},
+    },
+    "read": {
+        "args": {"path": '"feed.xml"'},
+        "call": 'xml.read("feed.xml").find_all("item").map(n => n.text)',
+        "nodes": [{"row": [{"param": "path", "icon": "file"},
+                           {"box": "feed.xml", "lines": ['<feed>', '  <item id="1">Hello</item>', '  <item id="2">Bye</item>', '</feed>'], "kind": "plain"}]},
+                  {"arrow": "xml.read(...).find_all(\"item\")"}, {"result": True, "label": "the items' text"}],
+        "roles": {"path": "the .xml file"},
+    },
+    "write": {
+        "args": {"path": '"note.xml"', "node": 'xml.node("note", {"lang": "en"}, ["Hi & bye"])', "options": "{}"},
+        "imports": ["fs"],
+        "call": 'xml.write("note.xml", xml.node("note", {"lang": "en"}, ["Hi & bye"])) or fs.read("note.xml")',
+        "show_call": 'xml.write("note.xml", xml.node("note", {"lang": "en"}, ["Hi & bye"]))', "hide_result_text": True,
+        "nodes": [{"param": "path", "icon": "file"}, {"param": "node"}, {"arrow": "xml.write"},
+                  {"result": True, "label": "note.xml afterwards (read back)", "mode": "lines"}],
+        "used": ["options"],
+        "roles": {"path": "the file to (re)write", "node": "the root node", "options": "indent (like stringify)"},
+    },
+    "node": {
+        "args": {"tag": '"item"', "attrs": '{"id": 1}', "children": '["Hello"]'},
+        "nodes": [{"row": [{"param": "tag"}, {"param": "attrs"}]}, {"param": "children"}, {"arrow": True},
+                  {"result": True, "label": "a node map, ready for stringify()", "mode": "tree"}],
+        "roles": {"tag": "the element name", "attrs": "its attributes", "children": "nodes and plain text inside it"},
+    },
+    "escape": {
+        "args": {"text": '"5 < 7 & 9 > 3"'},
+        "nodes": [{"param": "text"}, {"arrow": True}, {"result": True, "label": "safe inside XML", "mode": "lines"}],
+        "roles": {"text": "text that may hold < > &"},
+    },
+    "quote_attr": {
+        "args": {"text": '"R&D \\"lab\\""'},
+        "nodes": [{"param": "text"}, {"arrow": True}, {"result": True, "label": "an attribute value, quotes included", "mode": "lines"}],
+        "roles": {"text": "the attribute's value"},
+    },
+    "is_node": {
+        "args": {"x": 'xml.node("a")'},
+        "nodes": [{"param": "x"}, {"arrow": True}, {"result": True, "label": "a map with a text tag?"}],
+        "vary": {"param": "x", "values": ['xml.node("a")', '{"tag": "item"}', '"<a/>"', '{"name": "x"}'],
+                 "labels": ['xml.node("a")', '{"tag": "item"}', '"<a/>" (text)', '{"name": "x"}']},
+        "roles": {"x": "any value"},
+    },
+}

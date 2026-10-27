@@ -1,0 +1,27 @@
+# Pictures for the decimal library (read with ast.literal_eval; never run).
+# Exact decimals: what you see is what you get, unlike 0.1 + 0.2 with plain numbers.
+SPEC = {
+    "_default": {"roles": {"a": "a decimal, number or text like \"0.1\"", "b": "another decimal, number or text"}},
+    "of": {"args": {"value": '"1.50"'}, "vary": {"param": "value", "values": ['"1.50"', '"19.99"', "0.1"], "labels": ["\"1.50\"", "\"19.99\"", "0.1 (a number)"]},
+           "roles": {"value": "text keeps every digit; a number is taken as it is"}},
+    "is_decimal": {"args": {"x": 'decimal.of("1")'}, "vary": {"param": "x", "values": ['decimal.of("1")', "1", '"1"'], "labels": ["decimal.of(\"1\")", "1", "\"1\""]},
+                   "roles": {"x": "any value"}},
+    "add": {"args": {"a": '"0.1"', "b": '"0.2"'}, "call": "decimal.add($a, $b).text",
+            "vary": {"param": "b", "values": ['"0.2"', '"0.25"', '"-0.1"'], "labels": ["0.2", "0.25", "-0.1"]}},
+    "sub": {"args": {"a": '"1.00"', "b": '"0.35"'}, "call": "decimal.sub($a, $b).text"},
+    "mul": {"args": {"a": '"19.99"', "b": "3"}, "call": "decimal.mul($a, $b).text"},
+    "div": {"args": {"a": '"1"', "b": '"3"'}, "call": "decimal.div($a, $b).text",
+            "vary": {"param": "b", "values": ['"3"', '"4"', '"0"'], "labels": ["3", "4", "0 (error)"]}},
+    "round": {"args": {"value": '"2.675"', "places": "2", "mode": '"half_up"'}, "call": "decimal.round($value, $places, $mode).text",
+              "vary": {"param": "mode", "values": ['"half_up"', '"half_even"', '"down"', '"up"'], "labels": ["half_up", "half_even", "down", "up"]},
+              "roles": {"value": "the decimal", "places": "digits after the dot", "mode": "how to break ties: half_even (default), half_up, down, up..."}},
+    "compare": {"args": {"a": '"1.5"', "b": '"1.50"'},
+                "vary": {"param": "b", "values": ['"1.50"', '"2"', '"1.4"'], "labels": ["1.50", "2", "1.4"]}},
+    "sum": {"args": {"values": '["0.1", "0.2", 0.3]'}, "call": "decimal.sum($values).text",
+            "roles": {"values": "a list of decimals, numbers or texts (or several inputs)"}},
+    "text": {"args": {"value": "1e21"}, "vary": {"param": "value", "values": ["1e21", 'decimal.of("0.000001")', "2.5"], "labels": ["1e21", "0.000001", "2.5"]},
+             "roles": {"value": "a decimal or number"}},
+    "number": {"args": {"value": 'decimal.of("19.99")'}, "roles": {"value": "the decimal to turn into a plain number"}},
+    "money": {"args": {"value": '"1234.5"', "places": "2"}, "vary": {"param": "places", "values": ["0", "2", "3"], "default": "2"},
+              "roles": {"value": "the amount", "places": "digits after the dot (2 if left out)", "mode": "rounding mode (half_even if left out)"}},
+}

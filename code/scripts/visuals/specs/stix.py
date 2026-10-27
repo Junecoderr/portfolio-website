@@ -1,0 +1,85 @@
+# Pictures for the stix library (read with ast.literal_eval; never run).
+# Examples run through TB on apps/data/intel/sample-feed.stix.json (6
+# indicators) while the site builds; the TAXII client needs a server, so its
+# picture is an illustration.
+SPEC = {
+    "_default": {"setup": 'let feed = stix.read("apps/data/intel/sample-feed.stix.json")', "modes": {"path": "lines", "text": "lines"}},
+    "parse": {
+        "setup": "",
+        "args": {"text": '"[{\\"type\\": \\"ipv4-addr\\", \\"id\\": \\"ipv4-addr--1\\", \\"value\\": \\"203.0.113.9\\"}]"'},
+        "mode": "tree",
+        "nodes": [{"param": "text", "icon": "doc"}, {"arrow": "stix.parse"},
+                  {"result": True, "label": "result · always a bundle map", "mode": "tree"}],
+        "roles": {"text": "STIX JSON: a bundle, a list of objects, one object or a TAXII envelope"},
+    },
+    "read": {
+        "setup": "",
+        "args": {"path": '"apps/data/intel/sample-feed.stix.json"'},
+        "call": 'stix.read("apps/data/intel/sample-feed.stix.json").objects.map(o => o.type)',
+        "nodes": [{"param": "path", "icon": "file"}, {"arrow": "stix.read"},
+                  {"result": True, "label": "result · a bundle; its objects' types shown"}],
+        "roles": {"path": "a STIX JSON file"},
+    },
+    "write": {
+        "args": {"path": '"feed-copy.json"', "bundle": "feed"},
+        "nodes": [{"param": "bundle", "icon": "db", "lines": ["the bundle map", "8 objects"]}, {"arrow": "stix.write"},
+                  {"param": "path", "icon": "file"}, {"result": True, "label": "result · nil: pretty JSON is written"}],
+        "roles": {"path": "the file to write", "bundle": "a bundle from stix.bundle() or stix.read()"},
+    },
+    "stringify": {
+        "args": {"bundle": 'stix.bundle(["203.0.113.9"])'},
+        "mode": "lines",
+        "nodes": [{"param": "bundle", "icon": "db", "lines": ["stix.bundle([\"203.0.113.9\"])"]}, {"arrow": "stix.stringify"},
+                  {"result": True, "label": "result · pretty STIX JSON text"}],
+        "roles": {"bundle": "the bundle map"},
+    },
+    "indicators": {
+        "args": {"bundle": "feed", "options": '{"active": true}'},
+        "keys": ["name", "pattern", "confidence"],
+        "nodes": [{"row": [{"param": "bundle", "icon": "db", "lines": ["sample-feed.stix.json", "6 indicators"]}, {"param": "options"}]},
+                  {"arrow": "stix.indicators"}, {"result": True, "label": "result · indicators with their IOCs"}],
+        "roles": {"bundle": "a bundle map", "options": "filters such as active (skip expired ones)"},
+    },
+    "iocs": {
+        "args": {"bundle": "feed"},
+        "mode": "tree",
+        "nodes": [{"param": "bundle", "icon": "db", "lines": ["sample-feed.stix.json", "patterns + observables"]}, {"arrow": "stix.iocs"},
+                  {"result": True, "label": "result · IOCs grouped like ioc.extract()", "mode": "tree"}],
+        "roles": {"bundle": "a bundle map"},
+    },
+    "pattern": {
+        "setup": "",
+        "args": {"text": "\"[ipv4-addr:value = '203.0.113.9' OR domain-name:value = 'bad.example']\""},
+        "keys": ["type", "value", "object"],
+        "nodes": [{"param": "text", "icon": "code"}, {"arrow": "stix.pattern"}, {"result": True, "label": "result · one map per IOC compared with = or IN"}],
+        "roles": {"text": "one STIX pattern"},
+    },
+    "to_detect_rules": {
+        "imports": ["detect", "logs"],
+        "args": {"bundle": "feed", "options": '{"level": "high"}'},
+        "keys": ["name", "level"],
+        "nodes": [{"row": [{"param": "bundle", "icon": "db", "lines": ["sample-feed.stix.json", "6 indicators"]}, {"param": "options"}]},
+                  {"arrow": "stix.to_detect_rules"}, {"result": True, "label": "result · rules ready for detect.run()"}],
+        "roles": {"bundle": "a bundle with indicators", "options": "level and other rule settings"},
+    },
+    "bundle": {
+        "setup": "",
+        "args": {"iocs": '["203.0.113.9", "bad.example", "http://bad.example/x"]', "options": '{"confidence": 80}'},
+        "call": 'stix.bundle($iocs, $options).objects.map(o => o.pattern)',
+        "nodes": [{"param": "iocs"}, {"param": "options"}, {"arrow": "stix.bundle"},
+                  {"result": True, "label": "result · a STIX 2.1 bundle (each indicator's pattern shown)"}],
+        "roles": {"iocs": "IOC texts (the kind is worked out), maps, or what ioc.extract() gave",
+                  "options": "indicator_types, description, confidence, valid_until..."},
+    },
+    "taxii": {
+        "t": "net", "run": False, "port_param": None, "host_param": "url", "host_title": "TAXII server", "icon": "cloud",
+        "args": {"url": '"https://intel.example/taxii2/"', "auth": '{"token": "…"}', "options": '{"timeout": 20}'},
+        "request": "GET collections", "response": "STIX objects",
+        "extra": ["auth", "options"],
+        "static": '[{"id": "91a7b528", "title": "Phishing feed", "can_read": true}]',
+        "call": 'stix.taxii("https://intel.example/taxii2/", {"token": "…"}).collections()',
+        "result_node": {"label": "client.collections() gives back"},
+        "roles": {"url": "the server's discovery address or an API root", "auth": "a token, {user, password}, {token} or {header, key}",
+                  "options": "timeout and other connection settings"},
+    },
+}

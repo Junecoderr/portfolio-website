@@ -1,0 +1,52 @@
+# Pictures for the yaml library (read with ast.literal_eval; never run).
+SPEC = {
+    "parse": {
+        "args": {"text": '"name: tb\\nports:\\n  - 80\\n  - 443\\ntls:\\n  cert: site.pem"'},
+        "modes": {"text": "lines"},
+        "nodes": [{"param": "text", "icon": "doc"}, {"arrow": True},
+                  {"result": True, "label": "maps and lists, nested the same way", "mode": "tree"}],
+        "roles": {"text": "YAML text with one document"},
+    },
+    "parse_all": {
+        "args": {"text": '"name: web01\\n---\\nname: web02\\n---\\nname: db01"'},
+        "modes": {"text": "lines"},
+        "nodes": [{"param": "text", "icon": "doc"}, {"arrow": True},
+                  {"result": True, "label": "one value per --- document"}],
+        "roles": {"text": "YAML text with documents split by --- lines"},
+    },
+    "stringify": {
+        "args": {"value": '{"name": "tb", "ports": [80, 443], "tls": {"cert": "site.pem"}}', "indent": "2"},
+        "modes": {"value": "tree"},
+        "nodes": [{"row": [{"param": "value"}, {"param": "indent"}]}, {"arrow": True},
+                  {"result": True, "label": "YAML text, one key per line", "mode": "lines"}],
+        "vary": {"param": "indent", "values": ["2", "4"], "default": "2"},
+        "roles": {"value": "the map or list to write", "indent": "spaces per level (2 if left out)"},
+    },
+    "read": {
+        "args": {"path": '"config.yml"'},
+        "nodes": [{"row": [{"param": "path", "icon": "file"},
+                           {"box": "config.yml", "lines": ["name: tb", "ports:", "  - 80", "  - 443"], "kind": "plain"}]},
+                  {"arrow": True}, {"result": True, "label": "TB values", "mode": "tree"}],
+        "roles": {"path": "the .yml / .yaml file (one document)"},
+    },
+    "read_all": {
+        "args": {"path": '"hosts.yml"'},
+        "imports": ["fs"],
+        "setup": 'fs.write("hosts.yml", "name: web01\\n---\\nname: db01\\n")',
+        "nodes": [{"row": [{"param": "path", "icon": "file"},
+                           {"box": "hosts.yml", "lines": ["name: web01", "---", "name: db01"], "kind": "plain"}]},
+                  {"arrow": True}, {"result": True, "label": "a list: one value per document"}],
+        "roles": {"path": "a YAML file with --- separated documents"},
+    },
+    "write": {
+        "args": {"path": '"out.yml"', "value": '{"name": "tb", "tls": {"cert": "site.pem"}}', "indent": "2"},
+        "imports": ["fs"],
+        "call": 'yaml.write("out.yml", {"name": "tb", "tls": {"cert": "site.pem"}}, $indent) or fs.read("out.yml")',
+        "show_call": 'yaml.write("out.yml", {"name": "tb", "tls": {"cert": "site.pem"}}, $indent)', "hide_result_text": True,
+        "modes": {"value": "tree"},
+        "nodes": [{"row": [{"param": "path", "icon": "file"}, {"param": "indent"}]}, {"param": "value"},
+                  {"arrow": "yaml.write"}, {"result": True, "label": "out.yml afterwards (read back)", "mode": "lines"}],
+        "vary": {"param": "indent", "values": ["2", "4"], "default": "2"},
+        "roles": {"path": "the file to (re)write", "value": "what to save", "indent": "spaces per level (2 if left out)"},
+    },
+}

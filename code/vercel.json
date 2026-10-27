@@ -8,6 +8,10 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/api/registry/:route*",
+      "destination": "/api/registry?route=:route*"
+    },
+    {
       "source": "/dl/:file",
       "destination": "https://github.com/Junecoderr/portfolio-website/releases/download/tb-v3.0.0/:file"
     }

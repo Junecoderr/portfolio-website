@@ -428,6 +428,13 @@ Wave 2 (after Part A): `fmt`, `lsp`, `debug`, `docgen`, `build`, `spec/`.
   plain git URLs supplied by package authors; seed entries use
   `https://code.tanisha.ceo/packages/<name>.zip` as a `zip` source
   (support `zip` URLs as well as `git`).
+- **Update (October 2026): the TB Package Index is live.** The static
+  `packages/index.json` is superseded by a reviewed registry at
+  `code.tanisha.ceo/packages` (API under `/api/registry`, see `api/registry.js`
+  and CONTRIBUTING.md "Package index"). `tb add name@range` resolves semver
+  ranges against it and checks sha256 checksums; `tb login`, `tb publish`,
+  `tb search`, `tb info` and `tb yank` talk to it. New packages are reviewed
+  before listing. The static index and zip/git/path sources keep working.
 - **Formatter** `tb fmt [paths] [--check]`: canonical style (2-space
   indent, spaces around binary ops, one statement per line, trailing commas
   in multi-line literals, comments preserved, max line 100 with sensible

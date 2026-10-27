@@ -28,6 +28,11 @@ COMMANDS: dict[str, tuple[str, list[str]]] = {
     "update": ("pkg", ["update"]),
     "packages": ("pkg", ["packages"]),
     "publish": ("pkg", ["publish"]),
+    "login": ("pkg", ["login"]),
+    "logout": ("pkg", ["logout"]),
+    "search": ("pkg", ["search"]),
+    "info": ("pkg", ["info"]),
+    "yank": ("pkg", ["yank"]),
     "pkg": ("pkg", []),
 }
 

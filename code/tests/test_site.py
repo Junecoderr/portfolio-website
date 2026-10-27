@@ -5,6 +5,10 @@
   (from a folder laid out like the playground's pretend disk: apps/data/...)
 * the generated library reference covers every library and never contains
   the author's name (checked by hash, see scripts/name_guard.py)
+* every function, value, widget, window method, built-in function and method
+  in the reference has a "Visualize" picture (scripts/visuals/): its legend
+  names every parameter of the signature, the SVGs are well-formed XML, and
+  the pages have no inline scripts or handlers
 * every release asset the site links to is one the release workflow uploads
 * the hand-written pages use the shared header and footer, have one h1, and
   have no inline scripts (the live site's CSP forbids them)
@@ -38,6 +42,7 @@ SITE = ROOT / "site"
 sys.path.insert(0, str(SCRIPTS))
 
 import gen_lib_docs  # noqa: E402
+import visuals  # noqa: E402
 import name_guard  # noqa: E402
 import site_shell  # noqa: E402
 
@@ -126,6 +131,103 @@ def test_library_reference(tmp_path):
         assert not name_guard.contains_name(path.read_text(encoding="utf-8")), path.name
 
 
+LEGEND_RE = re.compile(r'<button type="button" class="fv-chip[^"]*" data-part="p\d+"[^>]*>'
+                       r'<span class="fv-sw" aria-hidden="true"></span><code>([^<]*)</code>')
+SVG_RE = re.compile(r'<svg xmlns="http://www.w3.org/2000/svg" class="fv-svg".*?</svg>', re.S)
+
+
+def first_visual(chunk: str) -> str:
+    start = chunk.find('<details class="fn-visual')
+    assert start >= 0, "no picture"
+    return chunk[start:chunk.find("</details>", start)]
+
+
+def check_legend(chunk: str, signature: str, where):
+    names = set(LEGEND_RE.findall(first_visual(chunk)))
+    for prm in visuals.parse_params(signature):
+        assert html.escape(prm.name) in names, (where, prm.name, sorted(names))
+
+
+@pytest.fixture(scope="module")
+def reference(tmp_path_factory):
+    out = tmp_path_factory.mktemp("ref")
+    visuals.PROBLEMS.clear()
+    gen_lib_docs.build(out, tb.__version__)
+    return out
+
+
+def test_every_function_has_a_picture(reference):
+    assert not visuals.PROBLEMS, visuals.PROBLEMS[:3]
+    for lib in tb.list_libraries():
+        text = (reference / "lib" / f"{lib}.html").read_text(encoding="utf-8")
+        d = tb.describe_library(lib)
+        for fn in d["functions"]:
+            start = text.index(f'<article class="sig" id="fn-{fn["name"]}">')
+            card = text[start:text.index("</article>", start)]
+            check_legend(card, fn["signature"], (lib, fn["name"]))
+        for v in d["values"]:
+            start = text.index(f'<tr id="value-{v["name"]}">')
+            row = text[start:text.index("</tr>", start)]
+            assert 'class="fn-visual' in row, (lib, v["name"])
+        assert 'assets/css/visuals.css' in text and 'assets/js/visuals.js' in text
+
+
+def test_gui_widgets_and_window_methods_have_pictures(reference):
+    text = (reference / "lib" / "gui.html").read_text(encoding="utf-8")
+    window_doc = next(f["doc"] for f in tb.describe_library("gui")["functions"] if f["name"] == "window")
+    count = 0
+    for title, intro, entries in visuals.gui_extras():
+        for ident, sig, _ in entries:
+            name = sig.split("(")[0]
+            assert re.search(rf"\b{name}\(", window_doc), f"win.{name} is not in gui.window's doc any more"
+            start = text.index(f'<details class="fn-visual fv-sub" id="{ident}">')
+            check_legend(text[start:], sig, ident)
+            count += 1
+    assert count >= 50
+    assert 'id="win-resize"' in text and 'data-fv-param="w"' in text and 'data-fv-param="h"' in text
+
+
+def test_builtins_and_methods_have_pictures(reference):
+    text = (reference / "library.html").read_text(encoding="utf-8")
+    b = tb.describe_builtins()
+    for f in b["functions"]:
+        start = text.index(f'<tr><td><code>{html.escape(f["signature"], quote=False)}</code></td>')
+        check_legend(text[start:text.index("</tr>", start)], f["signature"], f["signature"])
+    for kind, methods in b["methods"].items():
+        for m in methods:
+            start = text.index(f'<tr><td><code>.{html.escape(m["signature"], quote=False)}</code></td>')
+            check_legend(text[start:text.index("</tr>", start)], m["signature"], (kind, m["signature"]))
+
+
+def test_pictures_are_well_formed_and_csp_safe(reference):
+    import xml.etree.ElementTree as ET
+    pages = [reference / "library.html"] + sorted((reference / "lib").glob("*.html"))
+    total = 0
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        svgs = SVG_RE.findall(text)
+        assert svgs, page.name
+        for svg in svgs:
+            try:
+                ET.fromstring(svg)
+            except ET.ParseError as err:  # pragma: no cover - shows the broken picture
+                raise AssertionError(f"{page.name}: {err}: {svg[:300]}")
+        total += len(svgs)
+        assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", text), page.name
+        assert not re.search(r"\son[a-z]+\s*=\s*[\"']", text), page.name
+        assert not re.search(r'\sstyle="', "".join(svgs)), f"{page.name}: inline styles in a picture"
+        assert not name_guard.contains_name(text), page.name
+    assert total > 600
+
+
+def test_visual_parameters_are_parsed_from_signatures():
+    names = lambda sig: [p.name for p in visuals.parse_params(sig)]  # noqa: E731
+    assert names("pad_left(value, width, fill?) -> text") == ["value", "width", "fill"]
+    assert names("min(a, b, ...) or min(list) -> number") == ["a", "b", "list"]
+    assert names("run(fn, ...args) -> Task") == ["fn", "args"]
+    assert names("tables() -> list") == []
+
+
 def test_home_page_lists_every_library():
     text = (SITE / "index.html").read_text(encoding="utf-8")
     for lib in tb.list_libraries():
@@ -173,6 +275,7 @@ def test_full_build(tmp_path):
     # The counters' functions are deployed by Vercel from api/, never served as files.
     assert not (out / "api").exists() and not list(out.rglob("hit.js"))
     assert (out / "assets" / "js" / "stats.js").exists()
+    assert (out / "assets" / "js" / "visuals.js").exists() and (out / "assets" / "css" / "visuals.css").exists()
     for page in [out / "library.html", out / "lib" / "ioc.html", out / "spec.html", out / "packages.html"]:
         prefix = "../" if page.parent.name == "lib" else ""
         assert site_shell.stats_script(prefix) in page.read_text(encoding="utf-8"), page.name

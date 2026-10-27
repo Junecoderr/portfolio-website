@@ -175,6 +175,8 @@ Every function is documented in the reference
 | `tb debug file.tb` | Step through a program with breakpoints |
 | `tb build app.tb` | Package an application as a standalone folder |
 | `tb init` / `tb add` / `tb remove` / `tb update` / `tb packages` | Manage project dependencies (`tb.toml`, `tb.lock`) |
+| `tb search` / `tb info` | Find packages in the TB Package Index |
+| `tb login` / `tb publish` / `tb yank` | Publish your own packages |
 | `tb lsp` | Language server (used by editors) |
 
 **Editor support:** the VS Code extension (`tb-vscode-3.0.0.vsix`, from the
@@ -199,11 +201,15 @@ Run one with `tb apps/log-triage/main.tb`.
 
 ## Packages
 
-Third-party packages are TB projects with a `tb.toml` manifest:
+Third-party packages live in the **TB Package Index** at
+https://code.tanisha.ceo/packages. A package is a TB project with a `tb.toml`
+manifest and an entry file (`lib.tb`):
 
 ```sh
 tb init
-tb add tb-tables
+tb search tables
+tb add tb-tables              # newest version, recorded as ^1.0.0
+tb add tb-colors@~1.0         # or a range: ^1.2, ~1.2.3, ">=1.0 <2", 1.2.3
 ```
 
 ```tb
@@ -211,8 +217,18 @@ import "tb-tables" as tables
 say(tables.table([{"host": "web01", "status": "up"}]))
 ```
 
-The package index lives at https://code.tanisha.ceo/packages, which also
-explains how to publish your own.
+`tb add` checks every download against the sha256 the index lists and records
+the exact version in `tb.lock`; commit `tb.toml` and `tb.lock` and `tb add`
+(no arguments) reinstalls the same versions anywhere. Zip, git and local-folder
+sources still work (`tb add https://example.com/pkg.zip`).
+
+To publish: sign in on https://code.tanisha.ceo/packages/publish with GitHub,
+make an API token, then run `tb login` (stores the token in your user config,
+readable only by you) and `tb publish` in the package folder. The first version
+of a new package is reviewed by an index admin before it is listed; later
+versions from the same owner are published at once. `tb yank name@version`
+takes a version out of ranges without breaking projects that pinned it.
+`TB_PACKAGE_INDEX` (and `TB_REGISTRY`) point `tb` at another index.
 
 ## Compatibility and versioning
 

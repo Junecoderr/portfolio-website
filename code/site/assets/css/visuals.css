@@ -1,0 +1,266 @@
+/* "Visualize" pictures on the library reference pages (scripts/visuals/).
+   Each function card has a <details class="fn-visual">: an SVG drawn in a
+   340-unit viewBox, a legend chip per parameter and optional sliders. A
+   parameter's chip and the parts of the drawing it controls share
+   data-part="pN" and a colour (k0..k7); hovering or focusing either lights
+   up the other. Colours come from theme tokens, so both themes work. */
+
+:root {
+  --fv-c0: #1d5fbf; --fv-c1: #b3123e; --fv-c2: #1f7a3a; --fv-c3: #8a5100;
+  --fv-c4: #6b3fb3; --fv-c5: #0b6f80; --fv-c6: #a3266f; --fv-c7: #4f5b66;
+  --fv-ok: #1f7a3a; --fv-no: #b0102f; --fv-win: #ffffff; --fv-winbar: #efe9ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fv-c0: #8cb8ff; --fv-c1: #ff8ca5; --fv-c2: #6fd38a; --fv-c3: #f2b45c;
+    --fv-c4: #c3a1ff; --fv-c5: #5fd0dc; --fv-c6: #ff8fcf; --fv-c7: #b8c4cf;
+    --fv-ok: #6fd38a; --fv-no: #ff9cad; --fv-win: #1f1823; --fv-winbar: #2a2030;
+  }
+}
+:root[data-theme="dark"] {
+  --fv-c0: #8cb8ff; --fv-c1: #ff8ca5; --fv-c2: #6fd38a; --fv-c3: #f2b45c;
+  --fv-c4: #c3a1ff; --fv-c5: #5fd0dc; --fv-c6: #ff8fcf; --fv-c7: #b8c4cf;
+  --fv-ok: #6fd38a; --fv-no: #ff9cad; --fv-win: #1f1823; --fv-winbar: #2a2030;
+}
+.k0 { --pc: var(--fv-c0); } .k1 { --pc: var(--fv-c1); } .k2 { --pc: var(--fv-c2); } .k3 { --pc: var(--fv-c3); }
+.k4 { --pc: var(--fv-c4); } .k5 { --pc: var(--fv-c5); } .k6 { --pc: var(--fv-c6); } .k7 { --pc: var(--fv-c7); }
+
+/* ------------------------------------------------------------ the toggle */
+details.fn-visual { margin: 0.85rem 0 0; }
+details.fn-visual > summary {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  list-style: none; cursor: pointer; user-select: none;
+  padding: 0.3rem 0.75rem 0.3rem 0.6rem;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--bg); color: var(--ink-soft);
+  font-size: 0.85rem; font-weight: 650; line-height: 1.4;
+}
+details.fn-visual > summary::-webkit-details-marker { display: none; }
+details.fn-visual > summary::after {
+  content: ""; width: 0.45rem; height: 0.45rem; margin-left: 0.15rem;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: translateY(-0.12rem) rotate(45deg);
+}
+details.fn-visual[open] > summary::after { transform: translateY(0.1rem) rotate(-135deg); }
+details.fn-visual > summary:hover { color: var(--ink); border-color: var(--accent); }
+details.fn-visual > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+details.fn-visual[open] > summary { color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); }
+.fv-sum-icon { width: 1rem; height: 1rem; flex: none; }
+.fv-sum-sub { font-weight: 500; color: var(--ink-faint); font-family: var(--font-code); font-size: 0.78rem; }
+details.fn-visual[open] .fv-sum-sub { color: inherit; }
+@media (max-width: 30rem) { .fv-sum-sub { display: none; } }
+
+.fv {
+  margin-top: 0.6rem; padding: 0.85rem;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--bg-soft);
+}
+.fv-call { margin: 0 0 0.6rem; font-size: 0.85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.fv-call code { font-size: 0.82rem; }
+.fv-callrow[hidden] { display: none; }
+.fv-gives { color: var(--ink-faint); margin: 0 0.15rem; }
+.fv-err { color: var(--error); }
+.fv-grid { display: grid; gap: 0.85rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 46rem) {
+  .fv-grid { grid-template-columns: minmax(0, 25rem) minmax(0, 1fr); }
+}
+.fv-stage { min-width: 0; }
+.fv-svg { display: block; width: 100%; max-width: 27rem; height: auto; overflow: visible; }
+.fv-wait { margin: 0; color: var(--ink-faint); font-size: 0.85rem; }
+.fv-note { margin: 0.6rem 0 0; font-size: 0.8rem; color: var(--ink-faint); line-height: 1.45; }
+.fv-noparams { margin: 0; font-size: 0.85rem; color: var(--ink-soft); }
+
+/* legend chips */
+.fv-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.fv-legend li { margin: 0; }
+.fv-chip {
+  display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 0 0.45rem;
+  width: 100%; text-align: left; cursor: pointer;
+  padding: 0.35rem 0.55rem; border-radius: var(--r-sm);
+  border: 1px solid var(--line); border-left: 4px solid var(--pc);
+  background: var(--bg); color: var(--ink); font: inherit; font-size: 0.85rem; line-height: 1.4;
+}
+.fv-chip code { color: var(--pc); font-weight: 700; background: none; border: 0; padding: 0; font-size: 0.85rem; }
+.fv-chip .fv-role { grid-column: 1 / -1; color: var(--ink-soft); font-size: 0.8rem; }
+.fv-flag { justify-self: end; font-size: 0.7rem; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 999px; padding: 0 0.4rem; }
+.fv-sw { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; background: var(--pc); align-self: center; }
+.fv-chip .fv-sw { display: none; }
+.fv-chip:hover, .fv-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--pc) 12%, var(--bg)); border-color: var(--pc); }
+.fv-chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* sliders */
+.fv-controls { display: grid; gap: 0.5rem; margin-top: 0.7rem; }
+.fv-range {
+  display: grid; grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) minmax(3.5rem, auto);
+  align-items: center; gap: 0.6rem; font-size: 0.85rem;
+}
+.fv-range-name { display: inline-flex; align-items: center; gap: 0.35rem; }
+.fv-range code { color: var(--pc); font-weight: 700; background: none; border: 0; padding: 0; }
+.fv-range input[type="range"] { width: 100%; min-width: 0; accent-color: var(--pc); margin: 0; height: 1.6rem; }
+.fv-range input[type="range"]:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.fv-range output { font-family: var(--font-code); font-size: 0.8rem; color: var(--ink-soft); text-align: right; }
+
+/* widgets and window methods inside gui.window's card */
+.fv-subs { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }
+.fv-subs h4 { margin: 0 0 0.25rem; font-size: 0.95rem; }
+.fv-subs > p { margin: 0 0 0.5rem; color: var(--ink-soft); font-size: 0.9rem; }
+.fv-subs details.fn-visual { margin-top: 0.4rem; }
+.fv-subs details.fn-visual > summary { border-radius: var(--r-sm); }
+.fv-sub-sig { font-size: 0.8rem; background: none; border: 0; padding: 0; color: inherit; }
+details.fv-sub { scroll-margin-top: calc(var(--header-h) + 1rem); }
+.kw-table details.fn-visual { margin-top: 0.4rem; }
+.kw-table .fv-grid { grid-template-columns: minmax(0, 1fr); }
+
+/* ------------------------------------------------------------ the drawing */
+.fv-svg { font-family: var(--font-sans); font-size: 11px; }
+.fv-svg text { fill: var(--ink); }
+.fv-svg .m { font-family: var(--font-code); font-size: 12px; }
+.fv-svg .sm { font-size: 10.5px; }
+.fv-svg .m.sm { font-size: 10.5px; }
+.fv-svg .sm2 { font-size: 11.5px; }
+.fv-svg .lg { font-size: 16px; }
+.fv-svg .xl { font-size: 20px; }
+.fv-svg .b { font-weight: 700; }
+.fv-svg .ts { fill: var(--ink-soft); }
+.fv-svg .tf { fill: var(--ink-faint); }
+.fv-svg .ta { fill: var(--accent-text); }
+.fv-svg .tp { fill: var(--pc, var(--accent-text)); }
+.fv-svg .tbtnp { fill: var(--accent-ink); }
+.fv-svg .tbadge { fill: var(--bg); }
+.fv-svg .tlink { fill: var(--focus); }
+
+.fv-svg rect, .fv-svg circle, .fv-svg path, .fv-svg polygon, .fv-svg line { stroke-width: 1.2; }
+.fv-svg .bx { fill: var(--bg); stroke: var(--line-strong); }
+.fv-svg .pb { fill: color-mix(in srgb, var(--pc, var(--accent-text)) 9%, var(--bg)); stroke: var(--pc, var(--accent-text)); stroke-width: 1.5; }
+.fv-svg .ob { fill: var(--bg); stroke: var(--accent); stroke-width: 1.6; }
+.fv-svg .gb { fill: none; stroke: var(--pc, var(--line-strong)); stroke-dasharray: 4 3; }
+.fv-svg .fb { fill: var(--accent-soft); stroke: var(--accent); }
+.fv-svg .cl { fill: var(--bg-soft); stroke: var(--line-strong); }
+.fv-svg .rb { fill: var(--accent-soft); stroke: var(--accent); }
+.fv-svg .th { fill: var(--bg-sunk); stroke: none; }
+.fv-svg .ln { stroke: var(--line-strong); fill: none; }
+.fv-svg .ln2 { stroke: var(--line); fill: none; }
+.fv-svg .ar { stroke: var(--ink-faint); stroke-width: 1.6; fill: none; }
+.fv-svg .ah { fill: var(--ink-faint); stroke: none; }
+.fv-svg .pah { fill: var(--pc, var(--accent-text)); stroke: none; }
+.fv-svg .pl { stroke: var(--pc, var(--accent-text)); fill: none; }
+.fv-svg .w2 { stroke-width: 2; }
+.fv-svg .w3 { stroke-width: 3; }
+.fv-svg .dash { stroke-dasharray: 4 3; }
+.fv-svg .cn { stroke: var(--accent); stroke-opacity: 0.55; fill: none; stroke-width: 1.4; }
+.fv-svg .ic { fill: none; stroke: var(--ink-soft); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.fv-svg .icp { fill: none; stroke: var(--pc, var(--accent-text)); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fv-svg .ic2 { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.fv-svg .icw { fill: none; stroke: var(--accent-ink); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.fv-svg .okb { fill: color-mix(in srgb, var(--fv-ok) 14%, var(--bg)); stroke: var(--fv-ok); color: var(--fv-ok); }
+.fv-svg .nob { fill: color-mix(in srgb, var(--fv-no) 12%, var(--bg)); stroke: var(--fv-no); color: var(--fv-no); }
+.fv-svg .okg { color: var(--fv-ok); }
+.fv-svg .nog { color: var(--fv-no); }
+.fv-svg .lane { fill: var(--bg-sunk); stroke: none; }
+.fv-svg .hit { fill: var(--accent); stroke: none; }
+.fv-svg .dot { fill: var(--bg); stroke: var(--ink-soft); stroke-width: 2; }
+.fv-svg .pdot { fill: var(--pc, var(--accent)); stroke: var(--bg); stroke-width: 1.5; }
+.fv-svg .phl { fill: none; stroke: var(--pc, var(--accent-text)); stroke-width: 1.5; }
+.fv-svg .phl2 { fill: none; stroke: var(--accent); }
+.fv-svg .txl { stroke: var(--line-strong); stroke-width: 3; stroke-linecap: round; }
+
+/* windows and widgets */
+.fv-svg .win { fill: var(--fv-win); stroke: var(--line-strong); }
+.fv-svg .windark { fill: #1f1724; }
+.fv-svg .windark ~ text { fill: #f3eaf0; }
+.fv-svg .winbar { fill: var(--fv-winbar); stroke: var(--line-strong); }
+.fv-svg .wdot { fill: var(--line-strong); }
+.fv-svg .ghostwin { fill: none; stroke: var(--ink-faint); stroke-dasharray: 5 4; }
+.fv-svg .gbtn { fill: var(--bg-soft); stroke: var(--line-strong); }
+.fv-svg .gbtnp { fill: var(--accent); stroke: var(--accent); }
+.fv-svg .gfield { fill: var(--bg); stroke: var(--line-strong); }
+.fv-svg .gbox { fill: var(--bg); stroke: var(--ink-soft); }
+.fv-svg .gboxon { fill: var(--accent); stroke: var(--accent); }
+.fv-svg .gpop { fill: var(--bg); stroke: var(--line-strong); filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.15)); }
+.fv-svg .gsel { fill: var(--accent-soft); stroke: none; }
+.fv-svg .gth { fill: var(--bg-sunk); stroke: none; }
+.fv-svg .gcard { fill: var(--bg); stroke: var(--line-strong); }
+.fv-svg .gpic { fill: var(--bg-sunk); stroke: var(--line-strong); }
+.fv-svg .mtn { fill: var(--line-strong); stroke: none; }
+.fv-svg .sun { fill: var(--marigold); stroke: none; }
+.fv-svg .gtrack { fill: var(--bg-sunk); stroke: var(--line); }
+.fv-svg .pfill { fill: var(--pc, var(--accent)); stroke: none; }
+.fv-svg .gthumb { fill: var(--ink-faint); stroke: none; }
+.fv-svg .gtab { fill: var(--bg-soft); stroke: var(--line); }
+.fv-svg .gtabon { fill: var(--bg); stroke: var(--line-strong); }
+.fv-svg .gcanvas { fill: var(--bg); stroke: var(--ink-faint); stroke-dasharray: 3 3; }
+.fv-svg .knob { fill: var(--bg); stroke: var(--pc, var(--accent-text)); stroke-width: 3; }
+.fv-svg .swatch { stroke: var(--line-strong); }
+.fv-svg .lnlink { stroke: var(--focus); }
+.fv-svg .cur { fill: var(--ink); stroke: var(--bg); stroke-width: 1; }
+.fv-svg .key { fill: var(--bg); stroke: var(--line-strong); stroke-width: 1.5; }
+.fv-svg .keyp { fill: color-mix(in srgb, var(--pc, var(--accent-text)) 9%, var(--bg)); stroke: var(--pc, var(--accent-text)); stroke-width: 1.5; }
+.fv-svg .scr { fill: var(--bg-sunk); stroke: var(--line-strong); stroke-width: 2; }
+.fv-svg .scrst { fill: var(--line-strong); stroke: none; }
+.fv-svg .dim { fill: var(--bg-sunk); stroke: none; opacity: 0.8; }
+.fv-svg .s0 { fill: var(--fv-c0); } .fv-svg .s1 { fill: var(--fv-c2); } .fv-svg .s2 { fill: var(--fv-c3); } .fv-svg .s3 { fill: var(--fv-c4); }
+.fv-svg .slice { stroke: var(--bg); stroke-width: 1.5; }
+.fv-svg .bar { stroke: none; }
+.fv-svg .badge.b-danger { fill: var(--fv-no); } .fv-svg .badge.b-success { fill: var(--fv-ok); }
+.fv-svg .badge.b-warning { fill: var(--fv-c3); } .fv-svg .badge.b-accent { fill: var(--accent); }
+.fv-svg .badge.b-muted { fill: var(--ink-faint); } .fv-svg .badge.b-info { fill: var(--fv-c0); }
+
+/* ------------------------------------------------- linking chips and parts */
+.fv-svg [data-part] { transition: opacity 0.15s ease; }
+.fv:has(.fv-chip:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part],
+.fv:has(.fv-range input:is(:hover, :focus-visible, :active)) .fv-svg [data-part] { opacity: 0.28; }
+.fv:has(.fv-chip[data-part="p0"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p0"],
+.fv:has(.fv-range input[data-part="p0"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p0"],
+.fv:has(.fv-chip[data-part="p1"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p1"],
+.fv:has(.fv-range input[data-part="p1"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p1"],
+.fv:has(.fv-chip[data-part="p2"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p2"],
+.fv:has(.fv-range input[data-part="p2"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p2"],
+.fv:has(.fv-chip[data-part="p3"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p3"],
+.fv:has(.fv-range input[data-part="p3"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p3"],
+.fv:has(.fv-chip[data-part="p4"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p4"],
+.fv:has(.fv-range input[data-part="p4"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p4"],
+.fv:has(.fv-chip[data-part="p5"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p5"],
+.fv:has(.fv-range input[data-part="p5"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p5"],
+.fv:has(.fv-chip[data-part="p6"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p6"],
+.fv:has(.fv-range input[data-part="p6"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p6"],
+.fv:has(.fv-chip[data-part="p7"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p7"],
+.fv:has(.fv-range input[data-part="p7"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p7"],
+.fv:has(.fv-chip[data-part="p8"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p8"],
+.fv:has(.fv-range input[data-part="p8"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p8"],
+.fv:has(.fv-chip[data-part="p9"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p9"],
+.fv:has(.fv-range input[data-part="p9"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p9"],
+.fv:has(.fv-chip[data-part="p10"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p10"],
+.fv:has(.fv-range input[data-part="p10"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p10"],
+.fv:has(.fv-chip[data-part="p11"]:is(:hover, :focus-visible, [aria-pressed="true"])) .fv-svg [data-part="p11"],
+.fv:has(.fv-range input[data-part="p11"]:is(:hover, :focus-visible, :active)) .fv-svg [data-part="p11"] {
+  opacity: 1;
+  filter: drop-shadow(0 0 2.5px var(--pc, var(--accent-text)));
+}
+.fv:has(.fv-svg [data-part="p0"]:hover) .fv-chip[data-part="p0"],
+.fv:has(.fv-svg [data-part="p1"]:hover) .fv-chip[data-part="p1"],
+.fv:has(.fv-svg [data-part="p2"]:hover) .fv-chip[data-part="p2"],
+.fv:has(.fv-svg [data-part="p3"]:hover) .fv-chip[data-part="p3"],
+.fv:has(.fv-svg [data-part="p4"]:hover) .fv-chip[data-part="p4"],
+.fv:has(.fv-svg [data-part="p5"]:hover) .fv-chip[data-part="p5"],
+.fv:has(.fv-svg [data-part="p6"]:hover) .fv-chip[data-part="p6"],
+.fv:has(.fv-svg [data-part="p7"]:hover) .fv-chip[data-part="p7"],
+.fv:has(.fv-svg [data-part="p8"]:hover) .fv-chip[data-part="p8"],
+.fv:has(.fv-svg [data-part="p9"]:hover) .fv-chip[data-part="p9"],
+.fv:has(.fv-svg [data-part="p10"]:hover) .fv-chip[data-part="p10"],
+.fv:has(.fv-svg [data-part="p11"]:hover) .fv-chip[data-part="p11"] {
+  background: color-mix(in srgb, var(--pc, var(--accent-text)) 12%, var(--bg)); border-color: var(--pc, var(--accent-text));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fv-svg [data-part] { transition: none; }
+}
+@media print {
+  details.fn-visual { display: none; }
+}
+
+/* phones: give the drawing every pixel we can */
+@media (max-width: 30rem) {
+  .fv { padding: 0.55rem; margin-inline: -0.55rem; border-radius: var(--r-sm); }
+  .fv-svg .sm { font-size: 11px; }
+  .fv-svg .m.sm { font-size: 11px; }
+}

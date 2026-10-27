@@ -114,8 +114,11 @@ def footer(prefix: str = "", version: str = "3.0.0") -> str:
 
 
 def page(title: str, description: str, main: str, *, current: str = "", prefix: str = "",
-         scripts: tuple[str, ...] = (), version: str = "3.0.0") -> str:
+         scripts: tuple[str, ...] = (), version: str = "3.0.0", styles: tuple[str, ...] = ()) -> str:
+    """styles: extra stylesheets in assets/css/ after style.css (the library
+    pages add visuals.css for their "Visualize" pictures)."""
     tags = "\n".join(f'  <script src="{prefix}assets/js/{s}" defer></script>' for s in scripts)
+    extra_css = "".join(f'\n  <link rel="stylesheet" href="{prefix}assets/css/{s}">' for s in styles)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -125,7 +128,7 @@ def page(title: str, description: str, main: str, *, current: str = "", prefix: 
   <meta name="description" content="{html.escape(description, quote=True)}">
   <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="{prefix}assets/img/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="{prefix}assets/css/style.css">
+  <link rel="stylesheet" href="{prefix}assets/css/style.css">{extra_css}
   <script src="{prefix}assets/js/config.js"></script>
   <script src="{prefix}assets/js/theme.js"></script>
   {stats_script(prefix)}

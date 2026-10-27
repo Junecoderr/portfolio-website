@@ -3,5 +3,7 @@ name = "tb-colors"
 version = "1.0.0"
 description = "ANSI colour and style helpers for terminal output (honours NO_COLOR)."
 main = "lib.tb"
+license = "MIT"
+keywords = ["terminal", "color", "ansi", "cli"]
 
 [dependencies]
