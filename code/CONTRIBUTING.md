@@ -155,6 +155,45 @@ runtime by `site/assets/js/highlight.js`. The site's CSP allows no inline
 scripts or event handlers, and the site never links to the source
 repository.
 
+### Visit and download counters
+
+The home page (a strip under the hero), the download page (a count next to
+each file, plus a total) and every footer show live numbers. They come from
+two Vercel Functions in `api/` (Node.js, ESM, no dependencies; shared code in
+`api/_lib/stats.js`, which is not deployed as a function). Vercel deploys
+`api/` as functions on its own, so `vercel.json` needs no `functions` entry,
+and `build_site.py` only copies `site/`, so the function source is never
+served.
+
+- `POST /api/hit` with `{"path": "/download"}` adds 1 to the total
+  (`tb:visits`) and to that page's field in the hash `tb:pages`. No cookies;
+  IP addresses and user agents are never stored (the user agent is only
+  checked against a list of bots, which are not counted). It accepts only
+  POST, a body under 1 KB, a short same-site path and same-site requests.
+- `GET /api/stats` returns `{visits, downloads: {total, assets}, updated}`.
+  Downloads are the GitHub release assets' own `download_count`, summed over
+  every `tb-v*` release and fetched on the server (browsers never contact
+  GitHub), cached in memory for 10 minutes; the response is cached by the CDN
+  (`s-maxage=600, stale-while-revalidate=3600`). Only the visit total is
+  shown on the site; the per-page counts stay in Redis.
+- Environment variables (Vercel project settings): `KV_REST_API_URL` and
+  `KV_REST_API_TOKEN`, or `UPSTASH_REDIS_REST_URL` and
+  `UPSTASH_REDIS_REST_TOKEN` (Upstash Redis from the Vercel Marketplace, used
+  over its REST API with `fetch`); optionally `GITHUB_TOKEN` for a higher
+  GitHub rate limit. Without Redis, `visits` is `null`; if GitHub fails,
+  `downloads` is `null`. Neither ever turns into an error page.
+
+`site/assets/js/stats.js` (loaded in every page's `<head>` by the shell)
+posts the hit, fetches the stats and fills elements marked `data-stat="visits"`,
+`data-stat="downloads"` or `data-stat="dl:<asset name>"`. Their
+`data-stat-wrap` / `data-stats` containers start `hidden` and appear only
+when a number arrives, so the site looks complete without the API. Local
+previews (`localhost`, `127.0.0.1`) and automated browsers never count; add
+`?stats` to a local URL to fetch the numbers anyway (for example under
+`vercel dev`). The functions' unit tests are `tests/api/stats.test.mjs`
+(`node --test tests/api/stats.test.mjs`; `tests/test_site.py` runs them when
+`node` is installed).
+
 ### Deploying
 
 The site is served at https://code.tanisha.ceo by the Vercel project

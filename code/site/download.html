@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="assets/css/style.css">
   <script src="assets/js/config.js"></script>
   <script src="assets/js/theme.js"></script>
+  <script src="assets/js/stats.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -55,16 +56,17 @@
           <table class="hash-table">
             <thead><tr><th scope="col">File</th><th scope="col">For</th><th scope="col">What it is</th></tr></thead>
             <tbody>
-              <tr><td><a data-download="tb-windows-x64-setup.exe" href="/dl/tb-windows-x64-setup.exe"><code>tb-windows-x64-setup.exe</code></a></td><td>Windows 10 and 11, 64-bit <strong>(recommended)</strong></td><td>Installer: Start menu, double-click .tb files, tb on your PATH</td></tr>
-              <tr><td><a data-download="tb-windows-x64.zip" href="/dl/tb-windows-x64.zip"><code>tb-windows-x64.zip</code></a></td><td>Windows 10 and 11, 64-bit</td><td>Portable folder, nothing installed</td></tr>
-              <tr><td><a data-download="tb-macos-arm64.zip" href="/dl/tb-macos-arm64.zip"><code>tb-macos-arm64.zip</code></a></td><td>macOS on Apple silicon (M1 and newer)</td><td>A <code>tb</code> folder</td></tr>
-              <tr><td><a data-download="tb-linux-x64.tar.gz" href="/dl/tb-linux-x64.tar.gz"><code>tb-linux-x64.tar.gz</code></a></td><td>Linux, 64-bit Intel or AMD</td><td>A <code>tb</code> folder</td></tr>
-              <tr><td><a data-download="tb-python.zip" href="/dl/tb-python.zip"><code>tb-python.zip</code></a></td><td>Any computer with Python 3.10 or newer</td><td><code>tb.py</code>, the standard library, examples and apps</td></tr>
-              <tr><td><a data-download="tb-vscode-3.0.0.vsix" href="/dl/tb-vscode-3.0.0.vsix"><code>tb-vscode-3.0.0.vsix</code></a></td><td>Visual Studio Code, on any computer with TB installed</td><td>The TB extension: highlighting, completion, errors as you type, Run buttons (<a href="tools.html#vscode">how to install</a>)</td></tr>
-              <tr><td><a data-download="SHA256SUMS.txt" href="/dl/SHA256SUMS.txt"><code>SHA256SUMS.txt</code></a></td><td>Checking your download</td><td>SHA-256 fingerprints of every file</td></tr>
+              <tr><td><a data-download="tb-windows-x64-setup.exe" href="/dl/tb-windows-x64-setup.exe"><code>tb-windows-x64-setup.exe</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-windows-x64-setup.exe"></span> downloads</span></td><td>Windows 10 and 11, 64-bit <strong>(recommended)</strong></td><td>Installer: Start menu, double-click .tb files, tb on your PATH</td></tr>
+              <tr><td><a data-download="tb-windows-x64.zip" href="/dl/tb-windows-x64.zip"><code>tb-windows-x64.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-windows-x64.zip"></span> downloads</span></td><td>Windows 10 and 11, 64-bit</td><td>Portable folder, nothing installed</td></tr>
+              <tr><td><a data-download="tb-macos-arm64.zip" href="/dl/tb-macos-arm64.zip"><code>tb-macos-arm64.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-macos-arm64.zip"></span> downloads</span></td><td>macOS on Apple silicon (M1 and newer)</td><td>A <code>tb</code> folder</td></tr>
+              <tr><td><a data-download="tb-linux-x64.tar.gz" href="/dl/tb-linux-x64.tar.gz"><code>tb-linux-x64.tar.gz</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-linux-x64.tar.gz"></span> downloads</span></td><td>Linux, 64-bit Intel or AMD</td><td>A <code>tb</code> folder</td></tr>
+              <tr><td><a data-download="tb-python.zip" href="/dl/tb-python.zip"><code>tb-python.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-python.zip"></span> downloads</span></td><td>Any computer with Python 3.10 or newer</td><td><code>tb.py</code>, the standard library, examples and apps</td></tr>
+              <tr><td><a data-download="tb-vscode-3.0.0.vsix" href="/dl/tb-vscode-3.0.0.vsix"><code>tb-vscode-3.0.0.vsix</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-vscode-3.0.0.vsix"></span> downloads</span></td><td>Visual Studio Code, on any computer with TB installed</td><td>The TB extension: highlighting, completion, errors as you type, Run buttons (<a href="tools.html#vscode">how to install</a>)</td></tr>
+              <tr><td><a data-download="SHA256SUMS.txt" href="/dl/SHA256SUMS.txt"><code>SHA256SUMS.txt</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:SHA256SUMS.txt"></span> downloads</span></td><td>Checking your download</td><td>SHA-256 fingerprints of every file</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="dl-total" data-stats hidden><strong data-stat="downloads"></strong> downloads so far, across every TB release.</p>
         <p>Every download has the same folders inside: <code>apps</code> (the desktop apps and security tools), <code>examples</code> and <code>welcome.tb</code>. Rather not install anything? <a href="playground.html">The playground</a> runs TB in your browser.</p>
         <p>Packages are separate: once TB is installed, <code>tb add tb-tables</code> fetches one into your project from this site's <a href="packages.html">package index</a>, so there is nothing else to download by hand.</p>
       </section>
@@ -83,6 +85,7 @@
           <p>When you open TB for the first time, Windows or macOS may say it doesn't recognise the app. That's expected, and here is the honest reason.</p>
           <p>Big companies pay every year for a <strong>code-signing certificate</strong>, a kind of ID card that tells your computer who made a program. TB is a small, independent project, not a company product, so it doesn't have one. Your computer simply hasn't met TB before, so it plays safe and asks you first.</p>
           <p>TB itself never phones home and collects nothing. Like any programming language, a TB program can read and write files, use the network (the <code>http</code>, <code>net</code> and <code>intel</code> libraries) and run other programs (<code>os.run</code>), but only when its code says so. So run programs you trust, the same as you would with Python or anything else. TB's own code ships in readable form (<code>tb.py</code> and the <code>tblib</code> folder in <code>tb-python.zip</code>), and the <a href="#verify">checksums</a> below prove your download is exactly the published file.</p>
+          <p><strong>Site statistics.</strong> This website counts page views without cookies or personal data: no cookies are set and no IP addresses or browser details are stored, only a running total per page. Download numbers are the release files' own download counts.</p>
         </div>
       </section>
 
@@ -399,6 +402,7 @@ TB 3.0.0</div>
     </div>
     <div class="footer-bottom">
       <p>TB — a friendly programming language.</p>
+      <p class="footer-stats" data-stats hidden><span data-stat-wrap hidden><span data-stat="downloads"></span> downloads</span><span data-stat-wrap hidden><span data-stat="visits"></span> visits</span><span class="footer-stats-note">Counted without cookies or personal data.</span></p>
       <p>TB <span data-version>3.0.0</span>, released 26 October 2026.</p>
     </div>
   </footer>

@@ -10,3 +10,10 @@ src/data/writing.generated.json
 
 # Local Claude Code state (notes; never publish)
 .claude/
+
+# /brag launch video output
+brag-output/
+
+# Agent skills the Vercel CLI installs locally
+.agents/
+skills-lock.json

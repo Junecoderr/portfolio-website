@@ -672,6 +672,30 @@ pre.cmd code::before { content: "> "; color: var(--ink-faint); user-select: none
 .hero-meta { margin: 1.25rem 0 0; font-size: 0.9rem; color: var(--ink-faint); }
 .hero-meta a { color: var(--ink-soft); }
 
+/* site statistics (assets/js/stats.js fills them in; hidden until numbers arrive) */
+[data-stats][hidden], [data-stat-wrap][hidden] { display: none; }
+[data-stat] { font-variant-numeric: tabular-nums; }
+.stats-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0;
+  margin: 0 0 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-size: 0.95rem;
+}
+.stats-strip strong { color: var(--ink); font-family: var(--font-display); font-weight: 750; font-size: 1.15rem; letter-spacing: -0.01em; margin-right: 0.3em; }
+.stats-strip-item:not([hidden]) ~ .stats-strip-item::before,
+.footer-stats [data-stat-wrap]:not([hidden]) ~ [data-stat-wrap]::before { content: "·"; margin: 0 0.6em; color: var(--ink-faint); }
+.footer-stats-note { color: var(--ink-faint); }
+.footer-stats-note::before { content: "·"; margin: 0 0.6em; }
+.dl-count { display: block; margin-top: 0.15rem; font-size: 0.8rem; color: var(--ink-faint); }
+.dl-total { color: var(--ink-soft); }
+.dl-total strong { color: var(--ink); }
+
 /* feature grid: one ruled block, not floating cards */
 .features {
   display: grid;

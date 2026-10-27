@@ -33,6 +33,12 @@ NAV = [("docs.html", "Learn"), ("library.html", "Library"), ("tools.html", "Tool
        ("examples.html", "Examples"), ("playground.html", "Playground"), ("download.html", "Download")]
 
 
+def stats_script(prefix: str = "") -> str:
+    """The <script> tag for assets/js/stats.js (the visit and download
+    counters), which every page loads in its <head> right after theme.js."""
+    return f'<script src="{prefix}assets/js/stats.js" defer></script>'
+
+
 def esc(text: str) -> str:
     return html.escape(text, quote=False)
 
@@ -101,6 +107,7 @@ def footer(prefix: str = "", version: str = "3.0.0") -> str:
     </div>
     <div class="footer-bottom">
       <p>TB — a friendly programming language.</p>
+      <p class="footer-stats" data-stats hidden><span data-stat-wrap hidden><span data-stat="downloads"></span> downloads</span><span data-stat-wrap hidden><span data-stat="visits"></span> visits</span><span class="footer-stats-note">Counted without cookies or personal data.</span></p>
       <p>TB <span data-version>{version}</span>, released {RELEASE_DATE_HUMAN}.</p>
     </div>
   </footer>"""
@@ -121,6 +128,7 @@ def page(title: str, description: str, main: str, *, current: str = "", prefix: 
   <link rel="stylesheet" href="{prefix}assets/css/style.css">
   <script src="{prefix}assets/js/config.js"></script>
   <script src="{prefix}assets/js/theme.js"></script>
+  {stats_script(prefix)}
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>

@@ -10,6 +10,10 @@
   have no inline scripts (the live site's CSP forbids them)
 * a full build (when Pyodide has been fetched) ships tblib, the sample data,
   the app sources and the apps gallery
+* the visit and download counters: every page loads assets/js/stats.js, the
+  home page, download page and footer carry data-stat slots that stay hidden
+  without the API, and the Vercel functions in api/ pass their Node unit
+  tests (tests/api/, skipped without node)
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -137,6 +142,8 @@ def test_page_shell(page):
     assert expected_header in text, f"{page.name}: header differs from scripts/site_shell.py"
     assert site_shell.footer("", tb.__version__) in text, f"{page.name}: footer differs from scripts/site_shell.py"
     assert len(re.findall(r"<h1[\s>]", text)) == 1
+    head = text.split("</head>", 1)[0]
+    assert site_shell.stats_script("") in head, f"{page.name}: run scripts/sync_pages.py (stats.js missing)"
     assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", text), "inline <script> blocks break the CSP"
     assert not re.search(r"\son[a-z]+\s*=\s*\"", text), "inline event handlers break the CSP"
     assert not name_guard.contains_name(text)
@@ -163,6 +170,12 @@ def test_full_build(tmp_path):
             assert f'id="app-{app.name}"' in gallery, app.name
             assert (out / "apps" / app.name / "main.tb").exists()
     assert (out / "lib" / "ioc.html").exists()
+    # The counters' functions are deployed by Vercel from api/, never served as files.
+    assert not (out / "api").exists() and not list(out.rglob("hit.js"))
+    assert (out / "assets" / "js" / "stats.js").exists()
+    for page in [out / "library.html", out / "lib" / "ioc.html", out / "spec.html", out / "packages.html"]:
+        prefix = "../" if page.parent.name == "lib" else ""
+        assert site_shell.stats_script(prefix) in page.read_text(encoding="utf-8"), page.name
     for page in out.rglob("*.html"):
         assert not name_guard.contains_name(page.read_text(encoding="utf-8")), page
     config = (out / "assets" / "js" / "config.js").read_text(encoding="utf-8")
@@ -211,3 +224,74 @@ def test_release_assets_exist():
         assert "/releases/" not in text, f"{path.name} has a release URL"
         for name, href in re.findall(r'data-download="([^"]+)"(?: data-primary-link)? href="([^"]+)"', text):
             assert href == f"/dl/{name}", (path.name, name, href)
+
+
+# ---------------------------------------------------------------- site statistics
+
+STAT_SLOT = re.compile(r'data-stat="([^"]+)"')
+
+
+def test_stats_script_is_quiet_without_the_api():
+    js = (SITE / "assets" / "js" / "stats.js").read_text(encoding="utf-8")
+    assert 'fetch("/api/hit"' in js and "keepalive: true" in js and 'fetch("/api/stats"' in js
+    assert "navigator.webdriver" in js and "localhost" in js and "127.0.0.1" in js
+    assert "Intl.NumberFormat" in js
+    assert "document.cookie" not in js and "localStorage" not in js
+    assert "github" not in js.lower()
+
+
+def test_stats_slots_start_hidden():
+    for page in PAGES:
+        text = page.read_text(encoding="utf-8")
+        for tag in re.findall(r"<[^>]*data-stats?(?:-wrap)?[\s>][^>]*>", text):
+            if "data-stat=" in tag:
+                continue  # the number itself; its wrapper is what hides
+            assert re.search(r"\shidden[\s>]", tag), f"{page.name}: {tag} must start hidden"
+
+
+def test_footer_shows_the_totals():
+    footer = site_shell.footer("", tb.__version__)
+    assert set(STAT_SLOT.findall(footer)) == {"downloads", "visits"}
+    assert 'data-stats hidden' in footer
+    assert "without cookies or personal data" in footer
+    page = site_shell.page("T", "D", "<h1>x</h1>", prefix="../")
+    assert '<script src="../assets/js/stats.js" defer></script>' in page.split("</head>")[0]
+
+
+def test_home_page_stats_strip():
+    text = (SITE / "index.html").read_text(encoding="utf-8")
+    strip = re.search(r'<p class="stats-strip" data-stats hidden>(.*?)</p>', text, re.S)
+    assert strip, "the home page's stats strip is missing"
+    assert set(STAT_SLOT.findall(strip.group(1))) == {"downloads", "visits"}
+    assert text.index('class="stats-strip"') > text.index('aria-labelledby="hero-title"')
+
+
+def test_download_page_counts_every_file():
+    text = (SITE / "download.html").read_text(encoding="utf-8")
+    table = text[text.index('<h2 id="all-downloads">'):text.index("</table>", text.index('<h2 id="all-downloads">'))]
+    files = re.findall(r'<tr><td><a data-download="([^"]+)"', table)
+    assert len(files) >= 6
+    slots = set(STAT_SLOT.findall(table))
+    assert slots == {f"dl:{name}" for name in files}
+    assert re.search(r'<p class="dl-total" data-stats hidden><strong data-stat="downloads">', text)
+    assert "<strong>Site statistics.</strong>" in text
+    assert "counts page views without cookies or personal data" in text
+
+
+def test_stats_functions():
+    """The Vercel functions (api/hit.js, api/stats.js) pass their Node unit tests."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    tests = sorted((ROOT / "tests" / "api").glob("*.test.mjs"))
+    assert tests
+    proc = subprocess.run([node, "--test", *map(str, tests)], cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 0, proc.stdout[-4000:] + proc.stderr[-2000:]
+
+
+def test_stats_functions_stay_out_of_the_site():
+    assert (ROOT / "api" / "hit.js").exists() and (ROOT / "api" / "stats.js").exists()
+    assert not (SITE / "api").exists()
+    config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
+    assert config["outputDirectory"] == "dist/site"
+    assert "connect-src 'self'" in json.dumps(config)

@@ -5,6 +5,8 @@
 * replaces each page's <header class="site-header"> and <footer
   class="site-footer"> with the shared markup (keeping the page's current
   nav item), for the version in tb.py
+* makes sure each page loads assets/js/stats.js (the visit and download
+  counters) in its <head>, right after theme.js
 * fills the libraries grid on site/index.html (between the LIBRARIES GRID
   markers) from tb.list_libraries() and the groups in gen_lib_docs.py, and
   the "N libraries" counts marked with data-lib-count
@@ -36,6 +38,7 @@ HEADER_RE = re.compile(r'  <header class="site-header">.*?</header>', re.S)
 FOOTER_RE = re.compile(r'  <footer class="site-footer">.*?</footer>', re.S)
 CURRENT_RE = re.compile(r'<a href="([\w.-]+)"(?: class="nav-cta")? aria-current="page"')
 COUNT_RE = re.compile(r'(<span data-lib-count>)\d+(</span>)')
+THEME_TAG = '  <script src="assets/js/theme.js"></script>\n'
 
 
 def libraries_grid() -> str:
@@ -57,6 +60,9 @@ def sync_page(path: Path, version: str) -> bool:
     current = m.group(1) if m else ""
     text = HEADER_RE.sub(lambda _: site_shell.header(current, "", version), text, count=1)
     text = FOOTER_RE.sub(lambda _: site_shell.footer("", version), text, count=1)
+    stats = site_shell.stats_script("")
+    if stats not in text and THEME_TAG in text:
+        text = text.replace(THEME_TAG, f"{THEME_TAG}  {stats}\n", 1)
     if GRID_START in text and GRID_END in text:
         start = text.index(GRID_START)
         end = text.index(GRID_END) + len(GRID_END)
