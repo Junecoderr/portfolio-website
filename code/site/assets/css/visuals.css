@@ -264,3 +264,14 @@ details.fv-sub { scroll-margin-top: calc(var(--header-h) + 1rem); }
   .fv-svg .sm { font-size: 11px; }
   .fv-svg .m.sm { font-size: 11px; }
 }
+
+/* Keep the drawing in view while a slider moves it: sliders come straight
+   after the drawing (before the parameter legend), and the drawing sticks
+   below the header while you scroll down to the controls. */
+.fv-side { display: flex; flex-direction: column; }
+.fv-side > .fv-controls { order: -1; margin: 0 0 0.7rem; }
+.fv-stage { position: sticky; top: calc(var(--header-h) + 0.5rem); z-index: 1; background: var(--bg-soft); }
+@media (max-width: 45.99rem) {
+  .fv-stage { padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
+  .fv-svg { max-height: 45vh; }
+}
