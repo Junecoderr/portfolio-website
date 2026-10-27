@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Marks code/api/*.js (Vercel Functions for the TB website) as ES modules. No dependencies."
+}

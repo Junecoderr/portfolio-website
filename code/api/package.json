@@ -1,5 +1,0 @@
-{
-  "private": true,
-  "type": "module",
-  "description": "Vercel Functions for the TB website's counters. No dependencies."
-}
