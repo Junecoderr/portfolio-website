@@ -489,13 +489,27 @@ def load(api):
 
     @m.fn("indicators", 1, 2, doc=(
         "indicators(bundle, options?) -> list\n"
-        "The indicator objects in a bundle, each as {\"id\", \"name\", \"description\", \"pattern\", \"pattern_type\", "
-        "\"indicator_types\", \"valid_from\", \"valid_until\", \"expired\", \"confidence\", \"tags\" (ATT&CK tags from "
-        "kill chain phases), \"iocs\": [{\"type\", \"value\"}], \"skipped\"}. IOCs come from STIX pattern comparisons "
-        "with = or IN: [ipv4-addr:value = '198.51.100.7'] gives {\"type\": \"ip\", ...}; file hashes give md5/sha1/"
-        "sha256; also domain, url, email, filename, cidr. Comparisons that aren't exact (LIKE, MATCHES, !=) are "
-        "listed in \"skipped\". Revoked indicators and expired ones (valid_until in the past) are left out; "
-        "options {\"expired\": true} keeps expired ones."))
+        "The indicator objects in a bundle, each as a map.\n"
+        "\n"
+        "Fields of each indicator:\n"
+        "- \"id\", \"name\", \"description\": from the STIX object.\n"
+        "- \"pattern\", \"pattern_type\", \"indicator_types\": from the STIX object.\n"
+        "- \"valid_from\", \"valid_until\", \"expired\", \"confidence\": from the STIX object.\n"
+        "- \"tags\": ATT&CK tags from the kill chain phases.\n"
+        "- \"iocs\": a list of {\"type\", \"value\"} maps.\n"
+        "- \"skipped\": comparisons that aren't exact (LIKE, MATCHES, !=).\n"
+        "\n"
+        "IOCs come from pattern comparisons with = or IN. For example, "
+        "[ipv4-addr:value = '198.51.100.7'] gives {\"type\": \"ip\", ...}.\n"
+        "\n"
+        "IOC types:\n"
+        "- ip, domain, url, email, filename, cidr.\n"
+        "- md5, sha1, sha256 (from file hashes).\n"
+        "\n"
+        "Revoked indicators are left out. So are expired ones (valid_until in the past).\n"
+        "\n"
+        "Options:\n"
+        "- expired: true keeps the expired indicators."))
     def indicators(line, bundle, options=None):
         b = bundle_arg(line, bundle, "stix.indicators")
         opts = options or {}
@@ -530,12 +544,23 @@ def load(api):
 
     @m.fn("to_detect_rules", 1, 2, doc=(
         "to_detect_rules(bundle, options?) -> list\n"
-        "Detect rules (for detect.run()) from a bundle's indicators: one rule per indicator that alerts when a "
-        "record's ip / src_ip / dst_ip, domain / host / query, url, hash, email or file name field holds one of its "
-        "IOCs (CIDR ranges use |cidr). The level comes from the indicator's confidence (high when there is none) "
-        "and ATT&CK kill chain phases become tags, so attack.map() works on the alerts. options: {\"level\": "
-        "\"critical\", \"group\": \"type\" (one rule per IOC type instead of per indicator, better for big feeds), "
-        "\"fields\": {\"ip\": [\"client\"]} (which record fields to check for a type), \"expired\": true}."))
+        "Detect rules (for detect.run()) from a bundle's indicators. "
+        "By default there is one rule per indicator.\n"
+        "\n"
+        "A rule alerts when a record field holds one of its IOCs:\n"
+        "- ip, src_ip or dst_ip for IPs (CIDR ranges use |cidr).\n"
+        "- domain, host or query for domains.\n"
+        "- url, hash, email or file name fields for those types.\n"
+        "\n"
+        "The level comes from the indicator's confidence (high when there is none). "
+        "ATT&CK kill chain phases become tags, so attack.map() works on the alerts.\n"
+        "\n"
+        "Options:\n"
+        "- level: a fixed level for every rule, like \"critical\".\n"
+        "- group: \"type\" makes one rule per IOC type instead of per indicator.\n"
+        "  This is better for big feeds.\n"
+        "- fields: which record fields to check for a type, like {\"ip\": [\"client\"]}.\n"
+        "- expired: true keeps expired indicators."))
     def to_detect_rules(line, bundle, options=None):
         b = bundle_arg(line, bundle, "stix.to_detect_rules")
         opts = {}
@@ -557,11 +582,25 @@ def load(api):
 
     @m.fn("bundle", 1, 2, doc=(
         "bundle(iocs, options?) -> map\n"
-        "Write IOCs as a STIX 2.1 bundle of indicators. iocs is a list of text (the kind is worked out: IP, domain, "
-        "URL, email, hash, CIDR), a list of {\"type\", \"value\", \"name\"?, \"description\"?} maps, or the map from "
-        "ioc.extract(). Ids are stable: the same IOC always gets the same indicator id. options: {\"indicator_types\" "
-        "(default [\"malicious-activity\"]), \"description\", \"confidence\" (0-100), \"valid_until\", \"time\" "
-        "(the created/valid_from timestamp, default now), \"tags\" (attack.<tactic> tags become kill chain phases)}."))
+        "Write IOCs as a STIX 2.1 bundle of indicators. "
+        "Ids are stable: the same IOC always gets the same indicator id.\n"
+        "\n"
+        "iocs can be:\n"
+        "- a list of text. The kind is worked out: IP, domain, URL, email, hash, CIDR.\n"
+        "- a list of {\"type\", \"value\", \"name\"?, \"description\"?} maps.\n"
+        "- the map from ioc.extract().\n"
+        "\n"
+        "Options:\n"
+        "- indicator_types: the STIX indicator types (default: [\"malicious-activity\"]).\n"
+        "- description: text for every indicator.\n"
+        "- confidence: 0-100.\n"
+        "- valid_until: when the indicators expire.\n"
+        "- time: the created / valid_from timestamp (default: now).\n"
+        "- tags: attack.<tactic> tags become kill chain phases.\n"
+        "\n"
+        "Example:\n"
+        "    let b = stix.bundle([\"198.51.100.7\", \"bad.example\"])\n"
+        "    say(len(b.objects))"))
     def bundle_fn(line, iocs_value, options=None):
         check_type(line, iocs_value, "list|map", "stix.bundle", "iocs")
         opts = {}
@@ -572,12 +611,24 @@ def load(api):
 
     @m.fn("taxii", 1, 3, doc=(
         "taxii(url, auth?, options?) -> client\n"
-        "A TAXII 2.1 client. url is the server's discovery address (like https://intel.example/taxii2/) or an API "
-        "root. auth is nil, a bearer token (text), {\"user\", \"password\"}, {\"token\"} or {\"header\", \"key\"}; "
-        "it is never printed. The client has discover() -> map, collections() -> list of {\"id\", \"title\", "
-        "\"description\", \"can_read\", \"can_write\"}, and objects(collection_id, added_after?) -> bundle, which "
-        "follows the server's paging (up to options \"max_pages\", default 20). options: {\"timeout\" (seconds), "
-        "\"max_pages\"}."))
+        "A TAXII 2.1 client. url is the server's discovery address "
+        "(like https://intel.example/taxii2/) or an API root.\n"
+        "\n"
+        "auth can be:\n"
+        "- nil: no login.\n"
+        "- text: a bearer token.\n"
+        "- {\"user\", \"password\"}, {\"token\"} or {\"header\", \"key\"}.\n"
+        "The auth is never printed.\n"
+        "\n"
+        "Methods:\n"
+        "- discover(): gives back a map about the server.\n"
+        "- collections(): a list of {\"id\", \"title\", \"description\", \"can_read\", \"can_write\"}.\n"
+        "- objects(collection_id, added_after?): a bundle.\n"
+        "  It follows the server's paging, up to max_pages pages.\n"
+        "\n"
+        "Options:\n"
+        "- timeout: seconds to wait.\n"
+        "- max_pages: the most pages objects() reads (default: 20)."))
     def taxii(line, url, auth=None, options=None):
         fn = "stix.taxii"
         from tblib.http import check_url

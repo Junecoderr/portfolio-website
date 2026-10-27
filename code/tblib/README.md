@@ -65,7 +65,7 @@ The rules:
   `max_args=None` means exactly `min_args`; `MANY` means any number.
 * The `doc` text: first line is the signature (`read(path) -> text`, with
   `?` after optional inputs), then plain-English sentences. Write for a
-  beginner.
+  beginner. Long docs use the light structure below.
 * `m.value(name, value, doc=...)` adds a constant like `math.pi`.
 * Values: nil is `None`, true/false are `bool`, numbers are `int`/`float`,
   text is `str`, lists are `list`, maps are `dict` (keys `str` or numbers).
@@ -82,6 +82,45 @@ The rules:
 * `check_type(line, value, kind, "lib.fn", "arg")` checks an input and gives
   it back. Kinds: `text number whole bool list map function nil any`, or
   several joined with `|` (`"text|nil"`). `"whole"` gives back an `int`.
+
+### Writing doc strings
+
+The website (`scripts/gen_lib_docs.py`), `tb doc` and the editor hover all
+read the same doc strings through `tbcore/docfmt.py`, which understands a
+light structure:
+
+```
+rule(map) -> map
+Check a rule and fill in its defaults.
+
+Options:
+- name: what to call the alert.
+- level: how serious an alert is (default: "medium"). One of:
+  - "informational", "low", "medium", "high" or "critical"
+- count: how many matches make an alert (default: 1).
+
+Example:
+    let r = detect.rule({"name": "Root login", "where": {"user": "root"}})
+```
+
+1. **First line**: the signature, `name(args) -> kind`. Never change it
+   without changing the function.
+2. **Summary**: one or two short sentences saying what the function does.
+3. **Blocks**, each after a blank line, in any order:
+   * a heading on its own line: `Options:`, `Fields:`, `Returns:`,
+     `Errors:` or `Example:` (any short `Capitalised words:` line works),
+     followed on the next lines by its content;
+   * bullets, `- name: explanation`. The part before `: ` is shown as code
+     when it is a single name (`count`, `"path|contains"`, `on_click(x, y)`).
+     Indent a nested bullet by two spaces (`  - "low"`). A line indented
+     under a bullet continues it;
+   * under `Example:`, TB code indented by four spaces;
+   * plain paragraphs, still fine for anything that reads well as prose.
+
+Style: short sentences, one idea per bullet, defaults as `(default: 5)`,
+allowed values as nested bullets, no chains of semicolons. A paragraph on
+the website should stay under about 350 characters (a test checks).
+Wrap text in backticks for `code`.
 
 ### The `api` object
 

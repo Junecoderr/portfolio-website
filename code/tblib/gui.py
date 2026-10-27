@@ -2855,60 +2855,128 @@ DOC = (
 )
 
 WIDGET_DOC = """
-Add widgets to a window, a row() or a column() (they stack top to bottom; a row puts them side by side):
-  label(text, options?)            options: style ("normal", "title", "heading", "bold", "muted", "accent", "small", "display", "success", "danger", "mono"), wrap (pixels), align ("left", "center", "right"), width (characters)
-  button(text, on_click?, options?) options: primary (true for the main button), width, expand
-  input(options?)                  options: placeholder, value, on_enter(text), on_change(text), secret, width, expand
-  textarea(options?)               options: value, on_change(text), height (lines), mono, wrap, readonly, expand
-  checkbox(text, options?)         options: checked, on_change(checked)
-  select(choices, options?)        options: value, on_change(choice), width, expand
-  table(columns, options?)         options: height (rows), widths, on_select(row, index), on_open(row, index), expand
-  list_box(items?, options?)       options: height, on_select(item, index), on_open(item, index), expand
-  image(path)                      a PNG or GIF picture
-  progress(options?)               a bar from 0 to 100; options: value
-  separator()                      a thin line
-  row(options?) / column(options?) containers with all of these too; options: expand
-  card(options?)                   a bordered panel; options: title, direction ("column"/"row"), expand
-  scroll(options?)                 a column that scrolls when it is too tall; options: height, expand
-  tabs(names, options?)            pages with tabs; .page(name) is a container; options: on_change(name), expand
-  splitter(options?)               resizable panes; .pane(options?) adds a container; options: direction ("horizontal"/"vertical")
-  tree(columns, options?)          rows inside rows; options: height, widths, on_select(values, id), on_open(values, id), expand
-  chart(options?)                  a bar, line or pie chart; options: type, data (list or {"series": list}; nil leaves a gap), labels, title, width, height, empty
-  canvas(width?, height?, options?) a drawing area; options: background, on_click(x, y), on_drag(x, y), on_release(x, y), on_move(x, y)
-  slider(min, max, options?)       options: value, step, on_change(number), show_value, width, expand
-  spinner(min, max, options?)      a number box with up/down arrows; options: value, step, on_change(number), width
-  date_picker(options?)            a date with a pop-up calendar; options: value ("2026-03-14" or "today"), on_change(text)
-  color(options?)                  a colour swatch that opens the colour chooser; options: value ("#rrggbb"), text, on_change(colour)
-  link(text, url?, options?)       underlined text that opens a web page; options: on_click
-  badge(text, options?)            a small coloured pill; options: style ("accent", "success", "danger", "warning", "muted", "info")
-  clear()                          remove everything inside
-Every widget gives back a map you can use later:
-  label/button: .set(text) .value()   label: .style(name)   button: .click() .enable() .disable()
-  input/textarea: .value() .set(text) .clear() .focus()   textarea: .append(text)
-  checkbox: .value() .set(bool)            select: .value() .set(choice) .options() .set_options(list)
-  table: .add_row(list) .set_rows(rows) .rows() .selected() .selected_index() .select(i) .remove(i) .clear() .count()
-  list_box: .add(item) .set_items(list) .items() .selected() .selected_index() .select(i) .remove(i) .clear() .count()
-  image: .set(path)   progress: .set(0..100) .value()
-  tabs: .page(name) .pages() .add(name) .select(name) .selected()
-  tree: .add(parent_id or nil, values, {"open": bool}?) -> id  .set(id, values) .values(id) .parent(id) .children(id?)
-        .remove(id) .clear() .count() .ids() .selected() .selected_id() .select(id) .expand(id) .collapse(id) .expand_all() .is_expanded(id)
-  chart: .update({"data": ..., "labels": ...}) .data() .labels() .type()
-  canvas: .line(x1, y1, x2, y2, {color, width}?) .rect(x, y, w, h, {color, fill, width}?) .oval(...) .text(x, y, text, {color, size, bold, anchor}?)
-          .image(x, y, path) .clear() .remove(item) .move(item, dx, dy) .size()   (drawing calls give back an item number)
-  slider/spinner: .value() .set(n)   date_picker: .value() .set("2026-03-14")   color: .value() .set("#rrggbb")
-  link: .set(text) .set_url(url) .open()   badge: .set(text) .style(name)
-Window only: title(text?), menu({"File": {"Open": fn, "-": nil, "Quit": fn}}), status(text),
-  every(ms, fn) and after(ms, fn) (both give a timer with .stop()), key("Ctrl+S", fn) ("Mod" is Cmd on a Mac,
-  Ctrl elsewhere), run() (shows the window and waits until it closes), close(), is_open(),
-  icon(path), always_on_top(bool?), fullscreen(bool?), is_fullscreen(), center(), resize(w, h), size(), theme(),
-  on_close(fn) (give back false to keep the window open), on_key(fn(key)) (every key, as text like "a" or "Ctrl+S"),
-  bind_shortcut(keys, fn) (same as key), on_drop(fn(paths)) (files dropped on the app's Dock icon on a Mac, or file
-  paths pasted into the window with Ctrl/Cmd+V; also called on_paste_paths), tray({"Show": fn, "Quit": fn}, {"title"}?)
-  (a small always-on-top chip standing in for a system tray icon: .minimize() hides the window and shows the chip,
-  .restore() brings it back, .show() .hide() .visible()), hide(), show(),
-  run_in_background(fn, on_done(result)?, on_error(message)?) (runs fn on another thread, then on_done in the window).
-Your functions can take fewer inputs than offered: fn() { } is fine for on_change too.
-If a function you gave the window hits an error, the window shows it in a friendly message and keeps going."""
+Widgets:
+Add widgets to a window, a row() or a column(). They stack top to bottom; a row puts them side by side.
+- label(text, options?): a line of text.
+  - style: "normal", "title", "heading", "bold", "muted", "accent", "small", "display", "success", "danger" or "mono".
+  - wrap: wrap the text at this many pixels.
+  - align: "left", "center" or "right".
+  - width: the width in characters.
+- button(text, on_click?, options?): a button.
+  - primary: true for the main button.
+  - width, expand
+- input(options?): a one-line text box.
+  - placeholder, value
+  - on_enter(text), on_change(text)
+  - secret: hide what is typed.
+  - width, expand
+- textarea(options?): a text box with many lines.
+  - value, on_change(text)
+  - height: in lines.
+  - mono, wrap, readonly, expand
+- checkbox(text, options?): a tick box.
+  - checked, on_change(checked)
+- select(choices, options?): a drop-down list.
+  - value, on_change(choice), width, expand
+- table(columns, options?): rows and columns.
+  - height: in rows.
+  - widths, on_select(row, index), on_open(row, index), expand
+- list_box(items?, options?): a list to pick from.
+  - height, on_select(item, index), on_open(item, index), expand
+- image(path): a PNG or GIF picture.
+- progress(options?): a bar from 0 to 100.
+  - value
+- separator(): a thin line.
+- row(options?) / column(options?): containers that take all of these widgets too.
+  - expand
+- card(options?): a bordered panel.
+  - title, expand
+  - direction: "column" or "row".
+- scroll(options?): a column that scrolls when it is too tall.
+  - height, expand
+- tabs(names, options?): pages with tabs. .page(name) is a container.
+  - on_change(name), expand
+- splitter(options?): resizable panes. .pane(options?) adds a container.
+  - direction: "horizontal" or "vertical".
+- tree(columns, options?): rows inside rows.
+  - height, widths, expand
+  - on_select(values, id), on_open(values, id)
+- chart(options?): a bar, line or pie chart.
+  - type, labels, title, width, height, empty
+  - data: a list, or {"series": list}. nil leaves a gap.
+- canvas(width?, height?, options?): a drawing area.
+  - background
+  - on_click(x, y), on_drag(x, y), on_release(x, y), on_move(x, y)
+- slider(min, max, options?): drag to pick a number.
+  - value, step, on_change(number), show_value, width, expand
+- spinner(min, max, options?): a number box with up/down arrows.
+  - value, step, on_change(number), width
+- date_picker(options?): a date with a pop-up calendar.
+  - value: like "2026-03-14", or "today".
+  - on_change(text)
+- color(options?): a colour swatch that opens the colour chooser.
+  - value: like "#rrggbb".
+  - text, on_change(colour)
+- link(text, url?, options?): underlined text that opens a web page.
+  - on_click
+- badge(text, options?): a small coloured pill.
+  - style: "accent", "success", "danger", "warning", "muted" or "info".
+- clear(): remove everything inside.
+
+Widget methods:
+Every widget gives back a map you can use later.
+- label, button: .set(text) .value()
+- label: .style(name)
+- button: .click() .enable() .disable()
+- input, textarea: .value() .set(text) .clear() .focus()
+- textarea: .append(text)
+- checkbox: .value() .set(bool)
+- select: .value() .set(choice) .options() .set_options(list)
+- table: .add_row(list) .set_rows(rows) .rows() .selected() .selected_index() .select(i) .remove(i) .clear() .count()
+- list_box: .add(item) .set_items(list) .items() .selected() .selected_index() .select(i) .remove(i) .clear() .count()
+- image: .set(path)
+- progress: .set(0..100) .value()
+- tabs: .page(name) .pages() .add(name) .select(name) .selected()
+- tree: .add(parent_id or nil, values, {"open": bool}?) gives back an id.
+  - .set(id, values) .values(id) .parent(id) .children(id?) .remove(id) .clear() .count() .ids()
+  - .selected() .selected_id() .select(id) .expand(id) .collapse(id) .expand_all() .is_expanded(id)
+- chart: .update({"data": ..., "labels": ...}) .data() .labels() .type()
+- canvas: drawing calls give back an item number.
+  - .line(x1, y1, x2, y2, {color, width}?)
+  - .rect(x, y, w, h, {color, fill, width}?) .oval(...)
+  - .text(x, y, text, {color, size, bold, anchor}?)
+  - .image(x, y, path) .clear() .remove(item) .move(item, dx, dy) .size()
+- slider, spinner: .value() .set(n)
+- date_picker: .value() .set("2026-03-14")
+- color: .value() .set("#rrggbb")
+- link: .set(text) .set_url(url) .open()
+- badge: .set(text) .style(name)
+
+Window methods:
+- title(text?): set the title. With no input, give it back.
+- menu(map): a menu bar, like {"File": {"Open": fn, "-": nil, "Quit": fn}}.
+- status(text): text in the status bar.
+- every(ms, fn), after(ms, fn): run fn again and again, or once. Both give a timer with .stop().
+- key(keys, fn): a keyboard shortcut like "Ctrl+S". "Mod" is Cmd on a Mac and Ctrl elsewhere.
+- bind_shortcut(keys, fn): the same as key.
+- run(): show the window and wait until it closes.
+- close(), is_open()
+- icon(path), always_on_top(bool?), fullscreen(bool?), is_fullscreen(), center()
+- resize(w, h): the new size in pixels. size() gives it back.
+- theme(): the window's theme.
+- on_close(fn): fn can give back false to keep the window open.
+- on_key(fn): fn(key) gets every key, as text like "a" or "Ctrl+S".
+- on_drop(fn): fn(paths) gets files dropped on the app's Dock icon on a Mac, or file paths pasted into the window with Ctrl/Cmd+V. Also called on_paste_paths.
+- tray(menu, options?): a small always-on-top chip standing in for a system tray icon. menu is like {"Show": fn, "Quit": fn}. options can have "title".
+  - .minimize() hides the window and shows the chip.
+  - .restore() brings it back.
+  - .show() .hide() .visible()
+- hide(), show()
+- run_in_background(fn, on_done?, on_error?): run fn on another thread, then on_done(result) in the window. on_error(message) gets any error.
+
+Callbacks:
+- Your functions can take fewer inputs than offered: fn() { } is fine for on_change too.
+- If a function you gave the window hits an error, the window shows it in a friendly message and keeps going."""
 
 WINDOW_OPTIONS = {"width": "whole", "height": "whole", "theme": "text", "resizable": "bool", "accent": "text"}
 
@@ -4098,9 +4166,14 @@ def load(api):
     from tbcore import tasks as _tasks
     _tasks.MAIN_POSTER = post_to_window
 
-    @m.fn("window", 1, 2, doc="window(title, options?) -> window\nMake a window. options: width, height "
-                               "(pixels; default 520 x 400), theme (\"light\" or \"dark\"), resizable. "
-                               "Add widgets to it, then call win.run() to show it.\n" + WIDGET_DOC.strip())
+    @m.fn("window", 1, 2, doc="window(title, options?) -> window\n"
+                               "Make a window. Add widgets to it, then call win.run() to show it.\n"
+                               "\n"
+                               "Options:\n"
+                               "- width, height: the size in pixels (default: 520 x 400).\n"
+                               "- theme: \"light\" or \"dark\".\n"
+                               "- resizable: true if the window can be resized.\n"
+                               "\n" + WIDGET_DOC.strip())
     def window(line, title, options=None):
         return gui.window(line, title, options)
 

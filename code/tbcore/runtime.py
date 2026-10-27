@@ -1759,8 +1759,14 @@ def make_error_class(name: str, base: TBClass | None, doc: str) -> TBClass:
 
 ERROR_CLASS = make_error_class(
     "Error", None,
-    "The base class of every error. Fields: message, line, file, kind, stack, plus any extra fields. "
-    "throw Error(\"msg\") or throw Error(\"msg\", {\"code\": 7}); make your own with class MyError extends Error { }.",
+    "The base class of every error.\n"
+    "\n"
+    "Fields:\n"
+    "- message, line, file, kind and stack\n"
+    "- any extra fields you gave it\n"
+    "\n"
+    "Throw one with throw Error(\"msg\") or throw Error(\"msg\", {\"code\": 7}). "
+    "Make your own with class MyError extends Error { }.",
 )
 ERROR_CLASSES: dict[str, TBClass] = {"Error": ERROR_CLASS}
 for _name, _doc in (

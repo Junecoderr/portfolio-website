@@ -767,10 +767,24 @@ def load(api):
 
     @m.fn("aes_gcm_encrypt", 2, 3, doc=(
         "aes_gcm_encrypt(key, text, aad?) -> text\n"
-        "Encrypt text with AES-GCM (authenticated: tampering is detected when decrypting). key is hex text of 32, "
-        "48 or 64 characters (crypto.random_bytes(32)). The answer is base64 text holding nonce + ciphertext + tag; "
-        "a fresh random 12-byte nonce is used every time. aad is optional extra text that must match when decrypting "
-        "(like a record id) but isn't encrypted. Pure Python: about 0.5 MB/s."))
+        "Encrypt text with AES-GCM. It is authenticated: any tampering is detected when decrypting.\n"
+        "\n"
+        "Arguments:\n"
+        "- key: hex text of 32, 48 or 64 characters. Make one with crypto.random_bytes(32).\n"
+        "- text: the text to encrypt.\n"
+        "- aad: optional extra text, like a record id. It is not encrypted,\n"
+        "  but it must match when decrypting.\n"
+        "\n"
+        "Returns:\n"
+        "- base64 text holding the nonce, the ciphertext and the tag.\n"
+        "- A fresh random 12-byte nonce is used every time.\n"
+        "\n"
+        "Pure Python, so it runs at about 0.5 MB/s.\n"
+        "\n"
+        "Example:\n"
+        "    let key = crypto.random_bytes(32)\n"
+        "    let secret = crypto.aes_gcm_encrypt(key, \"meet at noon\")\n"
+        "    say(crypto.aes_gcm_decrypt(key, secret))"))
     def aes_gcm_encrypt_fn(line, key, text, aad=None):
         key_b, data = aes_args(line, key, text, "crypto.aes_gcm_encrypt")
         nonce = os.urandom(12)
@@ -794,9 +808,15 @@ def load(api):
 
     @m.fn("aes_cbc_encrypt", 2, 3, doc=(
         "aes_cbc_encrypt(key, text, iv?) -> text\n"
-        "Encrypt text with AES-CBC and PKCS#7 padding (for talking to older systems; prefer aes_gcm_encrypt, which "
-        "also detects tampering). key is hex text (32/48/64 characters); iv is optional hex text of 32 characters "
-        "(random when left out). The answer is base64 text holding iv + ciphertext."))
+        "Encrypt text with AES-CBC and PKCS#7 padding. Use it to talk to older systems.\n"
+        "Prefer aes_gcm_encrypt(), which also detects tampering.\n"
+        "\n"
+        "Arguments:\n"
+        "- key: hex text of 32, 48 or 64 characters.\n"
+        "- text: the text to encrypt.\n"
+        "- iv: optional hex text of 32 characters (default: random).\n"
+        "\n"
+        "Returns base64 text holding the iv and then the ciphertext."))
     def aes_cbc_encrypt_fn(line, key, text, iv=None):
         fn = "crypto.aes_cbc_encrypt"
         key_b, data = aes_args(line, key, text, fn)
@@ -865,8 +885,12 @@ def load(api):
 
     @m.fn("hmac", 2, 3, doc=(
         "hmac(key, text, hash?) -> text\n"
-        "A keyed signature (HMAC) of text as hex; hash is sha256 (default), sha1, sha384, sha512 or md5. Compare it "
-        "with hash.compare() so timing can't leak the answer."))
+        "A keyed signature (HMAC) of text, as hex. Compare it with hash.compare(),\n"
+        "so timing can't leak the answer.\n"
+        "\n"
+        "Options:\n"
+        "- hash: the hash to use (default: sha256). One of:\n"
+        "  - sha256, sha1, sha384, sha512 or md5"))
     def hmac_fn(line, key, text, algo="sha256"):
         fn = "crypto.hmac"
         name = wrap(line, fn, lambda: hash_name(check_type(line, algo, "text", fn, "hash"), fn))
@@ -898,8 +922,13 @@ def load(api):
 
     @m.fn("totp", 1, 3, doc=(
         "totp(secret, time?, options?) -> text\n"
-        "The 6-digit one-time code an authenticator app shows right now (or at time, a timestamp) for a base32 "
-        "secret (the text behind the QR code). options: {\"digits\": 6, \"period\": 30, \"hash\": \"sha1\"}."))
+        "The 6-digit one-time code an authenticator app shows right now.\n"
+        "secret is the base32 text behind the QR code. time is an optional timestamp to use instead of now.\n"
+        "\n"
+        "Options:\n"
+        "- digits: how long the code is (default: 6).\n"
+        "- period: seconds each code lasts (default: 30).\n"
+        "- hash: the hash to use (default: \"sha1\")."))
     def totp(line, secret, when=None, options=None):
         fn = "crypto.totp"
         check_type(line, secret, "text", fn, "secret")
@@ -909,8 +938,12 @@ def load(api):
 
     @m.fn("verify_totp", 2, 4, doc=(
         "verify_totp(secret, code, time?, options?) -> bool\n"
-        "True if code is the current one-time code for the secret, or the one just before or after (clocks "
-        "drift). Compared in constant time. options as for totp(), plus \"window\" (steps either side, default 1)."))
+        "True if code is the current one-time code for the secret.\n"
+        "The code just before or after also counts, because clocks drift. It is compared in constant time.\n"
+        "\n"
+        "Options:\n"
+        "- digits, period, hash: as for totp().\n"
+        "- window: how many steps either side to accept (default: 1)."))
     def verify_totp(line, secret, code, when=None, options=None):
         fn = "crypto.verify_totp"
         check_type(line, secret, "text", fn, "secret")
@@ -992,11 +1025,23 @@ def load(api):
 
     @m.fn("jwt_verify", 2, 3, doc=(
         "jwt_verify(token, key, options?) -> map\n"
-        "Check a JWT's signature and times, and give back its payload. key is the shared secret (HS256/384/512) or "
-        "a PEM public key or certificate (RS256/384/512, checked with pure-Python RSA). A bad signature, "
-        "\"alg\": \"none\", an expired token (exp) or one not valid yet (nbf) gives a catchable error with "
-        "err.reason = \"signature\", \"alg\", \"expired\" or \"not_yet\". options: {\"leeway\": seconds (default 60), "
-        "\"now\": timestamp, \"algs\": [\"HS256\"] to allow only some algorithms}."))
+        "Check a JWT's signature and times, and give back its payload.\n"
+        "\n"
+        "The key:\n"
+        "- For HS256, HS384 or HS512: the shared secret.\n"
+        "- For RS256, RS384 or RS512: a PEM public key or certificate (checked with pure-Python RSA).\n"
+        "\n"
+        "Options:\n"
+        "- leeway: seconds of clock difference to allow (default: 60).\n"
+        "- now: a timestamp to use as the current time.\n"
+        "- algs: a list like [\"HS256\"] to allow only some algorithms.\n"
+        "\n"
+        "Errors:\n"
+        "Each one is catchable, and err.reason says which:\n"
+        "- \"signature\": the signature is bad.\n"
+        "- \"alg\": the token says \"alg\": \"none\" (or an algorithm you did not allow).\n"
+        "- \"expired\": the token has expired (its exp time).\n"
+        "- \"not_yet\": the token is not valid yet (its nbf time)."))
     def jwt_verify(line, token, key, options=None):
         fn = "crypto.jwt_verify"
         header, payload, signature, signing = jwt_parts(line, token, fn)
@@ -1042,8 +1087,15 @@ def load(api):
 
     @m.fn("jwt_decode", 1, doc=(
         "jwt_decode(token) -> map\n"
-        "Read a JWT WITHOUT checking its signature: {\"header\", \"payload\", \"alg\", \"expired\", \"verified\": "
-        "false}. Good for a look inside; never trust the payload without jwt_verify()."))
+        "Read a JWT WITHOUT checking its signature. Good for a look inside.\n"
+        "Never trust the payload without jwt_verify().\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"header\": the token's header map.\n"
+        "- \"payload\": the token's payload map.\n"
+        "- \"alg\": the algorithm the header names.\n"
+        "- \"expired\": true if its exp time has passed.\n"
+        "- \"verified\": always false."))
     def jwt_decode(line, token):
         header, payload, _sig, _signing = jwt_parts(line, token, "crypto.jwt_decode")
         exp = payload.get("exp")
@@ -1085,9 +1137,17 @@ def load(api):
 
     @m.fn("rsa_verify", 3, 4, doc=(
         "rsa_verify(text, signature, public_key, hash?) -> bool\n"
-        "True if signature (base64 or hex text) is a valid RSA PKCS#1 v1.5 signature of text with the given PEM "
-        "public key (-----BEGIN PUBLIC KEY-----, RSA PUBLIC KEY, or a CERTIFICATE); hash is sha256 (default), "
-        "sha1, sha384 or sha512. Pure Python (pow()), no OpenSSL."))
+        "True if signature is a valid RSA PKCS#1 v1.5 signature of text.\n"
+        "Pure Python (pow()), no OpenSSL.\n"
+        "\n"
+        "Arguments:\n"
+        "- signature: base64 or hex text.\n"
+        "- public_key: a PEM public key. One of:\n"
+        "  - a PUBLIC KEY block (-----BEGIN PUBLIC KEY-----)\n"
+        "  - an RSA PUBLIC KEY block\n"
+        "  - a CERTIFICATE\n"
+        "- hash: the hash used (default: sha256). One of:\n"
+        "  - sha256, sha1, sha384 or sha512"))
     def rsa_verify(line, text, signature, public_key, algo="sha256"):
         fn = "crypto.rsa_verify"
         data = text_or_bytes(line, text, fn, "text")
@@ -1103,8 +1163,13 @@ def load(api):
 
     @m.fn("public_key", 1, doc=(
         "public_key(pem) -> map\n"
-        "Read a PEM public key (or the key inside a certificate): {\"kind\": \"rsa\"/\"ec\"/\"ed25519\", \"bits\", "
-        "and for RSA \"n\" (hex) and \"e\", for EC \"curve\"}."))
+        "Read a PEM public key, or the key inside a certificate.\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"kind\": \"rsa\", \"ec\" or \"ed25519\".\n"
+        "- \"bits\": the key size.\n"
+        "- \"n\" (hex) and \"e\": for RSA keys.\n"
+        "- \"curve\": for EC keys."))
     def public_key_fn(line, pem):
         fn = "crypto.public_key"
         if not isinstance(pem, (bytes, bytearray)):
@@ -1114,12 +1179,24 @@ def load(api):
 
     @m.fn("x509_parse", 1, 2, doc=(
         "x509_parse(pem_or_der, now?) -> map\n"
-        "Read an X.509 certificate (PEM text, or DER as base64/hex text): {\"subject\" and \"issuer\" (maps with CN, "
-        "O, C... and \"text\"), \"common_name\", \"dns_names\", \"sans\" (dns/ip/email/uri), \"not_before\", "
-        "\"not_after\", \"valid_now\", \"expired\", \"days_left\", \"is_ca\", \"self_signed\", \"key_usage\", "
-        "\"ext_key_usage\", \"signature_algorithm\", \"public_key\" (kind, bits), \"serial\", "
-        "\"fingerprint_sha256\" / \"_sha1\" / \"_md5\" (colon hex), \"extensions\", \"pem\"}. now is an optional "
-        "timestamp to judge validity against."))
+        "Read an X.509 certificate. Give it PEM text, or DER as base64 or hex text.\n"
+        "now is an optional timestamp to judge validity against.\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"subject\", \"issuer\": maps with CN, O, C... and \"text\".\n"
+        "- \"common_name\": the subject's CN.\n"
+        "- \"dns_names\": the host names the certificate covers.\n"
+        "- \"sans\": all alternative names (dns, ip, email, uri).\n"
+        "- \"not_before\", \"not_after\": when it starts and stops being valid.\n"
+        "- \"valid_now\", \"expired\", \"days_left\": its validity now (or at now).\n"
+        "- \"is_ca\", \"self_signed\": what kind of certificate it is.\n"
+        "- \"key_usage\", \"ext_key_usage\": what the key may be used for.\n"
+        "- \"signature_algorithm\": how it was signed.\n"
+        "- \"public_key\": a map with kind and bits.\n"
+        "- \"serial\": the serial number.\n"
+        "- \"fingerprint_sha256\", \"fingerprint_sha1\", \"fingerprint_md5\": colon hex.\n"
+        "- \"extensions\": the names of its extensions, sorted.\n"
+        "- \"pem\": the certificate as PEM text."))
     def x509_parse(line, pem, now=None):
         fn = "crypto.x509_parse"
         if not isinstance(pem, (bytes, bytearray)):

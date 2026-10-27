@@ -942,12 +942,26 @@ def load(api):
     )
     m.value("MAX_PACKETS", MAX_PACKETS, doc="The most packets pcap.read() will load from one file.")
 
-    @m.fn("read", 1, 2, doc="read(path, limit?) -> list\nEvery packet in a pcap or pcapng file (the first limit "
-                            "of them if given) as maps: {\"number\", \"time\", \"when\", \"length\", \"protocol\" "
-                            "(tcp, udp, icmp, arp, ...), \"src\", \"dst\", \"sport\", \"dport\", \"flags\" (TCP), "
-                            "\"ttl\", \"app\" (dns, http, tls, ssh, ...), \"dns\"/\"http\"/\"tls\"/\"arp\"/\"icmp\" "
-                            "detail maps, \"payload\" (bytes), \"payload_length\", \"summary\" (one readable line) "
-                            "and \"raw\" (the whole frame). Fails if the file isn't a capture.")
+    @m.fn("read", 1, 2, doc=(
+        "read(path, limit?) -> list\n"
+        "Every packet in a pcap or pcapng file, as a list of maps. Fails if the file isn't a capture.\n"
+        "\n"
+        "Arguments:\n"
+        "- limit: read only the first limit packets.\n"
+        "\n"
+        "Fields of each packet:\n"
+        "- \"number\", \"time\", \"when\", \"length\"\n"
+        "- \"protocol\": like tcp, udp, icmp or arp.\n"
+        "- \"src\", \"dst\": the addresses.\n"
+        "- \"sport\", \"dport\": the ports.\n"
+        "- \"flags\": the TCP flags.\n"
+        "- \"ttl\"\n"
+        "- \"app\": the application protocol, like dns, http, tls or ssh.\n"
+        "- \"dns\", \"http\", \"tls\", \"arp\", \"icmp\": detail maps for that protocol.\n"
+        "- \"payload\": the payload bytes.\n"
+        "- \"payload_length\": the size of the payload.\n"
+        "- \"summary\": one readable line.\n"
+        "- \"raw\": the whole frame."))
     def read(line, path, limit=None):
         if limit is not None:
             limit = check_type(line, limit, "whole", "pcap.read", "limit")
@@ -986,51 +1000,92 @@ def load(api):
             fail(line, f"'{path}' isn't a pcap or pcapng capture.", path=path)
         return capture_format(head)
 
-    @m.fn("flows", 1, doc="flows(packets) -> list\nGroup packets into conversations (same protocol, addresses "
-                          "and ports, both directions), oldest first: {\"protocol\", \"src\", \"sport\", \"dst\", "
-                          "\"dport\", \"packets\", \"bytes\", \"client_bytes\", \"server_bytes\", \"first\", "
-                          "\"last\", \"first_when\", \"last_when\", \"duration\", \"flags\", \"app\", \"service\", "
-                          "\"names\" (DNS names, HTTP hosts, SNI seen), \"state\" (TCP: established, refused, no_reply, "
-                          "half_open or other)}.")
+    @m.fn("flows", 1, doc=(
+        "flows(packets) -> list\n"
+        "Group packets into conversations, oldest first. A conversation is one protocol, addresses and ports,\n"
+        "in both directions.\n"
+        "\n"
+        "Fields of each flow:\n"
+        "- \"protocol\", \"src\", \"sport\", \"dst\", \"dport\"\n"
+        "- \"packets\", \"bytes\", \"client_bytes\", \"server_bytes\"\n"
+        "- \"first\", \"last\": the first and last timestamps.\n"
+        "- \"first_when\", \"last_when\": the same times as text.\n"
+        "- \"duration\"\n"
+        "- \"flags\", \"app\", \"service\"\n"
+        "- \"names\": DNS names, HTTP hosts and SNI names seen.\n"
+        "- \"state\": for TCP, one of:\n"
+        "  - \"established\", \"refused\", \"no_reply\", \"half_open\" or \"other\""))
     def flows(line, packets):
         return build_flows(check_packets(line, packets, "pcap.flows"))
 
-    @m.fn("top_talkers", 1, 2, doc="top_talkers(packets, n?) -> list\nThe busiest addresses by bytes (default top 10): "
-                                   "{\"ip\", \"packets\", \"bytes\", \"sent\", \"received\", \"peers\"}.")
+    @m.fn("top_talkers", 1, 2, doc=(
+        "top_talkers(packets, n?) -> list\n"
+        "The busiest addresses by bytes (default: top 10).\n"
+        "\n"
+        "Fields of each address:\n"
+        "- \"ip\", \"packets\", \"bytes\", \"sent\", \"received\", \"peers\""))
     def talkers(line, packets, n=10):
         n = check_type(line, n, "whole", "pcap.top_talkers", "n")
         return top_talkers(check_packets(line, packets, "pcap.top_talkers"), n)
 
-    @m.fn("dns_queries", 1, doc="dns_queries(packets) -> list\nEvery DNS question asked, with the answers that came "
-                                "back: {\"time\", \"when\", \"src\", \"dst\", \"name\", \"type\", \"answers\" (list of "
-                                "values), \"rcode\", \"answered\"}.")
+    @m.fn("dns_queries", 1, doc=(
+        "dns_queries(packets) -> list\n"
+        "Every DNS question asked, with the answers that came back.\n"
+        "\n"
+        "Fields of each query:\n"
+        "- \"time\", \"when\", \"src\", \"dst\", \"name\", \"type\"\n"
+        "- \"answers\": a list of the values that came back.\n"
+        "- \"rcode\", \"answered\""))
     def dns_q(line, packets):
         return dns_queries(check_packets(line, packets, "pcap.dns_queries"))
 
-    @m.fn("http_requests", 1, doc="http_requests(packets) -> list\nEvery plain HTTP request: {\"time\", \"when\", "
-                                  "\"src\", \"dst\", \"dport\", \"method\", \"host\", \"path\", \"url\", "
-                                  "\"user_agent\", \"headers\", \"content_type\"}.")
+    @m.fn("http_requests", 1, doc=(
+        "http_requests(packets) -> list\n"
+        "Every plain HTTP request.\n"
+        "\n"
+        "Fields of each request:\n"
+        "- \"time\", \"when\", \"src\", \"dst\", \"dport\"\n"
+        "- \"method\", \"host\", \"path\", \"url\"\n"
+        "- \"user_agent\", \"headers\", \"content_type\""))
     def http_r(line, packets):
         return http_requests(check_packets(line, packets, "pcap.http_requests"))
 
-    @m.fn("sni", 1, doc="sni(packets) -> list\nThe server names from TLS Client Hellos (what HTTPS connections are "
-                        "for, even though the traffic is encrypted): {\"time\", \"when\", \"src\", \"dst\", \"dport\", "
-                        "\"sni\", \"version\", \"alpn\"}.")
+    @m.fn("sni", 1, doc=(
+        "sni(packets) -> list\n"
+        "The server names from TLS Client Hellos. They show what HTTPS connections are for,\n"
+        "even though the traffic is encrypted.\n"
+        "\n"
+        "Fields of each hello:\n"
+        "- \"time\", \"when\", \"src\", \"dst\", \"dport\"\n"
+        "- \"sni\": the server name.\n"
+        "- \"version\", \"alpn\""))
     def sni(line, packets):
         return sni_list(check_packets(line, packets, "pcap.sni"))
 
-    @m.fn("port_scans", 1, 2, doc="port_scans(packets, min_ports?) -> list\nSources that sent bare TCP SYNs to many "
-                                  "ports of one host (default 10 or more): {\"src\", \"dst\", \"ports\", \"count\", "
-                                  "\"open_ports\" (the ones that answered SYN-ACK), \"first_when\", \"last_when\", "
-                                  "\"duration\"}.")
+    @m.fn("port_scans", 1, 2, doc=(
+        "port_scans(packets, min_ports?) -> list\n"
+        "Sources that sent bare TCP SYNs to many ports of one host (default: 10 or more ports).\n"
+        "\n"
+        "Fields of each scan:\n"
+        "- \"src\", \"dst\", \"ports\", \"count\"\n"
+        "- \"open_ports\": the ports that answered SYN-ACK.\n"
+        "- \"first_when\", \"last_when\", \"duration\""))
     def scans(line, packets, min_ports=10):
         min_ports = check_type(line, min_ports, "whole", "pcap.port_scans", "min_ports")
         return port_scans(check_packets(line, packets, "pcap.port_scans"), max(min_ports, 1))
 
-    @m.fn("summary", 1, doc="summary(path_or_packets) -> map\nAn overview of a capture: {\"format\", \"packets\", "
-                            "\"bytes\", \"first_when\", \"last_when\", \"duration\", \"hosts\", \"flows\", "
-                            "\"protocols\" (name -> count), \"apps\", \"ports\" (top destination ports), "
-                            "\"top_talkers\", \"dns_queries\", \"http_requests\", \"tls_hellos\", \"port_scans\"}.")
+    @m.fn("summary", 1, doc=(
+        "summary(path_or_packets) -> map\n"
+        "An overview of a capture.\n"
+        "\n"
+        "Fields:\n"
+        "- \"format\", \"packets\", \"bytes\"\n"
+        "- \"first_when\", \"last_when\", \"duration\"\n"
+        "- \"hosts\", \"flows\"\n"
+        "- \"protocols\": a map of name -> count.\n"
+        "- \"apps\"\n"
+        "- \"ports\": the top destination ports.\n"
+        "- \"top_talkers\", \"dns_queries\", \"http_requests\", \"tls_hellos\", \"port_scans\""))
     def summary(line, target):
         if isinstance(target, list):
             return summary_of(check_packets(line, target, "pcap.summary"), "packets")

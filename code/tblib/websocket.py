@@ -395,9 +395,19 @@ def load(api):
 
     @m.fn("connect", 1, 2, doc=(
         "connect(url, options?) -> ws\n"
-        "Open a WebSocket to ws://host:port/path or wss://... (TLS). options: {\"headers\": {name: value} "
-        "(for tokens), \"timeout\": 10 (seconds to connect and complete the handshake), \"ca_file\": a PEM "
-        "file to trust, \"insecure\": true to skip certificate checks (testing only)}."))
+        "Open a WebSocket to ws://host:port/path, or to wss://... (TLS).\n"
+        "\n"
+        "Options:\n"
+        "- headers: a map of {name: value} to send, for tokens.\n"
+        "- timeout: seconds to connect and complete the handshake (default: 10).\n"
+        "- ca_file: a PEM file of certificates to trust.\n"
+        "- insecure: true to skip certificate checks (testing only).\n"
+        "\n"
+        "Example:\n"
+        "    let ws = websocket.connect(\"wss://example.com/chat\")\n"
+        "    ws.send(\"hello\")\n"
+        "    say(ws.receive(5))\n"
+        "    ws.close()"))
     def connect_(line, url, options=None):
         api.need_desktop(line, "The websocket library")
         check_type(line, url, "text", "websocket.connect", "url")

@@ -426,14 +426,30 @@ def load(api):
         "injection or keylogging imports, odd entry points). Pure Python; also works in the playground on bytes.",
     )
 
-    @m.fn("parse", 1, doc="parse(path) -> map\nEverything pe knows about a file: {\"format\" (pe32/pe64), "
-                          "\"architecture\", \"machine\", \"is_dll\", \"is_driver\", \"is_dotnet\", \"is_signed\", "
-                          "\"subsystem\", \"timestamp\", \"compiled\", \"entry_point\", \"entry_hex\" (like \"0x401000\"), \"entry_section\", "
-                          "\"image_base\", \"sections\" (list of {name, virtual_address, virtual_size, raw_size, "
-                          "raw_offset, size, entropy, flags, readable, writable, executable}), \"imports\" "
-                          "(map dll -> list of names), \"import_count\", \"exports\" (list of names), "
-                          "\"export_name\", \"pdb\", \"directories\", \"overlay_size\", \"truncated\" (cut off), \"entropy\", \"size\" and "
-                          "\"indicators\" (list of {level, name, detail}). Fails if the file isn't a PE.")
+    @m.fn("parse", 1, doc=(
+        "parse(path) -> map\n"
+        "Everything pe knows about a file. Fails if the file isn't a PE.\n"
+        "\n"
+        "Fields:\n"
+        "- \"format\": pe32 or pe64.\n"
+        "- \"architecture\": the CPU type, like \"x86\" or \"x64\".\n"
+        "- \"machine\": the CPU's longer name, like \"x86-64 (64-bit)\".\n"
+        "- \"is_dll\", \"is_driver\", \"is_dotnet\", \"is_signed\": true or false.\n"
+        "- \"subsystem\"\n"
+        "- \"timestamp\", \"compiled\": when it was built, as a number and as text.\n"
+        "- \"entry_point\": the address where the program starts.\n"
+        "- \"entry_hex\": the same address in hex, like \"0x401000\".\n"
+        "- \"entry_section\": the section the entry point is in.\n"
+        "- \"image_base\"\n"
+        "- \"sections\": a list of maps with name, virtual_address, virtual_size, raw_size,\n"
+        "  raw_offset, size, entropy, flags, readable, writable and executable.\n"
+        "- \"imports\": a map of dll -> list of names.\n"
+        "- \"import_count\"\n"
+        "- \"exports\": a list of names.\n"
+        "- \"export_name\", \"pdb\", \"directories\", \"overlay_size\"\n"
+        "- \"truncated\": true if the file is cut off.\n"
+        "- \"entropy\", \"size\"\n"
+        "- \"indicators\": a list of {level, name, detail} findings."))
     def parse(line, path):
         data = _magic.read_file(line, path, "pe.parse", MAX_FILE)
         info = parse_or_fail(line, data, "pe.parse", path)

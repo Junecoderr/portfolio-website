@@ -31,6 +31,7 @@ import tb  # noqa: E402
 import name_guard  # noqa: E402
 import site_shell as shell  # noqa: E402
 import visuals  # noqa: E402
+from tbcore import docfmt  # noqa: E402
 
 EXAMPLES = Path(__file__).resolve().parent / "lib_examples"
 
@@ -86,6 +87,12 @@ def rich(text: str) -> str:
     """Escape doc text; `code` becomes <code>."""
     out = esc(text)
     return re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
+
+
+def doc_html(text: str) -> str:
+    """A doc string (summary, Options:/Fields:/... headings, - bullets,
+    Example: code) as HTML; see tbcore/docfmt.py and tblib/README.md."""
+    return docfmt.to_html(text)
 
 
 def first_sentence(text: str) -> str:
@@ -172,7 +179,7 @@ def lib_page(name: str, version: str) -> str:
     for f in d["functions"]:
         head, returns = signature_html(f["signature"], f["name"])
         ret = f'<span class="sig-returns">returns {esc(returns)}</span>' if returns else ""
-        doc = "".join(f"<p>{rich(p.strip())}</p>" for p in re.split(r"\n\s*\n", f["doc"]) if p.strip()) or "<p></p>"
+        doc = doc_html(f["doc"]) or "<p></p>"
         pic = visuals.function_html(name, f, desktop=name in DESKTOP_ONLY)
         if name == "gui" and f["name"] == "window":
             pic += gui_subs_html()
@@ -195,7 +202,7 @@ def lib_page(name: str, version: str) -> str:
             code = f"<code>{esc(name)}.{esc(v['name'])}</code>"
             val = f"<em>{esc(shown)}</em>" if name in NO_VALUES else f"<code>{esc(shown)}</code>"
             pic = visuals.value_html(name, v, hide=name in NO_VALUES)
-            rows.append(f"            <tr id=\"value-{esc(v['name'])}\"><td>{code}</td><td>{val}</td><td>{rich(v['doc'])}{pic}</td></tr>")
+            rows.append(f"            <tr id=\"value-{esc(v['name'])}\"><td>{code}</td><td>{val}</td><td>{doc_html(v['doc'])}{pic}</td></tr>")
         values = f"""      <section id="values">
         <h2>Values</h2>
         <div class="table-wrap" role="region" tabindex="0" aria-label="Values of the {esc(name)} library">
@@ -284,11 +291,11 @@ def index_page(version: str) -> str:
       </section>""")
     b = tb.describe_builtins()
     brows = "\n".join(
-        f'            <tr><td><code>{esc(f["signature"])}</code></td><td>{rich(f["doc"])}{visuals.builtin_html(f)}</td></tr>' for f in b["functions"])
+        f'            <tr><td><code>{esc(f["signature"])}</code></td><td>{doc_html(f["doc"])}{visuals.builtin_html(f)}</td></tr>' for f in b["functions"])
     mtabs = []
     for kind, methods in b["methods"].items():
         rows = "\n".join(
-            f'              <tr><td><code>.{esc(m["signature"])}</code></td><td>{rich(m["doc"])}{visuals.method_html(kind, m)}</td></tr>' for m in methods)
+            f'              <tr><td><code>.{esc(m["signature"])}</code></td><td>{doc_html(m["doc"])}{visuals.method_html(kind, m)}</td></tr>' for m in methods)
         mtabs.append(f"""        <h3 id="methods-{kind}">Methods on {esc(PLURAL.get(kind, kind))}</h3>
         <div class="table-wrap" role="region" tabindex="0" aria-label="Methods on {esc(kind)} values">
           <table class="kw-table">

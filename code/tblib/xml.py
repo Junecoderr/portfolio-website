@@ -215,9 +215,13 @@ def load(api):
 
     @m.fn("stringify", 1, 2, doc=(
         "stringify(node, options?) -> text\n"
-        "Turn a node (from parse, or a plain map {\"tag\": \"item\", \"attrs\": {...}, \"children\": [...], "
-        "\"text\": \"...\"}) into XML text. options: {\"indent\": \"  \" (default; false for one line), "
-        "\"declaration\": true} to add the <?xml ...?> header. Text is escaped for you."))
+        "Turn a node into XML text. Text is escaped for you.\n"
+        "The node can come from parse, or be a plain map:\n"
+        "{\"tag\": \"item\", \"attrs\": {...}, \"children\": [...], \"text\": \"...\"}.\n"
+        "\n"
+        "Options:\n"
+        "- indent: the indent text (default: \"  \"). false puts it all on one line.\n"
+        "- declaration: true adds the <?xml ...?> header."))
     def stringify_(line, node, options=None):
         return stringify(line, node, options)
 
@@ -274,7 +278,14 @@ def load(api):
                 kids.append(child if isinstance(child, str) else _tb.to_text(child))
         return {"tag": tag, "attrs": dict(attrs or {}), "children": kids, "text": text}
 
-    @m.fn("escape", 1, doc="escape(text) -> text\nText made safe inside XML: < > & become &lt; &gt; &amp;.")
+    @m.fn("escape", 1, doc=(
+        "escape(text) -> text\n"
+        "Text made safe inside XML.\n"
+        "\n"
+        "Changes:\n"
+        "- < becomes &lt;\n"
+        "- > becomes &gt;\n"
+        "- & becomes &amp;"))
     def escape(line, value):
         check_type(line, value, "text", "xml.escape", "text")
         return _escape(value)

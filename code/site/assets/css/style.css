@@ -895,6 +895,15 @@ pre.cmd code::before { content: "> "; color: var(--ink-faint); user-select: none
 .sig-body p { margin-bottom: 0.75rem; }
 .sig-body pre.tb-code { margin-top: 0.5rem; }
 .sig-body .runner { margin-bottom: 0; }
+/* structured doc strings: Options:/Fields:/Returns: headings, bullet lists, examples */
+.doc-h { margin: 0.9rem 0 0.3rem; font-size: 0.9rem; font-weight: 700; color: var(--ink); }
+.doc-list { margin: 0 0 0.75rem; padding-left: 1.2rem; }
+.doc-list li { margin: 0.2rem 0; line-height: 1.55; overflow-wrap: anywhere; }
+.doc-list li::marker { color: var(--ink-faint); }
+.doc-list .doc-list { margin: 0.15rem 0 0.25rem; }
+.doc-term { font-weight: 600; color: var(--accent-text); }
+.kw-table td > p:last-child, .kw-table td > .doc-list:last-child { margin-bottom: 0; }
+.kw-table td > p + p { margin-top: 0; }
 .kw-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 .kw-table th, .kw-table td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 .kw-table th { font-size: 0.85rem; color: var(--ink-soft); font-weight: 650; }

@@ -305,11 +305,22 @@ def load(api):
 
     @m.fn("extract", 1, 2, doc=(
         "extract(text, options?) -> map\n"
-        "Find every IOC in text: {\"ips\", \"domains\", \"urls\", \"emails\", \"md5\", \"sha1\", \"sha256\", \"cves\"}, "
-        "each a list without repeats, in the order they first appear. Defanged IOCs (hxxp://, [.], (.), [@]) are "
-        "found too and given back refanged; pass {\"refang\": false} to skip that. File names like report.pdf "
-        "are not counted as domains. Domains and IPs inside URLs and emails are listed as well. Email addresses keep "
-        "the case of the part before @. Message-ID / References header values are not counted as emails."))
+        "Find every IOC in text. Each list has no repeats, in the order the IOCs first appear.\n"
+        "\n"
+        "Fields:\n"
+        "- \"ips\", \"domains\", \"urls\", \"emails\"\n"
+        "- \"md5\", \"sha1\", \"sha256\"\n"
+        "- \"cves\"\n"
+        "\n"
+        "Options:\n"
+        "- refang: false skips refanging (default: true).\n"
+        "\n"
+        "What it finds:\n"
+        "- Defanged IOCs (hxxp://, [.], (.), [@]) are found too and given back refanged.\n"
+        "- File names like report.pdf are not counted as domains.\n"
+        "- Domains and IPs inside URLs and emails are listed as well.\n"
+        "- Email addresses keep the case of the part before @.\n"
+        "- Message-ID and References header values are not counted as emails."))
     def extract(line, text, options=None):
         check_type(line, text, "text", "ioc.extract", "text")
         refang = True

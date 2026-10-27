@@ -804,9 +804,15 @@ def load(api):
                        '    $c = /https?:\\/\\/[0-9.]+\\//\n  condition:\n    $a and ($b or $c)\n}',
             doc="A rule in the text form scan understands, to copy from.")
 
-    @m.fn("rule", 1, doc="rule(text) -> map\nParse one YARA-style rule into a rule map: {\"name\", \"tags\", "
-                         "\"meta\", \"strings\" (list of {\"name\", \"kind\", \"value\", flags}), \"condition\"}. "
-                         "Fails with a plain explanation if the rule is broken. For several rules use scan.rules().")
+    @m.fn("rule", 1, doc=(
+        "rule(text) -> map\n"
+        "Parse one YARA-style rule into a rule map. Fails with a plain explanation if the rule is broken.\n"
+        "For several rules use scan.rules().\n"
+        "\n"
+        "Fields:\n"
+        "- \"name\", \"tags\", \"meta\"\n"
+        "- \"strings\": a list of {\"name\", \"kind\", \"value\", flags} maps.\n"
+        "- \"condition\""))
     def rule(line, text):
         check_type(line, text, "text", "scan.rule", "text")
         rules = parse_rules_or_fail(line, text, "scan.rule")
@@ -834,9 +840,14 @@ def load(api):
     def check(line, rules):
         return rules_from(line, rules, "scan.check")
 
-    @m.fn("bytes", 2, doc="bytes(data, rules) -> list\nRun rules over bytes (or text). Gives back one map per rule "
-                          "that matched: {\"rule\", \"tags\", \"meta\", \"count\", \"strings\": [{\"name\", "
-                          "\"offset\", \"length\", \"data\"}]}. Empty list means no match.")
+    @m.fn("bytes", 2, doc=(
+        "bytes(data, rules) -> list\n"
+        "Run rules over bytes (or text). Gives back one map per rule that matched.\n"
+        "An empty list means no match.\n"
+        "\n"
+        "Fields of each match:\n"
+        "- \"rule\", \"tags\", \"meta\", \"count\"\n"
+        "- \"strings\": a list of {\"name\", \"offset\", \"length\", \"data\"} maps."))
     def scan_data(line, data, rules):
         raw = _magic.to_bytes(line, data, "scan.bytes")
         return scan_bytes(rules_from(line, rules, "scan.bytes"), raw)
@@ -851,10 +862,14 @@ def load(api):
             match["path"] = path
         return found
 
-    @m.fn("folder", 2, 3, doc="folder(dir, rules, options?) -> list\nScan every file in a folder (and its "
-                              "sub-folders unless options {\"recursive\": false}); skips files bigger than "
-                              "options \"max_size\" (default 32 MB) and ones it can't read. Gives back the "
-                              "matches from every file, each with \"path\".")
+    @m.fn("folder", 2, 3, doc=(
+        "folder(dir, rules, options?) -> list\n"
+        "Scan every file in a folder and its sub-folders. Gives back the matches from every file,\n"
+        "each with \"path\". Files it can't read are skipped.\n"
+        "\n"
+        "Options:\n"
+        "- recursive: false scans only the folder itself, not its sub-folders.\n"
+        "- max_size: skip files bigger than this many bytes (default: 32 MB)."))
     def scan_folder(line, folder, rules, options=None):
         check_type(line, folder, "text", "scan.folder", "dir")
         rule_list = rules_from(line, rules, "scan.folder")
@@ -890,9 +905,17 @@ def load(api):
                     found.append(match)
         return found
 
-    @m.fn("strings", 1, 3, doc="strings(data, min?, limit?) -> list\nReadable strings in bytes, text or a file path: "
-                               "ASCII runs and UTF-16 (Windows wide) runs of at least min characters (default 4), "
-                               "as {\"text\", \"offset\", \"encoding\"} maps sorted by offset. limit caps the count.")
+    @m.fn("strings", 1, 3, doc=(
+        "strings(data, min?, limit?) -> list\n"
+        "Readable strings in bytes, text or a file path, sorted by offset.\n"
+        "It finds ASCII runs and UTF-16 (Windows wide) runs.\n"
+        "\n"
+        "Arguments:\n"
+        "- min: the fewest characters a string can have (default: 4).\n"
+        "- limit: the most strings to give back.\n"
+        "\n"
+        "Fields of each string:\n"
+        "- \"text\", \"offset\", \"encoding\""))
     def strings(line, data, minimum=4, limit=None):
         minimum = check_type(line, minimum, "whole", "scan.strings", "min")
         if minimum < 1:
@@ -905,10 +928,13 @@ def load(api):
             raw = _magic.to_bytes(line, data, "scan.strings")
         return extract_strings(raw, minimum, limit)
 
-    @m.fn("file_type", 1, doc="file_type(path) -> map\nWhat a file really is, from its first bytes (not its name): "
-                              "{\"type\" (pe, elf, macho, pdf, zip, docx, png, pcap, evtx, script, text, unknown...), "
-                              "\"description\", \"mime\", \"extension\", \"executable\", \"size\"}. Same as "
-                              "binary.file_type().")
+    @m.fn("file_type", 1, doc=(
+        "file_type(path) -> map\n"
+        "What a file really is, from its first bytes (not its name). Same as binary.file_type().\n"
+        "\n"
+        "Fields:\n"
+        "- \"type\": like pe, elf, macho, pdf, zip, docx, png, pcap, evtx, script, text or unknown.\n"
+        "- \"description\", \"mime\", \"extension\", \"executable\", \"size\""))
     def file_type(line, path):
         return _magic.file_type(line, path)
 

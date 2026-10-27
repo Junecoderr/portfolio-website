@@ -1725,17 +1725,46 @@ def load(api):
 
     @m.fn("rule", 1, doc=(
         "rule(map) -> map\n"
-        "Check a rule and fill in its defaults. A rule is a map:\n"
-        "  \"name\": what to call the alert; \"level\": informational/low/medium (default)/high/critical;\n"
-        "  \"where\": {field: value, ...} - every field must match. A value can be exact text (any case), text "
-        "with * and ? wildcards, \"re:pattern\" for a regular expression, a number, nil (field missing), or a list "
-        "(any of them). Add a modifier to the field name: \"path|contains\", \"agent|startswith\", "
-        "\"file|endswith\", \"bytes|gt\", \"ip|cidr\" (\"10.0.0.0/8\"), \"cmd|re\", \"x|exists\", \"cmd|base64offset|contains\", "
-        "\"user|cased\", \"a|fieldref\" (equal to another field). where can also "
-        "be a function that gets a record and gives back true or false;\n"
-        "  \"unless\": {field: value} - skip records that match this (to remove false positives);\n"
-        "  \"count\": how many matches make an alert (default 1); \"within\": seconds (or \"5m\") they must fall in;\n"
-        "  \"by\": a field (or list of fields) to count separately, like \"ip\"; \"fields\": fields to copy into the alert."))
+        "Check a rule and fill in its defaults. A rule is a map that says what suspicious looks like.\n"
+        "\n"
+        "Fields:\n"
+        "- name: what to call the alert.\n"
+        "- level: how serious the alert is (default: \"medium\"). One of:\n"
+        "  - \"informational\", \"low\", \"medium\", \"high\" or \"critical\"\n"
+        "- where: a map of {field: value, ...}. Every field must match.\n"
+        "  It can also be a function that gets a record and gives back true or false.\n"
+        "- unless: a map of {field: value}. Records that match it are skipped, to remove false positives.\n"
+        "- count: how many matches make an alert (default: 1).\n"
+        "- within: the seconds (or text like \"5m\") the matches must fall in.\n"
+        "- by: a field (or a list of fields) to count separately, like \"ip\".\n"
+        "- fields: fields to copy into the alert.\n"
+        "\n"
+        "Values in where:\n"
+        "- Exact text, in any case.\n"
+        "- Text with * and ? wildcards.\n"
+        "- \"re:pattern\" for a regular expression.\n"
+        "- A number.\n"
+        "- nil, meaning the field is missing.\n"
+        "- A list: any of its values matches.\n"
+        "\n"
+        "Modifiers (add one to the field name):\n"
+        "- \"path|contains\": the text appears anywhere.\n"
+        "- \"agent|startswith\", \"file|endswith\": the start or end of the text.\n"
+        "- \"bytes|gt\": a number bigger than the value.\n"
+        "- \"ip|cidr\": an IP inside a range, like \"10.0.0.0/8\".\n"
+        "- \"cmd|re\": a regular expression.\n"
+        "- \"x|exists\": the field is there.\n"
+        "- \"cmd|base64offset|contains\": the value hidden in Base64.\n"
+        "- \"user|cased\": the case must match too.\n"
+        "- \"a|fieldref\": equal to another field.\n"
+        "\n"
+        "Example:\n"
+        "    let r = detect.rule({\n"
+        "      \"name\": \"Root login\",\n"
+        "      \"level\": \"high\",\n"
+        "      \"where\": {\"user\": \"root\", \"cmd|contains\": \"passwd\"},\n"
+        "    })\n"
+        "    say(r.count)"))
     def rule(line, spec):
         try:
             result = normalise_rule(spec)
@@ -1746,13 +1775,28 @@ def load(api):
 
     @m.fn("run", 2, doc=(
         "run(rules, records) -> list\n"
-        "Run one rule or a list of rules over log records and give back the alerts, most serious first. "
-        "Each alert is a map: {\"rule\", \"level\", \"by\" (the value of the by field, like the IP), \"count\", "
-        "\"first\", \"last\" (timestamps), \"first_when\", \"last_when\" (as text), \"description\", \"tags\", "
-        "\"records\" (the first few matching records)}, plus \"fields\" when the rule lists fields, \"value\" and "
-        "\"aggregation\" for Sigma min/max/avg/sum/count(field) rules, and \"rules\" for correlation rules. "
-        "With count and within, each burst of activity gives one alert. "
-        "A record's \"repeat\" field (from \"message repeated 3 times\") counts as that many records."))
+        "Run one rule or a list of rules over log records. Gives back the alerts, most serious first.\n"
+        "\n"
+        "Fields of each alert:\n"
+        "- \"rule\", \"level\": the rule's name and level.\n"
+        "- \"by\": the value of the by field, like the IP.\n"
+        "- \"count\": how many records matched.\n"
+        "- \"first\", \"last\": timestamps of the first and last match.\n"
+        "- \"first_when\", \"last_when\": the same times as text.\n"
+        "- \"description\", \"tags\": copied from the rule.\n"
+        "- \"records\": the first few matching records.\n"
+        "- \"fields\": only when the rule lists fields.\n"
+        "- \"value\", \"aggregation\": only for Sigma min/max/avg/sum/count(field) rules.\n"
+        "- \"rules\": only for correlation rules.\n"
+        "\n"
+        "Good to know:\n"
+        "- With count and within, each burst of activity gives one alert.\n"
+        "- A record's \"repeat\" field (from \"message repeated 3 times\") counts as that many records.\n"
+        "\n"
+        "Example:\n"
+        "    let r = detect.rule({\"name\": \"Root login\", \"where\": {\"user\": \"root\"}})\n"
+        "    let alerts = detect.run(r, [{\"user\": \"root\"}, {\"user\": \"Tanisha\"}])\n"
+        "    say(alerts[0].count)"))
     def run(line, rules, records):
         check_type(line, rules, "list|map", "detect.run", "rules")
         rules = [rules] if isinstance(rules, dict) else rules
@@ -1776,10 +1820,18 @@ def load(api):
 
     @m.fn("brute_force", 1, 3, doc=(
         "brute_force(records, attempts?, within?) -> list\n"
-        "Find password guessing: at least attempts failed logins (default 5) from one IP within within seconds "
-        "(default 600). Works on auth.log (SSH, sudo) and Windows 4625/4771 events, or any record with "
-        "success = false. Each alert also has \"users\" (the accounts tried) and \"success_after\": true if the "
-        "same IP then logged in successfully - that alert becomes critical, because the attacker got in."))
+        "Find password guessing: many failed logins from one IP in a short time.\n"
+        "\n"
+        "Options:\n"
+        "- attempts: how many failed logins make an alert (default: 5).\n"
+        "- within: the seconds those failures must fall in (default: 600).\n"
+        "\n"
+        "It works on auth.log (SSH, sudo) and Windows 4625/4771 events, or any record with success = false.\n"
+        "\n"
+        "Extra alert fields:\n"
+        "- \"users\": the accounts that were tried.\n"
+        "- \"success_after\": true if the same IP then logged in successfully.\n"
+        "  That alert becomes critical, because the attacker got in."))
     def brute_force(line, records, attempts=5, within=600):
         records = records_arg(line, records, "brute_force")
         attempts = check_type(line, attempts, "whole", "detect.brute_force", "attempts")
@@ -1825,10 +1877,20 @@ def load(api):
 
     @m.fn("port_scan", 1, 3, doc=(
         "port_scan(records, ports?, within?) -> list\n"
-        "Find port scans in connection or firewall logs: one source IP touching at least ports different "
-        "destination ports (default 10) within within seconds (default 60). Uses the fields src_ip / ip for the "
-        "source and dst_port (or dest_port, DestinationPort, dpt) for the destination; UFW and iptables lines "
-        "from the logs library have them. Alerts list the \"ports\" and \"targets\" seen."))
+        "Find port scans in connection or firewall logs: one source IP touching many different "
+        "destination ports.\n"
+        "\n"
+        "Options:\n"
+        "- ports: how many different destination ports make an alert (default: 10).\n"
+        "- within: the seconds those ports must fall in (default: 60).\n"
+        "\n"
+        "Fields it reads:\n"
+        "- src_ip or ip: the source.\n"
+        "- dst_port (or dest_port, DestinationPort, dpt): the destination port.\n"
+        "UFW and iptables lines from the logs library have these fields.\n"
+        "\n"
+        "Extra alert fields:\n"
+        "- \"ports\", \"targets\": the ports and destinations seen."))
     def port_scan(line, records, ports=10, within=60):
         records = records_arg(line, records, "port_scan")
         ports = check_type(line, ports, "whole", "detect.port_scan", "ports")
@@ -1960,16 +2022,40 @@ def load(api):
 
     @m.fn("sigma", 1, 2, doc=(
         "sigma(text_or_path, options?) -> map\n"
-        "Load a Sigma rule (the shared YAML format for detections) from a .yml file or from text, as a rule for "
-        "detect.run(). Supported: title, id, level, description, tags, logsource, fields, timeframe, and detection "
-        "with named selections (maps, lists of maps, keyword lists), every modifier (contains, startswith, endswith, "
-        "all, re with i/m/s, cased, cidr, gt/gte/lt/lte, exists, windash, base64, base64offset, utf16/utf16le/utf16be/"
-        "wide, fieldref, expand), wildcards * and ?, conditions with and, or, not, brackets, \"1 of selection*\", "
-        "\"all of them\", aggregations \"| count() by field > N\", \"| count(field) by other > N\", "
-        "\"| min/max/avg/sum(field) by other > N\" and \"| near other\", plus Sigma correlation rules (a file with "
-        "the rules and a correlation: document, --- separated). options: {\"placeholders\": {\"name\": [values]}} "
-        "fills %name% in |expand values. logsource limits the rule to matching record formats. Anything else "
-        "gives a clear error."))
+        "Load a Sigma rule (the shared YAML format for detections) from a .yml file or from text. "
+        "The result is a rule for detect.run().\n"
+        "\n"
+        "Supported Sigma fields:\n"
+        "- title, id, level, description, tags, fields, timeframe.\n"
+        "- logsource: limits the rule to matching record formats.\n"
+        "- detection: named selections (maps, lists of maps, keyword lists).\n"
+        "\n"
+        "Modifiers (all of them):\n"
+        "- contains, startswith, endswith, all.\n"
+        "- re (with i, m and s), cased, cidr.\n"
+        "- gt, gte, lt, lte, exists.\n"
+        "- windash, base64, base64offset.\n"
+        "- utf16, utf16le, utf16be, wide.\n"
+        "- fieldref, expand.\n"
+        "\n"
+        "Conditions:\n"
+        "- Wildcards * and ? in values.\n"
+        "- and, or, not and brackets.\n"
+        "- \"1 of selection*\" and \"all of them\".\n"
+        "\n"
+        "Aggregations:\n"
+        "- \"| count() by field > N\"\n"
+        "- \"| count(field) by other > N\"\n"
+        "- \"| min/max/avg/sum(field) by other > N\"\n"
+        "- \"| near other\"\n"
+        "\n"
+        "Sigma correlation rules work too: a file with the rules and a correlation: document, "
+        "separated by --- lines.\n"
+        "\n"
+        "Options:\n"
+        "- placeholders: a map {\"name\": [values]} that fills %name% in |expand values.\n"
+        "\n"
+        "Anything else gives a clear error."))
     def sigma(line, source, options=None):
         return load_sigma(line, source, "sigma", sigma_options(line, options, "sigma"))
 
@@ -1999,12 +2085,23 @@ def load(api):
 
     @m.fn("sigma_to_query", 2, 3, doc=(
         "sigma_to_query(rule, backend, options?) -> text\n"
-        "Write a rule (from detect.sigma() or detect.rule()) as a query for a SIEM: backend is \"splunk\" (SPL), "
-        "\"elastic\" (a Lucene query string for Kibana / Elasticsearch) or \"kql\" (Microsoft Sentinel). The "
-        "logsource picks the index, source type or table and the field names (EventID -> EventCode in Splunk, "
-        "Image -> NewProcessName in Sentinel...). options: {\"fields\": {sigma_name: siem_name}} to add field "
-        "mappings, \"table\" (KQL table / Splunk source / Lucene filter), \"index\" (Splunk). Aggregations become "
-        "| stats / | summarize; the elastic backend can't count, so it refuses those rules with a hint."))
+        "Write a rule (from detect.sigma() or detect.rule()) as a query for a SIEM.\n"
+        "\n"
+        "Backends:\n"
+        "- \"splunk\": SPL.\n"
+        "- \"elastic\": a Lucene query string for Kibana / Elasticsearch.\n"
+        "- \"kql\": Microsoft Sentinel.\n"
+        "\n"
+        "The rule's logsource picks the index, source type or table. It also picks the field names, "
+        "like EventID -> EventCode in Splunk or Image -> NewProcessName in Sentinel.\n"
+        "\n"
+        "Options:\n"
+        "- fields: a map {sigma_name: siem_name} that adds field mappings.\n"
+        "- table: the KQL table, Splunk source or Lucene filter.\n"
+        "- index: the Splunk index.\n"
+        "\n"
+        "Aggregations become | stats (Splunk) or | summarize (KQL). "
+        "The elastic backend can't count, so it refuses those rules with a hint."))
     def sigma_to_query_fn(line, rule, backend, options=None):
         check_type(line, rule, "map", "detect.sigma_to_query", "rule")
         check_type(line, backend, "text", "detect.sigma_to_query", "backend")

@@ -312,9 +312,12 @@ def load(api):
 
     @m.fn("render", 1, 3, doc=(
         "render(text, values?, options?) -> text\n"
-        "Fill the template with values (a map): template.render(\"Hi {{name}}!\", {\"name\": \"Tanisha\"}). "
-        "Values are HTML-escaped unless written {{{like this}}}, given the raw filter, or options is "
-        "{\"escape\": false} (for plain text, emails, config files)."))
+        "Fill the template with values (a map): template.render(\"Hi {{name}}!\", {\"name\": \"Tanisha\"}).\n"
+        "\n"
+        "Values are HTML-escaped, unless:\n"
+        "- they are written {{{like this}}},\n"
+        "- they are given the raw filter,\n"
+        "- or options is {\"escape\": false} (for plain text, emails or config files)."))
     def render(line, text, values=None, options=None):
         return do_render(line, text, values, options, "render")
 

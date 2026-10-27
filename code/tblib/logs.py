@@ -1105,9 +1105,14 @@ def load(api):
 
     @m.fn("parse_line", 1, 2, doc=(
         "parse_line(line, format?) -> map\n"
-        "Parse one log line into a record. format is \"auto\" (default), \"syslog\", \"auth\", \"apache\", "
-        "\"nginx\", \"json\", \"windows\" (one JSON event) or \"csv\" (gives {\"fields\": [...]}). "
-        "A line that doesn't fit becomes a \"text\" record with just time, message and raw."))
+        "Parse one log line into a record.\n"
+        "A line that doesn't fit becomes a \"text\" record with just time, message and raw.\n"
+        "\n"
+        "Formats:\n"
+        "- \"auto\": guess the format (the default).\n"
+        "- \"syslog\", \"auth\", \"apache\", \"nginx\", \"json\"\n"
+        "- \"windows\": one JSON event.\n"
+        "- \"csv\": gives {\"fields\": [...]}."))
     def parse_line(line, text, fmt="auto"):
         check_type(line, text, "text", "logs.parse_line", "line")
         fmt = check_format(line, fmt, "parse_line")
@@ -1126,10 +1131,21 @@ def load(api):
 
     @m.fn("read", 1, 3, doc=(
         "read(path, format?, options?) -> list\n"
-        "Read a log file into a list of records. format \"auto\" (default) looks at the start of the file and "
-        "picks the format for you. Files are read a line at a time, so big logs are fine. "
-        "options: {\"limit\": n} to stop after n records, {\"year\": 2024} for syslog lines (which have no year; "
-        "otherwise the most recent year that isn't in the future is used)."))
+        "Read a log file into a list of records. Files are read a line at a time, so big logs are fine.\n"
+        "\n"
+        "Arguments:\n"
+        "- format: the layout of the log (default: \"auto\").\n"
+        "  \"auto\" looks at the start of the file and picks the format for you.\n"
+        "- options: a map of extra settings, listed below.\n"
+        "\n"
+        "Options:\n"
+        "- limit: stop after this many records.\n"
+        "- year: the year for syslog lines, which have no year of their own.\n"
+        "  Without it, the most recent year that isn't in the future is used.\n"
+        "\n"
+        "Example:\n"
+        "    let records = logs.read(\"apps/data/auth.log\", \"auto\", {\"limit\": 4})\n"
+        "    say(records[0])"))
     def read(line, path, fmt="auto", options=None):
         path = path_arg(line, path, "read")
         fmt = check_format(line, fmt, "read")
@@ -1168,10 +1184,16 @@ def load(api):
 
     @m.fn("parse_time", 1, 2, doc=(
         "parse_time(text, year?) -> number or nil\n"
-        "A timestamp from the time formats logs use: ISO 8601 (2024-03-10T09:15:02Z), syslog (Mar 10 09:15:02), "
-        "Apache (10/Mar/2024:09:15:02 +0000), Windows (3/10/2024 9:15:02 AM, /Date(1710062102000)/) and Unix "
-        "seconds or milliseconds. Times without a time zone are taken as this computer's local time. nil if it "
-        "isn't a time."))
+        "Turn a time written in a log into a timestamp. Gives back nil if the text isn't a time.\n"
+        "\n"
+        "Formats it reads:\n"
+        "- ISO 8601, like 2024-03-10T09:15:02Z\n"
+        "- syslog, like Mar 10 09:15:02\n"
+        "- Apache, like 10/Mar/2024:09:15:02 +0000\n"
+        "- Windows, like 3/10/2024 9:15:02 AM or /Date(1710062102000)/\n"
+        "- Unix seconds or milliseconds.\n"
+        "\n"
+        "Times without a time zone are taken as this computer's local time."))
     def parse_time_fn(line, value, year=None):
         check_type(line, value, "text|number", "logs.parse_time", "text")
         if year is not None:

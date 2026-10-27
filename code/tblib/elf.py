@@ -370,13 +370,29 @@ def load(api):
         "UPX section names, ptrace/dlopen imports, odd interpreters). Pure Python; works on bytes in the playground.",
     )
 
-    @m.fn("parse", 1, doc="parse(path) -> map\nEverything elf knows about a file: {\"format\" (elf32/elf64), "
-                          "\"architecture\", \"machine\", \"type\" (executable, shared_object, relocatable, core), "
-                          "\"os_abi\", \"endian\", \"is_pie\", \"is_static\", \"is_stripped\", \"entry_point\", \"entry_hex\" (like \"0x401000\"), "
-                          "\"entry_section\", \"interpreter\", \"needed\" (libraries), \"soname\", \"rpath\", "
-                          "\"sections\" (list of {name, type, flags, address, offset, size, entropy, writable, "
-                          "executable}), \"segments\", \"imports\", \"exports\", \"entropy\", \"size\", \"truncated\" (cut off) and "
-                          "\"indicators\" (list of {level, name, detail}). Fails if the file isn't ELF.")
+    @m.fn("parse", 1, doc=(
+        "parse(path) -> map\n"
+        "Everything elf knows about a file. Fails if the file isn't ELF.\n"
+        "\n"
+        "Fields:\n"
+        "- \"format\": elf32 or elf64.\n"
+        "- \"architecture\": the CPU type, like \"x64\" or \"arm64\".\n"
+        "- \"machine\": the CPU's longer name, like \"x86-64\".\n"
+        "- \"type\": executable, shared_object, relocatable or core.\n"
+        "- \"os_abi\", \"endian\"\n"
+        "- \"is_pie\", \"is_static\", \"is_stripped\": true or false.\n"
+        "- \"entry_point\": the address where the program starts.\n"
+        "- \"entry_hex\": the same address in hex, like \"0x401000\".\n"
+        "- \"entry_section\": the section the entry point is in.\n"
+        "- \"interpreter\": the loader the program asks for.\n"
+        "- \"needed\": the libraries it needs.\n"
+        "- \"soname\", \"rpath\"\n"
+        "- \"sections\": a list of maps with name, type, flags, address, offset, size,\n"
+        "  entropy, writable and executable.\n"
+        "- \"segments\", \"imports\", \"exports\"\n"
+        "- \"entropy\", \"size\"\n"
+        "- \"truncated\": true if the file is cut off.\n"
+        "- \"indicators\": a list of {level, name, detail} findings."))
     def parse(line, path):
         data = _magic.read_file(line, path, "elf.parse", MAX_FILE)
         info = parse_or_fail(line, data, path)

@@ -2128,7 +2128,7 @@ BUILTIN_DOCS = {
     "keys": "keys(map) -> list\nThe map's keys, in order.",
     "int": "int(value) -> number\nThe whole-number part (3.9 gives 3). Text is turned into a number first.",
     "float": "float(value) -> number\nThe value as a float (a number that may have a fraction). Text is turned into a number first.",
-    "format": "format(value, spec) -> text\nThe value as text with a format spec: format(3.14159, \".2f\") is \"3.14\"; format(42, \"08\") is \"00000042\"; same specs as f\"{x:spec}\".",
+    "format": "format(value, spec) -> text\nThe value as text with a format spec. The specs are the same as in f\"{x:spec}\".\n\nFor example:\n- format(3.14159, \".2f\") is \"3.14\"\n- format(42, \"08\") is \"00000042\"",
     "round": "round(number, digits?) -> number\nRounded to digits after the dot (default 0). 2.5 rounds to 3.",
     "min": "min(list) / min(a, b, ...) -> value\nThe smallest value.",
     "max": "max(list) / max(a, b, ...) -> value\nThe biggest value.",

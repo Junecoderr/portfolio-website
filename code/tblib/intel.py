@@ -214,9 +214,13 @@ def load(api):
     @m.fn("abuseipdb", 1, 3, doc=(
         "abuseipdb(ip, key?, days?) -> map\n"
         "Check an IP address on AbuseIPDB: how many people reported it for attacks in the last days "
-        "(default 90). score is AbuseIPDB's confidence of abuse (0-100): 75+ is \"malicious\", "
-        "25+ \"suspicious\". details has reports, country, isp, usage, domain, whitelisted and "
-        "last_reported. Needs ABUSEIPDB_API_KEY."))
+        "(default: 90). Needs ABUSEIPDB_API_KEY.\n"
+        "\n"
+        "score is AbuseIPDB's confidence of abuse (0-100):\n"
+        "- 75 or more: \"malicious\".\n"
+        "- 25 or more: \"suspicious\".\n"
+        "\n"
+        "details has reports, country, isp, usage, domain, whitelisted and last_reported."))
     def abuseipdb(line, ip, key=None, days=90):
         api.need_desktop(line, "The intel library")
         fn = "intel.abuseipdb"
@@ -247,9 +251,14 @@ def load(api):
 
     @m.fn("urlhaus_url", 1, 2, doc=(
         "urlhaus_url(url, key?) -> map\n"
-        "Check a web address against URLhaus, abuse.ch's list of URLs that spread malware. A listed URL "
-        "is \"malicious\" (score 100 while online, 80 once offline); an unlisted one is \"unknown\" "
-        "(URLhaus only knows bad URLs). details has listed, status, threat, tags and a link. "
+        "Check a web address against URLhaus, abuse.ch's list of URLs that spread malware.\n"
+        "\n"
+        "Verdicts:\n"
+        "- A listed URL is \"malicious\": score 100 while online, 80 once offline.\n"
+        "- An unlisted one is \"unknown\", because URLhaus only knows bad URLs.\n"
+        "\n"
+        "details has listed, status, threat, tags and a link.\n"
+        "\n"
         "abuse.ch may ask for a free Auth-Key: set URLHAUS_API_KEY (or pass it)."))
     def urlhaus_url(line, url, key=None):
         api.need_desktop(line, "The intel library")

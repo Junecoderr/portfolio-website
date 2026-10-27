@@ -291,10 +291,21 @@ def load(api):
 
     @m.fn("parse", 1, 3, doc=(
         "parse(text, pattern?, zone?) -> datetime\n"
-        "Read a date written as text. Without a pattern it reads ISO 8601 (\"2026-10-26T14:30:00Z\", "
-        "\"2026-10-26 14:30\") and common log forms (\"Oct 26 14:30:00\", \"26/Oct/2026:14:30:00 +0000\", "
-        "\"10/26/2026 2:30 PM\"). A pattern uses %Y %m %d %H %M %S %z. zone is used when the text has none "
-        "(default: this computer's zone). Pass nil as the pattern to give only a zone."))
+        "Read a date written as text.\n"
+        "\n"
+        "Without a pattern it reads:\n"
+        "- ISO 8601, like \"2026-10-26T14:30:00Z\" or \"2026-10-26 14:30\".\n"
+        "- Common log forms, like \"Oct 26 14:30:00\", \"26/Oct/2026:14:30:00 +0000\" or\n"
+        "  \"10/26/2026 2:30 PM\".\n"
+        "\n"
+        "Arguments:\n"
+        "- pattern: the layout of the text, using %Y %m %d %H %M %S %z.\n"
+        "  Pass nil as the pattern to give only a zone.\n"
+        "- zone: used when the text has none (default: this computer's zone).\n"
+        "\n"
+        "Example:\n"
+        "    let d = datetime.parse(\"26/10/2026 14:30\", \"%d/%m/%Y %H:%M\", \"UTC\")\n"
+        "    say(d.iso)"))
     def parse(line, text, pattern=None, zone=None):
         check_type(line, text, "text", "datetime.parse", "text")
         if pattern is not None:

@@ -233,29 +233,52 @@ def load(api):
         return send(line, request, timeout, fn, int(max_bytes))
 
     options_doc = (
-        "options is a map with any of: \"headers\" (map), \"params\" (map added to the address as "
-        "?key=value), \"json\" (a value sent as JSON), \"timeout\" (seconds, default 15), "
-        "\"user_agent\" (default \"TB/3.0\"), \"max_bytes\" (biggest answer to accept, default 10 MB).")
+        "Options:\n"
+        "- headers: a map of extra headers to send.\n"
+        "- params: a map added to the address as ?key=value.\n"
+        "- json: a value sent as JSON.\n"
+        "- timeout: seconds to wait (default: 15).\n"
+        "- user_agent: the User-Agent header (default: \"TB/3.0\").\n"
+        "- max_bytes: the biggest answer to accept (default: 10 MB).")
 
     @m.fn("get", 1, 2, doc=(
         "get(url, options?) -> map\n"
-        "Fetch a web page or API: let r = http.get(\"https://example.com\"), then r.status, r.ok, "
-        "r.text, r.json (the parsed JSON, or nil), r.headers (names in lower case), "
-        "r.elapsed (milliseconds). " + options_doc))
+        "Fetch a web page or API.\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"status\": the HTTP status code, like 200 or 404.\n"
+        "- \"ok\": true for a status from 200 to 299.\n"
+        "- \"text\": the body as text.\n"
+        "- \"json\": the parsed JSON, or nil.\n"
+        "- \"headers\": the answer's headers (names in lower case).\n"
+        "- \"elapsed\": how long it took, in milliseconds.\n"
+        "\n" + options_doc + "\n"
+        "\n"
+        "Example:\n"
+        "    let r = http.get(\"https://example.com\")\n"
+        "    say(r.status)"))
     def get(line, url, options=None):
         return do(line, "GET", url, options, "http.get")
 
     @m.fn("post", 1, 3, doc=(
         "post(url, body?, options?) -> map\n"
-        "Send data to a web API. body is text (sent as plain text) or a map/list (sent as JSON). "
-        "Gives back the same kind of map as get(). " + options_doc))
+        "Send data to a web API. Gives back the same kind of map as get().\n"
+        "\n"
+        "The body:\n"
+        "- text: sent as plain text.\n"
+        "- a map or list: sent as JSON.\n"
+        "\n" + options_doc))
     def post(line, url, body=None, options=None):
         return do(line, "POST", url, options, "http.post", body)
 
     @m.fn("request", 2, 3, doc=(
         "request(method, url, options?) -> map\n"
-        "Any kind of request: method is \"GET\", \"POST\", \"PUT\", \"PATCH\", \"DELETE\", \"HEAD\" or "
-        "\"OPTIONS\". options may also have \"body\" (text, map or list). " + options_doc))
+        "Any kind of request. Gives back the same kind of map as get().\n"
+        "\n"
+        "Methods:\n"
+        "- \"GET\", \"POST\", \"PUT\", \"PATCH\", \"DELETE\", \"HEAD\" or \"OPTIONS\"\n"
+        "\n" + options_doc + "\n"
+        "- body: text, a map or a list to send."))
     def request(line, method, url, options=None):
         check_type(line, method, "text", "http.request", "method")
         if method.upper() not in METHODS:
@@ -264,9 +287,12 @@ def load(api):
 
     @m.fn("download", 2, 3, doc=(
         "download(url, path, options?) -> map\n"
-        "Save what a web address gives back into a file, and give back {\"path\", \"bytes\", \"status\"}. "
-        "It fails (and saves nothing) if the answer isn't OK (like 404) or is bigger than the "
-        "\"max_bytes\" option (default 100 MB). Other options as for get()."))
+        "Save what a web address gives back into a file.\n"
+        "Gives back a map with \"path\", \"bytes\" and \"status\".\n"
+        "\n"
+        "It fails, and saves nothing, if the answer isn't OK (like 404),\n"
+        "or is bigger than the max_bytes option (default: 100 MB).\n"
+        "Other options are as for get()."))
     def download(line, url, path, options=None):
         api.need_desktop(line, "The http library")
         fn = "http.download"

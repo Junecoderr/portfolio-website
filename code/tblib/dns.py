@@ -396,11 +396,26 @@ def load(api):
 
     @m.fn("lookup", 1, 4, doc=(
         "lookup(name, type?, server?, options?) -> list\n"
-        "The records of a name: dns.lookup(\"example.com\") gives A records, dns.lookup(\"example.com\", "
-        "\"MX\") mail servers. Types: A, AAAA, MX, TXT, NS, CNAME, PTR, SOA, SRV, CAA. server is an IP like "
-        "\"1.1.1.1\" (or \"ip:port\", or a list to try in turn); default: this computer's resolvers. "
-        "options: {\"timeout\": 3, \"tcp\": false, \"retries\": 1}. An empty list means the name exists but has "
-        "no such records; a name that doesn't exist gives an error with reason \"nxdomain\"."))
+        "The records of a name, like the A records of \"example.com\".\n"
+        "\n"
+        "Arguments:\n"
+        "- type: the kind of record (default: \"A\"). One of:\n"
+        "  - A, AAAA, MX, TXT, NS, CNAME, PTR, SOA, SRV or CAA\n"
+        "- server: an IP like \"1.1.1.1\", or \"ip:port\", or a list to try in turn\n"
+        "  (default: this computer's resolvers).\n"
+        "\n"
+        "Options:\n"
+        "- timeout: seconds to wait (default: 3).\n"
+        "- tcp: true to ask over TCP (default: false).\n"
+        "- retries: how many more tries after a failure (default: 1).\n"
+        "\n"
+        "Results:\n"
+        "- An empty list means the name exists but has no such records.\n"
+        "- A name that doesn't exist gives an error with reason \"nxdomain\".\n"
+        "\n"
+        "Example:\n"
+        "    say(dns.lookup(\"example.com\"))\n"
+        "    say(dns.lookup(\"example.com\", \"MX\"))"))
     def lookup(line, name, qtype="A", server=None, options=None):
         api.need_desktop(line, "The dns library")
         name = name_arg(line, name, "lookup")
@@ -421,9 +436,14 @@ def load(api):
 
     @m.fn("query", 2, 4, doc=(
         "query(name, type, server?, options?) -> map\n"
-        "The full DNS answer: {\"status\" (\"ok\", \"nxdomain\", ...), \"answers\", \"authority\", "
-        "\"additional\" (lists of records), \"truncated\", \"authoritative\", \"recursion_available\", "
-        "\"server\"}. Use this when you want the authority section or to see an nxdomain without an error."))
+        "The full DNS answer. Use it when you want the authority section,\n"
+        "or to see an nxdomain without an error.\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"status\": \"ok\", \"nxdomain\", ...\n"
+        "- \"answers\", \"authority\", \"additional\": lists of records.\n"
+        "- \"truncated\", \"authoritative\", \"recursion_available\": true or false.\n"
+        "- \"server\": the server that answered."))
     def query_(line, name, qtype, server=None, options=None):
         api.need_desktop(line, "The dns library")
         name = name_arg(line, name, "query")
@@ -464,8 +484,8 @@ def load(api):
 
     @m.fn("servers", 0, doc=(
         "servers() -> list\n"
-        "The DNS servers this computer is set up to use (from /etc/resolv.conf or the Windows registry). "
-        "Empty when none can be found; lookup() then uses 1.1.1.1 and 8.8.8.8."))
+        "The DNS servers this computer is set up to use (from /etc/resolv.conf or the Windows registry).\n"
+        "Empty when none can be found. lookup() then uses 1.1.1.1 and 8.8.8.8."))
     def servers(line):
         api.need_desktop(line, "The dns library")
         return system_servers()

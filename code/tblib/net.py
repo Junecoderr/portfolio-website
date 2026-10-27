@@ -19,8 +19,8 @@ MAX_TIMEOUT = 60            # seconds
 DNS_TIMEOUT = 5             # seconds for resolve()/reverse()
 MAX_UDP = 65_507            # bytes in one UDP message
 
-AUTHORISED = ("Only check computers you own or have written permission to test; "
-              "checking other people's systems can be against the law.")
+AUTHORISED = ("Only check computers you own or have written permission to test. "
+              "Checking other people's systems can be against the law.")
 
 # Well-known ports and what usually listens there (for reports and apps).
 COMMON_PORTS = {
@@ -182,8 +182,13 @@ def load(api):
 
     @m.fn("ip_info", 1, doc=(
         "ip_info(ip) -> map\n"
-        "Facts about an address: {\"ip\", \"version\" (4 or 6), \"private\", \"loopback\", \"multicast\", "
-        "\"reserved\", \"global\"}. \"global\" is true for normal public internet addresses."))
+        "Facts about an address.\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"ip\": the address.\n"
+        "- \"version\": 4 or 6.\n"
+        "- \"private\", \"loopback\", \"multicast\", \"reserved\": true or false.\n"
+        "- \"global\": true for normal public internet addresses."))
     def ip_info(line, ip):
         addr = ip_arg(line, ip, "ip_info")
         return {
@@ -200,8 +205,13 @@ def load(api):
 
     @m.fn("cidr_info", 1, doc=(
         "cidr_info(cidr) -> map\n"
-        "About a range: {\"network\", \"netmask\", \"broadcast\", \"prefix\", \"size\" (number of addresses), "
-        "\"first\", \"last\"} (first/last usable host)."))
+        "Facts about a range of addresses, like \"192.168.1.0/24\".\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"network\", \"netmask\", \"broadcast\": the range's addresses.\n"
+        "- \"prefix\": the number after the slash.\n"
+        "- \"size\": the number of addresses.\n"
+        "- \"first\", \"last\": the first and last usable host."))
     def cidr_info(line, cidr):
         net = cidr_arg(line, cidr, "cidr_info")
         if net.num_addresses <= 2:
@@ -328,10 +338,14 @@ def load(api):
 
     @m.fn("check_ports", 2, 3, doc=(
         f"check_ports(host, ports, timeout?) -> map\n"
-        f"Try a normal TCP connection to each port and give back a map port -> true/false (open or not), "
-        f"in the order given. ports is a list like [22, 80, 443] or text like \"22,80,8000-8010\" "
-        f"(at most {MAX_PORTS}). Several ports are tried at once; timeout is per port, in seconds "
-        f"(default 1). {AUTHORISED}"))
+        f"Try a normal TCP connection to each port. Several ports are tried at once.\n"
+        f"Gives back a map of port -> true (open) or false, in the order given.\n"
+        f"\n"
+        f"Arguments:\n"
+        f"- ports: a list like [22, 80, 443], or text like \"22,80,8000-8010\" (at most {MAX_PORTS}).\n"
+        f"- timeout: seconds to wait for each port (default: 1).\n"
+        f"\n"
+        f"{AUTHORISED}"))
     def check_ports(line, host, ports, timeout=None):
         api.need_desktop(line, "The net library")
         host = host_arg(line, host, "check_ports")
@@ -347,9 +361,12 @@ def load(api):
 
     @m.fn("banner", 2, 3, doc=(
         f"banner(host, port, timeout?) -> text\n"
-        f"Connect and read the greeting a service sends first (SSH, FTP and mail servers do), at most "
-        f"{MAX_BANNER} bytes. Gives \"\" if the service says nothing before the timeout (seconds, default 2). "
-        f"It sends nothing itself. {AUTHORISED}"))
+        f"Connect and read the greeting a service sends first. SSH, FTP and mail servers do this.\n"
+        f"It reads at most {MAX_BANNER} bytes and sends nothing itself.\n"
+        f"\n"
+        f"Gives \"\" if the service says nothing before the timeout (in seconds, default: 2).\n"
+        f"\n"
+        f"{AUTHORISED}"))
     def banner(line, host, port, timeout=None):
         api.need_desktop(line, "The net library")
         host = host_arg(line, host, "banner")
@@ -397,9 +414,14 @@ def load(api):
 
     @m.fn("udp_send", 3, 4, doc=(
         "udp_send(host, port, data, timeout?) -> text\n"
-        "Send one UDP message (text) to host:port. Without a timeout it just sends and gives nil (UDP has no "
-        "delivery confirmation). With a timeout in seconds it waits that long for one reply and gives it as "
-        "text, or nil if nothing came back. " + AUTHORISED))
+        "Send one UDP message (text) to host:port.\n"
+        "\n"
+        "Returns:\n"
+        "- Without a timeout: nil. It just sends, because UDP has no delivery confirmation.\n"
+        "- With a timeout in seconds: it waits that long for one reply and gives it as text,\n"
+        "  or nil if nothing came back.\n"
+        "\n"
+        + AUTHORISED))
     def udp_send(line, host, port, data, timeout=None):
         api.need_desktop(line, "The net library")
         host = host_arg(line, host, "udp_send")
@@ -435,10 +457,22 @@ def load(api):
 
     @m.fn("udp_listen", 2, 3, doc=(
         "udp_listen(port, fn, options?) -> listener\n"
-        "Receive UDP messages on a port, in the background. fn(message) is called for each one with "
-        "{\"data\": text, \"ip\", \"port\"}; if fn gives back text, it is sent as the reply. Port 0 picks a "
-        "free port. options: {\"host\": \"127.0.0.1\" (default; \"0.0.0.0\" to accept from the network)}. "
-        "The listener has .port, .host, .running, stop() and wait(seconds?) (block until stopped). " + AUTHORISED))
+        "Receive UDP messages on a port, in the background. Port 0 picks a free port.\n"
+        "\n"
+        "The function:\n"
+        "- fn(message) is called for each message, a map with \"data\" (text), \"ip\" and \"port\".\n"
+        "- If fn gives back text, it is sent as the reply.\n"
+        "\n"
+        "Options:\n"
+        "- host: where to listen (default: \"127.0.0.1\").\n"
+        "  Use \"0.0.0.0\" to accept messages from the network.\n"
+        "\n"
+        "The listener has:\n"
+        "- .port, .host, .running: where it listens and whether it is still on.\n"
+        "- stop(): stop listening.\n"
+        "- wait(seconds?): block until it is stopped.\n"
+        "\n"
+        + AUTHORISED))
     def udp_listen(line, port, fn, options=None):
         api.need_desktop(line, "The net library")
         check_type(line, port, "whole", "net.udp_listen", "port")

@@ -314,9 +314,19 @@ def load(api):
 
     @m.fn("tactic", 1, 2, doc=(
         "tactic(name, platform?) -> list\n"
-        "The techniques (without sub-techniques) under a tactic. name can be the short name (\"credential-access\"), "
-        "the Sigma tag spelling (\"credential_access\"), the display name (\"Credential Access\") or the id "
-        "(\"TA0006\"). platform (\"Windows\", \"Linux\", \"macOS\", \"IaaS\"...) keeps only techniques for it."))
+        "The techniques (without sub-techniques) under a tactic.\n"
+        "\n"
+        "name can be:\n"
+        "- the short name, like \"credential-access\".\n"
+        "- the Sigma tag spelling, like \"credential_access\".\n"
+        "- the display name, like \"Credential Access\".\n"
+        "- the id, like \"TA0006\".\n"
+        "\n"
+        "platform (\"Windows\", \"Linux\", \"macOS\", \"IaaS\"...) keeps only the techniques for it.\n"
+        "\n"
+        "Example:\n"
+        "    let found = attack.tactic(\"credential-access\", \"Linux\")\n"
+        "    say(found[0].name)"))
     def tactic(line, name, platform=None):
         check_type(line, name, "text", "attack.tactic", "name")
         key = norm_tactic(name[7:] if name.lower().startswith("attack.") else name)
@@ -352,11 +362,16 @@ def load(api):
 
     @m.fn("map", 1, doc=(
         "map(alerts) -> map\n"
-        "Which ATT&CK techniques and tactics a list of alerts (from detect.run()) or rules points at, read from "
-        "their tags (attack.t1110.001, attack.credential_access). Gives back {\"techniques\": [{\"id\", \"name\", "
-        "\"tactics\", \"url\", \"count\", \"rules\"}] (most alerts first), \"tactics\": [{\"tactic\", \"name\", "
-        "\"id\", \"count\", \"techniques\"}] (kill-chain order), \"unmapped\" (alerts without ATT&CK tags), "
-        "\"unknown\" (technique ids the table doesn't have)}."))
+        "Which ATT&CK techniques and tactics a list of alerts (from detect.run()) or rules points at. "
+        "It reads their tags, like attack.t1110.001 and attack.credential_access.\n"
+        "\n"
+        "Returns a map:\n"
+        "- \"techniques\": a list of {\"id\", \"name\", \"tactics\", \"url\", \"count\", \"rules\"},\n"
+        "  most alerts first.\n"
+        "- \"tactics\": a list of {\"tactic\", \"name\", \"id\", \"count\", \"techniques\"},\n"
+        "  in kill-chain order.\n"
+        "- \"unmapped\": alerts without ATT&CK tags.\n"
+        "- \"unknown\": technique ids the table doesn't have."))
     def map_fn(line, alerts):
         check_type(line, alerts, "list", "attack.map", "alerts")
         return map_alerts(table(), alerts)

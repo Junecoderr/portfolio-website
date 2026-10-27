@@ -800,12 +800,24 @@ def load(api):
         "substitutions) itself. Times are read as UTC and shown in local time like logs does.",
     )
 
-    @m.fn("read", 1, 2, doc="read(path, options?) -> list\nEvery event in an .evtx file as records. options: "
-                            "{\"limit\": n, \"xml\": true (add the event's XML as \"xml\"), \"strict\": true (fail "
-                            "on a broken record instead of keeping a placeholder with \"broken\": true)}. Records "
-                            "have \"time\", \"when\", \"event_id\", \"action\", \"description\", \"user\", \"ip\", "
-                            "\"success\", \"computer\", \"channel\", \"provider\", \"level_name\", \"record_id\", "
-                            "\"event_data\" (map) and every EventData field as its own key; \"raw\" is the XML.")
+    @m.fn("read", 1, 2, doc=(
+        "read(path, options?) -> list\n"
+        "Every event in an .evtx file, as a list of records.\n"
+        "\n"
+        "Options:\n"
+        "- limit: stop after this many events.\n"
+        "- xml: true adds the event's XML as \"xml\".\n"
+        "- strict: true fails on a broken record.\n"
+        "  Without it, a broken record is kept as a placeholder with \"broken\": true.\n"
+        "\n"
+        "Fields of each record:\n"
+        "- \"time\", \"when\"\n"
+        "- \"event_id\", \"action\", \"description\"\n"
+        "- \"user\", \"ip\", \"success\"\n"
+        "- \"computer\", \"channel\", \"provider\", \"level_name\", \"record_id\"\n"
+        "- \"event_data\": a map of the EventData fields.\n"
+        "  Every EventData field is also its own key.\n"
+        "- \"raw\": the XML."))
     def read(line, path, options=None):
         opts = options_of(line, options, "evtx.read")
         data = read_bytes(line, path, "evtx.read")
@@ -837,10 +849,16 @@ def load(api):
             fail(line, f"'{path}' isn't an EVTX log I can read: {err}.", path=path)
         return count
 
-    @m.fn("summary", 1, doc="summary(path_or_records) -> map\nAn overview: {\"records\", \"first_when\", "
-                            "\"last_when\", \"event_ids\" (id -> count), \"actions\", \"channels\", \"computers\", "
-                            "\"providers\", \"failures\", \"users\", \"ips\", \"chunks\", \"version\", \"dirty\", "
-                            "\"checksums_ok\"}. Give it a path or the records from evtx.read().")
+    @m.fn("summary", 1, doc=(
+        "summary(path_or_records) -> map\n"
+        "An overview of an event log. Give it a path or the records from evtx.read().\n"
+        "\n"
+        "Fields:\n"
+        "- \"records\", \"first_when\", \"last_when\"\n"
+        "- \"event_ids\": a map of id -> count.\n"
+        "- \"actions\", \"channels\", \"computers\", \"providers\"\n"
+        "- \"failures\", \"users\", \"ips\"\n"
+        "- \"chunks\", \"version\", \"dirty\", \"checksums_ok\""))
     def summary(line, target):
         if isinstance(target, list):
             return summary_of(target, None)
@@ -852,10 +870,17 @@ def load(api):
         records = records_or_fail(line, data, target, {"limit": None, "xml": False, "strict": False}, "evtx.summary")
         return summary_of(records, info)
 
-    @m.fn("info", 1, doc="info(path) -> map\nThe file's own bookkeeping: {\"version\", \"chunk_count\", "
-                         "\"next_record_id\", \"dirty\" (not closed cleanly), \"full\", \"checksum_ok\", \"records\", "
-                         "\"checksums_ok\", \"chunks\": [{\"index\", \"first_record_id\", \"last_record_id\", "
-                         "\"records\", \"header_checksum_ok\", \"records_checksum_ok\"}]}.")
+    @m.fn("info", 1, doc=(
+        "info(path) -> map\n"
+        "The file's own bookkeeping.\n"
+        "\n"
+        "Fields:\n"
+        "- \"version\", \"chunk_count\", \"next_record_id\"\n"
+        "- \"dirty\": true if the file wasn't closed cleanly.\n"
+        "- \"full\", \"checksum_ok\", \"records\", \"checksums_ok\"\n"
+        "- \"chunks\": a list of maps, one per chunk, with:\n"
+        "  - \"index\", \"first_record_id\", \"last_record_id\", \"records\"\n"
+        "  - \"header_checksum_ok\", \"records_checksum_ok\""))
     def info(line, path):
         data = read_bytes(line, path, "evtx.info")
         try:

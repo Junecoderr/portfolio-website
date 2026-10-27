@@ -511,8 +511,11 @@ def load(api):
 
     @m.fn("file", 1, 2, doc=(
         "file(path, options?) -> response\n"
-        "Send a file from disk, with its type guessed from the name. options: {\"download\": \"name.csv\"} "
-        "makes browsers save it, {\"type\": \"text/csv\"} sets the type. A missing file gives a 404 answer."))
+        "Send a file from disk, with its type guessed from the name. A missing file gives a 404 answer.\n"
+        "\n"
+        "Options:\n"
+        "- download: a file name like \"name.csv\". It makes browsers save the file.\n"
+        "- type: the type to send, like \"text/csv\"."))
     def file_(line, path, options=None):
         check_type(line, path, "text", "server.file", "path")
         download = None
@@ -556,10 +559,26 @@ def load(api):
 
     @m.fn("create", 0, 1, doc=(
         "create(options?) -> app\n"
-        "Make a web app. options: {\"log\": true (print one line per request), \"max_body\": bytes (10 MB), "
-        "\"cors\": true or an origin (allow browser pages from elsewhere to call the API), \"name\": text}. "
-        "The app has get/post/put/patch/delete/route(path, fn), static(prefix, folder), ws(path, fn), "
-        "listen(port?, host?), start(port?, host?), stop(), and .port/.url/.running."))
+        "Make a web app.\n"
+        "\n"
+        "Options:\n"
+        "- log: print one line per request (default: true).\n"
+        "- max_body: the biggest request body, in bytes (default: 10 MB).\n"
+        "- cors: true or an origin. It lets browser pages from elsewhere call the API.\n"
+        "- name: a name for the app (text).\n"
+        "\n"
+        "The app has:\n"
+        "- get, post, put, patch, delete, route(path, fn): add a handler for a path.\n"
+        "- static(prefix, folder): serve the files in a folder.\n"
+        "- ws(path, fn): serve WebSockets.\n"
+        "- listen(port?, host?): run the server until Ctrl+C.\n"
+        "- start(port?, host?): run the server in the background. stop() stops it.\n"
+        "- .port, .url, .running: where it runs and whether it is on.\n"
+        "\n"
+        "Example:\n"
+        "    let app = server.create()\n"
+        "    app.get(\"/hello\", fn(req) { return \"Hi!\" })\n"
+        "    app.listen(8000)"))
     def create(line, options=None):
         api.need_desktop(line, "The server library")
         o = {}

@@ -52,15 +52,23 @@ def load(api):
 
     @m.fn("run", 1, 2, doc=(
         "run(command, options?) -> map\n"
-        "Run another program and wait for it. Gives back {\"code\", \"out\", \"err\"}: the exit code "
-        "(0 means it worked) and what it printed.\n"
-        "A text command goes through the system shell, so pipes and wildcards work: "
-        "run(\"ls -l | head\"). Never build that text from untrusted input.\n"
-        "A list runs the program directly with exactly those arguments, with no shell: "
-        "run([\"ping\", \"-c\", \"1\", host]). Prefer this whenever input comes from outside.\n"
-        "options: {\"timeout\": seconds, \"cwd\": folder, \"input\": text to send it}.\n"
-        "Not available in the browser playground."
-    ))
+        "Run another program and wait for it. Not available in the browser playground.\n"
+        "\n"
+        "Returns:\n"
+        "- \"code\": the exit code. 0 means it worked.\n"
+        "- \"out\": what it printed.\n"
+        "- \"err\": the errors it printed.\n"
+        "\n"
+        "The command:\n"
+        "- A text command goes through the system shell, so pipes and wildcards work:\n"
+        "  run(\"ls -l | head\"). Never build that text from untrusted input.\n"
+        "- A list runs the program directly with exactly those arguments, with no shell:\n"
+        "  run([\"ping\", \"-c\", \"1\", host]). Prefer this whenever input comes from outside.\n"
+        "\n"
+        "Options:\n"
+        "- timeout: the most seconds to wait.\n"
+        "- cwd: the folder to run it in.\n"
+        "- input: text to send it."))
     def run(line, command, options=None):
         api.need_desktop(line, "os.run()")
         check_type(line, command, "text|list", "os.run", "command")

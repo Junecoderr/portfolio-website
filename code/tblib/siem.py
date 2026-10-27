@@ -323,11 +323,20 @@ def load(api):
 
     @m.fn("cef", 1, 2, doc=(
         "cef(event, options?) -> text\n"
-        "One line of CEF (ArcSight's Common Event Format): \"CEF:0|TB|detect|3.0.0|brute_force|Brute force|8|src=... "
-        "suser=... cnt=...\". event is an alert from detect.run() or any map; \"vendor\", \"product\", \"version\", "
-        "\"id\" and \"severity\" (0-10) override the header, \"level\" sets the severity (critical = 10), other fields "
-        "become extensions with standard CEF keys (ip -> src, user -> suser, message -> msg...). "
-        "options: {\"keys\": {your_field: cef_key}}."))
+        "One line of CEF (ArcSight's Common Event Format), like:\n"
+        "\"CEF:0|TB|detect|3.0.0|brute_force|Brute force|8|src=... suser=... cnt=...\"\n"
+        "\n"
+        "event is an alert from detect.run() or any map.\n"
+        "\n"
+        "Event fields:\n"
+        "- \"vendor\", \"product\", \"version\", \"id\": override the header.\n"
+        "- \"severity\": overrides the header's severity (0-10).\n"
+        "- \"level\": sets the severity (critical = 10).\n"
+        "- Other fields become extensions with standard CEF keys:\n"
+        "  ip -> src, user -> suser, message -> msg, and so on.\n"
+        "\n"
+        "Options:\n"
+        "- keys: a map {your_field: cef_key} for your own key names."))
     def cef(line, event, options=None):
         check_type(line, event, "map", "siem.cef", "event")
         return to_cef(event, options_arg(line, options, "siem.cef", {"keys", "keep_names"}))
@@ -343,10 +352,17 @@ def load(api):
 
     @m.fn("syslog_line", 1, 2, doc=(
         "syslog_line(message_or_event, options?) -> text\n"
-        "A syslog line, RFC 5424 by default: \"<PRI>1 2026-03-12T08:02:11.000Z host app - - [tb@32473 level=\\\"high\\\" "
-        "src=\\\"...\\\"] Brute force\". An alert map's fields go into the structured data. options: {\"format\": "
-        "\"rfc3164\" for the classic \"<PRI>Mar 12 08:02:11 host app: message\", \"facility\": \"local0\" (default user), "
-        "\"severity\": \"warning\" or 0-7 (default from the alert's level), \"host\", \"app\", \"time\", \"msgid\"}."))
+        "A syslog line, RFC 5424 by default, like:\n"
+        "\"<PRI>1 2026-03-12T08:02:11.000Z host app - - [tb@32473 level=\\\"high\\\" src=\\\"...\\\"] "
+        "Brute force\"\n"
+        "\n"
+        "An alert map's fields go into the structured data.\n"
+        "\n"
+        "Options:\n"
+        "- format: \"rfc3164\" for the classic \"<PRI>Mar 12 08:02:11 host app: message\".\n"
+        "- facility: like \"local0\" (default: user).\n"
+        "- severity: like \"warning\", or 0-7 (default: from the alert's level).\n"
+        "- host, app, time, msgid: values for those parts of the line."))
     def syslog_line(line, message, options=None):
         check_type(line, message, "text|map", "siem.syslog_line", "message_or_event")
         options = options_arg(line, options, "siem.syslog_line", {"format", "facility", "severity", "host", "app", "time", "msgid"})
@@ -397,9 +413,15 @@ def load(api):
 
     @m.fn("event", 1, doc=(
         "event(alert) -> map\n"
-        "The flat event cef()/leef()/the senders build from an alert: {\"name\", \"severity\" (0-10), \"level\", "
-        "\"id\", \"time\", plus the alert's by field under its own name, count, description, tags and the first "
-        "record's ip/user/host/message}. Handy to see what will be sent, or to tweak before sending."))
+        "The flat event that cef(), leef() and the senders build from an alert. "
+        "Handy to see what will be sent, or to tweak it before sending.\n"
+        "\n"
+        "Fields:\n"
+        "- \"name\", \"level\", \"id\", \"time\": from the alert.\n"
+        "- \"severity\": 0-10.\n"
+        "- The alert's by field, under its own name.\n"
+        "- count, description and tags.\n"
+        "- ip, user, host and message from the first record."))
     def event(line, alert):
         check_type(line, alert, "map", "siem.event", "alert")
         n = normalise_event(alert)
@@ -440,12 +462,26 @@ def load(api):
 
     @m.fn("splunk", 2, 3, doc=(
         "splunk(url, token, options?) -> sender\n"
-        "A Splunk HTTP Event Collector client: let s = siem.splunk(\"https://splunk.example:8088\", token), then "
-        "s.send(events) posts each map as an event (alerts from detect.run() are flattened with siem.event()). "
-        "options: {\"index\", \"sourcetype\" (default \"tb:detect\"), \"source\", \"host\", \"dry_run\": true to get "
-        "the payload back instead of sending, \"timeout\"}. send() gives back {\"sent\", \"status\", \"ok\", "
-        "\"response\"} or, in dry-run, {\"dry_run\": true, \"url\", \"headers\" (token hidden), \"body\", \"count\"}. "
-        "The token is never printed."))
+        "A Splunk HTTP Event Collector client. The token is never printed.\n"
+        "\n"
+        "Methods:\n"
+        "- send(events): posts each map as an event.\n"
+        "  Alerts from detect.run() are flattened with siem.event().\n"
+        "\n"
+        "Options:\n"
+        "- index, source, host: set on every event.\n"
+        "- sourcetype: the source type (default: \"tb:detect\").\n"
+        "- dry_run: true to get the payload back instead of sending.\n"
+        "- timeout: seconds to wait.\n"
+        "\n"
+        "Returns (from send):\n"
+        "- \"sent\", \"status\", \"ok\", \"response\".\n"
+        "- In dry-run: \"dry_run\": true, \"url\", \"headers\" (token hidden), \"body\", \"count\".\n"
+        "\n"
+        "Example:\n"
+        "    let s = siem.splunk(\"https://splunk.example:8088\", \"my-token\", {\"dry_run\": true})\n"
+        "    let out = s.send([{\"user\": \"Tanisha\", \"action\": \"login\"}])\n"
+        "    say(out.body)"))
     def splunk(line, url, token, options=None):
         fn = "siem.splunk"
         from tblib.http import check_url
@@ -500,11 +536,31 @@ def load(api):
 
     @m.fn("elastic", 1, 3, doc=(
         "elastic(url, auth?, options?) -> sender\n"
-        "An Elasticsearch / OpenSearch client for the bulk API: let es = siem.elastic(\"https://es.example:9200\", "
-        "{\"user\": \"tb\", \"password\": pw}), then es.index(\"alerts-tb\", docs) indexes each map. auth is nil, "
-        "{\"user\", \"password\"} (basic auth), {\"api_key\": \"...\"} or a bearer token as text. Alerts from "
-        "detect.run() are flattened and get @timestamp. options: {\"dry_run\": true, \"timeout\"}. index() gives back "
-        "{\"sent\", \"errors\" (how many documents failed), \"status\", \"response\"}."))
+        "An Elasticsearch / OpenSearch client for the bulk API.\n"
+        "\n"
+        "auth can be:\n"
+        "- nil: no login.\n"
+        "- {\"user\", \"password\"}: basic auth.\n"
+        "- {\"api_key\": \"...\"}: an API key.\n"
+        "- text: a bearer token.\n"
+        "\n"
+        "Methods:\n"
+        "- index(name, docs): indexes each map into the index name.\n"
+        "  Alerts from detect.run() are flattened and get @timestamp.\n"
+        "\n"
+        "Options:\n"
+        "- dry_run: true to get the payload back instead of sending.\n"
+        "- timeout: seconds to wait.\n"
+        "\n"
+        "Returns (from index):\n"
+        "- \"sent\", \"status\", \"response\".\n"
+        "- \"errors\": how many documents failed.\n"
+        "\n"
+        "Example:\n"
+        "    let auth = {\"user\": \"tb\", \"password\": \"secret\"}\n"
+        "    let es = siem.elastic(\"https://es.example:9200\", auth, {\"dry_run\": true})\n"
+        "    let out = es.index(\"alerts-tb\", [{\"user\": \"Tanisha\"}])\n"
+        "    say(out.body)"))
     def elastic(line, url, auth=None, options=None):
         fn = "siem.elastic"
         from tblib.http import check_url
@@ -564,11 +620,28 @@ def load(api):
 
     @m.fn("sentinel", 2, 3, doc=(
         "sentinel(workspace_id, key, options?) -> sender\n"
-        "A Microsoft Sentinel / Log Analytics client (HTTP Data Collector API with the shared-key signature): "
-        "let s = siem.sentinel(workspace_id, shared_key), then s.send(\"TBAlerts\", records) creates the custom "
-        "table TBAlerts_CL. key is the workspace's primary or secondary key (base64). options: {\"dry_run\": true, "
-        "\"timeout\", \"url\" to point at another endpoint (tests, sovereign clouds), \"time_field\" (the record "
-        "field holding the event time)}. send() gives back {\"sent\", \"status\", \"ok\"}."))
+        "A Microsoft Sentinel / Log Analytics client. It uses the HTTP Data Collector API "
+        "with the shared-key signature.\n"
+        "\n"
+        "key is the workspace's primary or secondary key (base64).\n"
+        "\n"
+        "Methods:\n"
+        "- send(log_type, records): posts records to a custom table.\n"
+        "  send(\"TBAlerts\", records) creates the table TBAlerts_CL.\n"
+        "\n"
+        "Options:\n"
+        "- dry_run: true to get the payload back instead of sending.\n"
+        "- timeout: seconds to wait.\n"
+        "- url: another endpoint (for tests and sovereign clouds).\n"
+        "- time_field: the record field holding the event time.\n"
+        "\n"
+        "Returns (from send):\n"
+        "- \"sent\", \"status\", \"ok\".\n"
+        "\n"
+        "Example:\n"
+        "    let s = siem.sentinel(\"my-workspace-id\", \"c2VjcmV0\", {\"dry_run\": true})\n"
+        "    let out = s.send(\"TBAlerts\", [{\"user\": \"Tanisha\"}])\n"
+        "    say(out.url)"))
     def sentinel(line, workspace_id, key, options=None):
         fn = "siem.sentinel"
         check_type(line, workspace_id, "text", fn, "workspace_id")

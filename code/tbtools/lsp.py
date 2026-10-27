@@ -137,6 +137,21 @@ def path_to_uri(path: str) -> str:
 
 
 # =============================================================================
+# Doc strings as Markdown
+# =============================================================================
+
+
+def doc_markdown(doc: str) -> str:
+    """A library/built-in doc string (summary, Options:, - bullets, Example:)
+    as Markdown for hovers. Docs that already use Markdown (code fences, `*`
+    or numbered lists, from `##` comments) are passed through unchanged."""
+    if "```" in doc or re.search(r"^\s*(?:[*+]|\d+\.) ", doc, re.M):
+        return doc
+    from tbcore import docfmt
+    return docfmt.to_markdown(doc)
+
+
+# =============================================================================
 # Analysis of one document
 # =============================================================================
 
@@ -901,7 +916,7 @@ class Server:
             if detail:
                 item["detail"] = detail
             if doc:
-                item["documentation"] = {"kind": "markdown", "value": doc}
+                item["documentation"] = {"kind": "markdown", "value": doc_markdown(doc)}
             items.append(item)
 
         tok = analysis.token_at(offset) if analysis else -1
@@ -998,7 +1013,7 @@ class Server:
         signature, doc = found
         value = f"```tb\n{signature}\n```" if signature else ""
         if doc:
-            value += ("\n\n" if value else "") + doc
+            value += ("\n\n" if value else "") + doc_markdown(doc)
         return {"contents": {"kind": "markdown", "value": value}, "range": index.range(start, end)}
 
     def describe(self, analysis, text, start, word) -> tuple[str, str] | None:
@@ -1122,7 +1137,7 @@ class Server:
             if p.startswith("...") and commas >= i:
                 active = i
                 break
-        return {"signatures": [{"label": label, "documentation": {"kind": "markdown", "value": doc},
+        return {"signatures": [{"label": label, "documentation": {"kind": "markdown", "value": doc_markdown(doc)},
                                 "parameters": [{"label": p} for p in params_out]}],
                 "activeSignature": 0, "activeParameter": active}
 

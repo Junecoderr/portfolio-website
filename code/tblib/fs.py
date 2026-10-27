@@ -175,7 +175,17 @@ def load(api):
                        "\"a\" (append), or add b for bytes: \"rb\", \"wb\", \"ab\".", cls="ValueError")
         return mode
 
-    @m.fn("open", 1, 2, doc="open(path, mode?) -> file\nOpen a file to read or write it a piece at a time. mode: \"r\" (default), \"w\", \"a\", or with b for bytes (\"rb\", \"wb\", \"ab\"). The file has read(n?), read_line(), write(x), seek(pos), tell() and close(). See fs.with_file to have it closed for you.")
+    @m.fn("open", 1, 2, doc=(
+        "open(path, mode?) -> file\n"
+        "Open a file to read or write it a piece at a time. See fs.with_file to have it closed for you.\n"
+        "\n"
+        "Modes:\n"
+        "- \"r\": read (the default).\n"
+        "- \"w\": write.\n"
+        "- \"a\": add to the end.\n"
+        "- add b for bytes: \"rb\", \"wb\", \"ab\".\n"
+        "\n"
+        "The file has read(n?), read_line(), write(x), seek(pos), tell() and close()."))
     def open_(line, path, mode="r"):
         path = path_arg(line, path, "open")
         mode = mode_arg(line, mode, "open")

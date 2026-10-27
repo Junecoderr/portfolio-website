@@ -167,9 +167,12 @@ def load(api):
 
     @m.fn("zip", 2, 3, doc=(
         "zip(target, paths, options?) -> number\n"
-        "Make a .zip file holding the files and folders in paths (folders are added with everything inside). "
-        "Names in the zip are the file or folder names; {\"base\": folder} keeps paths relative to that folder "
-        "instead. Replaces an existing target. Gives the number of files added."))
+        "Make a .zip file holding the files and folders in paths. Folders are added with everything inside.\n"
+        "Replaces an existing target. Gives back the number of files added.\n"
+        "\n"
+        "Options:\n"
+        "- base: a folder. Paths in the zip are kept relative to it.\n"
+        "  Without it, names in the zip are just the file or folder names."))
     def zip_(line, target, paths, options=None):
         target = path_arg(line, target, "zip", "target")
         roots = paths_arg(line, paths, "zip")
@@ -228,11 +231,19 @@ def load(api):
 
     @m.fn("unzip", 2, 3, doc=(
         "unzip(path, dest, options?) -> list\n"
-        "Extract a .zip into the folder dest (made if needed) and give the paths written. Safe by default: "
-        "members with absolute paths or '..' (zip-slip), links, and archives unpacking to more than 2 GB "
-        "are refused. options: {\"safe\": false} to only skip the dangerous members instead of stopping, "
-        "{\"overwrite\": false} to keep existing files, {\"max_size\": bytes}, {\"members\": [names]} to "
-        "extract only some."))
+        "Extract a .zip into the folder dest (made if needed) and give back the paths written.\n"
+        "It is safe by default.\n"
+        "\n"
+        "Refused by default:\n"
+        "- Members with absolute paths or '..' in them (zip-slip).\n"
+        "- Links.\n"
+        "- Archives that unpack to more than 2 GB.\n"
+        "\n"
+        "Options:\n"
+        "- safe: false only skips the dangerous members, instead of stopping.\n"
+        "- overwrite: false keeps files that already exist.\n"
+        "- max_size: the most bytes the archive may unpack to.\n"
+        "- members: a list of names, to extract only some."))
     def unzip(line, path, dest, options=None):
         path = path_arg(line, path, "unzip")
         safe, overwrite, wanted = extraction_options(line, options, "unzip")
@@ -309,9 +320,13 @@ def load(api):
 
     @m.fn("tar", 2, 3, doc=(
         "tar(target, paths, options?) -> number\n"
-        "Make a .tar file (compressed when the name ends in .tar.gz/.tgz, .tar.bz2 or .tar.xz, or with "
-        "{\"compress\": \"gz\"}). paths and {\"base\": folder} work like zip(). Links are skipped. "
-        "Gives the number of files added."))
+        "Make a .tar file. Links are skipped. Gives back the number of files added.\n"
+        "\n"
+        "It is compressed when the name ends in .tar.gz or .tgz, .tar.bz2 or .tar.xz.\n"
+        "\n"
+        "Options:\n"
+        "- compress: like \"gz\", to compress whatever the name is.\n"
+        "- base: works like in zip(), and so do paths."))
     def tar_(line, target, paths, options=None):
         target = path_arg(line, target, "tar", "target")
         roots = paths_arg(line, paths, "tar")

@@ -23,8 +23,8 @@ with warnings.catch_warnings():
         "TLSv1.0": getattr(ssl.TLSVersion, "TLSv1", None), "TLSv1.1": getattr(ssl.TLSVersion, "TLSv1_1", None),
         "TLSv1.2": getattr(ssl.TLSVersion, "TLSv1_2", None), "TLSv1.3": getattr(ssl.TLSVersion, "TLSv1_3", None),
     }
-AUTHORISED = ("Only check servers you own or have written permission to test; "
-              "checking other people's systems can be against the law.")
+AUTHORISED = ("Only check servers you own or have written permission to test. "
+              "Checking other people's systems can be against the law.")
 
 
 class TlsProblem(Exception):
@@ -277,12 +277,27 @@ def load(api):
 
     @m.fn("certificate", 1, 3, doc=(
         "certificate(host, port?, options?) -> map\n"
-        "Fetch a server's certificate: {\"pem\", \"subject\" {common_name, organization...}, \"issuer\", "
-        "\"not_before\", \"not_after\", \"days_left\", \"expired\", \"san\" (the names it covers), "
-        "\"serial\", \"verified\" (trusted by this computer), \"verify_error\", \"self_signed\", "
-        "\"hostname_matches\", \"version\" (like \"TLSv1.3\"), \"cipher\", \"parsed\" (the crypto library's "
-        "full x509 parse when available)}. host may be \"host:port\" or an https:// URL. options: "
-        "{\"timeout\": 5, \"server_name\": name to ask for (SNI), \"ca_file\": a PEM file to trust}. "
+        "Fetch a server's certificate and describe it.\n"
+        "host may also be \"host:port\" or an https:// URL.\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"pem\": the certificate as PEM text.\n"
+        "- \"subject\", \"issuer\": maps with common_name, organization...\n"
+        "- \"not_before\", \"not_after\": when it starts and stops being valid.\n"
+        "- \"days_left\", \"expired\": how long it has left.\n"
+        "- \"san\": the names it covers.\n"
+        "- \"serial\": the serial number.\n"
+        "- \"verified\": true if this computer trusts it. \"verify_error\" says why not.\n"
+        "- \"self_signed\", \"hostname_matches\": true or false.\n"
+        "- \"version\": the TLS version used, like \"TLSv1.3\".\n"
+        "- \"cipher\": the cipher used.\n"
+        "- \"parsed\": the crypto library's full x509 parse, when available.\n"
+        "\n"
+        "Options:\n"
+        "- timeout: seconds to wait (default: 5).\n"
+        "- server_name: the name to ask for (SNI).\n"
+        "- ca_file: a PEM file of certificates to trust.\n"
+        "\n"
         + AUTHORISED))
     def certificate(line, host, port=None, options=None):
         api.need_desktop(line, "The tls library")
@@ -294,9 +309,17 @@ def load(api):
 
     @m.fn("versions", 1, 3, doc=(
         "versions(host, port?, options?) -> map\n"
-        "Which TLS versions the server accepts: {\"TLSv1.0\": false, \"TLSv1.1\": false, \"TLSv1.2\": true, "
-        "\"TLSv1.3\": true}. nil for a version this computer's OpenSSL can't even try. Old versions "
-        "(1.0, 1.1) being on is a finding. " + AUTHORISED))
+        "Which TLS versions the server accepts.\n"
+        "\n"
+        "Returns a map of version name -> answer, like\n"
+        "{\"TLSv1.0\": false, \"TLSv1.1\": false, \"TLSv1.2\": true, \"TLSv1.3\": true}.\n"
+        "- true: the server accepts it.\n"
+        "- false: the server refuses it.\n"
+        "- nil: this computer's OpenSSL can't even try it.\n"
+        "\n"
+        "Old versions (1.0, 1.1) being on is a finding.\n"
+        "\n"
+        + AUTHORISED))
     def versions(line, host, port=None, options=None):
         api.need_desktop(line, "The tls library")
         port = port_from(host if isinstance(host, str) else "", port)
@@ -325,10 +348,27 @@ def load(api):
 
     @m.fn("check", 1, 3, doc=(
         "check(host, port?, options?) -> map\n"
-        "A verdict on a server's TLS: {\"ok\": true/false, \"issues\": [text...], \"host\", \"port\", "
-        "\"days_left\", \"expires\", \"verified\", \"hostname_matches\", \"self_signed\", \"version\", "
-        "\"cipher\", \"issuer\", \"subject\"}. Issues: not trusted, name mismatch, expired, expiring within "
-        "warn_days (default 30), old TLS version. options add {\"warn_days\": 30}. " + AUTHORISED))
+        "A verdict on a server's TLS.\n"
+        "\n"
+        "Returns a map with:\n"
+        "- \"ok\": true if no issues were found.\n"
+        "- \"issues\": a list of texts, one per problem.\n"
+        "- \"host\", \"port\": the server checked.\n"
+        "- \"days_left\", \"expires\": when the certificate runs out.\n"
+        "- \"verified\", \"hostname_matches\", \"self_signed\": true or false.\n"
+        "- \"version\", \"cipher\": what the connection used.\n"
+        "- \"issuer\", \"subject\": who the certificate is from and for.\n"
+        "\n"
+        "Issues it looks for:\n"
+        "- The certificate is not trusted.\n"
+        "- The name does not match.\n"
+        "- It has expired, or expires within warn_days.\n"
+        "- An old TLS version was used.\n"
+        "\n"
+        "Options (as for certificate(), plus):\n"
+        "- warn_days: warn when fewer days than this are left (default: 30).\n"
+        "\n"
+        + AUTHORISED))
     def check(line, host, port=None, options=None):
         api.need_desktop(line, "The tls library")
         port = port_from(host if isinstance(host, str) else "", port)
@@ -364,8 +404,10 @@ def load(api):
 
     @m.fn("parse_pem", 1, doc=(
         "parse_pem(pem) -> map\n"
-        "Describe a certificate you already have as PEM text: {\"subject\", \"issuer\", \"not_before\", "
-        "\"not_after\", \"days_left\", \"expired\", \"san\", \"serial\", \"self_signed\"}."))
+        "Describe a certificate you already have as PEM text.\n"
+        "\n"
+        "Returns a map with \"subject\", \"issuer\", \"not_before\", \"not_after\", \"days_left\",\n"
+        "\"expired\", \"san\", \"serial\" and \"self_signed\", as for certificate()."))
     def parse_pem(line, pem):
         check_type(line, pem, "text", "tls.parse_pem", "pem")
         try:

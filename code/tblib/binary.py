@@ -151,7 +151,22 @@ def load(api):
         _, items = parse_format(line, fmt, "size")
         return format_size(items)
 
-    @m.fn("pack", 1, MANY, doc="pack(format, value, ...) -> bytes\nNumbers (and bytes) packed the way file formats store them: pack(\"<HI\", 1, 2) is 6 bytes, little-endian. Format: < little-endian (default), > or ! big-endian, then B b H h I i Q q (8/16/32/64-bit, capital = unsigned), f d (32/64-bit decimals), Ns (N bytes), x (a zero byte).")
+    @m.fn("pack", 1, MANY, doc=(
+        "pack(format, value, ...) -> bytes\n"
+        "Numbers (and bytes) packed the way file formats store them.\n"
+        "pack(\"<HI\", 1, 2) is 6 bytes, little-endian.\n"
+        "\n"
+        "Format letters:\n"
+        "- <: little-endian (the default).\n"
+        "- > or !: big-endian.\n"
+        "- B b H h I i Q q: whole numbers. A capital letter means unsigned.\n"
+        "  - B b: 8-bit\n"
+        "  - H h: 16-bit\n"
+        "  - I i: 32-bit\n"
+        "  - Q q: 64-bit\n"
+        "- f d: 32-bit and 64-bit decimals.\n"
+        "- Ns: N bytes, like 4s.\n"
+        "- x: a zero byte."))
     def pack(line, fmt, *values):
         order, items = parse_format(line, fmt, "pack")
         out = []

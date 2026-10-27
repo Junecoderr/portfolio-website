@@ -194,10 +194,18 @@ def load(api):
 
     @m.fn("table", 1, 3, doc=(
         "table(rows, columns?, options?) -> text\n"
-        "An aligned text table to say(). rows is a list of maps (or lists, with the first list as the header). "
-        "columns picks and orders the columns (default: every key, except big ones like records and raw). "
-        "Long cells are cut to fit, with ...; options {\"max_width\": 60} changes the limit (default 40). "
-        "Numbers line up on the right."))
+        "An aligned text table, ready to say(). Numbers line up on the right.\n"
+        "\n"
+        "Arguments:\n"
+        "- rows: a list of maps, or a list of lists with the first list as the header.\n"
+        "- columns: which columns to show, in order.\n"
+        "  The default is every key, except big ones like records and raw.\n"
+        "- options: {\"max_width\": 60} changes how wide a cell can be (default: 40).\n"
+        "  Longer cells are cut to fit, ending with ...\n"
+        "\n"
+        "Example:\n"
+        "    let rows = [{\"user\": \"Tanisha\", \"logins\": 3}, {\"user\": \"root\", \"logins\": 12}]\n"
+        "    say(report.table(rows))"))
     def table(line, rows, columns=None, options=None):
         width = width_arg(line, options, "table")
         cols, data = table_shape(line, rows, columns, "table")
@@ -223,10 +231,16 @@ def load(api):
 
     @m.fn("html", 2, 3, doc=(
         "html(title, rows, options?) -> text\n"
-        "A complete HTML page (one file, styles included, light and dark mode) with a title and a table of rows. "
-        "Every value is escaped, so log lines can't inject HTML. A \"level\" column gets coloured badges. "
-        "options: {\"columns\": [...], \"intro\": text shown above the table, \"stats\": {label: number}, "
-        "\"sections\": [{\"title\", \"rows\", \"columns\"?}, ...] for more tables}."))
+        "A complete HTML page with a title and a table of rows.\n"
+        "It is one file, with styles included, in light and dark mode.\n"
+        "\n"
+        "Every value is escaped, so log lines can't inject HTML. A \"level\" column gets coloured badges.\n"
+        "\n"
+        "Options:\n"
+        "- columns: a list of the columns to show.\n"
+        "- intro: text shown above the table.\n"
+        "- stats: numbers to show, as a map of {label: number}.\n"
+        "- sections: more tables, as a list of {\"title\", \"rows\", \"columns\"?} maps."))
     def html(line, title, rows, options=None):
         check_type(line, title, "text", "report.html", "title")
         options = check_type(line, options, "map|nil", "report.html", "options") or {}
@@ -259,9 +273,13 @@ def load(api):
 
     @m.fn("timeline", 1, 2, doc=(
         "timeline(records, options?) -> text\n"
-        "One line per record or alert, oldest first: \"2026-03-12 09:14:05  [auth] Failed password for root ...\". "
-        "Records without a time go last. options: {\"limit\": n} keeps the first n lines, {\"max_width\": n} "
-        "cuts long lines (default 160)."))
+        "One line per record or alert, oldest first, like:\n"
+        "\"2026-03-12 09:14:05  [auth] Failed password for root ...\".\n"
+        "Records without a time go last.\n"
+        "\n"
+        "Options:\n"
+        "- limit: keep only the first n lines.\n"
+        "- max_width: cut lines longer than this (default: 160)."))
     def timeline(line, records, options=None):
         check_type(line, records, "list", "report.timeline", "records")
         options = check_type(line, options, "map|nil", "report.timeline", "options") or {}

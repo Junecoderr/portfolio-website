@@ -24,6 +24,8 @@ Files (all pure Python 3.10+, standard library only):
     vm.py         VMInterpreter: the default engine, a stack VM that runs
                   the compiled code (same API and messages as interp.py)
     types.py      the gradual type checker used by `tb check` and the LSP
+    docfmt.py     the structure of doc strings (summary, Options:, bullets,
+                  Example:) and its HTML, terminal and Markdown forms
 """
 
 FILES = [
@@ -38,4 +40,5 @@ FILES = [
     "compiler.py",
     "vm.py",
     "types.py",
+    "docfmt.py",
 ]

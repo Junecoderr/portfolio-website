@@ -146,7 +146,15 @@ def load(api):
             else:
                 fields.pop(name, None)
 
-    @m.fn("mock", 3, doc="mock(target, name, value)\nReplace target.name (a library function, a map key, an object field) with value, usually a fn. It goes back to the real one when the current test.case ends, or when you call test.restore(). Example: test.mock(http, \"get\", url => {\"status\": 200, \"body\": \"hi\"})")
+    @m.fn("mock", 3, doc=(
+        "mock(target, name, value)\n"
+        "Replace target.name with value, which is usually a fn. The target can be a library function,\n"
+        "a map key or an object field.\n"
+        "\n"
+        "It goes back to the real one when the current test.case ends, or when you call test.restore().\n"
+        "\n"
+        "Example:\n"
+        "    test.mock(http, \"get\", url => {\"status\": 200, \"body\": \"hi\"})"))
     def mock(line, target, name, value):
         check_type(line, name, "text", "test.mock", "name")
         fields = fields_of(line, target)
@@ -165,7 +173,16 @@ def load(api):
 
     fixtures: dict = {}   # name -> (setup fn, teardown fn or None)
 
-    @m.fn("fixture", 2, 3, doc="fixture(name, setup, teardown?)\nRegister a fixture. A test.case function with an input called name gets setup()'s value; teardown(value) runs after the case, even if it failed. Example: test.fixture(\"db\", () => sqlite.open(\":memory:\"), db => db.close()) then test.case(\"insert\", db => { ... })")
+    @m.fn("fixture", 2, 3, doc=(
+        "fixture(name, setup, teardown?)\n"
+        "Register a fixture. A test.case function with an input called name gets setup()'s value.\n"
+        "teardown(value) runs after the case, even if it failed.\n"
+        "\n"
+        "Example:\n"
+        "    test.fixture(\"db\", () => sqlite.open(\":memory:\"), db => db.close())\n"
+        "    test.case(\"insert\", db => {\n"
+        "      db.run(\"create table t (x)\")\n"
+        "    })"))
     def fixture(line, name, setup, teardown=None):
         check_type(line, name, "text", "test.fixture", "name")
         check_type(line, setup, "function", "test.fixture", "setup")

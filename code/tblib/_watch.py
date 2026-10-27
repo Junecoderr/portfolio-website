@@ -132,10 +132,20 @@ def install(m, api):
 
     @m.fn("watch", 2, 3, doc=(
         "watch(path, fn, interval?) -> watcher\n"
-        "Watch a file or folder (and its subfolders) for changes, checking every interval seconds (1 by "
-        "default). fn(event) gets {\"kind\": \"created\"|\"changed\"|\"deleted\", \"path\": ...} for each "
-        "change; give back false to stop. The program keeps going: call watcher.wait() to block, "
-        "watcher.stop() or fs.watch_stop() to end. Errors in fn are printed, not fatal."))
+        "Watch a file or folder (and its subfolders) for changes. The program keeps going while it watches.\n"
+        "\n"
+        "Arguments:\n"
+        "- fn: called as fn(event) for each change. Give back false to stop.\n"
+        "- interval: how often to check, in seconds (default: 1).\n"
+        "\n"
+        "Fields of each event:\n"
+        "- \"kind\": \"created\", \"changed\" or \"deleted\".\n"
+        "- \"path\": the file or folder that changed.\n"
+        "\n"
+        "Stopping:\n"
+        "- watcher.wait() blocks until the watcher stops.\n"
+        "- watcher.stop() or fs.watch_stop() ends it.\n"
+        "- Errors in fn are printed, not fatal."))
     def watch(line, path, fn, interval=1):
         api.need_desktop(line, "fs.watch")
         check_type(line, path, "text", "fs.watch", "path")

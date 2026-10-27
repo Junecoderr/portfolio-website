@@ -398,3 +398,63 @@ def test_stats_functions_stay_out_of_the_site():
     config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
     assert config["outputDirectory"] == "dist/site"
     assert "connect-src 'self'" in json.dumps(config)
+
+
+# -- readable doc strings (tbcore/docfmt.py; format in tblib/README.md) --------------------
+
+def _plain(fragment: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", "", fragment))
+
+
+def test_doc_paragraphs_stay_short_and_lists_render_as_lists(reference):
+    from tbcore import docfmt
+    for lib in tb.list_libraries():
+        text = (reference / "lib" / f"{lib}.html").read_text(encoding="utf-8")
+        d = tb.describe_library(lib)
+        for entry in d["functions"] + d["values"]:
+            rendered = docfmt.to_html(entry["doc"])
+            assert rendered in text, (lib, entry["name"])
+            for para in re.findall(r"<p>(.*?)</p>", rendered, re.S):
+                assert len(_plain(para)) <= 350, (lib, entry["name"], _plain(para)[:80])
+            bullets = [ln for ln in entry["doc"].splitlines() if re.match(r"^ *- ", ln)]
+            if bullets:
+                assert rendered.count("<li>") == len(bullets), (lib, entry["name"])
+                assert '<ul class="doc-list">' in rendered
+            assert not re.search(r"<p>\s*- ", rendered), (lib, entry["name"])
+            if "\nExample:\n" in "\n" + entry["doc"]:
+                assert '<pre class="tb-code"><code>' in rendered, (lib, entry["name"])
+
+
+def test_doc_format_parts():
+    from tbcore import docfmt
+    doc = ('Check a rule.\n\nOptions:\n- count: how many (default: 1).\n  - "a|b": nested\n'
+           '- A plain bullet: not a name.\n  continued here\n\nExample:\n    let x = 1\n    say(x)')
+    blocks = docfmt.parse(doc)
+    assert [b["kind"] for b in blocks] == ["para", "heading", "list", "heading", "code"]
+    items = blocks[2]["items"]
+    assert items[0]["term"] == "count" and items[0]["children"][0]["term"] == '"a|b"'
+    assert items[1]["term"] is None and items[1]["text"].endswith("continued here")
+    assert blocks[4]["text"] == "let x = 1\nsay(x)"
+    out = docfmt.to_html(doc)
+    assert '<p class="doc-h">Options</p><ul class="doc-list"><li><code class="doc-term">count</code>' in out
+    assert '<pre class="tb-code"><code>let x = 1\nsay(x)</code></pre>' in out
+    md = docfmt.to_markdown(doc)
+    assert "**Options**\n\n- `count`: how many (default: 1).\n  - `\"a|b\"`: nested" in md and "```tb\nlet x = 1" in md
+    lines = docfmt.to_text(doc, "  ", 40)
+    assert "  Options:" in lines and "  - count: how many (default: 1)." in lines
+    assert all(len(ln) <= 40 for ln in lines if not ln.startswith("      "))
+
+
+def test_tb_doc_detect_fits_a_terminal(capsys):
+    assert tb.main(["doc", "detect"]) == 0
+    out = capsys.readouterr().out
+    lines = out.splitlines()
+    assert lines and all(len(ln) <= 100 for ln in lines), max(lines, key=len)
+    assert "      Fields:" in out and '      - "path|contains": the text appears anywhere.' in out
+
+
+def test_every_library_doc_fits_a_terminal(capsys):
+    for lib in tb.list_libraries():
+        assert tb.main(["doc", lib]) == 0
+        long = [ln for ln in capsys.readouterr().out.splitlines() if len(ln) > 100]
+        assert not long, (lib, long[:2])

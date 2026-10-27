@@ -448,9 +448,12 @@ METHOD_EXAMPLES = {
 
 
 def _print_entry(signature: str, doc: str) -> None:
+    """One function or value for `tb doc`: the signature, then its doc string
+    (summary, Options:, bullets, Example:) wrapped to fit a terminal."""
+    from tbcore import docfmt
     print("  " + signature)
-    for text in doc.splitlines():
-        print("      " + text if text.strip() else "")
+    for text in docfmt.to_text(doc, indent="      ", width=78):
+        print(text)
 
 
 def first_sentence(text: str) -> str:
@@ -515,15 +518,20 @@ def doc_command(args: list) -> int:
     except TBError as err:
         print(err, file=sys.stderr)
         return 1
-    print(f"{info['name']} - {info['doc']}" if info["doc"] else info["name"])
+    import textwrap
+    head = f"{info['name']} - {info['doc']}" if info["doc"] else info["name"]
+    print("\n".join(textwrap.wrap(head, 78, break_long_words=False, break_on_hyphens=False)))
     print(f"Use it with: import {info['name']}")
     if info["values"]:
         print()
         for entry in info["values"]:
-            _print_entry(f"{info['name']}.{entry['name']} = {entry['value']}", entry["doc"])
+            shown = f"{info['name']}.{entry['name']} = {entry['value']}"
+            if len(shown) > 78:
+                shown = shown[:75] + "..."
+            _print_entry(shown, entry["doc"])
     if info["functions"]:
-        print()
         for entry in info["functions"]:
+            print()
             _print_entry(f"{info['name']}.{entry['signature']}", entry["doc"])
     return 0
 

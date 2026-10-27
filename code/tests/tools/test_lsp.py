@@ -264,3 +264,14 @@ def test_formatting_and_rename(session):
 def test_shutdown_and_exit(session):
     client, _init, _uri, _tmp = session
     assert client.close() == 0
+
+
+def test_library_docs_hover_as_markdown_lists():
+    import tb
+    from tbtools.lsp import doc_markdown
+    doc = next(f["doc"] for f in tb.describe_library("detect")["functions"] if f["name"] == "rule")
+    md = doc_markdown(doc)
+    assert "**Fields**" in md and "\n- `level`: how serious" in md and "\n  - " in md
+    assert "```tb\nlet r = detect.rule({" in md
+    own = "Adds one.\n\n* first\n* second"
+    assert doc_markdown(own) == own

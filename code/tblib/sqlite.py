@@ -288,9 +288,15 @@ def load(api):
 
     @m.fn("open", 0, 2, doc=(
         "open(path?, options?) -> db\n"
-        "Open (or create) a database file. Without a path, or with \":memory:\", the database lives in memory "
-        "and vanishes when the program ends. options: {\"readonly\": true} to refuse changes. "
-        "The db has run, all, one, value, execute_many, script, tables, columns, schema, transaction, close."))
+        "Open (or create) a database file.\n"
+        "\n"
+        "Without a path, or with \":memory:\", the database lives in memory and vanishes when the program ends.\n"
+        "\n"
+        "Options:\n"
+        "- readonly: true refuses changes.\n"
+        "\n"
+        "The db has run, all, one, value, execute_many, script, tables, columns, schema, transaction\n"
+        "and close."))
     def open_(line, path=":memory:", options=None):
         check_type(line, path, "text", "sqlite.open", "path")
         if options is not None:
