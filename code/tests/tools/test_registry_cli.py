@@ -485,7 +485,7 @@ def test_yank_and_undo(registry, monkeypatch, capsys):
 def test_registry_base(monkeypatch):
     monkeypatch.delenv("TB_REGISTRY", raising=False)
     monkeypatch.delenv("TB_PACKAGE_INDEX", raising=False)
-    assert pkg.index_url() == "https://code.tanisha.ceo/api/registry/index"
+    assert pkg.index_url() == "https://code.tanisha.ceo/api/registry/index.json"
     assert pkg.registry_base() == "https://code.tanisha.ceo/api/registry"
     assert pkg.site_url() == "https://code.tanisha.ceo"
     monkeypatch.setenv("TB_PACKAGE_INDEX", "https://example.com/mirror/index")

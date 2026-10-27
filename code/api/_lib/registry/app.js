@@ -836,7 +836,9 @@ async function route(ctx) {
   const m = ctx.request.method === "HEAD" ? "GET" : ctx.request.method;
   const [a, b, c, d, e] = ctx.parts;
   const n = ctx.parts.length;
-  if (m === "GET" && n === 1 && a === "index") return getIndex(ctx);
+  // "/api/registry/index" is redirected to "/api/registry" by the site's clean
+  // URLs, so the index answers on the bare path and on "index.json" too.
+  if (m === "GET" && (n === 0 || (n === 1 && (a === "index" || a === "index.json")))) return getIndex(ctx);
   if (m === "GET" && n === 1 && a === "search") return getSearch(ctx);
   if (m === "GET" && n === 1 && a === "me") return me(ctx);
   if (a === "auth" && n === 2) {

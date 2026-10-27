@@ -22,7 +22,7 @@ in `tb.lock` (git commit or zip sha256), so `tb add` with no arguments
 re-creates the same `tb_packages/` folder on another machine.
 
 Names are looked up in the TB Package Index (https://code.tanisha.ceo/packages),
-whose machine-readable index is https://code.tanisha.ceo/api/registry/index:
+whose machine-readable index is https://code.tanisha.ceo/api/registry/index.json:
 `{"format": "tb-registry-1", "packages": {"<name>": {"description", "version",
 "versions": {"1.2.0": {"sha256": "...", "yanked"?: true}}, ...}}}`. `tb add
 name@range` picks the newest version that matches the range (`^1.2`, `~1.2.3`,
@@ -70,7 +70,7 @@ import zipfile
 __all__ = ["main", "PkgError", "DEFAULT_INDEX", "parse_toml", "dump_toml"]
 
 DEFAULT_REGISTRY = "https://code.tanisha.ceo/api/registry"
-DEFAULT_INDEX = DEFAULT_REGISTRY + "/index"
+DEFAULT_INDEX = DEFAULT_REGISTRY + "/index.json"
 LEGACY_INDEX = "https://code.tanisha.ceo/packages/index.json"
 PACKAGES_DIR = "tb_packages"
 MANIFEST = "tb.toml"
