@@ -13,6 +13,7 @@ Contents (flat, so "Extract all" on Windows gives one tidy folder):
     apps/...           the example apps and their sample data
     packages/...       example TB packages (tb add ...)
     spec/...           the language spec and its conformance tests (tb test spec)
+    editors/...        tree-sitter grammar, Neovim, Helix and JetBrains setups
     README.txt         (from packaging/README-python.txt, Windows line endings)
 """
 
@@ -36,10 +37,11 @@ def add(zf: zipfile.ZipFile, arcname: str, data: bytes) -> None:
     zf.writestr(info, data)
 
 
-SKIP_DIRS = {"__pycache__", ".pytest_cache", "dist"}
+SKIP_DIRS = {"__pycache__", ".pytest_cache", "dist", "node_modules", "build"}
 # Data an app saved while being tried out on the build machine.
 SKIP_NAMES = {"todo.json", "journal.json", ".DS_Store"}
-FOLDERS = ("tbcore", "tbtools", "tblib", "apps", "packages", "spec")
+FOLDERS = ("tbcore", "tbtools", "tblib", "apps", "packages", "spec",
+           "editors/tree-sitter-tb", "editors/neovim", "editors/helix", "editors/jetbrains")
 SKIP_SUFFIXES = {".pyc", ".pyo"}
 
 

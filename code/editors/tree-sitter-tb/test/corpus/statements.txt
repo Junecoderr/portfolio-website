@@ -1,0 +1,404 @@
+==================
+let, const and types
+==================
+
+let a = 1
+const LIMIT: number = 10
+let pair: list<list<number>> | nil = nil
+let cb: fn(number, text) -> bool = fn(n, t) { return true }
+
+---
+
+(source_file
+  (let_declaration
+    (identifier)
+    (number))
+  (let_declaration
+    (identifier)
+    (type_name
+      (identifier))
+    (number))
+  (let_declaration
+    (identifier)
+    (union_type
+      (generic_type
+        (type_name
+          (identifier))
+        (generic_type
+          (type_name
+            (identifier))
+          (type_name
+            (identifier))))
+      (type_name))
+    (nil))
+  (let_declaration
+    (identifier)
+    (function_type
+      (type_name
+        (identifier))
+      (type_name
+        (identifier))
+      (type_name
+        (identifier)))
+    (function_expression
+      (parameters
+        (parameter
+          (identifier))
+        (parameter
+          (identifier)))
+      (block
+        (return_statement
+          (true))))))
+
+==================
+destructuring
+==================
+
+let [first, second, ...rest] = items
+let {name, port: p = 80, "user-agent": ua} = config
+let a, [b, c] = pair
+for key, value in entries { say(key) }
+for [x, y] in points { }
+
+---
+
+(source_file
+  (let_declaration
+    (list_pattern
+      (identifier)
+      (identifier)
+      (rest_pattern
+        (identifier)))
+    (identifier))
+  (let_declaration
+    (map_pattern
+      (map_pattern_entry
+        (identifier))
+      (map_pattern_entry
+        (identifier)
+        (identifier)
+        (number))
+      (map_pattern_entry
+        (string)
+        (identifier)))
+    (identifier))
+  (let_declaration
+    (name_list
+      (identifier)
+      (list_pattern
+        (identifier)
+        (identifier)))
+    (identifier))
+  (for_statement
+    (identifier)
+    (identifier)
+    (identifier)
+    (block
+      (expression_statement
+        (call
+          (identifier)
+          (arguments
+            (identifier))))))
+  (for_statement
+    (list_pattern
+      (identifier)
+      (identifier))
+    (identifier)
+    (block)))
+
+==================
+assignment
+==================
+
+x = 1
+x += 2
+obj.field //= 3
+grid[i][j] <<= 1
+a, b = b, a
+
+---
+
+(source_file
+  (assignment
+    (identifier)
+    (number))
+  (assignment
+    (identifier)
+    (number))
+  (assignment
+    (member
+      (identifier)
+      (identifier))
+    (number))
+  (assignment
+    (index
+      (index
+        (identifier)
+        (identifier))
+      (identifier))
+    (number))
+  (multi_assignment
+    (identifier)
+    (identifier)
+    (identifier)
+    (identifier)))
+
+==================
+control flow
+==================
+
+if a > 1 {
+  say("big")
+} else if a == 1 {
+  say("one")
+} else {
+  say("small")
+}
+while running { break }
+for i in 0..10 { continue }
+if ready then go() else wait()
+
+---
+
+(source_file
+  (if_statement
+    (binary_expression
+      (identifier)
+      (number))
+    (block
+      (expression_statement
+        (call
+          (identifier)
+          (arguments
+            (string)))))
+    (else_clause
+      (if_statement
+        (binary_expression
+          (identifier)
+          (number))
+        (block
+          (expression_statement
+            (call
+              (identifier)
+              (arguments
+                (string)))))
+        (else_clause
+          (block
+            (expression_statement
+              (call
+                (identifier)
+                (arguments
+                  (string)))))))))
+  (while_statement
+    (identifier)
+    (block
+      (break_statement)))
+  (for_statement
+    (identifier)
+    (binary_expression
+      (number)
+      (number))
+    (block
+      (continue_statement)))
+  (expression_statement
+    (conditional_expression
+      (identifier)
+      (call
+        (identifier)
+        (arguments))
+      (call
+        (identifier)
+        (arguments)))))
+
+==================
+try, throw, defer, assert
+==================
+
+fn work() {
+  defer { close() }
+  try {
+    throw "broken"
+  } catch err: ValueError or net.Timeout {
+    say(err)
+  } catch {
+    say("other")
+  } finally {
+    done()
+  }
+  assert x > 0, "x must be positive"
+}
+
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameters)
+    (block
+      (defer_statement
+        (block
+          (expression_statement
+            (call
+              (identifier)
+              (arguments)))))
+      (try_statement
+        (block
+          (throw_statement
+            (string)))
+        (catch_clause
+          (identifier)
+          (type_name
+            (identifier))
+          (type_name
+            (identifier)
+            (identifier))
+          (block
+            (expression_statement
+              (call
+                (identifier)
+                (arguments
+                  (identifier))))))
+        (catch_clause
+          (block
+            (expression_statement
+              (call
+                (identifier)
+                (arguments
+                  (string))))))
+        (finally_clause
+          (block
+            (expression_statement
+              (call
+                (identifier)
+                (arguments))))))
+      (assert_statement
+        (binary_expression
+          (identifier)
+          (number))
+        (string)))))
+
+==================
+imports and exports
+==================
+
+import fs
+import "helpers.tb" as h
+from json import parse, dumps as to_json
+from "./util.tb" import tool
+export fn api() { }
+export const VERSION = "1.0"
+export class Thing { }
+export enum Mode { on, off }
+export async fn load() { }
+
+---
+
+(source_file
+  (import_statement
+    (identifier))
+  (import_statement
+    (string)
+    (identifier))
+  (from_import
+    (identifier)
+    (import_name
+      (identifier))
+    (import_name
+      (identifier)
+      (identifier)))
+  (from_import
+    (string)
+    (import_name
+      (identifier)))
+  (export_statement
+    (function_declaration
+      (identifier)
+      (parameters)
+      (block)))
+  (export_statement
+    (let_declaration
+      (identifier)
+      (string)))
+  (export_statement
+    (class_declaration
+      (identifier)
+      (class_body)))
+  (export_statement
+    (enum_declaration
+      (identifier)
+      (enum_member
+        (identifier))
+      (enum_member
+        (identifier))))
+  (export_statement
+    (function_declaration
+      (identifier)
+      (parameters)
+      (block))))
+
+==================
+statement words are names elsewhere
+==================
+
+let import = 3
+let try = import + 1
+say(catch, throw, defer, assert, as)
+re.match(text)
+obj.from
+
+---
+
+(source_file
+  (let_declaration
+    (identifier)
+    (number))
+  (let_declaration
+    (identifier)
+    (binary_expression
+      (identifier)
+      (number)))
+  (expression_statement
+    (call
+      (identifier)
+      (arguments
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier)
+        (identifier))))
+  (expression_statement
+    (call
+      (member
+        (identifier)
+        (identifier))
+      (arguments
+        (identifier))))
+  (expression_statement
+    (member
+      (identifier)
+      (identifier))))
+
+==================
+semicolons
+==================
+
+let a = 1; let b = 2;
+fn f() { a; b }
+
+---
+
+(source_file
+  (let_declaration
+    (identifier)
+    (number))
+  (let_declaration
+    (identifier)
+    (number))
+  (function_declaration
+    (identifier)
+    (parameters)
+    (block
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (identifier)))))

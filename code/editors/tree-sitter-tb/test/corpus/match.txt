@@ -1,0 +1,200 @@
+==================
+every kind of pattern
+==================
+
+let label = match level {
+  "critical" or "high" => "act now"
+  n if n is number and n > 7 => f"score {n}"
+  [first, ...rest] => first
+  [] => "empty"
+  [a, ...] => a
+  {"kind": "alert", "level": lv, count} => lv
+  1..=5 => "low range"
+  -3..0 => "negative"
+  Level.low => "enum low"
+  Alert(a) => a.name
+  Point {x, y: 0} => x
+  net.Error() => "net"
+  is text => "some text"
+  (nil) => "nothing"
+  _ => "unknown"
+}
+
+---
+
+(source_file
+  (let_declaration
+    (identifier)
+    (match_expression
+      (identifier)
+      (match_arm
+        (or_pattern
+          (literal_pattern
+            (string))
+          (literal_pattern
+            (string)))
+        (string))
+      (match_arm
+        (identifier)
+        (binary_expression
+          (is_expression
+            (identifier)
+            (type_name
+              (identifier)))
+          (binary_expression
+            (identifier)
+            (number)))
+        (fstring
+          (fstring_start)
+          (string_content)
+          (interpolation
+            (identifier))
+          (fstring_end)))
+      (match_arm
+        (list_match_pattern
+          (identifier)
+          (rest_pattern
+            (identifier)))
+        (identifier))
+      (match_arm
+        (list_match_pattern)
+        (string))
+      (match_arm
+        (list_match_pattern
+          (identifier)
+          (rest_pattern))
+        (identifier))
+      (match_arm
+        (map_match_pattern
+          (map_match_entry
+            (string)
+            (literal_pattern
+              (string)))
+          (map_match_entry
+            (string)
+            (identifier))
+          (map_match_entry
+            (identifier)))
+        (identifier))
+      (match_arm
+        (range_pattern
+          (number)
+          (number))
+        (string))
+      (match_arm
+        (range_pattern
+          (number)
+          (number))
+        (string))
+      (match_arm
+        (value_pattern
+          (dotted_name
+            (identifier)
+            (identifier)))
+        (string))
+      (match_arm
+        (class_pattern
+          (identifier)
+          (identifier))
+        (member
+          (identifier)
+          (identifier)))
+      (match_arm
+        (class_pattern
+          (identifier)
+          (field_pattern
+            (identifier))
+          (field_pattern
+            (identifier)
+            (literal_pattern
+              (number))))
+        (identifier))
+      (match_arm
+        (class_pattern
+          (dotted_name
+            (identifier)
+            (identifier)))
+        (string))
+      (match_arm
+        (is_pattern
+          (type_name
+            (identifier)))
+        (string))
+      (match_arm
+        (parenthesized_pattern
+          (literal_pattern
+            (nil)))
+        (string))
+      (match_arm
+        (identifier)
+        (string)))))
+
+==================
+an operator at the start of a line begins the next arm
+==================
+
+match n {
+  0 => zero
+  -1 => minus_one
+  2 => n - 1
+  is text => "text"
+}
+
+---
+
+(source_file
+  (expression_statement
+    (match_expression
+      (identifier)
+      (match_arm
+        (literal_pattern
+          (number))
+        (identifier))
+      (match_arm
+        (literal_pattern
+          (number))
+        (identifier))
+      (match_arm
+        (literal_pattern
+          (number))
+        (binary_expression
+          (identifier)
+          (number)))
+      (match_arm
+        (is_pattern
+          (type_name
+            (identifier)))
+        (string)))))
+
+==================
+arms with blocks and commas
+==================
+
+match cmd {
+  "a" => { run() }, "b" => stop(),
+  _ => {}
+}
+
+---
+
+(source_file
+  (expression_statement
+    (match_expression
+      (identifier)
+      (match_arm
+        (literal_pattern
+          (string))
+        (block
+          (expression_statement
+            (call
+              (identifier)
+              (arguments)))))
+      (match_arm
+        (literal_pattern
+          (string))
+        (call
+          (identifier)
+          (arguments)))
+      (match_arm
+        (identifier)
+        (map)))))

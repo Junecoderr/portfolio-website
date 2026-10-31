@@ -1,0 +1,277 @@
+==================
+functions and parameters
+==================
+
+fn greet(name: text, greeting = "hi", ...rest, **opts) -> text {
+  return f"{greeting}, {name}"
+}
+fn swap([a, b], {key}) { return b, a }
+async fn fetch(url) { return await http.get(url) }
+fn empty() { return }
+
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)
+        (type_name
+          (identifier)))
+      (parameter
+        (identifier)
+        (string))
+      (rest_parameter
+        (identifier))
+      (kwrest_parameter
+        (identifier)))
+    (type_name
+      (identifier))
+    (block
+      (return_statement
+        (fstring
+          (fstring_start)
+          (interpolation
+            (identifier))
+          (string_content)
+          (interpolation
+            (identifier))
+          (fstring_end)))))
+  (function_declaration
+    (identifier)
+    (parameters
+      (parameter
+        (list_pattern
+          (identifier)
+          (identifier)))
+      (parameter
+        (map_pattern
+          (map_pattern_entry
+            (identifier)))))
+    (block
+      (return_statement
+        (identifier)
+        (identifier))))
+  (function_declaration
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)))
+    (block
+      (return_statement
+        (await_expression
+          (call
+            (member
+              (identifier)
+              (identifier))
+            (arguments
+              (identifier)))))))
+  (function_declaration
+    (identifier)
+    (parameters)
+    (block
+      (return_statement))))
+
+==================
+generators
+==================
+
+fn count(n) {
+  for i in 0..=n { yield i }
+  yield
+}
+
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameters
+      (parameter
+        (identifier)))
+    (block
+      (for_statement
+        (identifier)
+        (binary_expression
+          (number)
+          (identifier))
+        (block
+          (expression_statement
+            (yield_expression
+              (identifier)))))
+      (expression_statement
+        (yield_expression)))))
+
+==================
+classes
+==================
+
+class Dog extends animals.Animal {
+  let name: text = "rex"
+  static let count = 0
+  const KIND = "dog"
+  fn init(name) {
+    super.init(name)
+    self.name = name
+  }
+  static fn make() { return Dog("x") }
+  async fn bark() { await sleep(1) }
+  static async fn many() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    (identifier)
+    (type_name
+      (identifier)
+      (identifier))
+    (class_body
+      (field_declaration
+        (identifier)
+        (type_name
+          (identifier))
+        (string))
+      (field_declaration
+        (identifier)
+        (number))
+      (field_declaration
+        (identifier)
+        (string))
+      (method_declaration
+        (identifier)
+        (parameters
+          (parameter
+            (identifier)))
+        (block
+          (expression_statement
+            (call
+              (super
+                (identifier))
+              (arguments
+                (identifier))))
+          (assignment
+            (member
+              (self)
+              (identifier))
+            (identifier))))
+      (method_declaration
+        (identifier)
+        (parameters)
+        (block
+          (return_statement
+            (call
+              (identifier)
+              (arguments
+                (string))))))
+      (method_declaration
+        (identifier)
+        (parameters)
+        (block
+          (expression_statement
+            (await_expression
+              (call
+                (identifier)
+                (arguments
+                  (number)))))))
+      (method_declaration
+        (identifier)
+        (parameters)
+        (block)))))
+
+==================
+enums
+==================
+
+enum Level { low, mid, high, }
+
+---
+
+(source_file
+  (enum_declaration
+    (identifier)
+    (enum_member
+      (identifier))
+    (enum_member
+      (identifier))
+    (enum_member
+      (identifier))))
+
+==================
+lambdas and function values
+==================
+
+let double = x => x * 2
+let add = (a, b) => a + b
+let none = () => nil
+let block = (x) => { say(x) }
+let mapper = x => {}
+let anon = fn(x) -> number { return x }
+let task = async fn() { await job() }
+
+---
+
+(source_file
+  (let_declaration
+    (identifier)
+    (lambda
+      (identifier)
+      (binary_expression
+        (identifier)
+        (number))))
+  (let_declaration
+    (identifier)
+    (lambda
+      (parameters
+        (parameter
+          (identifier))
+        (parameter
+          (identifier)))
+      (binary_expression
+        (identifier)
+        (identifier))))
+  (let_declaration
+    (identifier)
+    (lambda
+      (parameters)
+      (nil)))
+  (let_declaration
+    (identifier)
+    (lambda
+      (parameters
+        (parameter
+          (identifier)))
+      (block
+        (expression_statement
+          (call
+            (identifier)
+            (arguments
+              (identifier)))))))
+  (let_declaration
+    (identifier)
+    (lambda
+      (identifier)
+      (map)))
+  (let_declaration
+    (identifier)
+    (function_expression
+      (parameters
+        (parameter
+          (identifier)))
+      (type_name
+        (identifier))
+      (block
+        (return_statement
+          (identifier)))))
+  (let_declaration
+    (identifier)
+    (function_expression
+      (parameters)
+      (block
+        (expression_statement
+          (await_expression
+            (call
+              (identifier)
+              (arguments))))))))
