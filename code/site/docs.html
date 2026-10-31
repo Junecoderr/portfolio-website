@@ -680,6 +680,7 @@ say(merged)</code></pre>
     <section id="functions-3">
       <h2><span class="chapter-num">22.</span>More about functions: defaults, names, extras and lambdas</h2>
       <p>Inputs can have <strong>defaults</strong>, and you can pass any input <strong>by name</strong>. <code>...rest</code> collects any extra inputs into a list, and <code>**opts</code> collects extra named ones into a map. A <strong>lambda</strong> such as <code>x =&gt; x * 2</code> is a short way to write a small function.</p>
+      <p>Library functions take names too, using the names in their signature (<code>tb doc text</code> lists them): <code>text.pad_left("7", 3, fill = "0")</code> or <code>parallel.map(check, hosts, workers = 8)</code>. A misspelled name gets a "Did you mean...?" hint. Functions that take any number of inputs, such as <code>fs.join</code>, take them in order only.</p>
       <pre class="tb-code" data-runnable><code>fn connect(host, port = 22, timeout = 5) {
   return f"{host}:{port} (wait {timeout}s)"
 }

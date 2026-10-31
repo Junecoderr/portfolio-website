@@ -198,9 +198,10 @@ def test_spread_skips_the_count_check():
 def test_builtin_and_library_arity():
     src = 'import fs\nsay(len(1, 2))\nsay(fs.read())\nsay(fs.read("a", encoding = "x"))\n'
     assert problems(src) == [
-        (2, 5, "error", "wrong-arity"), (3, 8, "error", "wrong-arity"), (4, 8, "error", "unknown-keyword"),
+        (2, 5, "error", "wrong-arity"), (3, 8, "error", "wrong-arity"), (4, 18, "error", "unknown-keyword"),
     ]
     assert messages(src)[0] == "len() needs 1 input, but got 2."
+    assert messages(src)[2] == "fs.read() has no input called 'encoding'. Its inputs are: path."
 
 
 def test_method_and_constructor_arity():

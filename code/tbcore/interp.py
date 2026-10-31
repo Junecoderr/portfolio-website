@@ -5,6 +5,7 @@ from __future__ import annotations
 import difflib
 import importlib
 import importlib.util
+import inspect
 import math
 import os
 import random
@@ -1749,10 +1750,7 @@ class Interpreter:
     def call(self, callee, args, line, kwargs: dict | None = None):
         if isinstance(callee, Builtin):
             if kwargs:
-                raise TBError(
-                    f"{callee.name}() doesn't take named inputs like {next(iter(kwargs))} = ...; "
-                    "give its inputs in order.", line,
-                )
+                args = self.native_kwargs(callee, args, kwargs, line)
             lo, hi = callee.arity
             if not lo <= len(args) <= hi:
                 raise TBError(arity_message(callee.name, lo, hi, len(args)), line)
@@ -1851,8 +1849,48 @@ class Interpreter:
             scope.vars[kwrest.name] = {}
         return scope
 
+    def native_kwargs(self, callee: Builtin, args, kwargs: dict, line) -> list:
+        """Put named inputs to a library function into their places, using
+        the names from its doc signature: map(fn, items, workers = 8)."""
+        names = callee.params
+        label = callee.name
+        if names is None:
+            raise TBError(f"{label}() doesn't take named inputs like {next(iter(kwargs))} = ...; "
+                          "give its inputs in order.", line)
+        for name in kwargs:
+            if name not in names:
+                raise self.unknown_keyword(label, name, names, line)
+            if names.index(name) < len(args):
+                raise TBError(f"{label}() got '{name}' twice: once in order and once by name.", line)
+        args = list(args)
+        last = max(names.index(name) for name in kwargs)
+        for i in range(len(args), max(last + 1, callee.arity[0])):
+            name = names[i]
+            if name in kwargs:
+                args.append(kwargs[name])
+                continue
+            if i < callee.arity[0]:
+                raise TBError(f"{label}() is missing its input '{name}'.", line)
+            args.append(self._native_default(callee, i, name, names[last], line))
+        return args
+
+    @staticmethod
+    def _native_default(callee: Builtin, index, name, later, line):
+        """The Python default of a left-out optional input."""
+        try:
+            params = list(inspect.signature(callee.fn).parameters.values())[1:]  # [0] is line
+        except (TypeError, ValueError):
+            params = []
+        if index < len(params):
+            p = params[index]
+            if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD) and p.default is not p.empty:
+                return p.default
+        raise TBError(f"{callee.name}() can't leave out '{name}' when '{later}' is given by name; "
+                      f"give {name} too.", line)
+
     def unknown_keyword(self, label, name, positional, line) -> TBError:
-        names = [p.name for p in positional if p.name]
+        names = [getattr(p, "name", p) for p in positional]  # Params, or plain names (library functions)
+        names = [n for n in names if n]
         hint = difflib.get_close_matches(name, names, n=1)
         extra = f" Did you mean '{hint[0]}'?" if hint else ""
         listing = f" Its inputs are: {', '.join(names)}." if names else " It has no named inputs."

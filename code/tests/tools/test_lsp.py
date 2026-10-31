@@ -218,6 +218,17 @@ def test_signature_help(session):
     assert "read(" in help2["signatures"][0]["label"]
 
 
+def test_signature_help_follows_named_inputs(session):
+    client, _init, uri, _tmp = session
+    text = MAIN.replace("fs.\n", "import text\ntext.pad_left(\"a\", fill = \n")
+    client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 2},
+                                             "contentChanges": [{"text": text}]})
+    found = client.request("textDocument/signatureHelp", {"textDocument": {"uri": uri},
+                                                          "position": pos(text, "fill = ", 7)})
+    params = [p["label"] for p in found["signatures"][0]["parameters"]]
+    assert params[found["activeParameter"]].startswith("fill")
+
+
 def test_definition_same_file_and_across_files(session):
     client, _init, uri, tmp = session
     loc = client.request("textDocument/definition", {"textDocument": {"uri": uri},

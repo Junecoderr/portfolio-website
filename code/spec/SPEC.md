@@ -437,6 +437,12 @@ fn greet(name, greeting = "Hello", ...rest, **opts) -> text { … }
   passed by name: `greet("Tanisha", greeting = "Hi")`. A positional
   argument after a named one, the same parameter given twice, a missing
   required argument, or an unknown name (without `**opts`) is an error.
+  Standard-library (native) functions take named arguments too (TB 3.1):
+  their parameter names are the ones in the doc signature's first line
+  (`map(fn, items, workers?)`), so `parallel.map(f, xs, workers = 8)`
+  works, with the same errors. A left-out optional parameter before a
+  named one gets the library's default. Functions taking any number of
+  arguments (`join(part, ...)`) are positional only.
 - Lambdas: `x => x * 2`, `(a, b) => a + b`, `() => 1`, and `x => { … }`
   whose value is what an explicit `return` gives, else nil **(settled)**.
 - `fn(x) { … }` and `async fn(x) { … }` expressions.

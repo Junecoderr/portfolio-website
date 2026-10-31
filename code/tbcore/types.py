@@ -87,10 +87,11 @@ class FnSig:
     """What we know about something callable."""
 
     def __init__(self, label, params=None, lo=0, hi=MANY, returns=None, native=False,
-                 decl=None, is_generator=False, is_async=False):
+                 decl=None, is_generator=False, is_async=False, names=None):
         self.label = label
         self.params = params        # list[A.Param] for TB functions
         self.lo, self.hi = lo, hi   # for native functions
+        self.names = names          # native input names from the doc (None: positional only)
         self.returns = returns
         self.native = native
         self.decl = decl
@@ -548,7 +549,8 @@ def value_type(value, label=""):
         return "bytes"
     if isinstance(value, Builtin):
         lo, hi = value.arity
-        return FnT(FnSig(value.name, lo=lo, hi=hi, returns=doc_returns(value.doc), native=True))
+        return FnT(FnSig(value.name, lo=lo, hi=hi, returns=doc_returns(value.doc), native=True,
+                         names=value.params))
     if isinstance(value, Module):
         return ModT(native_modinfo(value))
     if isinstance(value, TBClass):
@@ -1824,11 +1826,12 @@ class Checker:
                     return "text"
                 if name == "arity":
                     return "number"
-            from .runtime import METHOD_HINTS, METHOD_KIND_LABEL, METHOD_KIND_PLURAL, METHODS
+            from .runtime import METHOD_HINTS, METHOD_KIND_LABEL, METHOD_KIND_PLURAL, METHODS, native_params
             table = METHODS.get(k, {})
             if name in table:
                 _fn, lo, hi, doc = table[name]
-                return FnT(FnSig(name, lo=lo, hi=hi, returns=doc_returns(doc), native=True))
+                return FnT(FnSig(name, lo=lo, hi=hi, returns=doc_returns(doc), native=True,
+                                 names=native_params(doc, (lo, hi))))
             names = sorted(table)
             if name in METHOD_HINTS and METHOD_HINTS[name] in table:
                 hint = [METHOD_HINTS[name]]
@@ -1987,6 +1990,21 @@ class Checker:
             return None
         return None
 
+    def bad_keyword(self, label, a, names, n, has_spread, kwrest) -> bool:
+        """Report a named input given twice or not taken; True if reported."""
+        if a.name in names[:n] and not has_spread:
+            self.error("wrong-arity", f"{label}() got '{a.name}' twice: once in order and once by name.",
+                       a.line, a.name)
+            return True
+        if a.name not in names and not kwrest:
+            hint = difflib.get_close_matches(a.name, [x for x in names if x], n=1)
+            extra = f" Did you mean '{hint[0]}'?" if hint else ""
+            listing = f" Its inputs are: {', '.join(x for x in names if x)}." if any(names) else " It has no named inputs."
+            self.error("unknown-keyword", f"{label}() has no input called '{a.name}'.{extra}{listing}",
+                       a.line, a.name)
+            return True
+        return False
+
     def check_args(self, sig: FnSig, node, arg_types, word, attr):
         line = node.line
         has_spread = any(isinstance(a, A.Spread) for a in node.args)
@@ -1994,10 +2012,22 @@ class Checker:
         kws = [(a, t) for a, t in zip(node.args, arg_types) if isinstance(a, A.KeywordArg)]
         from .runtime import arity_message
         if sig.native:
-            if kws:
+            if kws and sig.names is None:
                 self.error("unknown-keyword",
                            f"{sig.label}() doesn't take named inputs like {kws[0][0].name} = ...; give its inputs in order.",
                            line, word, attr)
+                return
+            if kws:  # a library function: input names come from its doc signature
+                names = list(sig.names)
+                for a, _t in kws:
+                    if self.bad_keyword(sig.label, a, names, len(pos), has_spread, False):
+                        return
+                given = {a.name for a, _t in kws}
+                missing = [x for x in names[len(pos):sig.lo] if x not in given]
+                if not has_spread and missing:
+                    self.error("wrong-arity", f"{sig.label}() is missing its input '{missing[0]}'.", line, word, attr)
+                elif not has_spread and len(pos) > sig.hi:
+                    self.error("wrong-arity", arity_message(sig.label, sig.lo, sig.hi, len(pos)), line, word, attr)
                 return
             if not has_spread and not sig.lo <= len(pos) <= sig.hi:
                 self.error("wrong-arity", arity_message(sig.label, sig.lo, sig.hi, len(pos)), line, word, attr)
@@ -2011,16 +2041,7 @@ class Checker:
         n = len(pos)
         given = set()
         for a, t in kws:
-            if a.name in names[:n] and not has_spread:
-                self.error("wrong-arity", f"{sig.label}() got '{a.name}' twice: once in order and once by name.",
-                           a.line, a.name)
-                return
-            if a.name not in names and not kwrest:
-                hint = difflib.get_close_matches(a.name, [x for x in names if x], n=1)
-                extra = f" Did you mean '{hint[0]}'?" if hint else ""
-                listing = f" Its inputs are: {', '.join(x for x in names if x)}." if any(names) else " It has no named inputs."
-                self.error("unknown-keyword", f"{sig.label}() has no input called '{a.name}'.{extra}{listing}",
-                           a.line, a.name)
+            if self.bad_keyword(sig.label, a, names, n, has_spread, kwrest):
                 return
             given.add(a.name)
         if not has_spread:
