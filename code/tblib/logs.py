@@ -616,6 +616,7 @@ EVENTS = {
     5157: ("connection_blocked", "The Windows Filtering Platform has blocked a connection", None),
     7045: ("service_installed", "A new service was installed in the system", None),
 }
+SYSTEM_IDS = {104, 7045}  # EVENTS from the System channel; the rest are Security
 
 LOGON_TYPES = {2: "interactive", 3: "network", 4: "batch", 5: "service", 7: "unlock",
                8: "network_cleartext", 9: "new_credentials", 10: "remote_interactive", 11: "cached_interactive"}
@@ -700,13 +701,20 @@ def windows_record(obj: dict, raw: str):
     message = message if isinstance(message, str) else ""
     first, sections = parse_event_message(message) if message else ("", {"": {}})
 
+    provider = none_if_dash(lookup(obj, ["providername", "source", "provider", "sourcename"], low))
+    channel = lookup(obj, ["channel", "logname"], low)
+    sysmon = "sysmon" in f"{provider} {channel}".lower()
+    # EVENTS only applies in its own channel (or with none given): elsewhere the same number means something else.
+    home = "system" if event_id in SYSTEM_IDS else "security"
+    known_id = None if sysmon or str(channel or home).lower() != home else event_id
+
     data: dict = {}
     for key in ("eventdata", "event_data", "data"):
         if key in low and isinstance(obj[low[key]], dict):
             data.update({k: v for k, v in obj[low[key]].items()})
     props = lookup(obj, ["properties"], low)
-    if isinstance(props, list) and event_id in PROPERTY_NAMES:
-        for index, name in PROPERTY_NAMES[event_id].items():
+    if isinstance(props, list) and known_id in PROPERTY_NAMES:
+        for index, name in PROPERTY_NAMES[known_id].items():
             if index < len(props) and name not in data:
                 value = props[index]
                 if isinstance(value, dict):
@@ -741,9 +749,6 @@ def windows_record(obj: dict, raw: str):
             value = any_section(label)
             if value is not None:
                 data[name] = value
-    provider = none_if_dash(lookup(obj, ["providername", "source", "provider", "sourcename"], low))
-    channel = lookup(obj, ["channel", "logname"], low)
-    sysmon = "sysmon" in f"{provider} {channel}".lower()
     if sysmon and message:
         # Sysmon's Message is "Name: value" lines with the EventData names.
         for text_line in message.replace("\r", "\n").split("\n")[1:]:
@@ -752,13 +757,13 @@ def windows_record(obj: dict, raw: str):
                 data.setdefault(name.strip(), value.strip())
     data = {k: v for k, v in data.items() if v is not None}
 
-    action, description, success = EVENTS.get(event_id, (None, None, None))
+    action, description, success = EVENTS.get(known_id, (None, None, None))
     if sysmon:
         action, description = SYSMON_EVENTS.get(event_id, (None, None))
         if ts is None and data.get("UtcTime"):
             ts, when = parse_time(utc_if_bare(data["UtcTime"]))
     group = none_if_dash(data.get("GroupName"))
-    if event_id in GROUP_EVENTS:
+    if known_id in GROUP_EVENTS:
         # In group events EventData's TargetUserName is the group; the member is MemberName.
         if group is None and "GroupName" not in data:
             group = none_if_dash(data.get("TargetUserName"))
@@ -766,18 +771,18 @@ def windows_record(obj: dict, raw: str):
             data["TargetUserName"] = data.get("MemberName")
     target = none_if_dash(data.get("TargetUserName"))
     subject = none_if_dash(data.get("SubjectUserName"))
-    user = subject if (event_id in SUBJECT_EVENTS or not target) else target
+    user = subject if (known_id in SUBJECT_EVENTS or not target) else target
     ip = none_if_dash(data.get("IpAddress"))
     if ip and ip.lower().startswith("::ffff:"):
         ip = ip[7:]
     status = none_if_dash(data.get("Status"))
-    if event_id == 4776 and status:
+    if known_id == 4776 and status:
         success = status.lower() in ("0x0", "0", "0x00000000")
     keywords = lookup(obj, ["keywordsdisplaynames", "keywords"], low)
     keyword_text = " ".join(keywords) if isinstance(keywords, list) else str(keywords or "")
     if success is None and "Audit Failure" in keyword_text:
         success = False
-    elif success is None and event_id in (4624, 4648) and "Audit Success" in keyword_text:
+    elif success is None and known_id in (4624, 4648) and "Audit Success" in keyword_text:
         success = True
     logon_type = to_int(data.get("LogonType"))
 
@@ -813,26 +818,44 @@ def windows_record(obj: dict, raw: str):
     return make_record("windows", raw, ts, when, text, fields)
 
 
-# Sysmon event IDs (Microsoft Sysinternals Sysmon documentation): id -> (action, description)
+# Sysmon event IDs: id -> (action, description). Each description starts with the
+# event's name in the Sysinternals Sysmon reference, then says what it means.
+# evtx builds its Sysmon descriptions from this table too.
 SYSMON_EVENTS = {
-    1: ("process_created", "Process creation"), 2: ("file_time_changed", "A process changed a file creation time"),
-    3: ("network_connection", "Network connection"), 4: ("sysmon_state_changed", "Sysmon service state changed"),
-    5: ("process_exited", "Process terminated"), 6: ("driver_loaded", "Driver loaded"),
-    7: ("image_loaded", "Image loaded"), 8: ("remote_thread_created", "CreateRemoteThread"),
-    9: ("raw_disk_read", "RawAccessRead"), 10: ("process_accessed", "ProcessAccess"),
-    11: ("file_created", "FileCreate"), 12: ("registry_object_changed", "RegistryEvent (Object create and delete)"),
-    13: ("registry_value_set", "RegistryEvent (Value Set)"), 14: ("registry_renamed", "RegistryEvent (Key and Value Rename)"),
-    15: ("file_stream_created", "FileCreateStreamHash"), 16: ("sysmon_config_changed", "ServiceConfigurationChange"),
-    17: ("pipe_created", "PipeEvent (Pipe Created)"), 18: ("pipe_connected", "PipeEvent (Pipe Connected)"),
-    19: ("wmi_filter", "WmiEvent (WmiEventFilter activity detected)"),
-    20: ("wmi_consumer", "WmiEvent (WmiEventConsumer activity detected)"),
-    21: ("wmi_binding", "WmiEvent (WmiEventConsumerToFilter activity detected)"),
-    22: ("dns_query", "DNSEvent (DNS query)"), 23: ("file_deleted", "FileDelete (File Delete archived)"),
+    1: ("process_created", "Process creation: a process was started"),
+    2: ("file_time_changed", "File creation time changed: a process changed a file's creation time"),
+    3: ("network_connection", "Network connection: a process made a TCP/UDP connection"),
+    4: ("sysmon_state_changed", "Sysmon service state changed: Sysmon started or stopped"),
+    5: ("process_exited", "Process terminated: a process ended"),
+    6: ("driver_loaded", "Driver loaded: a kernel driver was loaded"),
+    7: ("image_loaded", "Image loaded: a process loaded a DLL or other module"),
+    8: ("remote_thread_created", "CreateRemoteThread: a process started a thread in another process"),
+    9: ("raw_disk_read", "RawAccessRead: a process read a drive directly"),
+    10: ("process_accessed", "ProcessAccess: a process opened another process"),
+    11: ("file_created", "FileCreate: a file was created or overwritten"),
+    12: ("registry_object_changed",
+         "RegistryEvent (Object create and delete): a registry key or value was created or deleted"),
+    13: ("registry_value_set", "RegistryEvent (Value Set): a registry value was written"),
+    14: ("registry_renamed", "RegistryEvent (Key and Value Rename): a registry key or value was renamed"),
+    15: ("file_stream_created", "FileCreateStreamHash: a named file stream (alternate data stream) was created"),
+    16: ("sysmon_config_changed", "ServiceConfigurationChange: the Sysmon configuration changed"),
+    17: ("pipe_created", "PipeEvent (Pipe Created): a named pipe was created"),
+    18: ("pipe_connected", "PipeEvent (Pipe Connected): a client connected to a named pipe"),
+    19: ("wmi_filter", "WmiEvent (WmiEventFilter activity detected): a WMI event filter was registered or removed"),
+    20: ("wmi_consumer",
+         "WmiEvent (WmiEventConsumer activity detected): a WMI event consumer was registered or removed"),
+    21: ("wmi_binding",
+         "WmiEvent (WmiEventConsumerToFilter activity detected): a WMI consumer was bound to a filter or unbound"),
+    22: ("dns_query", "DNSEvent (DNS query): a process ran a DNS query"),
+    23: ("file_deleted", "FileDelete (File Delete archived): a file was deleted and a copy kept"),
     24: ("clipboard_changed", "ClipboardChange (New content in the clipboard)"),
-    25: ("process_tampering", "ProcessTampering (Process image change)"),
-    26: ("file_delete_logged", "FileDeleteDetected (File Delete logged)"),
-    27: ("file_block_executable", "FileBlockExecutable"), 28: ("file_block_shredding", "FileBlockShredding"),
-    29: ("file_executable_detected", "FileExecutableDetected"), 255: ("sysmon_error", "Error"),
+    25: ("process_tampering",
+         "ProcessTampering (Process image change): a process image was changed (hollowing or herpaderping)"),
+    26: ("file_delete_logged", "FileDeleteDetected (File Delete logged): a file was deleted, no copy kept"),
+    27: ("file_block_executable", "FileBlockExecutable: Sysmon blocked an executable file from being created"),
+    28: ("file_block_shredding", "FileBlockShredding: Sysmon blocked a file from being shredded"),
+    29: ("file_executable_detected", "FileExecutableDetected: a new executable file was created"),
+    255: ("sysmon_error", "Error: Sysmon hit an error"),
 }
 
 
@@ -965,9 +988,12 @@ def zeek_header(line, state):
     """Read one '#name value' header line of a Zeek TSV log."""
     name, _, value = line[1:].partition(state["sep"] if not line.startswith("#separator") else " ")
     if name == "separator":
-        state["sep"] = value.strip().encode().decode("unicode_escape") or "\t"
+        try:
+            state["sep"] = value.strip().encode().decode("unicode_escape") or "\t"
+        except UnicodeDecodeError:  # a broken escape such as "\x": keep the default
+            state["sep"] = "\t"
     elif name == "set_separator":
-        state["set_sep"] = value
+        state["set_sep"] = value or ","
     elif name == "empty_field":
         state["empty"] = value
     elif name == "unset_field":
@@ -1238,6 +1264,19 @@ JSON_READERS = {"zeek": zeek_record, "suricata": suricata_record, "cloudtrail": 
 JSON_FORMATS = {"json", *JSON_READERS}
 
 
+# Zeek connection UIDs start with C, file IDs with F, then base62 text.
+ZEEK_UID = re.compile(r"[CF][A-Za-z0-9]{15,21}")
+
+
+def zeek_like(obj) -> bool:
+    """Zeek's own field names, or a Zeek-shaped uid with an epoch ts (plain "uid" and "ts" are common elsewhere)."""
+    if "id.orig_h" in obj or "_path" in obj or (isinstance(obj.get("id"), dict) and "orig_h" in obj["id"]):
+        return True
+    ts = obj.get("ts")
+    return isinstance(ts, (int, float)) and not isinstance(ts, bool) and any(
+        isinstance(obj.get(k), str) and ZEEK_UID.fullmatch(obj[k]) for k in ("uid", "fuid"))
+
+
 def classify(obj) -> str:
     """Which product wrote this JSON object (by its documented field names)."""
     if not isinstance(obj, dict):
@@ -1251,7 +1290,7 @@ def classify(obj) -> str:
         return "okta"
     if "event_type" in obj and "timestamp" in obj and any(k in obj for k in ("flow_id", "src_ip", "dest_ip", "in_iface", "stats")):
         return "suricata"
-    if "id.orig_h" in obj or ("ts" in obj and any(k in obj for k in ("uid", "fuid", "_path"))):
+    if zeek_like(obj):
         return "zeek"
     if windows_like(obj):
         return "windows"
@@ -1502,20 +1541,32 @@ def iter_rows(handle, fmt):
             yield object_record(obj, raw, "csv")
 
 
+def json_documents(text, line):
+    """Every JSON value in the text: usually one, several when files were
+    concatenated (zcat *.json.gz > all.json gives one {"Records": [...]} per line)."""
+    decoder, out, i = _json.JSONDecoder(), [], 0
+    while True:
+        i = re.compile(r"\s*").match(text, i).end()
+        if i >= len(text):
+            return out
+        try:
+            value, i = decoder.raw_decode(text, i)
+        except ValueError as err:
+            fail(line, f"That log isn't valid JSON: {err}.")
+        out.append(value)
+
+
 def iter_json_document(text, fmt, line):
-    try:
-        data = _json.loads(text)
-    except ValueError as err:
-        fail(line, f"That log isn't valid JSON: {err}.")
-    if isinstance(data, dict):
-        # {"Events": [...]} / {"records": [...]} wrappers, or one event
-        inner = next((v for v in data.values() if isinstance(v, list) and v and isinstance(v[0], dict)), None)
-        data = inner if inner is not None else [data]
-    if not isinstance(data, list):
-        fail(line, "That JSON log should be a list of events (or one event per line).")
-    for obj in data:
-        raw = _json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
-        yield json_record(obj, raw, fmt)
+    for data in json_documents(text, line):
+        if isinstance(data, dict):
+            # {"Events": [...]} / {"records": [...]} wrappers, or one event
+            inner = next((v for v in data.values() if isinstance(v, list) and v and isinstance(v[0], dict)), None)
+            data = inner if inner is not None else [data]
+        if not isinstance(data, list):
+            fail(line, "That JSON log should be a list of events (or one event per line).")
+        for obj in data:
+            raw = _json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+            yield json_record(obj, raw, fmt)
 
 
 def iter_text(text, fmt, line, year=None):
@@ -1621,7 +1672,7 @@ def load(api):
         "- evtx: binary .evtx files, read by the evtx library.\n"
         "- zeek: Zeek logs, tab-separated with #fields headers, or JSON.\n"
         "- suricata: Suricata EVE JSON.\n"
-        "- cloudtrail: AWS CloudTrail, the {\"Records\": [...]} file or one event per line.\n"
+        "- cloudtrail: AWS CloudTrail, {\"Records\": [...]} files (also several joined together) or one event per line.\n"
         "- okta: the Okta System Log (JSON).\n"
         "- m365: the Microsoft 365 unified audit log, as JSON or the CSV export with an AuditData column.\n"
         "- cef, leef: CEF and LEEF lines, bare or after a syslog header."))
