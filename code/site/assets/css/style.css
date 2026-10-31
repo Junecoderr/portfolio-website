@@ -544,6 +544,16 @@ pre.tb-code[data-runnable], pre.tb-code[data-example] { margin-bottom: 0; border
 .output .out-ask { color: var(--ink-soft); }
 .output .out-answer { color: var(--accent-text); font-weight: 600; }
 .output .out-done { display: block; margin-top: 0.3rem; color: var(--ink-faint); font-family: var(--font-sans); font-size: 0.85rem; }
+/* an ask() answer typed into the output (tb-pyodide.js askInline) */
+.output .out-input {
+  font: inherit; color: inherit; background: transparent;
+  border: 0; border-bottom: 1px solid currentColor; padding: 0 0.15rem;
+  min-width: 12ch; width: 40%; max-width: 100%;
+}
+.output .out-input:focus { outline: 2px solid var(--marigold); outline-offset: 1px; }
+.button-stop[hidden] { display: none; }
+.button-stop { background: transparent; border-color: var(--marigold); color: var(--code-ink); }
+.button-stop:hover { background: rgb(255 255 255 / 0.08); border-color: #f7bd61; color: var(--code-ink); }
 
 /* shell commands (not TB code) */
 pre.cmd {

@@ -150,7 +150,7 @@ it when releasing and release before deploying a version bump.
 ```sh
 uv run python scripts/fetch_pyodide.py          # once: pinned Pyodide into site/vendor/pyodide/
 uv run python scripts/build_site.py             # assembles dist/site/
-uv run python -m http.server -d dist/site 8000  # http://localhost:8000
+uv run python scripts/serve_site.py              # http://localhost:8000, with vercel.json's headers
 ```
 
 `build_site.py` copies `site/`, the runtime (`tb.py`, `tbcore/`, `tblib/`) for
@@ -166,6 +166,16 @@ hashlib/openssl, ssl, tzdata) vendored by `fetch_pyodide.py` on demand. Code is 
 runtime by `site/assets/js/highlight.js`. The site's CSP allows no inline
 scripts or event handlers, and the site never links to the source
 repository.
+
+Programs run in a Web Worker (`site/assets/js/tb-worker.js`, driven by
+`tb-pyodide.js`), shared by the playground and every Run button on a page.
+`vercel.json` makes the whole site cross-origin isolated (COOP/COEP), which
+gives the worker a SharedArrayBuffer: `ask()` answers are typed into the
+output and Stop uses Pyodide's interrupt buffer. So nothing on the site may
+load from another origin. Without isolation (plain `http.server`) Stop
+restarts the worker and a program that asks is re-run on the page with
+prompt boxes. `tests/browser/playground.mjs` checks all of this in headless
+Chrome (`TB_BROWSER_TESTS=1` runs it from `tests/test_site.py`; about 2 min).
 
 ### "Visualize" pictures in the library reference
 

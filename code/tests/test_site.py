@@ -400,6 +400,101 @@ def test_stats_functions_stay_out_of_the_site():
     assert "connect-src 'self'" in json.dumps(config)
 
 
+# -- the playground's worker (tb-worker.js) and cross-origin isolation ----------
+
+def _site_headers() -> dict:
+    config = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
+    rule = next(r for r in config["headers"] if r["source"] == "/(.*)")
+    return {h["key"]: h["value"] for h in rule["headers"]}
+
+
+def test_site_is_cross_origin_isolated():
+    """COOP/COEP give the playground SharedArrayBuffer (inline ask(), instant
+    Stop). Run buttons are on nearly every page, and the worker script and
+    Pyodide need the headers too, so they cover the whole site."""
+    headers = _site_headers()
+    assert headers["Cross-Origin-Opener-Policy"] == "same-origin"
+    assert headers["Cross-Origin-Embedder-Policy"] == "require-corp"
+    csp = headers["Content-Security-Policy"]
+    assert "script-src 'self' 'wasm-unsafe-eval';" in csp and "unsafe-inline" not in csp.split("script-src")[1].split(";")[0]
+    assert "worker-src 'self'" in csp and "default-src 'self'" in csp
+
+
+_CROSS_ORIGIN = re.compile(r"""<(?:script|img|iframe|source|video|audio|embed|track)\b[^>]*\ssrc=["']?(?:https?:)?//"""
+                           r"""|<link\b[^>]*\shref=["']?(?:https?:)?//|url\(\s*["']?(?:https?:)?//""", re.I)
+
+
+@pytest.mark.parametrize("page", PAGES + sorted((SITE / "assets" / "css").glob("*.css")), ids=lambda p: p.name)
+def test_no_cross_origin_subresources(page):
+    """Under COEP require-corp a cross-origin script, image or stylesheet would fail to load."""
+    assert not _CROSS_ORIGIN.search(page.read_text(encoding="utf-8")), page.name
+
+
+def test_playground_runs_in_a_worker():
+    js = SITE / "assets" / "js"
+    client = (js / "tb-pyodide.js").read_text(encoding="utf-8")
+    worker = (js / "tb-worker.js").read_text(encoding="utf-8")
+    assert 'new URL("tb-worker.js", here)' in client and "new Worker(WORKER_URL)" in client
+    assert "SharedArrayBuffer" in client and "crossOriginIsolated" in client
+    assert "worker.terminate()" in client  # Stop without shared memory
+    assert "setInterruptBuffer" in worker and "Atomics.wait" in worker and "importScripts" in worker
+    assert "except KeyboardInterrupt" in worker
+    for name in ("tb-pyodide.js", "tb-worker.js", "playground.js", "runner.js"):
+        assert "http://" not in (js / name).read_text(encoding="utf-8")
+        assert "https://" not in (js / name).read_text(encoding="utf-8")
+    page = (SITE / "playground.html").read_text(encoding="utf-8")
+    assert 'id="pg-stop"' in page and 'id="pg-run"' in page
+    for name in ("playground.js", "runner.js"):
+        text = (js / name).read_text(encoding="utf-8")
+        assert "TB.askInline(" in text and ".stop()" in text, name
+
+
+def test_serve_site_sends_vercel_headers():
+    import threading
+    import functools
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+    import serve_site
+    serve_site.Handler.rules = serve_site.vercel_headers(json.loads((ROOT / "vercel.json").read_text(encoding="utf-8")))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(serve_site.Handler, directory=str(SITE)))
+    server.RequestHandlerClass.log_message = lambda *a: None
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        with urllib.request.urlopen(base + "/playground") as r:  # cleanUrls
+            assert b'id="pg-stop"' in r.read()
+            for key, value in _site_headers().items():
+                assert r.headers[key] == value, key
+        with urllib.request.urlopen(base + "/assets/js/tb-worker.js") as r:
+            assert r.headers["Cross-Origin-Embedder-Policy"] == "require-corp"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_playground_in_a_real_browser(tmp_path):
+    """Opt-in (TB_BROWSER_TESTS=1, needs node, Chrome and Pyodide): runs
+    tests/browser/playground.mjs against a fresh build served like Vercel."""
+    if os.environ.get("TB_BROWSER_TESTS") != "1":
+        pytest.skip("set TB_BROWSER_TESTS=1 to drive headless Chrome")
+    node = shutil.which("node")
+    if not node or not (SITE / "vendor" / "pyodide" / "pyodide.asm.wasm").exists():
+        pytest.skip("needs node and Pyodide (scripts/fetch_pyodide.py)")
+    import build_site
+    out = tmp_path / "site"
+    assert build_site.main(["--out", str(out)]) == 0
+    server = subprocess.Popen([sys.executable, str(SCRIPTS / "serve_site.py"), "--dir", str(out), "--port", "0"],
+                              stdout=subprocess.PIPE, text=True)
+    try:
+        url = re.search(r"http://\S+", server.stdout.readline()).group(0)
+        proc = subprocess.run([node, str(ROOT / "tests" / "browser" / "playground.mjs"), url],
+                              capture_output=True, text=True, timeout=300)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+    finally:
+        server.terminate()
+        server.wait(timeout=10)
+
+
 # -- readable doc strings (tbcore/docfmt.py; format in tblib/README.md) --------------------
 
 def _plain(fragment: str) -> str:
