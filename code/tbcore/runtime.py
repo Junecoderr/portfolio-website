@@ -239,6 +239,13 @@ class NativeMethod:
 
 
 class TBClass:
+    """A TB class. Invariant: its methods (and its base) never change once the
+    class statement (or the native library defining it) has finished: TB has no
+    way to add or replace a method later. The JIT's per-call-site inline cache
+    (tbcore/jit.py: class -> method, filled on first lookup, never invalidated)
+    relies on this; anything that ever mutates `methods` after creation must
+    also clear those caches."""
+
     def __init__(self, name: str, base: TBClass | None = None, *, interp=None, file=None):
         self.name = name
         self.base = base
