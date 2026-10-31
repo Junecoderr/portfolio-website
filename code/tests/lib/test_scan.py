@@ -154,8 +154,8 @@ def test_friendly_errors(tmp_path):
     unknown = q('rule A { strings: $a = "x" condition: $b }')
     msg = str(tb_error(f'import scan\nscan.rule({unknown})'))
     assert "$b" in msg
-    xor = q('rule A { strings: $a = "x" xor condition: $a }')
-    assert "isn't supported" in str(tb_error(f'import scan\nscan.rule({xor})'))
+    xor = q('rule A { strings: $a = "x" xor nocase condition: $a }')
+    assert "doesn't allow 'xor' together with 'nocase'" in str(tb_error(f'import scan\nscan.rule({xor})'))
     assert "needs rules" in str(tb_error('import scan\nscan.bytes("x", [])'))
     assert "is a file, not a folder" in str(tb_error(f'import scan\nscan.folder("{tb_path(RULES)}", "rule A {{ condition: true }}")'))
     assert "I couldn't find" in str(tb_error('import scan\nscan.load("missing.yar")'))

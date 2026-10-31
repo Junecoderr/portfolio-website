@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import struct
 
 from tblib import _magic
@@ -79,6 +80,158 @@ SUSPICIOUS_IMPORTS = {
     "file_wiping": ["DeleteFileA", "DeleteFileW", "MoveFileExA", "MoveFileExW", "SetFileAttributesA",
                     "SetFileAttributesW"],
 }
+
+
+RESOURCE_TYPES = {
+    1: "cursor", 2: "bitmap", 3: "icon", 4: "menu", 5: "dialog", 6: "string", 7: "fontdir", 8: "font",
+    9: "accelerator", 10: "rcdata", 11: "messagetable", 12: "group_cursor", 14: "group_icon", 16: "version",
+    17: "dlginclude", 19: "plugplay", 20: "vxd", 21: "anicursor", 22: "aniicon", 23: "html", 24: "manifest",
+}
+
+# Names pefile's ordlookup gives ordinal-only imports (imphash uses them).
+# shortcut: only the classic Winsock 1.1 and first OLE Automation ordinals; others hash as "ordN"
+# (as pefile does for DLLs it has no table for), extend from pefile's ordlookup if a mismatch shows up.
+_WINSOCK = {1: "accept", 2: "bind", 3: "closesocket", 4: "connect", 5: "getpeername", 6: "getsockname",
+            7: "getsockopt", 8: "htonl", 9: "htons", 10: "ioctlsocket", 11: "inet_addr", 12: "inet_ntoa",
+            13: "listen", 14: "ntohl", 15: "ntohs", 16: "recv", 17: "recvfrom", 18: "select", 19: "send",
+            20: "sendto", 21: "setsockopt", 22: "shutdown", 23: "socket", 51: "gethostbyaddr", 52: "gethostbyname",
+            53: "getprotobyname", 54: "getprotobynumber", 55: "getservbyname", 56: "getservbyport",
+            57: "gethostname", 101: "WSAAsyncSelect", 102: "WSAAsyncGetHostByAddr", 103: "WSAAsyncGetHostByName",
+            104: "WSAAsyncGetProtoByNumber", 105: "WSAAsyncGetProtoByName", 106: "WSAAsyncGetServByPort",
+            107: "WSAAsyncGetServByName", 108: "WSACancelAsyncRequest", 109: "WSASetBlockingHook",
+            110: "WSAUnhookBlockingHook", 111: "WSAGetLastError", 112: "WSASetLastError",
+            113: "WSACancelBlockingCall", 114: "WSAIsBlocking", 115: "WSAStartup", 116: "WSACleanup",
+            151: "__WSAFDIsSet", 500: "WEP"}
+ORDINAL_NAMES = {
+    "ws2_32.dll": _WINSOCK, "wsock32.dll": _WINSOCK,
+    "oleaut32.dll": {2: "SysAllocString", 3: "SysReAllocString", 4: "SysAllocStringLen", 5: "SysReAllocStringLen",
+                     6: "SysFreeString", 7: "SysStringLen", 8: "VariantInit", 9: "VariantClear", 10: "VariantCopy",
+                     11: "VariantCopyInd", 12: "VariantChangeType"},
+}
+
+
+def rol32(value: int, n: int) -> int:
+    n %= 32
+    return ((value << n) | (value >> (32 - n))) & 0xFFFFFFFF
+
+
+# -- DER / X.509 / PKCS#7, just enough to name who signed a file --------------
+
+OIDS = {
+    "2.5.4.3": "CN", "2.5.4.6": "C", "2.5.4.7": "L", "2.5.4.8": "ST", "2.5.4.10": "O", "2.5.4.11": "OU",
+    "2.5.4.5": "serialNumber", "1.2.840.113549.1.9.1": "emailAddress",
+    "1.3.14.3.2.26": "sha1", "2.16.840.1.101.3.4.2.1": "sha256", "2.16.840.1.101.3.4.2.2": "sha384",
+    "2.16.840.1.101.3.4.2.3": "sha512", "1.2.840.113549.2.5": "md5",
+}
+
+
+def der_items(data: bytes, start: int = 0, end: int | None = None) -> list:
+    """The DER elements between start and end: [(tag, content_start, content_end)]."""
+    end = len(data) if end is None else end
+    out = []
+    pos = start
+    while pos < end:
+        if pos + 2 > end:
+            raise ValueError("a DER element is cut off")
+        tag, length = data[pos], data[pos + 1]
+        pos += 2
+        if length & 0x80:
+            n = length & 0x7F
+            if n == 0 or n > 4 or pos + n > end:
+                raise ValueError("a DER length is damaged")
+            length = int.from_bytes(data[pos:pos + n], "big")
+            pos += n
+        if pos + length > end:
+            raise ValueError("a DER element runs past its parent")
+        out.append((tag, pos, pos + length))
+        pos += length
+    return out
+
+
+def der_oid(raw: bytes) -> str:
+    if not raw:
+        return ""
+    parts = [raw[0] // 40, raw[0] % 40]
+    value = 0
+    for b in raw[1:]:
+        value = (value << 7) | (b & 0x7F)
+        if not b & 0x80:
+            parts.append(value)
+            value = 0
+    return ".".join(map(str, parts))
+
+
+def der_text(tag: int, raw: bytes) -> str:
+    if tag == 0x1E:
+        return raw.decode("utf-16-be", "replace")
+    return raw.decode("utf-8" if tag == 0x0C else "latin-1", "replace")
+
+
+def der_name(data: bytes, start: int, end: int) -> str:
+    """An X.501 name as "CN=..., O=..., C=..."."""
+    parts = []
+    for _, s1, e1 in der_items(data, start, end):           # SET
+        for _, s2, e2 in der_items(data, s1, e1):           # SEQUENCE {oid, value}
+            pair = der_items(data, s2, e2)
+            if len(pair) >= 2:
+                oid = der_oid(data[pair[0][1]:pair[0][2]])
+                parts.append(f"{OIDS.get(oid, oid)}={der_text(pair[1][0], data[pair[1][1]:pair[1][2]])}")
+    return ", ".join(parts)
+
+
+def der_time(tag: int, raw: bytes):
+    text = raw.decode("ascii", "replace").rstrip("Z")
+    if tag == 0x17:  # UTCTime: YYMMDDHHMMSS
+        year = int(text[:2])
+        text = f"{2000 + year if year < 50 else 1900 + year}{text[2:]}"
+    try:
+        return dt.datetime.strptime(text[:14], "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S UTC")
+    except ValueError:
+        return None
+
+
+def x509_info(data: bytes, start: int, end: int) -> dict:
+    """Subject, issuer, serial and validity of the certificate whose content is data[start:end]."""
+    tbs = der_items(data, *der_items(data, start, end)[0][1:])
+    if tbs and tbs[0][0] == 0xA0:
+        tbs = tbs[1:]
+    serial = data[tbs[0][1]:tbs[0][2]]
+    validity = der_items(data, tbs[3][1], tbs[3][2])
+    return {"subject": der_name(data, tbs[4][1], tbs[4][2]), "issuer": der_name(data, tbs[2][1], tbs[2][2]),
+            "serial": ":".join(f"{b:02x}" for b in serial.lstrip(b"\x00") or b"\x00"),
+            "not_before": der_time(validity[0][0], data[validity[0][1]:validity[0][2]]),
+            "not_after": der_time(validity[1][0], data[validity[1][1]:validity[1][2]])}
+
+
+def pkcs7_info(blob: bytes) -> dict:
+    """Certificates, digest algorithm and signer from a PKCS#7 SignedData (nothing is verified)."""
+    out = {"digest_algorithm": None, "signer": None, "certificates": [], "problem": None}
+    try:
+        top = der_items(blob, 0, len(blob))[0]
+        content_info = der_items(blob, top[1], top[2])
+        signed = der_items(blob, *der_items(blob, content_info[1][1], content_info[1][2])[0][1:])
+        algs = der_items(blob, signed[1][1], signed[1][2])
+        if algs:
+            oid = der_oid(blob[slice(*der_items(blob, algs[0][1], algs[0][2])[0][1:])])
+            out["digest_algorithm"] = OIDS.get(oid, oid)
+        signer_key = None
+        for tag, s, e in signed[3:]:
+            if tag == 0xA0:
+                for _, cs, ce in der_items(blob, s, e):
+                    out["certificates"].append(x509_info(blob, cs, ce))
+            elif tag == 0x31:
+                infos = der_items(blob, s, e)
+                if infos:
+                    who = der_items(blob, *der_items(blob, infos[0][1], infos[0][2])[1][1:])
+                    signer_key = (der_name(blob, who[0][1], who[0][2]),
+                                  ":".join(f"{b:02x}" for b in blob[who[1][1]:who[1][2]].lstrip(b"\x00") or b"\x00"))
+        for cert in out["certificates"]:
+            cert["is_signer"] = signer_key == (cert["issuer"], cert["serial"])
+            if cert["is_signer"]:
+                out["signer"] = cert["subject"]
+    except (ValueError, IndexError) as err:
+        out["problem"] = f"the signature block is damaged ({err})"
+    return out
 
 
 class PEFormat(Exception):
@@ -199,8 +352,18 @@ class PE:
     # -- imports/exports ----------------------------------------------------------
 
     def imports(self) -> dict:
-        rva, size = self.directories.get("import", (0, 0))
         result: dict = {}
+        for dll, entries in self.import_entries():
+            result.setdefault(dll, []).extend(
+                name if name is not None else f"ordinal_{ordinal}" for name, ordinal in entries)
+        return result
+
+    def import_entries(self) -> list:
+        """[(dll, [(name or None, ordinal or None), ...]), ...] in file order (what imphash needs)."""
+        if hasattr(self, "_import_entries"):
+            return self._import_entries
+        self._import_entries = result = []
+        rva, size = self.directories.get("import", (0, 0))
         if not rva:
             return result
         off = self.rva_to_offset(rva)
@@ -229,15 +392,121 @@ class PE:
                         break
                     ordinal_bit = 1 << (63 if self.plus else 31)
                     if value & ordinal_bit:
-                        names.append(f"ordinal_{value & 0xFFFF}")
+                        names.append((None, value & 0xFFFF))
                     else:
                         hint_off = self.rva_to_offset(value & 0x7FFFFFFF)
                         if hint_off is None or hint_off + 2 >= len(d):
-                            names.append(f"<bad 0x{value:x}>")
+                            names.append((f"<bad 0x{value:x}>", None))
                         else:
-                            names.append(cstr(d, hint_off + 2, 512))
-            result[dll] = names
+                            names.append((cstr(d, hint_off + 2, 512), None))
+            result.append((dll, names))
         return result
+
+    def imphash(self):
+        """pefile's get_imphash(): md5 of "dll.function" pairs, lower-cased, in import order."""
+        parts = []
+        for dll, entries in self.import_entries():
+            lib = dll.lower()
+            stem, dot, ext = lib.rpartition(".")
+            if dot and ext in ("ocx", "sys", "dll"):
+                lib = stem
+            for name, ordinal in entries:
+                if name is None:
+                    name = ORDINAL_NAMES.get(dll.lower(), {}).get(ordinal, f"ord{ordinal}")
+                if name:
+                    parts.append(f"{lib}.{name.lower()}")
+        return hashlib.md5(",".join(parts).encode()).hexdigest() if parts else None
+
+    def rich_header(self):
+        """The Rich header MSVC's linker hides after the DOS stub: which tools built the file."""
+        d = self.data
+        rich = d.find(b"Rich", 0x40, self.e_lfanew)
+        if rich < 0 or rich + 8 > len(d):
+            return None
+        (key,) = struct.unpack_from("<I", d, rich + 4)
+        start = None
+        for pos in range(rich - 4, 0x3F, -4):
+            if struct.unpack_from("<I", d, pos)[0] ^ key == 0x536E6144:  # "DanS"
+                start = pos
+                break
+        if start is None:
+            return None
+        entries = []
+        for pos in range(start + 16, rich, 8):
+            comp, count = (v ^ key for v in struct.unpack_from("<II", d, pos))
+            entries.append({"product_id": comp >> 16, "build": comp & 0xFFFF, "count": count})
+        checksum = start
+        for i in range(start):
+            if not 0x3C <= i < 0x40:
+                checksum += rol32(d[i], i)
+        for e in entries:
+            checksum += rol32((e["product_id"] << 16) | e["build"], e["count"])
+        clear = b"".join(struct.pack("<I", struct.unpack_from("<I", d, p)[0] ^ key) for p in range(start, rich, 4))
+        return {"offset": start, "key": f"0x{key:08x}", "checksum_valid": checksum & 0xFFFFFFFF == key,
+                "entries": entries, "hash": hashlib.md5(clear).hexdigest()}
+
+    def resources(self) -> list:
+        """Every resource: [{type, name, language, size, offset, entropy}], walking the 3-level tree."""
+        rva, size = self.directories.get("resource", (0, 0))
+        base = self.rva_to_offset(rva) if rva else None
+        out: list = []
+        if base is None:
+            return out
+        d = self.data
+        seen = set()
+
+        def label(raw):
+            if raw & 0x80000000:
+                o = base + (raw & 0x7FFFFFFF)
+                if o + 2 > len(d):
+                    return "?"
+                (n,) = struct.unpack_from("<H", d, o)
+                return d[o + 2:o + 2 + 2 * n].decode("utf-16-le", "replace")
+            return raw
+
+        def walk(off, path):
+            if off in seen or off + 16 > len(d) or len(out) >= 4096 or len(path) > 2:
+                return
+            seen.add(off)
+            named, ids = struct.unpack_from("<HH", d, off + 12)
+            for i in range(min(named + ids, 1024)):
+                e = off + 16 + 8 * i
+                if e + 8 > len(d):
+                    return
+                ident, target = struct.unpack_from("<II", d, e)
+                here = path + [label(ident)]
+                if target & 0x80000000:
+                    walk(base + (target & 0x7FFFFFFF), here)
+                elif base + target + 16 <= len(d) and len(here) == 3:
+                    data_rva, data_size, codepage = struct.unpack_from("<III", d, base + target)
+                    data_off = self.rva_to_offset(data_rva)
+                    body = d[data_off:data_off + data_size] if data_off is not None else b""
+                    kind = here[0]
+                    out.append({"type": RESOURCE_TYPES.get(kind, str(kind)) if isinstance(kind, int) else kind,
+                                "name": str(here[1]), "language": here[2] if isinstance(here[2], int) else 0,
+                                "size": data_size, "offset": data_off, "codepage": codepage,
+                                "entropy": _magic.entropy(body)})
+        walk(base, [])
+        return out
+
+    def signature(self):
+        """The Authenticode signature's certificates (read, never verified), or None if unsigned."""
+        off, size = self.directories.get("security", (0, 0))
+        if not off or not size:
+            return None
+        d = self.data
+        out = {"type": None, "digest_algorithm": None, "signer": None, "certificates": [], "verified": False,
+               "problem": None}
+        if off + 8 > len(d):
+            out["problem"] = "the signature lies past the end of the file"
+            return out
+        length, revision, cert_type = struct.unpack_from("<IHH", d, off)
+        out["type"] = {1: "x509", 2: "pkcs7"}.get(cert_type, f"0x{cert_type:x}")
+        if cert_type != 2:
+            out["problem"] = "the signature is not a PKCS#7 SignedData block"
+            return out
+        out.update(pkcs7_info(d[off + 8:off + min(length, size)]))
+        return out
 
     def exports(self) -> dict:
         rva, size = self.directories.get("export", (0, 0))
@@ -317,6 +586,10 @@ class PE:
             "exports": [f["name"] for f in exports["functions"]], "export_name": exports["name"],
             "export_details": exports["functions"],
             "pdb": self.debug_pdb(),
+            "imphash": self.imphash(),
+            "rich_header": self.rich_header(),
+            "resources": self.resources(),
+            "signature": self.signature() if security[0] and security[1] else None,
             "directories": {k: {"rva": v[0], "size": v[1]} for k, v in self.directories.items() if v[0] or v[1]},
             "overlay_size": max(0, len(self.data) - self.end_of_sections()),
             "truncated": self.truncated,
@@ -391,6 +664,20 @@ def indicators_for(info: dict) -> list:
             f"{info['overlay_size']:,} bytes sit after the last section (an overlay: often a payload or installer data).")
     if not info["is_signed"]:
         add("info", "unsigned", "No Authenticode signature directory.")
+    sig = info.get("signature") or {}
+    if sig.get("problem"):
+        add("medium", "damaged_signature", f"The Authenticode signature can't be read: {sig['problem']}.")
+    for cert in sig.get("certificates", []):
+        if cert.get("is_signer") and cert["subject"] == cert["issuer"]:
+            add("medium", "self_signed_signer", f"The signing certificate is self-signed ({cert['subject']}).")
+    rich = info.get("rich_header")
+    if rich and not rich["checksum_valid"]:
+        add("medium", "rich_header_tampered",
+            "The Rich header's checksum doesn't match: it was edited or copied from another file.")
+    for r in info.get("resources", []):
+        if r["entropy"] >= 7.2 and r["size"] >= 1024:
+            add("medium", "high_entropy_resource", f"Resource {r['type']}/{r['name']} has entropy {r['entropy']} "
+                f"({r['size']:,} bytes): an encrypted or packed payload?")
     if "dynamic_base" not in info["dll_characteristics"] and not info["is_dotnet"]:
         add("low", "no_aslr", "Built without ASLR (dynamic base).")
     if "nx_compat" not in info["dll_characteristics"] and not info["is_dotnet"]:
@@ -447,6 +734,13 @@ def load(api):
         "- \"import_count\"\n"
         "- \"exports\": a list of names.\n"
         "- \"export_name\", \"pdb\", \"directories\", \"overlay_size\"\n"
+        "- \"imphash\": the import hash pefile and VirusTotal show (nil without imports).\n"
+        "- \"rich_header\": nil, or {offset, key, checksum_valid, hash, entries}. Each entry\n"
+        "  is {product_id, build, count}: a Microsoft tool that built the file.\n"
+        "- \"resources\": a list of {type, name, language, size, offset, codepage, entropy}.\n"
+        "- \"signature\": nil if unsigned, else {type, digest_algorithm, signer, certificates,\n"
+        "  verified, problem}. Each certificate has subject, issuer, serial, not_before,\n"
+        "  not_after and is_signer. Nothing is checked: verified is always false.\n"
         "- \"truncated\": true if the file is cut off.\n"
         "- \"entropy\", \"size\"\n"
         "- \"indicators\": a list of {level, name, detail} findings."))

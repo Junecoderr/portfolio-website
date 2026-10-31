@@ -7,22 +7,16 @@ import re
 
 from tblib import _magic
 from tblib._api import MANY, Module, check_type, fail, fail_os
+from tblib._yara import MODULES, Cond, Ctx, RuleSyntax, base64_variants, find_all, truth, yara_regex
 
 MAX_MATCHES_PER_STRING = 1000
 MAX_FILE = 256 * 1024 * 1024
-WORD = rb"[A-Za-z0-9_]"
+WORD = rb"[A-Za-z0-9]"  # YARA's fullword: delimited by non-alphanumeric characters
+WIDE_WORD = rb"[A-Za-z0-9]\x00"
 
 # =============================================================================
 # Rule text parser (a YARA subset)
 # =============================================================================
-
-MODIFIERS = {"nocase", "wide", "ascii", "fullword", "private"}
-UNSUPPORTED_MODIFIERS = {"xor", "base64", "base64wide"}
-
-
-class RuleSyntax(Exception):
-    pass
-
 
 class Scanner:
     """A tiny cursor over rule text."""
@@ -96,10 +90,16 @@ class Scanner:
             if ch == "\\":
                 nxt = text[self.pos + 1:self.pos + 2]
                 if nxt == "x":
-                    out.append(chr(int(text[self.pos + 2:self.pos + 4], 16)))
+                    digits = text[self.pos + 2:self.pos + 4]
+                    if not re.fullmatch(r"[0-9A-Fa-f]{2}", digits):
+                        raise RuleSyntax(f"'\\x{digits}' needs two hex digits, like \\x41 (line {self.line()})")
+                    out.append(chr(int(digits, 16)))
                     self.pos += 4
                     continue
-                out.append({"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\"}.get(nxt, nxt))
+                if nxt not in TEXT_ESCAPES:
+                    raise RuleSyntax(f"'\\{nxt}' isn't an escape YARA knows (use \\\\ for a backslash; the others "
+                                     f"are \\\" \\n \\r \\t \\xNN) (line {self.line()})")
+                out.append(TEXT_ESCAPES[nxt])
                 self.pos += 2
                 continue
             out.append(ch)
@@ -138,30 +138,51 @@ class Scanner:
         return "".join(out), flags
 
 
-def parse_rules(text: str) -> list:
-    """Parse rule text into a list of rule maps (raises RuleSyntax)."""
+MODIFIERS = {"nocase", "wide", "ascii", "fullword", "private", "xor", "base64", "base64wide"}
+TEXT_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\"}
+
+
+def parse_rules(text: str, known=()) -> list:
+    """Parse rule text into a list of rule maps (raises RuleSyntax). known: names of rules
+    defined earlier (a condition may use them)."""
     s = Scanner(text)
     rules = []
+    known = list(known)
     while not s.at_end():
-        while s.try_word("import"):
-            s.quoted()
-        while s.try_word("include"):
-            s.quoted()
-        if s.at_end():
-            break
-        private = s.try_word("private")
-        s.try_word("global")
+        if s.try_word("import"):
+            line = s.line()
+            module = s.quoted()
+            if module not in MODULES:
+                raise RuleSyntax(f'import "{module}" (line {line}): TB\'s scan supports the YARA modules '
+                                 '"pe", "elf" and "math"')
+            continue
+        if s.try_word("include"):
+            line = s.line()
+            raise RuleSyntax(f'include "{s.quoted()}" (line {line}) isn\'t supported: load each file with '
+                             "scan.load() and join the lists")
+        start_line = s.line()
+        private = is_global = False
+        while True:
+            if s.try_word("private"):
+                private = True
+            elif s.try_word("global"):
+                is_global = True
+            else:
+                break
         if not s.try_word("rule"):
             got = s.text[s.pos:s.pos + 20].split("\n")[0]
             raise RuleSyntax(f"expected 'rule' but found '{got}' (line {s.line()})")
         name = s.word()
+        if name in known:
+            raise RuleSyntax(f"rule {name} is defined twice (line {start_line})")
         tags = []
         if s.peek() == ":":
             s.expect(":")
             while s.peek() != "{":
                 tags.append(s.word())
         s.expect("{")
-        rule = {"name": name, "tags": tags, "meta": {}, "strings": [], "condition": "", "private": private}
+        rule = {"name": name, "tags": tags, "meta": {}, "strings": [], "condition": "", "private": private,
+                "global": is_global}
         while True:
             if s.peek() == "}":
                 s.expect("}")
@@ -186,40 +207,77 @@ def parse_rules(text: str) -> list:
                         rule["meta"][key] = int(m.group(0), 0)
             elif section == "strings":
                 while s.peek() == "$":
-                    rule["strings"].append(_parse_string(s))
+                    rule["strings"].append(_parse_string(s, rule["strings"]))
             elif section == "condition":
+                s.skip()
+                rule["_line"] = s.line()
                 start = s.pos
-                depth = 0
-                while s.pos < len(s.text):
-                    ch = s.text[s.pos]
-                    if ch == "(":
-                        depth += 1
-                    elif ch == ")":
-                        depth -= 1
-                    elif ch == "}" and depth <= 0:
-                        break
-                    s.pos += 1
-                rule["condition"] = " ".join(s.text[start:s.pos].split())
+                s.pos = _condition_end(s)
+                rule["condition"] = s.text[start:s.pos]
             else:
                 raise RuleSyntax(f"unknown section '{section}' in rule {name} (line {s.line()}); "
                                  "I know meta, strings and condition")
-        if not rule["condition"]:
-            raise RuleSyntax(f"rule {name} has no condition")
-        rules.append(normalize_rule(rule))
+        if not rule["condition"].strip():
+            raise RuleSyntax(f"rule {name} has no condition (line {start_line})")
+        rules.append(normalize_rule(rule, known))
+        known.append(name)
     return rules
+
+
+def _condition_end(s: Scanner) -> int:
+    """Where a condition stops: the rule's closing }, skipping "text", /regex/ and comments."""
+    text, pos, depth = s.text, s.pos, 0
+    while pos < len(text):
+        ch = text[pos]
+        if ch == '"':
+            m = re.compile(r'"(?:[^"\\\n]|\\.)*"').match(text, pos)
+            if not m:
+                raise RuleSyntax(f"a \"text\" in the condition is never closed (line {text.count(chr(10), 0, pos) + 1})")
+            pos = m.end()
+            continue
+        if text.startswith("//", pos):
+            end = text.find("\n", pos)
+            pos = len(text) if end < 0 else end
+            continue
+        if text.startswith("/*", pos):
+            end = text.find("*/", pos + 2)
+            if end < 0:
+                raise RuleSyntax("a /* comment is never closed")
+            pos = end + 2
+            continue
+        if ch == "/":
+            m = re.compile(r"/(?:[^/\\\n]|\\.)+/[is]*").match(text, pos)
+            if m:
+                pos = m.end()
+                continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "}" and depth <= 0:
+            return pos
+        pos += 1
+    raise RuleSyntax("a rule's { ... } is never closed")
 
 
 def _section_ahead(s: Scanner) -> bool:
     return bool(re.compile(r"(meta|strings|condition)\s*:").match(s.text, s.pos))
 
 
-def _parse_string(s: Scanner) -> dict:
+def _parse_string(s: Scanner, existing: list) -> dict:
+    line = s.line()
     s.expect("$")
     m = re.compile(r"[A-Za-z0-9_]*").match(s.text, s.pos)
     s.pos = m.end()
     name = "$" + m.group(0)
+    entry = {"name": name, "_line": line}
+    if name == "$":  # anonymous: only reachable through them, $* and for-of
+        taken = {e["name"] for e in existing}
+        n = len(existing) + 1
+        while f"$anonymous{n}" in taken:
+            n += 1
+        entry["name"], entry["anonymous"] = f"$anonymous{n}", True
     s.expect("=")
-    entry = {"name": name}
     ch = s.peek()
     if ch == '"':
         entry["kind"] = "text"
@@ -235,17 +293,35 @@ def _parse_string(s: Scanner) -> dict:
         if "s" in flags:
             entry["dotall"] = True
     else:
-        raise RuleSyntax(f"string {name} needs a \"text\", {{ hex }} or /regex/ value (line {s.line()})")
+        raise RuleSyntax(f"string {name} needs a \"text\", {{ hex }} or /regex/ value (line {line})")
+    seen = set()
     while True:
         s.skip()
-        m = re.compile(r"[a-z0-9]+").match(s.text, s.pos)
-        if not m or m.group(0) not in MODIFIERS | UNSUPPORTED_MODIFIERS:
+        m = re.compile(r"[a-z0-9]+(?![A-Za-z0-9_])").match(s.text, s.pos)
+        if not m or m.group(0) not in MODIFIERS:
             break
         word = m.group(0)
+        if word in seen:
+            raise RuleSyntax(f"string {name} has the '{word}' modifier twice (line {s.line()})")
+        seen.add(word)
         s.pos = m.end()
-        if word in UNSUPPORTED_MODIFIERS:
-            raise RuleSyntax(f"the '{word}' modifier on {name} isn't supported (TB's scan knows nocase, wide, ascii, fullword)")
-        entry[word] = True
+        value = True
+        if word == "xor":
+            value = [0, 255]
+            if s.text.startswith("(", s.pos):
+                m = re.compile(r"\(\s*(0x[0-9A-Fa-f]+|\d+)\s*(?:-\s*(0x[0-9A-Fa-f]+|\d+)\s*)?\)").match(s.text, s.pos)
+                if not m:
+                    raise RuleSyntax(f"string {name}: xor takes a key or a range, like xor(0x20) or "
+                                     f"xor(0x01-0xff) (line {s.line()})")
+                lo = int(m.group(1), 0)
+                hi = int(m.group(2), 0) if m.group(2) else lo
+                s.pos = m.end()
+                value = [lo, hi]
+        elif word in ("base64", "base64wide") and s.text.startswith("(", s.pos):
+            s.pos += 1
+            value = s.quoted()
+            s.expect(")")
+        entry[word] = value
     return entry
 
 
@@ -253,7 +329,7 @@ def _parse_string(s: Scanner) -> dict:
 # Rule maps (the TB-friendly form) and compilation
 # =============================================================================
 
-def normalize_rule(rule) -> dict:
+def normalize_rule(rule, known=()) -> dict:
     """Accept the text-parser output or a TB map; give back the canonical rule map."""
     if not isinstance(rule, dict):
         raise RuleSyntax("a rule must be a map or rule text")
@@ -295,17 +371,23 @@ def normalize_rule(rule) -> dict:
                 entry = {"kind": "text", "value": value["text"]}
             else:
                 raise RuleSyntax(f"rule {name}: string {key} needs \"text\", \"hex\" or \"regex\"")
-            for flag in ("nocase", "wide", "ascii", "fullword", "dotall", "private"):
+            for flag in ("nocase", "wide", "ascii", "fullword", "dotall", "private", "anonymous", "xor", "base64",
+                         "base64wide"):
                 if value.get(flag):
-                    entry[flag] = True
+                    entry[flag] = value[flag]
         else:
             raise RuleSyntax(f"rule {name}: string {key} must be text or a map")
         if entry["kind"] not in ("text", "hex", "regex") or not isinstance(entry["value"], str):
             raise RuleSyntax(f"rule {name}: string {key} has a bad definition")
         entry["name"] = key
+        try:
+            compile_string(entry)  # validate now, so errors point at the string
+        except RuleSyntax as err:
+            line = value.get("_line") if isinstance(value, dict) else None
+            raise RuleSyntax(f"rule {name}: {err}" + (f" (line {line})" if line else ""))
         out_strings.append(entry)
-    condition = rule.get("condition") or ("any of them" if out_strings else "true")
-    if not isinstance(condition, str):
+    raw_condition = rule.get("condition") or ("any of them" if out_strings else "true")
+    if not isinstance(raw_condition, str):
         raise RuleSyntax(f"rule {name}: the condition must be text")
     meta = rule.get("meta") or {}
     if not isinstance(meta, dict):
@@ -314,10 +396,13 @@ def normalize_rule(rule) -> dict:
     if isinstance(tags, str):
         tags = tags.split()
     result = {"name": name, "tags": [str(t) for t in tags], "meta": dict(meta), "strings": out_strings,
-              "condition": " ".join(condition.split())}
-    if rule.get("private"):
-        result["private"] = True
-    compile_rule(result)  # validate now, so errors point at the rule
+              "condition": " ".join(raw_condition.split())}
+    for flag in ("private", "global"):
+        if rule.get(flag):
+            result[flag] = True
+    # Compile from the raw text first so a mistake is reported with its line number.
+    Cond(raw_condition, [e["name"] for e in out_strings], name, known, rule.get("_line"))
+    compile_rule(result, known)
     return result
 
 
@@ -327,13 +412,13 @@ _HEX_TOKEN = re.compile(r"\s*(\[\s*(\d*)\s*(-?)\s*(\d*)\s*\]|\(|\)|\||\?\?|[0-9A
 def hex_to_regex(body: str, name: str) -> bytes:
     pos = 0
     out = []
-    body = body.strip()
+    body = re.sub(r"//[^\n]*|/\*.*?\*/", " ", body, flags=re.S).strip()
     if not body:
         raise RuleSyntax(f"string {name}: the hex string is empty")
     while pos < len(body):
         m = _HEX_TOKEN.match(body, pos)
         if not m:
-            raise RuleSyntax(f"string {name}: I don't understand '{body[pos:pos + 8]}' in the hex string")
+            raise RuleSyntax(f"string {name}: I don't understand '{body[pos:pos + 8].strip()}' in the hex string")
         pos = m.end()
         tok = m.group(1)
         if tok.startswith("["):
@@ -344,10 +429,10 @@ def hex_to_regex(body: str, name: str) -> bytes:
                 out.append(".{%d}" % int(lo))
             else:
                 lo_n = int(lo) if lo else 0
-                hi_n = int(hi) if hi else 64
-                if hi_n < lo_n:
+                if hi and int(hi) < lo_n:
                     raise RuleSyntax(f"string {name}: the jump [{lo}-{hi}] is backwards")
-                out.append(".{%d,%d}" % (lo_n, hi_n))
+                # [n-] and [-] have no upper limit in YARA
+                out.append(".{%d,%s}?" % (lo_n, int(hi) if hi else ""))
         elif tok == "(":
             out.append("(?:")
         elif tok == ")":
@@ -370,338 +455,121 @@ def hex_to_regex(body: str, name: str) -> bytes:
     return "".join(out).encode("latin-1")
 
 
+def _check_modifiers(entry: dict):
+    """The modifier combinations YARA itself rejects."""
+    kind, name = entry["kind"], entry["name"]
+    used = {k for k in ("nocase", "wide", "ascii", "fullword", "xor", "base64", "base64wide") if entry.get(k)}
+    if kind == "hex" and used:
+        raise RuleSyntax(f"string {name}: hex strings only take 'private', not {', '.join(sorted(used))}")
+    if kind == "regex" and used & {"xor", "base64", "base64wide"}:
+        raise RuleSyntax(f"string {name}: {', '.join(sorted(used & {'xor', 'base64', 'base64wide'}))} only "
+                         "works on \"text\" strings, not regexes")
+    if "xor" in used and "nocase" in used:
+        raise RuleSyntax(f"string {name}: YARA doesn't allow 'xor' together with 'nocase'")
+    b64 = used & {"base64", "base64wide"}
+    if b64 and used & {"nocase", "xor", "fullword"}:
+        raise RuleSyntax(f"string {name}: {' and '.join(sorted(b64))} can't be combined with "
+                         f"{', '.join(sorted(used & {'nocase', 'xor', 'fullword'}))}")
+    xor = entry.get("xor")
+    if xor:
+        if xor is True:
+            entry["xor"] = xor = [0, 255]
+        if isinstance(xor, int) and not isinstance(xor, bool):
+            entry["xor"] = xor = [xor, xor]
+        if not (isinstance(xor, list) and len(xor) == 2 and all(isinstance(k, int) for k in xor)
+                and 0 <= xor[0] <= xor[1] <= 255):
+            raise RuleSyntax(f"string {name}: the xor keys must be a range between 0 and 255, low to high")
+    for word in b64:
+        alphabet = entry[word]
+        if alphabet is not True and (not isinstance(alphabet, str) or len(alphabet.encode("latin-1", "replace")) != 64):
+            raise RuleSyntax(f"string {name}: a {word} alphabet must be exactly 64 characters")
+
+
 def compile_string(entry: dict) -> list:
-    """One string definition -> list of compiled byte regexes (ascii and/or wide)."""
+    """One string definition -> list of compiled byte regexes."""
     kind, value, name = entry["kind"], entry["value"], entry["name"]
-    flags = re.DOTALL
-    if entry.get("nocase"):
-        flags |= re.IGNORECASE
+    _check_modifiers(entry)
+    flags = re.IGNORECASE if entry.get("nocase") else 0
     patterns = []
     try:
         if kind == "text":
             if value == "":
                 raise RuleSyntax(f"string {name} is empty")
             raw = value.encode("utf-8", "surrogatepass")
-            variants = []
-            if entry.get("ascii") or not entry.get("wide"):
-                variants.append(re.escape(raw))
-            if entry.get("wide"):
-                variants.append(b"".join(re.escape(bytes([b])) + b"\\x00" for b in raw))
-            for pat in variants:
+            groups = []  # (variants, wide?)
+            for word, wide in (("base64", False), ("base64wide", True)):
+                if entry.get(word):
+                    alphabet = None if entry[word] is True else entry[word].encode("latin-1")
+                    found = base64_variants(raw, alphabet)
+                    groups.append(([_widen(v) for v in found] if wide else found, wide))
+            if not groups:
+                if entry.get("ascii") or not entry.get("wide"):
+                    groups.append(([raw], False))
+                if entry.get("wide"):
+                    groups.append(([_widen(raw)], True))
+            if entry.get("xor"):
+                lo, hi = entry["xor"]
+                groups = [([bytes(b ^ k for b in v) for v in variants for k in range(lo, hi + 1)], wide)
+                          for variants, wide in groups]
+            for variants, wide in groups:
+                unique = list(dict.fromkeys(variants))
+                pat = b"|".join(re.escape(v) for v in unique)
                 if entry.get("fullword"):
-                    pat = b"(?<!" + WORD + b")" + pat + b"(?!" + WORD + b")"
-                patterns.append(re.compile(pat, flags))
+                    edge = WIDE_WORD if wide else WORD
+                    pat = b"(?<!" + edge + b")(?:" + pat + b")(?!" + edge + b")"
+                patterns.append(re.compile(pat, flags | re.DOTALL))
         elif kind == "hex":
             patterns.append(re.compile(hex_to_regex(value, name), re.DOTALL))
         else:
-            pat = value.encode("utf-8", "surrogatepass")
-            if entry.get("fullword"):
-                pat = b"(?<!" + WORD + b")(?:" + pat + b")(?!" + WORD + b")"
-            patterns.append(re.compile(pat, flags))
+            forms = []
+            if entry.get("ascii") or not entry.get("wide"):
+                forms.append((yara_regex(value, False, name), False))
             if entry.get("wide"):
-                raise RuleSyntax(f"string {name}: 'wide' isn't supported on regex strings")
+                forms.append((yara_regex(value, True, name), True))
+            for text, wide in forms:
+                pat = text.encode("utf-8", "surrogatepass")
+                if entry.get("fullword"):
+                    edge = WIDE_WORD if wide else WORD
+                    pat = b"(?<!" + edge + b")(?:" + pat + b")(?!" + edge + b")"
+                # YARA's . matches any byte but \n, unless the regex ends in /s
+                patterns.append(re.compile(pat, flags | (re.DOTALL if entry.get("dotall") else 0)))
     except re.error as err:
         raise RuleSyntax(f"string {name} has a broken pattern: {err}")
     return patterns
 
 
-# -- conditions ---------------------------------------------------------------
-
-_COND_TOKEN = re.compile(
-    r"\s*(?:(?P<num>0x[0-9A-Fa-f]+|\d+(?:\.\d+)?)(?P<unit>KB|MB|GB)?"
-    r"|(?P<op><=|>=|==|!=|<|>|\(|\)|\.\.|\[|\]|,|\*)"
-    r"|(?P<str>[$#@!][A-Za-z0-9_]*\*?)"
-    r"|(?P<word>[A-Za-z_][A-Za-z0-9_]*))"
-)
-
-
-class Cond:
-    """Compile a condition into a closure f(ctx) where ctx has .counts (name -> [(offset, length)]),
-    .size, .data."""
-
-    def __init__(self, text: str, names: list, rule: str):
-        self.rule = rule
-        self.names = names
-        self.tokens = []
-        pos = 0
-        text = text.strip()
-        while pos < len(text):
-            if text[pos:].isspace():
-                break
-            m = _COND_TOKEN.match(text, pos)
-            if not m or m.end() == pos:
-                raise RuleSyntax(f"rule {rule}: I don't understand '{text[pos:pos + 10]}' in the condition")
-            pos = m.end()
-            if m.group("num") is not None:
-                n = m.group("num")
-                value = int(n, 0) if not ("." in n) else float(n)
-                unit = m.group("unit")
-                value *= {"KB": 1024, "MB": 1024 ** 2, "GB": 1024 ** 3, None: 1}[unit]
-                self.tokens.append(("num", value))
-            elif m.group("str") is not None:
-                self.tokens.append(("str", m.group("str")))
-            elif m.group("op") is not None:
-                self.tokens.append(("op", m.group("op")))
-            else:
-                self.tokens.append(("word", m.group("word")))
-        self.i = 0
-        self.fn = self.parse_or()
-        if self.i < len(self.tokens):
-            raise RuleSyntax(f"rule {rule}: unexpected '{self.tokens[self.i][1]}' in the condition")
-
-    def peek(self, kind=None, value=None):
-        if self.i >= len(self.tokens):
-            return None
-        k, v = self.tokens[self.i]
-        if kind and k != kind:
-            return None
-        if value is not None and v != value:
-            return None
-        return v
-
-    def take(self):
-        tok = self.tokens[self.i]
-        self.i += 1
-        return tok
-
-    def accept(self, kind, value):
-        if self.peek(kind, value) is not None:
-            self.i += 1
-            return True
-        return False
-
-    def need(self, kind, value):
-        if not self.accept(kind, value):
-            found = self.tokens[self.i][1] if self.i < len(self.tokens) else "the end"
-            raise RuleSyntax(f"rule {self.rule}: expected '{value}' in the condition but found '{found}'")
-
-    def parse_or(self):
-        left = self.parse_and()
-        while self.accept("word", "or"):
-            right = self.parse_and()
-            left = (lambda a, b: lambda ctx: truth(a(ctx)) or truth(b(ctx)))(left, right)
-        return left
-
-    def parse_and(self):
-        left = self.parse_not()
-        while self.accept("word", "and"):
-            right = self.parse_not()
-            left = (lambda a, b: lambda ctx: truth(a(ctx)) and truth(b(ctx)))(left, right)
-        return left
-
-    def parse_not(self):
-        if self.accept("word", "not"):
-            inner = self.parse_not()
-            return lambda ctx: not truth(inner(ctx))
-        return self.parse_cmp()
-
-    def parse_cmp(self):
-        left = self.parse_primary()
-        op = self.peek("op")
-        if op in ("<", ">", "<=", ">=", "==", "!="):
-            self.take()
-            right = self.parse_primary()
-            ops = {"<": lambda a, b: a < b, ">": lambda a, b: a > b, "<=": lambda a, b: a <= b,
-                   ">=": lambda a, b: a >= b, "==": lambda a, b: a == b, "!=": lambda a, b: a != b}[op]
-            return (lambda a, b, f: lambda ctx: f(number(a(ctx)), number(b(ctx))))(left, right, ops)
-        return left
-
-    def string_set(self):
-        """After 'of': 'them' or '( $a, $b* )' -> list of string names."""
-        if self.accept("word", "them"):
-            if not self.names:
-                raise RuleSyntax(f"rule {self.rule}: 'of them' needs a strings: section")
-            return list(self.names)
-        self.need("op", "(")
-        chosen = []
-        while True:
-            tok = self.peek("str")
-            if tok is None or not tok.startswith("$"):
-                raise RuleSyntax(f"rule {self.rule}: 'of (...)' needs string names like $a or $a*")
-            self.take()
-            if tok.endswith("*"):
-                prefix = tok[:-1]
-                found = [n for n in self.names if n.startswith(prefix)]
-                if not found:
-                    raise RuleSyntax(f"rule {self.rule}: no string starts with {prefix}")
-                chosen.extend(found)
-            else:
-                self.check_name(tok)
-                chosen.append(tok)
-            if not self.accept("op", ","):
-                break
-        self.need("op", ")")
-        return chosen
-
-    def check_name(self, name):
-        if name not in self.names:
-            raise RuleSyntax(f"rule {self.rule}: the condition uses {name} but no such string is defined")
-
-    def parse_primary(self):
-        if self.accept("op", "("):
-            inner = self.parse_or()
-            self.need("op", ")")
-            return inner
-        tok = self.peek()
-        if tok is None:
-            raise RuleSyntax(f"rule {self.rule}: the condition ends too early")
-        kind, value = self.take()
-        if kind == "num":
-            if self.accept("word", "of"):
-                names = self.string_set()
-                return (lambda n, ns: lambda ctx: sum(1 for s in ns if ctx.counts.get(s)) >= n)(value, names)
-            return lambda ctx, v=value: v
-        if kind == "str":
-            if value == "#" or value == "$" or value == "@":
-                raise RuleSyntax(f"rule {self.rule}: a string name is missing after '{value}'")
-            sigil, name = value[0], "$" + value[1:]
-            if value.endswith("*"):
-                raise RuleSyntax(f"rule {self.rule}: {value} can only be used inside 'of (...)'")
-            self.check_name(name)
-            if sigil == "$":
-                if self.accept("word", "at"):
-                    where = self.parse_primary()
-                    return (lambda n, w: lambda ctx: any(o == number(w(ctx)) for o, _ in ctx.counts.get(n, [])))(name, where)
-                if self.accept("word", "in"):
-                    self.need("op", "(")
-                    lo = self.parse_primary()
-                    self.need("op", "..")
-                    hi = self.parse_primary()
-                    self.need("op", ")")
-                    return (lambda n, a, b: lambda ctx: any(
-                        number(a(ctx)) <= o <= number(b(ctx)) for o, _ in ctx.counts.get(n, [])))(name, lo, hi)
-                return lambda ctx, n=name: bool(ctx.counts.get(n))
-            if sigil == "#":
-                if self.accept("word", "in"):
-                    self.need("op", "(")
-                    lo = self.parse_primary()
-                    self.need("op", "..")
-                    hi = self.parse_primary()
-                    self.need("op", ")")
-                    return (lambda n, a, b: lambda ctx: sum(
-                        1 for o, _ in ctx.counts.get(n, []) if number(a(ctx)) <= o <= number(b(ctx))))(name, lo, hi)
-                return lambda ctx, n=name: len(ctx.counts.get(n, []))
-            if sigil == "@":
-                index = None
-                if self.accept("op", "["):
-                    index = self.parse_primary()
-                    self.need("op", "]")
-
-                def offset(ctx, n=name, ix=index):
-                    hits = ctx.counts.get(n, [])
-                    k = 1 if ix is None else number(ix(ctx))
-                    if k < 1 or k > len(hits):
-                        return -1
-                    return hits[k - 1][0]
-                return offset
-            if sigil == "!":
-                index = None
-                if self.accept("op", "["):
-                    index = self.parse_primary()
-                    self.need("op", "]")
-
-                def length(ctx, n=name, ix=index):
-                    hits = ctx.counts.get(n, [])
-                    k = 1 if ix is None else number(ix(ctx))
-                    if k < 1 or k > len(hits):
-                        return -1
-                    return hits[k - 1][1]
-                return length
-        if kind == "word":
-            if value == "true":
-                return lambda ctx: True
-            if value == "false":
-                return lambda ctx: False
-            if value == "filesize":
-                return lambda ctx: ctx.size
-            if value in ("any", "all", "none"):
-                self.need("word", "of")
-                names = self.string_set()
-                if value == "any":
-                    return lambda ctx, ns=names: any(ctx.counts.get(s) for s in ns)
-                if value == "none":
-                    return lambda ctx, ns=names: not any(ctx.counts.get(s) for s in ns)
-                return lambda ctx, ns=names: all(ctx.counts.get(s) for s in ns)
-            if value in ("uint8", "uint16", "uint32", "int8", "int16", "int32", "uint16be", "uint32be",
-                         "int16be", "int32be"):
-                self.need("op", "(")
-                where = self.parse_or()
-                self.need("op", ")")
-                bits = int(re.search(r"\d+", value).group(0))
-                signed = value.startswith("int")
-                big = value.endswith("be")
-
-                def read(ctx, w=where, n=bits // 8, s=signed, b=big):
-                    off = number(w(ctx))
-                    chunk = ctx.data[off:off + n]
-                    if off < 0 or len(chunk) < n:
-                        return -1
-                    return int.from_bytes(chunk, "big" if b else "little", signed=s)
-                return read
-            if value == "entrypoint":
-                raise RuleSyntax(f"rule {self.rule}: 'entrypoint' isn't supported; use the pe or elf library "
-                                 "and uint32() instead")
-            if value in ("for", "them", "of", "at", "in", "and", "or", "not"):
-                raise RuleSyntax(f"rule {self.rule}: '{value}' is in the wrong place in the condition")
-            if value.startswith("pe") or value.startswith("math") or value.startswith("hash"):
-                raise RuleSyntax(f"rule {self.rule}: YARA modules like '{value}' aren't supported")
-            raise RuleSyntax(f"rule {self.rule}: I don't know '{value}' in the condition")
-        raise RuleSyntax(f"rule {self.rule}: unexpected '{value}' in the condition")
-
-
-def truth(v) -> bool:
-    if isinstance(v, bool):
-        return v
-    if isinstance(v, (int, float)):
-        return v > 0
-    return bool(v)
-
-
-def number(v):
-    if isinstance(v, bool):
-        return 1 if v else 0
-    return v
-
-
-class Ctx:
-    __slots__ = ("counts", "size", "data")
-
-    def __init__(self, counts, data):
-        self.counts = counts
-        self.size = len(data)
-        self.data = data
+def _widen(raw: bytes) -> bytes:
+    return b"".join(bytes([b]) + b"\x00" for b in raw)
 
 
 _COMPILED: dict = {}
 
 
-def compile_rule(rule: dict):
-    key = (rule["name"], repr(rule["strings"]), rule["condition"])
+def compile_rule(rule: dict, known=()):
+    key = (rule["name"], repr(rule["strings"]), rule["condition"], tuple(known))
     cached = _COMPILED.get(key)
     if cached:
         return cached
     strings = [(entry, compile_string(entry)) for entry in rule["strings"]]
-    cond = Cond(rule["condition"], [e["name"] for e in rule["strings"]], rule["name"])
+    cond = Cond(rule["condition"], [e["name"] for e in rule["strings"]], rule["name"], known)
     if len(_COMPILED) > 500:
         _COMPILED.clear()
     _COMPILED[key] = (strings, cond)
     return _COMPILED[key]
 
 
-def match_rule(rule: dict, data: bytes):
-    """Run one rule over bytes. Returns a match map or None."""
-    strings, cond = compile_rule(rule)
+def match_rule(rule: dict, data: bytes, results=None, modules=None, known=()):
+    """Run one rule over bytes. Returns a match map or None. results: earlier rules' outcomes
+    (for conditions that name them); modules: pe/elf/math built once per buffer."""
+    strings, cond = compile_rule(rule, known)
     counts = {}
     for entry, patterns in strings:
-        hits = []
+        hits = {}
         for pat in patterns:
-            for m in pat.finditer(data):
-                hits.append((m.start(), m.end() - m.start()))
-                if len(hits) >= MAX_MATCHES_PER_STRING:
-                    break
-        hits.sort()
-        counts[entry["name"]] = hits
-    if not truth(cond.fn(Ctx(counts, data))):
+            for offset, length in find_all(pat, data, MAX_MATCHES_PER_STRING):
+                hits[offset] = max(length, hits.get(offset, 0))
+        counts[entry["name"]] = sorted(hits.items())[:MAX_MATCHES_PER_STRING]
+    if not truth(cond.fn(Ctx(counts, data, results, modules))):
         return None
     found = []
     for entry, _ in strings:
@@ -709,8 +577,8 @@ def match_rule(rule: dict, data: bytes):
             continue
         for offset, length in counts[entry["name"]][:50]:
             piece = data[offset:offset + length]
-            found.append({"name": entry["name"], "offset": offset, "length": length,
-                          "data": _show(piece)})
+            found.append({"name": "$" if entry.get("anonymous") else entry["name"], "offset": offset,
+                          "length": length, "data": _show(piece)})
     found.sort(key=lambda h: (h["offset"], h["name"]))
     return {"rule": rule["name"], "tags": list(rule["tags"]), "meta": dict(rule["meta"]), "strings": found,
             "count": sum(len(v) for v in counts.values())}
@@ -727,12 +595,17 @@ def _show(piece: bytes) -> str:
 
 
 def scan_bytes(rules: list, data: bytes) -> list:
-    out = []
+    """Every rule over data, in order (a condition may use earlier rules). Private rules count for
+    other rules but aren't reported; if any global rule fails, nothing matches."""
+    results, modules, out = {}, {}, []
+    known = []
     for rule in rules:
-        if rule.get("private"):
-            continue
-        m = match_rule(rule, data)
-        if m:
+        m = match_rule(rule, data, results, modules, tuple(known))
+        known.append(rule["name"])
+        results[rule["name"]] = m is not None
+        if m is None and rule.get("global"):
+            return []
+        if m and not rule.get("private"):
             out.append(m)
     return out
 
@@ -760,9 +633,9 @@ def extract_strings(data: bytes, minimum: int = 4, limit: int | None = None) -> 
 # The module
 # =============================================================================
 
-def parse_rules_or_fail(line, text, fn):
+def parse_rules_or_fail(line, text, fn, known=()):
     try:
-        rules = parse_rules(text)
+        rules = parse_rules(text, known)
     except RuleSyntax as err:
         fail(line, f"{fn}() couldn't read that rule: {err}.")
     if not rules:
@@ -781,11 +654,12 @@ def rules_from(line, rules, fn) -> list:
         fail(line, f"{fn}() needs rules: rule text, a rule map or a list of them.")
     out = []
     for rule in rules:
+        known = [r["name"] for r in out]
         if isinstance(rule, str):
-            out.extend(parse_rules_or_fail(line, rule, fn))
+            out.extend(parse_rules_or_fail(line, rule, fn, known))
             continue
         try:
-            out.append(normalize_rule(rule))
+            out.append(normalize_rule(rule, known))
         except RuleSyntax as err:
             fail(line, f"{fn}() couldn't use that rule: {err}.")
     return out

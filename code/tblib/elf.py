@@ -222,10 +222,63 @@ class ELF:
                     out[DYN_TAGS[tag]] = text
         return out
 
-    def symbols(self, section_name: str) -> list:
+    def section_of_type(self, type_id: int):
+        for s in self.sections:
+            if s["type_id"] == type_id:
+                return s
+        return None
+
+    def versions(self) -> dict:
+        """GNU symbol versioning: {"needs": {file: [versions]}, "defines": [...], "names": {index: version}}."""
+        d, e = self.data, self.endian
+        out = {"needs": {}, "defines": [], "names": {}}
+
+        def strtab_of(s):
+            return self.sections[s["link"]]["offset"] if s["link"] < len(self.sections) else None
+        need = self.section_of_type(0x6FFFFFFE)
+        if need and strtab_of(need) is not None:
+            strs, off = strtab_of(need), need["offset"]
+            for _ in range(min(need["info"] or 64, 256)):
+                if off + 16 > len(d):
+                    break
+                _ver, cnt, file_, aux, nxt = struct.unpack_from(e + "HHIII", d, off)
+                versions = out["needs"].setdefault(cstr(d, strs + file_, 256), [])
+                a = off + aux
+                for _ in range(min(cnt, 256)):
+                    if a + 16 > len(d):
+                        break
+                    _hash, _flags, other, name, anext = struct.unpack_from(e + "IHHII", d, a)
+                    text = cstr(d, strs + name, 256)
+                    versions.append(text)
+                    out["names"][other & 0x7FFF] = text
+                    if not anext:
+                        break
+                    a += anext
+                if not nxt:
+                    break
+                off += nxt
+        define = self.section_of_type(0x6FFFFFFD)
+        if define and strtab_of(define) is not None:
+            strs, off = strtab_of(define), define["offset"]
+            for _ in range(min(define["info"] or 64, 256)):
+                if off + 20 > len(d):
+                    break
+                _ver, flags, ndx, cnt, _hash, aux, nxt = struct.unpack_from(e + "HHHHIII", d, off)
+                if cnt and off + aux + 8 <= len(d):
+                    text = cstr(d, strs + struct.unpack_from(e + "I", d, off + aux)[0], 256)
+                    out["names"][ndx & 0x7FFF] = text
+                    if not flags & 1:  # VER_FLG_BASE names the file itself
+                        out["defines"].append(text)
+                if not nxt:
+                    break
+                off += nxt
+        return out
+
+    def symbols(self, section_name: str, version_names=None) -> list:
         sym = self.section(section_name)
         if not sym:
             return []
+        versym = self.section_of_type(0x6FFFFFFF) if version_names else None
         strtab = self.sections[sym["link"]] if sym["link"] < len(self.sections) else None
         if not strtab:
             return []
@@ -243,24 +296,47 @@ class ELF:
             name = cstr(d, strtab["offset"] + name_idx, 512)
             if not name:
                 continue
+            version = None
+            if versym and versym["offset"] + 2 * i + 2 <= len(d):
+                version = version_names.get(struct.unpack_from(e + "H", d, versym["offset"] + 2 * i)[0] & 0x7FFF)
             out.append({"name": name, "type": SYMBOL_TYPES.get(info & 0xF, str(info & 0xF)),
                         "bind": SYMBOL_BINDS.get(info >> 4, str(info >> 4)), "value": value, "size": size,
-                        "defined": shndx != 0})
+                        "defined": shndx != 0, "version": version})
         return out
+
+    def hardening(self, dynamic: dict, names: set) -> dict:
+        """What checksec reports: RELRO, NX, PIE, stack canary and FORTIFY_SOURCE."""
+        tags = {}
+        for entry in dynamic["entries"]:
+            tags[entry["tag"]] = tags.get(entry["tag"], 0) | entry["value"]
+        bind_now = "bind_now" in tags or bool(tags.get("flags", 0) & 0x8) or bool(tags.get("flags_1", 0) & 0x1)
+        types = {seg["type"]: seg for seg in self.segments}
+        relro = ("full" if bind_now else "partial") if "gnu_relro" in types else "none"
+        stack = types.get("gnu_stack")
+        return {"relro": relro, "bind_now": bind_now, "nx": bool(stack) and not stack["executable"],
+                "pie": self.pie(tags), "canary": bool(names & {"__stack_chk_fail", "__stack_chk_guard"}),
+                "fortify": any(n.startswith("__") and n.endswith("_chk") and n != "__stack_chk_fail" for n in names),
+                "rpath": bool(dynamic["rpath"]), "runpath": bool(dynamic["runpath"])}
+
+    def pie(self, tags: dict) -> bool:
+        has_interp = any(seg["type"] == "interp" for seg in self.segments)
+        return self.e_type == 3 and (has_interp or bool(tags.get("flags_1", 0) & 0x08000000))
 
     def info(self) -> dict:
         arch, machine_name = MACHINES.get(self.machine, (f"0x{self.machine:x}", f"unknown machine 0x{self.machine:x}"))
         dynamic = self.dynamic()
-        dynsyms = self.symbols(".dynsym")
+        versions = self.versions()
+        dynsyms = self.symbols(".dynsym", versions["names"])
         imports = sorted({s["name"] for s in dynsyms if not s["defined"] and s["type"] in ("func", "notype", "gnu_ifunc", "object")})
         exports = sorted({s["name"] for s in dynsyms if s["defined"] and s["bind"] in ("global", "weak") and s["type"] in ("func", "object", "gnu_ifunc")})
         symtab = self.symbols(".symtab")
+        hardening = self.hardening(dynamic, {s["name"] for s in dynsyms + symtab})
         info = {
             "format": f"elf{self.bits}", "bits": self.bits, "endian": "little" if self.endian == "<" else "big",
             "architecture": arch, "machine": machine_name,
             "type": TYPES.get(self.e_type, f"0x{self.e_type:x}"), "os_abi": OS_ABI.get(self.os_abi, str(self.os_abi)),
             "is_executable": self.e_type == 2, "is_shared_object": self.e_type == 3,
-            "is_pie": self.e_type == 3 and any(seg["type"] == "interp" for seg in self.segments),
+            "is_pie": hardening["pie"],
             "entry_point": self.entry, "entry_hex": f"0x{self.entry:x}",
             "entry_section": self.entry_section["name"] if self.entry_section else None,
             "interpreter": self.interpreter(),
@@ -270,6 +346,9 @@ class ELF:
             "segments": self.segments,
             "needed": dynamic["needed"], "soname": dynamic["soname"], "rpath": dynamic["rpath"], "runpath": dynamic["runpath"],
             "imports": imports, "exports": exports,
+            "version_needs": versions["needs"], "version_definitions": versions["defines"],
+            "symbol_versions": {s["name"]: s["version"] for s in dynsyms if s["version"]},
+            "hardening": hardening,
             "symbol_count": len(symtab), "size": len(self.data), "entropy": _magic.entropy(self.data),
             "has_section_headers": bool(self.sections), "truncated": self.truncated,
         }
@@ -390,6 +469,12 @@ def load(api):
         "- \"sections\": a list of maps with name, type, flags, address, offset, size,\n"
         "  entropy, writable and executable.\n"
         "- \"segments\", \"imports\", \"exports\"\n"
+        "- \"version_needs\": the symbol versions it needs per library,\n"
+        "  like {\"libc.so.6\": [\"GLIBC_2.34\"]}.\n"
+        "- \"version_definitions\": the versions a library defines for others.\n"
+        "- \"symbol_versions\": dynamic symbol -> version, like {\"puts\": \"GLIBC_2.2.5\"}.\n"
+        "- \"hardening\": the checksec report: relro (full, partial or none), bind_now, nx,\n"
+        "  pie, canary, fortify, rpath and runpath.\n"
         "- \"entropy\", \"size\"\n"
         "- \"truncated\": true if the file is cut off.\n"
         "- \"indicators\": a list of {level, name, detail} findings."))
