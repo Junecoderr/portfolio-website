@@ -168,7 +168,8 @@ def test_add_from_index_installs_zip_and_runs(project, index_server, capsys):
     assert pkg.main(["add", "tb-colors"]) == 0
     out = capsys.readouterr().out
     assert "+ tb-colors 1.0.0 (zip)" in out
-    assert 'import "tb_packages/tb-colors/lib.tb" as tb_colors' in out
+    assert 'Use it with: import "tb-colors" as tb_colors' in out
+    assert "tb_packages/" not in out.split("Use it with:")[1]
     lib = project / "tb_packages" / "tb-colors" / "lib.tb"
     assert lib.is_file()
     assert not (project / "tb_packages" / "tb-colors" / "tb-colors-main").exists()  # top folder stripped
@@ -180,6 +181,11 @@ def test_add_from_index_installs_zip_and_runs(project, index_server, capsys):
     # and a program can use it
     write(project / "main.tb", 'import "tb_packages/tb-colors/lib.tb" as colors\ncolors.force(false)\nsay(colors.red("Tanisha"))\nsay(colors.width(colors.bold("abc")))\n')
     assert run_tb((project / "main.tb").read_text(), str(project / "main.tb")) == ["Tanisha", "3"]
+    # the printed short form works too, also from a subfolder of the project
+    short = 'import "tb-colors" as tb_colors\ntb_colors.force(false)\nsay(tb_colors.red("hi"))\n'
+    write(project / "src" / "app.tb", short)
+    assert run_tb(short, str(project / "main.tb")) == ["hi"]
+    assert run_tb(short, str(project / "src" / "app.tb")) == ["hi"]
 
 
 def test_add_all_example_packages_and_their_tests_pass(project, index_server, capsys):
