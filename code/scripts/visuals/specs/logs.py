@@ -45,6 +45,20 @@ SPEC = {
         "roles": {"path": "the log file", "format": "its layout (\"auto\" looks at the first lines)",
                   "options": "limit: stop after n records; year: for syslog lines"},
     },
+    "stream": {
+        "args": {"path": '"apps/data/auth.log"', "format": '"auto"', "options": '{"limit": 3}'},
+        "call": "logs.stream($path, $format, $options).to_list()",
+        "keys": ["program", "user", "action"],
+        "nodes": [
+            {"row": [{"param": "path", "icon": "file"}, {"param": "format"}]},
+            {"param": "options"},
+            {"arrow": "logs.stream"},
+            {"box": "pulled one record at a time", "icon": "list",
+             "lines": ["loop asks → read record 1", "loop asks → read record 2", "loop stops → reading stops"]},
+            {"result": True, "label": "result · a generator of records (shown here with .to_list())"},
+        ],
+        "roles": {"path": "the (huge) log file", "format": "its layout", "options": "the same options as read()"},
+    },
     "each": {
         "setup": "let seen = []",
         "args": {"path": '"apps/data/auth.log"', "fn": "r => seen.push(r.program)", "format": '"auth"'},

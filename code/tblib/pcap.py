@@ -5,6 +5,7 @@ from __future__ import annotations
 import bisect
 import datetime as dt
 import hashlib
+import io
 import ipaddress
 import os
 import re
@@ -16,7 +17,7 @@ from tblib import _magic
 from tblib._api import Module, check_type, fail, fail_os
 
 MAX_PACKETS = 1_000_000
-MAX_FILE = 2 * 1024 * 1024 * 1024
+MAX_BLOCK = 16 * 1024 * 1024  # no real frame or pcapng block comes near this; bigger sizes are damage
 
 LINK_TYPES = {0: "null", 1: "ethernet", 12: "raw", 101: "raw", 113: "linux_sll", 228: "ipv4", 229: "ipv6",
               276: "linux_sll2", 105: "ieee802_11", 127: "radiotap"}
@@ -67,51 +68,56 @@ def tidy(ts: float):
 # File readers
 # =============================================================================
 
-def iter_frames(data: bytes):
-    """Yield (timestamp, original_length, link_type, frame_bytes, interface_name|None) from pcap or pcapng bytes."""
-    if len(data) < 4:
+def iter_frames(src, limit=MAX_PACKETS):
+    """Yield (timestamp, original_length, link_type, frame_bytes, interface_name|None) from pcap or pcapng
+    bytes, or from a binary file object read a packet at a time (limit None: no cap)."""
+    f = io.BytesIO(src) if isinstance(src, (bytes, bytearray, memoryview)) else src
+    magic = f.read(4)
+    if len(magic) < 4:
         raise CaptureFormat("the file is too short to be a capture")
-    magic = data[:4]
     if magic == b"\x0a\x0d\x0d\x0a":
-        yield from iter_pcapng(data)
+        yield from iter_pcapng(f, magic, limit)
         return
     if magic in (b"\xa1\xb2\xc3\xd4", b"\xa1\xb2\x3c\x4d"):
         endian, nanos = ">", magic == b"\xa1\xb2\x3c\x4d"
     elif magic in (b"\xd4\xc3\xb2\xa1", b"\x4d\x3c\xb2\xa1"):
         endian, nanos = "<", magic == b"\x4d\x3c\xb2\xa1"
     else:
-        kind = _magic.sniff(data)
+        kind = _magic.sniff(magic + f.read(_magic.SNIFF_BYTES))
         hint = f" It looks like {kind['description']}." if kind["type"] not in ("pcap", "pcapng", "unknown") else ""
         raise CaptureFormat(f"it doesn't start with a pcap or pcapng magic number.{hint}")
-    if len(data) < 24:
+    head = f.read(20)
+    if len(head) < 20:
         raise CaptureFormat("the pcap header is cut off")
-    _vmaj, _vmin, _zone, _sig, snaplen, link = struct.unpack_from(endian + "HHiIII", data, 4)
+    _vmaj, _vmin, _zone, _sig, snaplen, link = struct.unpack_from(endian + "HHiIII", head, 0)
     link &= 0x0FFFFFFF
-    pos = 24
     count = 0
-    while pos + 16 <= len(data):
-        sec, frac, incl, orig = struct.unpack_from(endian + "IIII", data, pos)
-        pos += 16
-        if incl > len(data) - pos:
-            incl = len(data) - pos  # the last packet was cut off; keep what there is
-        frame = data[pos:pos + incl]
-        pos += incl
+    while limit is None or count < limit:
+        rec = f.read(16)
+        if len(rec) < 16:
+            return
+        sec, frac, incl, orig = struct.unpack_from(endian + "IIII", rec, 0)
+        frame = f.read(min(incl, MAX_BLOCK))
         ts = sec + frac / (1e9 if nanos else 1e6)
         yield tidy(ts), orig, link, frame, None
         count += 1
-        if count >= MAX_PACKETS:
-            return
+        if len(frame) < incl:
+            return  # the last packet was cut off (or claims an impossible size); keep what there is
 
 
-def iter_pcapng(data: bytes):
+def iter_pcapng(f, first: bytes, limit=MAX_PACKETS):
     pos = 0
     endian = "<"
     interfaces = []
     count = 0
-    while pos + 12 <= len(data):
-        block_type = struct.unpack_from(endian + "I", data, pos)[0]
+    while limit is None or count < limit:
+        head = first + f.read(12 - len(first))
+        first = b""
+        if len(head) < 12:
+            return
+        block_type = struct.unpack_from(endian + "I", head, 0)[0]
         if block_type == 0x0A0D0D0A:  # section header: byte order from the magic
-            bom = data[pos + 8:pos + 12]
+            bom = head[8:12]
             if bom == b"\x4d\x3c\x2b\x1a":
                 endian = "<"
             elif bom == b"\x1a\x2b\x3c\x4d":
@@ -119,12 +125,15 @@ def iter_pcapng(data: bytes):
             else:
                 raise CaptureFormat("the pcapng section header has a bad byte-order mark")
             interfaces = []
-        length = struct.unpack_from(endian + "I", data, pos + 4)[0]
-        if length < 12 or length % 4 or pos + length > len(data):
-            if block_type in (6, 3, 2) and pos + length > len(data):
+        length = struct.unpack_from(endian + "I", head, 4)[0]
+        if length < 12 or length % 4 or length > MAX_BLOCK:
+            raise CaptureFormat(f"a pcapng block at offset {pos} has an impossible length {length}")
+        rest = f.read(length - 12)
+        if len(rest) < length - 12:
+            if block_type in (6, 3, 2):
                 return  # cut-off last block
             raise CaptureFormat(f"a pcapng block at offset {pos} has an impossible length {length}")
-        body = data[pos + 8:pos + length - 4]
+        body = (head + rest)[8:length - 4]
         if block_type == 1:  # interface description
             link, _res, snaplen = struct.unpack_from(endian + "HHI", body, 0)
             iface = {"link": link, "snaplen": snaplen, "tsresol": 6, "name": None}
@@ -158,8 +167,6 @@ def iter_pcapng(data: bytes):
             yield tidy(ts), orig, iface["link"], frame, iface["name"]
             count += 1
         pos += length
-        if count >= MAX_PACKETS:
-            return
 
 
 def iter_options(data: bytes, endian: str):
@@ -671,36 +678,21 @@ def summarize(p: dict) -> str:
 # Reading from TB
 # =============================================================================
 
-def read_capture_bytes(line, path, fn):
-    check_type(line, path, "text", fn, "path")
-    if path == "":
-        fail(line, f"{fn}() needs a path, but got empty text.")
-    full = os.path.expanduser(path)
-    if os.path.isdir(full):
-        fail(line, f"'{path}' is a folder, not a file.", path=path)
+def iter_packets(line, src, path=None, limit=MAX_PACKETS):
+    """Decoded packet maps from capture bytes or a file object, one at a time, with friendly errors."""
+    what = f"'{path}'" if path else "that data"
     try:
-        if os.path.getsize(full) > MAX_FILE:
-            fail(line, f"'{path}' is bigger than 2 GB; pcap reads whole files, so split it first.", path=path)
-        with open(full, "rb") as f:
-            return f.read()
-    except OSError as err:
-        fail_os(line, err, path, "read")
-
-
-def packets_from(line, data: bytes, fn, path=None, limit=None):
-    out = []
-    try:
-        for n, (ts, orig, link, frame, iface) in enumerate(iter_frames(data), 1):
-            if limit is not None and len(out) >= limit:
-                break
-            out.append(decode_frame(ts, orig, link, frame, iface, n))
+        for n, (ts, orig, link, frame, iface) in enumerate(iter_frames(src, limit), 1):
+            yield decode_frame(ts, orig, link, frame, iface, n)
     except CaptureFormat as err:
-        what = f"'{path}'" if path else "that data"
         fail(line, f"{what} isn't a capture I can read: {err}", path=path)
     except struct.error:
-        what = f"'{path}'" if path else "that data"
         fail(line, f"{what} is a cut-off or damaged capture.", path=path)
-    return out
+
+
+def packets_from(line, src, fn, path=None, limit=None):
+    cap = MAX_PACKETS if limit is None else min(limit, MAX_PACKETS)
+    return list(iter_packets(line, src, path, cap))
 
 
 def capture_format(data: bytes) -> str:
@@ -1408,8 +1400,8 @@ def load(api):
     def read(line, path, limit=None):
         if limit is not None:
             limit = check_type(line, limit, "whole", "pcap.read", "limit")
-        data = read_capture_bytes(line, path, "pcap.read")
-        return packets_from(line, data, "pcap.read", path, limit)
+        with _magic.open_stream(line, path, "pcap.read") as f:
+            return packets_from(line, f, "pcap.read", path, limit)
 
     @m.fn("parse", 1, 2, doc="parse(data, limit?) -> list\nLike pcap.read() but for capture bytes already in memory.")
     def parse(line, data, limit=None):
@@ -1419,21 +1411,17 @@ def load(api):
         return packets_from(line, raw, "pcap.parse", None, limit)
 
     @m.fn("each", 2, doc="each(path, fn) -> number\nCall fn(packet) for every packet in the file, one at a time, "
-                         "without building the whole list of packet maps (the file's bytes are still read in one "
-                         "go). Return false from fn to stop early. Gives back how many packets fn saw.")
+                         "streaming from disk, so captures of any size use little memory (and there is no "
+                         "packet limit). .gz and one-file .zip captures are unpacked as they are read. "
+                         "Return false from fn to stop early. Gives back how many packets fn saw.")
     def each(line, path, fn):
         check_type(line, fn, "function", "pcap.each", "fn")
-        data = read_capture_bytes(line, path, "pcap.each")
         count = 0
-        try:
-            for n, (ts, orig, link, frame, iface) in enumerate(iter_frames(data), 1):
-                count = n
-                if api.call(fn, [decode_frame(ts, orig, link, frame, iface, n)], line) is False:
+        with _magic.open_stream(line, path, "pcap.each") as f:
+            for packet in iter_packets(line, f, path, None):
+                count += 1
+                if api.call(fn, [packet], line) is False:
                     break
-        except CaptureFormat as err:
-            fail(line, f"'{path}' isn't a capture I can read: {err}", path=path)
-        except struct.error:
-            fail(line, f"'{path}' is a cut-off or damaged capture.", path=path)
         return count
 
     @m.fn("format", 1, doc="format(path) -> text\n\"pcap\", \"pcap-ns\" (nanosecond) or \"pcapng\"; fails for other files.")
@@ -1532,8 +1520,9 @@ def load(api):
     def summary(line, target):
         if isinstance(target, list):
             return summary_of(check_packets(line, target, "pcap.summary"), "packets")
-        data = read_capture_bytes(line, target, "pcap.summary")
-        return summary_of(packets_from(line, data, "pcap.summary", target), capture_format(data), target)
+        with _magic.open_stream(line, target, "pcap.summary") as f:
+            fmt = capture_format(f.peek(4)[:4])
+            return summary_of(packets_from(line, f, "pcap.summary", target), fmt, target)
 
     @m.fn("filter", 2, doc="filter(packets, fn) -> list\nKeep the packets for which fn(packet) is true "
                            "(same as packets.filter(fn); here so pipelines read naturally).")
