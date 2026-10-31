@@ -1,6 +1,6 @@
 # tb-tables: pretty text tables and Markdown tables for terminal output.
 #
-#   import "tb-tables" as tables
+#   import "tb_packages/tb-tables/lib.tb" as tables
 #   say(tables.table([{"name": "Tanisha", "score": 91}, {"name": "web01", "score": 7}]))
 #   say(tables.render(rows, {"style": "ascii", "title": "Hosts"}))
 #

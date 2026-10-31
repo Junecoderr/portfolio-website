@@ -7,7 +7,7 @@ tb add tb-progress
 ```
 
 ```tb
-import "tb-progress" as progress
+import "tb_packages/tb-progress/lib.tb" as progress
 
 say(progress.bar(3, 10, 20))              # [██████              ]  30%
 say(progress.ascii_bar(5, 10, 10))        # [#####-----]  50%

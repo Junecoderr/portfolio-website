@@ -7,7 +7,7 @@ tb add tb-tables
 ```
 
 ```tb
-import "tb-tables" as tables
+import "tb_packages/tb-tables/lib.tb" as tables
 
 let rows = [
   {"host": "web01", "alerts": 12, "status": "ok"},
