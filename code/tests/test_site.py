@@ -458,3 +458,36 @@ def test_every_library_doc_fits_a_terminal(capsys):
         assert tb.main(["doc", lib]) == 0
         long = [ln for ln in capsys.readouterr().out.splitlines() if len(ln) > 100]
         assert not long, (lib, long[:2])
+
+
+def test_changelog_matches_the_version_and_renders(tmp_path):
+    import xml.dom.minidom
+    import changelog
+    rels = changelog.releases()
+    assert rels[0].version == tb.__version__, "add a CHANGELOG.md entry for the new version"
+    assert [r.date for r in rels] == sorted((r.date for r in rels), reverse=True)
+    assert all(r.summary and r.sections for r in rels)
+    assert [changelog.kind(r, rels[i + 1] if i + 1 < len(rels) else None) for i, r in enumerate(rels)][:2] == ["Major", "Patch"]
+    changelog.render(tmp_path, tb.__version__)
+    page = (tmp_path / "releases.html").read_text(encoding="utf-8")
+    for r in rels:
+        assert f'id="v{r.version}"' in page
+    assert "<script>" not in page and "github.com" not in page.lower()
+    feed = xml.dom.minidom.parse(str(tmp_path / "releases.xml"))
+    assert len(feed.getElementsByTagName("entry")) == len(rels)
+    assert "### Added" in changelog.notes(tb.__version__)
+    with pytest.raises(SystemExit):
+        changelog.render(tmp_path, "99.0.0")
+
+
+def test_changelog_rejects_bad_entries(tmp_path):
+    import changelog
+    bad = tmp_path / "CHANGELOG.md"
+    bad.write_text("## Unreleased\n\n- draft\n\n## 1.0.0 - 2026-01-02\n\nFirst.\n\n### Added\n\n- One.\n", encoding="utf-8")
+    assert [r.version for r in changelog.releases(bad)] == ["1.0.0"]  # drafts never publish
+    bad.write_text("## 1.0 - soon\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        changelog.releases(bad)
+    bad.write_text("## 1.0.0 - 2026-01-02\n\n### Improved\n\n- x\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        changelog.releases(bad)

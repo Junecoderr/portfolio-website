@@ -30,6 +30,8 @@ What it does:
   * writes the TB Package Index pages (packages.html, packages/view.html,
     publish.html, account.html, admin.html, bundled.json) with
     scripts/registry_pages.py; the API behind them is api/registry.js
+  * writes releases.html and the releases.xml feed from CHANGELOG.md with
+    scripts/changelog.py (the newest release there must match tb.py)
   * zips every example package (packages/<name>/) into packages/<name>.zip and
     copies packages/index.json, the static index TB 3.0.0's `tb add` reads
   * refuses to build if api/_lib/registry/seed.js (the bundled packages the
@@ -281,7 +283,7 @@ def render_migration(out: Path, version: str) -> None:
     (out / "migration.html").write_text(page, encoding="utf-8")
 
 
-SERVED_TEXT = (".html", ".js", ".css", ".json", ".tb", ".md", ".txt", ".yml", ".toml", ".csv", ".log")
+SERVED_TEXT = (".html", ".xml", ".js", ".css", ".json", ".tb", ".md", ".txt", ".yml", ".toml", ".csv", ".log")
 
 
 def check_no_github(out: Path) -> None:
@@ -377,6 +379,8 @@ def main(argv: list[str] | None = None) -> int:
     render_migration(out, version)
     import registry_pages  # noqa: E402
     registry_pages.render(out, version)
+    import changelog  # noqa: E402
+    changelog.render(out, version)
     config_path = out / "assets" / "js" / "config.js"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(

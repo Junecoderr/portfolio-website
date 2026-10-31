@@ -224,5 +224,7 @@ jobs:
             gh release upload "$TAG" "${assets[@]}" --clobber
           else
             # --latest=false keeps TB releases from being shown as the site's "latest release".
-            gh release create "$TAG" "${assets[@]}" --title "TB ${TAG#tb-v}" --notes "Downloads for the TB programming language. See https://code.tanisha.ceo/download for install steps." --latest=false
+            # The notes are this version's section of CHANGELOG.md (also on code.tanisha.ceo/releases).
+            uv run --locked python scripts/changelog.py notes "${TAG#tb-v}" > "$RUNNER_TEMP/notes.md"
+            gh release create "$TAG" "${assets[@]}" --title "TB ${TAG#tb-v}" --notes-file "$RUNNER_TEMP/notes.md" --latest=false
           fi

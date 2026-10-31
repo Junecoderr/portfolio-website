@@ -118,7 +118,15 @@ Fallback zip for running with your own Python:
 
 Keep `tb.__version__`, `pyproject.toml` (then `uv lock`), `packaging/tb.spec`,
 `packaging/build.py`, `packaging/windows/tb.iss`,
-`editors/vscode/package.json` and the tag in step, then:
+`editors/vscode/package.json` and the tag in step. Write the release notes in
+`CHANGELOG.md`: collect changes under `## Unreleased` as you go, then on
+release day rename it to `## <version> - <YYYY-MM-DD>` with a one-paragraph
+summary (the format is explained at the top of the file). That one entry
+becomes the GitHub release notes (`scripts/changelog.py notes <version>`), the
+website's Releases page (`releases.html`), its Atom feed (`releases.xml`) and
+the release date in the footer; the site build stops if the newest entry
+doesn't match `tb.__version__`. A notes-only fix (a typo, a missed item) just
+needs an edit to `CHANGELOG.md` and a redeploy. Then:
 
 ```sh
 git tag tb-v3.0.0 && git push origin tb-v3.0.0

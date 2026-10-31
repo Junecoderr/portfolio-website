@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import html
 
-RELEASE_DATE_HUMAN = "26 October 2026"
+import changelog
+
+RELEASE_DATE_HUMAN = changelog.releases()[0].date_human  # the newest release in CHANGELOG.md
 
 
 def whats_new_url(prefix: str = "") -> str:
@@ -56,7 +58,7 @@ def header(current: str = "", prefix: str = "", version: str = "3.0.0") -> str:
     return f"""  <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="{prefix}index.html" aria-label="TB home">{LOGO}<span>TB</span></a>
-      <a class="version-badge" href="{whats_new_url(prefix)}" aria-label="Version {version}: what's new">v<span data-version>{version}</span></a>
+      <a class="version-badge" href="{prefix}releases.html" aria-label="Version {version}: release notes">v<span data-version>{version}</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu">{MENU_ICON}</button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
 {nav}
@@ -97,6 +99,7 @@ def footer(prefix: str = "", version: str = "3.0.0") -> str:
       <nav aria-labelledby="footer-project">
         <h2 id="footer-project">Project</h2>
         <ul>
+          <li><a href="{p}releases.html">Releases</a></li>
           <li><a href="{whats_new_url(p)}">What's new in 3.0</a></li>
           <li><a href="{p}migration.html">Moving from 2.x</a></li>
           <li><a href="{p}spec.html">Language specification</a></li>
