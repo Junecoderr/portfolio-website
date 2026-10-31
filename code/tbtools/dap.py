@@ -166,8 +166,7 @@ class DapServer(Debugger):
                 command = request.get("command")
                 if command in RESUME:
                     self.mode = RESUME[command]
-                    self.target_depth = self.depth
-                    self.step_file = file or self.path
+                    self.mark_step(file)
                     self.paused = False
                     self.respond(request, {"allThreadsContinued": True})
                     return
