@@ -27,7 +27,7 @@ import md2html
 ROOT = Path(__file__).resolve().parent.parent
 CHANGELOG = ROOT / "CHANGELOG.md"
 SITE_URL = "https://code.tanisha.ceo"
-RELEASE_RE = re.compile(r"^## (\d+\.\d+\.\d+(?:-[\w.]+)?) - (\d{4}-\d{2}-\d{2})\s*$")
+RELEASE_RE = re.compile(r"^## (\d+\.\d+\.\d+(?:-[\w.]+)?) - (\d{4}-\d{2}-\d{2})( \(not published\))?\s*$")
 SECTIONS = ("Breaking", "Security", "Added", "Changed", "Fixed", "Removed")
 
 
@@ -37,6 +37,7 @@ class Release:
     date: dt.date
     summary: str = ""  # Markdown
     sections: list[tuple[str, list[str]]] = field(default_factory=list)  # (title, Markdown bullets)
+    published: bool = True  # False: built, but never offered as a download
 
     @property
     def anchor(self) -> str:
@@ -57,7 +58,7 @@ def releases(path: Path = CHANGELOG) -> list[Release]:
             m = RELEASE_RE.match(line)
             if not m and line.strip() != "## Unreleased":
                 raise ValueError(f"CHANGELOG.md line {n}: expected '## <version> - <YYYY-MM-DD>', got {line!r}")
-            current = Release(m.group(1), dt.date.fromisoformat(m.group(2))) if m else None
+            current = Release(m.group(1), dt.date.fromisoformat(m.group(2)), published=not m.group(3)) if m else None
             if current:
                 out.append(current)
             summary = []
@@ -105,6 +106,8 @@ def _release_html(r: Release, older: Release | None, latest: bool) -> str:
     badges = f'<span class="rel-badge rel-{k.lower()}">{k}</span>'
     if latest:
         badges += '<span class="rel-badge rel-latest">Latest</span>'
+    if not r.published:
+        badges += '<span class="rel-badge rel-unpublished">Not published</span>'
     body = [f'          <p class="rel-summary">{md2html.inline(r.summary)}</p>'] if r.summary else []
     for title, bullets in r.sections:
         items = "\n".join(f"            <li>{md2html.inline(b)}</li>" for b in bullets)
@@ -132,6 +135,13 @@ def page_html(rels: list[Release], version: str) -> str:
       <header class="rel-hero">
         <h1>Releases</h1>
         <p class="lead">Every version of TB, newest first: what's new, what changed and what might affect your programs.</p>
+        <dl class="rel-legend">
+          <div><dt><span class="rel-badge rel-major">Major</span></dt><dd>Big new features. Some old programs may need small changes; the entry lists them under <strong>Breaking</strong>.</dd></div>
+          <div><dt><span class="rel-badge">Minor</span></dt><dd>New features. Programs that work on the version before keep working.</dd></div>
+          <div><dt><span class="rel-badge">Patch</span></dt><dd>Fixes and documentation only. No new features.</dd></div>
+          <div><dt><span class="rel-badge rel-unpublished">Not published</span></dt><dd>The version was built but never offered as a download.</dd></div>
+        </dl>
+        <p class="rel-note">The <a href="download.html">Download page</a> always has the latest version.</p>
         <p class="rel-actions"><a class="button button-primary" href="download.html">Download TB {html.escape(latest.version)}</a><a class="button" href="releases.xml">Subscribe to the feed</a></p>
       </header>
       <ol class="rel-list">
@@ -178,7 +188,7 @@ def feed_xml(rels: list[Release]) -> str:
 
 def render(out: Path, version: str) -> list[Release]:
     rels = releases()
-    if not rels or rels[0].version != version:
+    if not rels or rels[0].version != version or not rels[0].published:
         raise SystemExit(f"error: the newest release in CHANGELOG.md is "
                          f"{rels[0].version if rels else 'missing'}, but tb.py says {version}. "
                          f"Add a '## {version} - YYYY-MM-DD' entry.")

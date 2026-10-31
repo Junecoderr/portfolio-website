@@ -3,6 +3,11 @@
 
 .rel-page { max-width: 64rem; padding-block: 3rem 4rem; }
 .rel-hero h1 { margin: 0 0 0.5rem; font-size: var(--step-4, 2.4rem); }
+.rel-legend { display: grid; gap: 0.4rem; margin: 1.25rem 0 0; max-width: 46rem; }
+.rel-legend > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.75rem; align-items: baseline; }
+.rel-legend dt { margin: 0; }
+.rel-legend dd { margin: 0; color: var(--ink-soft); font-size: 0.95rem; }
+.rel-note { margin: 1rem 0 0; color: var(--ink-soft); }
 .rel-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.5rem 0 0; }
 
 /* A timeline: version and date on the left, notes on the right. */
@@ -29,6 +34,7 @@
   font-size: 0.78rem; font-weight: 600; color: var(--ink-soft); background: var(--bg-soft);
 }
 .rel-badge.rel-major { background: var(--accent-soft); color: var(--accent-text); border-color: transparent; }
+.rel-badge.rel-unpublished { background: var(--bg-sunk); color: var(--ink-soft); border-style: dashed; }
 .rel-badge.rel-latest { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 
 .rel-body { min-width: 0; }
@@ -48,6 +54,7 @@
 }
 
 @media (max-width: 44rem) {
+  .rel-legend > div { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; }
   .rel { grid-template-columns: minmax(0, 1fr); padding-left: 1.25rem; }
   .rel-meta { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; }
 }

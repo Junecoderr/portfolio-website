@@ -15,6 +15,8 @@ How to write an entry:
   the website, so you can fill it in as you go and rename it on release day.
 - The newest released version must match `__version__` in tb.py (the build
   checks this).
+- Add ` (not published)` after the date for a version that was built but
+  never offered as a download.
 
 ## Unreleased
 
@@ -41,7 +43,7 @@ Named inputs for standard-library functions, packet-capture stream reassembly wi
 
 - Sigma rules converted to KQL use real columns of Microsoft Sentinel's `Syslog` table, reading the user, address and action out of `SyslogMessage`, and filter on the auth facility.
 
-## 3.0.0 - 2026-10-26
+## 3.0.0 - 2026-10-27
 
 The biggest TB release so far: classes, pattern matching, generators and tasks
 in the same friendly language, a bytecode virtual machine, a full set of
@@ -75,9 +77,9 @@ A documentation release with no language changes.
 - Sample programs and documentation are neutral and ready for everyone.
 - The first program is now `welcome.tb`, a short tour of TB.
 
-## 2.0.0 - 2026-10-26
+## 2.0.0 - 2026-10-26 (not published)
 
-TB becomes a real language for desktop apps and security work.
+TB becomes a real language for desktop apps and security work. This version was never offered as a download; 2.0.1, released the same day, was the first public 2.x release.
 
 ### Added
 

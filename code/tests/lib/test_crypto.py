@@ -188,10 +188,11 @@ say(other != secret)'''
 
 def test_aes_cbc_round_trip_and_fixed_iv():
     key = "000102030405060708090a0b0c0d0e0f"
+    other = "f0e0d0c0b0a090807060504030201000"  # fixed: a random wrong key gives valid padding 1 time in 256
     src = f'''let c = crypto.aes_cbc_encrypt("{key}", "hello", "00000000000000000000000000000000")
 say(c)
 say(crypto.aes_cbc_decrypt("{key}", c))
-try {{ crypto.aes_cbc_decrypt("{key}", crypto.aes_cbc_encrypt(crypto.random_bytes(16), "x")) }} catch e {{ say(e.message) }}'''
+try {{ crypto.aes_cbc_decrypt("{key}", crypto.aes_cbc_encrypt("{other}", "x", "00000000000000000000000000000000")) }} catch e {{ say(e.message) }}'''
     out = run(src)
     raw = base64.b64decode(out[0])
     assert raw[:16] == bytes(16) and len(raw) == 32

@@ -469,11 +469,16 @@ def test_changelog_matches_the_version_and_renders(tmp_path):
     assert all(r.summary and r.sections for r in rels)
     kinds = {r.version: changelog.kind(r, rels[i + 1] if i + 1 < len(rels) else None) for i, r in enumerate(rels)}
     assert (kinds["3.0.0"], kinds["2.0.1"], kinds.get("3.1.0", "Minor")) == ("Major", "Patch", "Minor")
+    # Every published version is a release on GitHub with downloads; 2.0.0 never was.
+    assert [r.version for r in rels if not r.published] == ["2.0.0"]
+    assert {r.version for r in rels if r.published} >= {"2.0.1", "3.0.0"}
     changelog.render(tmp_path, tb.__version__)
     page = (tmp_path / "releases.html").read_text(encoding="utf-8")
     for r in rels:
         assert f'id="v{r.version}"' in page
     assert "<script>" not in page and "github.com" not in page.lower()
+    assert 'class="rel-legend"' in page and "rel-unpublished" in page
+    assert page.count("rel-latest") == 1  # only the newest release is "Latest"
     feed = xml.dom.minidom.parse(str(tmp_path / "releases.xml"))
     assert len(feed.getElementsByTagName("entry")) == len(rels)
     assert "### Added" in changelog.notes(tb.__version__)
@@ -481,11 +486,18 @@ def test_changelog_matches_the_version_and_renders(tmp_path):
         changelog.render(tmp_path, "99.0.0")
 
 
-def test_changelog_rejects_bad_entries(tmp_path):
+def test_changelog_rejects_bad_entries(tmp_path, monkeypatch):
     import changelog
     bad = tmp_path / "CHANGELOG.md"
     bad.write_text("## Unreleased\n\n- draft\n\n## 1.0.0 - 2026-01-02\n\nFirst.\n\n### Added\n\n- One.\n", encoding="utf-8")
     assert [r.version for r in changelog.releases(bad)] == ["1.0.0"]  # drafts never publish
+    bad.write_text("## 1.0.0 - 2026-01-02 (not published)\n\nBuilt only.\n\n### Added\n\n- One.\n", encoding="utf-8")
+    assert changelog.releases(bad)[0].published is False
+    unpublished = changelog.releases(bad)
+    monkeypatch.setattr(changelog, "releases", lambda *a: unpublished)
+    with pytest.raises(SystemExit):  # an unpublished version can't be the site's current one
+        changelog.render(tmp_path, "1.0.0")
+    monkeypatch.undo()
     bad.write_text("## 1.0 - soon\n", encoding="utf-8")
     with pytest.raises(ValueError):
         changelog.releases(bad)
