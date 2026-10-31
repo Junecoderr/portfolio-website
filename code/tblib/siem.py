@@ -269,14 +269,15 @@ def redact_headers(headers: dict) -> dict:
     return out
 
 
-def post(line, url, body: bytes, headers: dict, timeout: float, label: str, fn: str) -> dict:
-    """POST and parse the answer; friendly errors that never show the headers."""
+def post(line, url, body: bytes, headers: dict, timeout: float, label: str, fn: str, verify: bool = True) -> dict:
+    """POST and parse the answer; friendly errors that never show the headers. Redirects to
+    another site are refused: the headers hold the token."""
     from tblib.http import describe_error, open_url
     hdrs = {"User-Agent": f"TB/{tb_version()}", "Accept": "application/json"}
     hdrs.update(headers)
     req = urllib.request.Request(url, data=body, headers=hdrs, method="POST")
     try:
-        resp = open_url(req, timeout)
+        resp = open_url(req, timeout, verify=verify, same_site=True)
         status = resp.status if getattr(resp, "status", None) else resp.getcode()
     except urllib.error.HTTPError as err:
         resp, status = err, err.code
@@ -438,7 +439,9 @@ def load(api):
         options = options_arg(line, options, fn, allowed)
         timeout = options.get("timeout", TIMEOUT)
         check_type(line, timeout, "number", fn, "the timeout option")
-        return dict(options, timeout=float(timeout), dry_run=bool(options.get("dry_run", False)))
+        verify = options.get("verify", True)
+        check_type(line, verify, "bool", fn, "the verify option")
+        return dict(options, timeout=float(timeout), dry_run=bool(options.get("dry_run", False)), verify=verify)
 
     def events_arg(line, events, fn):
         check_type(line, events, "list|map", fn, "events")
@@ -459,7 +462,7 @@ def load(api):
             return {"dry_run": True, "url": url, "headers": redact_headers(headers),
                     "body": body.decode("utf-8", "replace"), "count": count, "sent": 0}
         api.need_desktop(line, "The siem library")
-        return post(line, url, body, headers, opts["timeout"], label, fn)
+        return post(line, url, body, headers, opts["timeout"], label, fn, verify=opts.get("verify", True))
 
     # -- Splunk HEC ---------------------------------------------------------------------------
 
@@ -476,6 +479,8 @@ def load(api):
         "- sourcetype: the source type (default: \"tb:detect\").\n"
         "- dry_run: true to get the payload back instead of sending.\n"
         "- timeout: seconds to wait.\n"
+        "- verify: false skips the TLS certificate check. Only for a test server with a\n"
+        "  self-signed certificate: anyone on the network could then read the token.\n"
         "\n"
         "Returns (from send):\n"
         "- \"sent\", \"status\", \"ok\", \"response\".\n"
@@ -554,6 +559,8 @@ def load(api):
         "Options:\n"
         "- dry_run: true to get the payload back instead of sending.\n"
         "- timeout: seconds to wait.\n"
+        "- verify: false skips the TLS certificate check. Only for a test server with a\n"
+        "  self-signed certificate: anyone on the network could then read the token.\n"
         "\n"
         "Returns (from index):\n"
         "- \"sent\", \"status\", \"response\".\n"
@@ -635,6 +642,8 @@ def load(api):
         "Options:\n"
         "- dry_run: true to get the payload back instead of sending.\n"
         "- timeout: seconds to wait.\n"
+        "- verify: false skips the TLS certificate check. Only for a test server with a\n"
+        "  self-signed certificate: anyone on the network could then read the token.\n"
         "- url: another endpoint (for tests and sovereign clouds).\n"
         "- time_field: the record field holding the event time.\n"
         "\n"
@@ -731,6 +740,8 @@ def load(api):
         "- version: the REST API version header (default: \"20.0\").\n"
         "- dry_run: true to get the payload back instead of sending.\n"
         "- timeout: seconds to wait.\n"
+        "- verify: false skips the TLS certificate check. Only for a test server with a\n"
+        "  self-signed certificate: anyone on the network could then read the token.\n"
         "\n"
         "Example:\n"
         "    let q = siem.qradar(\"https://qradar.example:12469\", {\"dry_run\": true})\n"
@@ -743,7 +754,10 @@ def load(api):
         opts = sender_options(line, options, fn, ("console", "version"))
         parts = urllib.parse.urlsplit(url)
         console = opts.get("console")
-        console = check_url(line, console, fn) if console is not None else f"{parts.scheme}://{parts.hostname}"
+        host = parts.hostname or ""
+        # The console's API is on the default https port, not the log listener's; IPv6 keeps its brackets.
+        default = f"{parts.scheme}://{'[' + host + ']' if ':' in host else host}"
+        console = check_url(line, console, fn) if console is not None else default
         console = console.rstrip("/")
         version = _tb.to_text(opts.get("version", "20.0"))
         obj = {"kind": "qradar", "url": url, "console": console, "dry_run": opts["dry_run"]}
@@ -793,6 +807,8 @@ def load(api):
         "Options:\n"
         "- dry_run: true to get the payload back instead of sending.\n"
         "- timeout: seconds to wait.\n"
+        "- verify: false skips the TLS certificate check. Only for a test server with a\n"
+        "  self-signed certificate: anyone on the network could then read the token.\n"
         "\n"
         "Example:\n"
         "    let feed = \"https://us-chronicle.googleapis.com/v1alpha/projects/p\"\n"

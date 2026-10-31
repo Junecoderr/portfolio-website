@@ -42,8 +42,10 @@ DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-
 
 
 def urlopen(request, timeout):
-    """The one place intel talks to the internet (tests replace this)."""
-    return urllib.request.urlopen(request, timeout=timeout, context=ssl.create_default_context())
+    """The one place intel talks to the internet (tests replace this). The API key is in the headers,
+    so a redirect to another site (or from https to http) is refused rather than followed."""
+    from tblib.http import open_url
+    return open_url(request, timeout, same_site=True)
 
 
 def vt_verdict(stats: dict) -> tuple[str, int]:
@@ -333,7 +335,12 @@ def load(api):
             return result("otx", value, "unknown", 0, {"pulses": 0, "note": "OTX has nothing on this."}, data)
         info = data.get("pulse_info") if isinstance(data.get("pulse_info"), dict) else {}
         pulses = [p for p in info.get("pulses") or [] if isinstance(p, dict)]
-        count = int(info.get("count") or len(pulses))
+        raw_count = info.get("count")
+        if isinstance(raw_count, str) and raw_count.strip().isdigit():
+            raw_count = int(raw_count.strip())
+        # A damaged answer ("many", NaN, -1, a list) falls back to the pulses we can see.
+        ok = isinstance(raw_count, (int, float)) and not isinstance(raw_count, bool) and 0 <= raw_count < 1e12
+        count = int(raw_count) if ok else len(pulses)
         tags = []
         for p in pulses:
             tags.extend(t for t in p.get("tags") or [] if isinstance(t, str) and t not in tags)
