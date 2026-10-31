@@ -12,9 +12,10 @@ chart draws the latency of every target over the last minutes.
   `host:port` and press Enter to watch something new.
 - **Notify me** sends a desktop notification (`gui.notify`) when a target goes
   down or comes back.
-- **Minimize to tray** hides the window behind a small always-on-top chip;
-  click it for the menu, double-click (or click the Dock icon on a Mac) to
-  bring the window back.
+- **Minimize to tray** hides the window behind a tray icon (Windows), a menu
+  bar item (macOS) or a small always-on-top chip (Linux). Click it for the
+  menu; double-click (Windows, Linux) or click the Dock icon (Mac) to bring
+  the window back.
 
 ```
 tb apps/network-monitor/main.tb                   # targets.json next to the script
