@@ -74,10 +74,21 @@ class Table:
             for key in (t["shortname"], t["id"], t["name"]):
                 if key:
                     self.tactic_index[norm_tactic(key)] = t
-        # ATT&CK v19 split Defense Evasion (TA0005) into Stealth and Defense Impairment; Sigma rules still
-        # tag attack.defense_evasion, so that name keeps pointing at TA0005.
+        # ATT&CK v19 split Defense Evasion (TA0005) into Stealth (TA0005) and Defense Impairment (TA0112):
+        # classic defense-evasion techniques like Impair Defenses moved to TA0112. Sigma rules still tag
+        # attack.defense_evasion, so that name means both tactics (tactic_index keeps TA0005 for one name).
+        self.legacy = {}
         if "defense-evasion" not in self.tactic_index and "ta0005" in self.tactic_index:
             self.tactic_index["defense-evasion"] = self.tactic_index["ta0005"]
+            self.legacy["defense-evasion"] = [self.tactic_index["ta0005"]["shortname"]] + (
+                [self.tactic_index["ta0112"]["shortname"]] if "ta0112" in self.tactic_index else [])
+
+    def tactic_names(self, key):
+        """The shortnames a tactic name, id or legacy name stands for (defense-evasion -> two)."""
+        if key in self.legacy:
+            return list(self.legacy[key])
+        found = self.tactic_index.get(key)
+        return [found["shortname"]] if found else []
 
     def lookup(self, text):
         tid = technique_id(text)
@@ -279,9 +290,9 @@ def map_alerts(table: Table, alerts: list) -> dict:
                 continue
             m = TAG_TACTIC.match(tag.strip())
             if m:
-                found = table.tactic_index.get(norm_tactic(m.group(1)))
-                if found and found["shortname"] not in tactics:
-                    tactics.append(found["shortname"])
+                for s in table.tactic_names(norm_tactic(m.group(1))):
+                    if s not in tactics:
+                        tactics.append(s)
         if not ids and not tactics:
             unmapped += 1
             continue
@@ -393,6 +404,9 @@ def load(api):
         "- the display name, like \"Credential Access\".\n"
         "- the id, like \"TA0006\".\n"
         "\n"
+        "ATT&CK v19 split Defense Evasion into stealth (TA0005) and defense-impairment (TA0112).\n"
+        "The old name defense-evasion (and Sigma's attack.defense_evasion tag) means both.\n"
+        "\n"
         "platform (\"Windows\", \"Linux\", \"macOS\", \"IaaS\"...) keeps only the techniques for it.\n"
         "\n"
         "Example:\n"
@@ -407,9 +421,10 @@ def load(api):
             fail(line, f"attack.tactic() doesn't know the tactic '{name}'. Tactics: {names}.")
         if platform is not None:
             check_type(line, platform, "text", "attack.tactic", "platform")
+        wanted = table().tactic_names(key)
         out = []
         for item in table().techniques.values():
-            if "parent" in item or info["shortname"] not in item["tactics"]:
+            if "parent" in item or not any(s in item["tactics"] for s in wanted):
                 continue
             if platform is not None and platform.lower() not in [p.lower() for p in item["platforms"]]:
                 continue

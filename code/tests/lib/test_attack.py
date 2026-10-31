@@ -66,8 +66,30 @@ def test_tactic_names_and_platform_filter():
     assert run('say(attack.tactic("execution", "macOS").map(fn(t) { return t.id }).contains("T1047"))') == ["false"]
     assert "doesn't know the tactic 'sparkle'" in str(tb_error('import attack\nattack.tactic("sparkle")'))
     assert run('let t = attack.tactics()\nsay(t[0].shortname, t[-1].shortname)') == ["reconnaissance impact"]
-    # ATT&CK v19 split Defense Evasion; Sigma's attack.defense_evasion still finds TA0005.
-    assert run('say(attack.map([{"tags": ["attack.defense_evasion"]}]).tactics[0].id)') == ["TA0005"]
+    # ATT&CK v19 split Defense Evasion; Sigma's attack.defense_evasion means both of its successors.
+    assert run('say(attack.map([{"tags": ["attack.defense_evasion"]}]).tactics.map(fn(t) { return t.id }))') == \
+        ['["TA0005", "TA0112"]']
+    out = run('let ids = attack.tactic("defense_evasion").map(fn(t) { return t.id })\n'
+              'say(ids.contains("T1027"), ids.contains("T1685"), len(ids) == len(attack.tactic("stealth")) + '
+              'len(attack.tactic("defense-impairment")))')
+    assert out == ["true true true"]   # T1027 Obfuscation (stealth), T1685 Disable or Modify Tools (impairment)
+
+
+def test_defense_evasion_reaches_impair_defenses(tmp_path):
+    """T1562 Impair Defenses (TA0112 in a table that still has it) is found under the legacy name."""
+    import json
+    table = {"snapshot": "test", "tactics": [
+        {"id": "TA0005", "shortname": "stealth", "name": "Stealth"},
+        {"id": "TA0112", "shortname": "defense-impairment", "name": "Defense Impairment"}],
+        "techniques": [{"id": "T1562", "name": "Impair Defenses", "tactics": ["defense-impairment"]},
+                       {"id": "T1027", "name": "Obfuscated Files or Information", "tactics": ["stealth"]}]}
+    path = tmp_path / "t.json"
+    path.write_text(json.dumps(table))
+    out = run(f'attack.load("{path.as_posix()}")\n'
+              'say(attack.tactic("defense-evasion").map(fn(t) { return t.id }))\n'
+              'let m = attack.map([{"tags": ["attack.defense_evasion", "attack.t1562"]}])\n'
+              'say(m.tactics.map(fn(t) { return t.tactic + " " + str(t.techniques) }))')
+    assert out == ['["T1027", "T1562"]', '["stealth []", "defense-impairment [\\"T1562\\"]"]']
 
 
 def test_map_alerts_by_tags():
