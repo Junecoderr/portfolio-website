@@ -41,6 +41,7 @@
             <li><a href="#check">tb check</a></li>
             <li><a href="#test">tb test</a></li>
             <li><a href="#debug">tb debug</a></li>
+            <li><a href="#profile">tb profile</a></li>
             <li><a href="#doc">tb doc</a></li>
             <li><a href="#build">tb build</a></li>
             <li><a href="#packages">tb init, add, search, publish</a></li>
@@ -65,6 +66,7 @@
             <tr><td><a href="#check"><code>tb check</code></a></td><td>Find mistakes without running the program</td></tr>
             <tr><td><a href="#test"><code>tb test [--coverage]</code></a></td><td>Run the <code>*_test.tb</code> files, and show which lines they reached</td></tr>
             <tr><td><a href="#debug"><code>tb debug</code></a></td><td>Step through a program with breakpoints</td></tr>
+            <tr><td><a href="#profile"><code>tb profile</code></a></td><td>Show where a program spends its time and memory, with a flame graph</td></tr>
             <tr><td><a href="#doc"><code>tb doc</code></a></td><td>Show a library's help, or make docs from your own comments</td></tr>
             <tr><td><a href="#build"><code>tb build</code></a></td><td>Pack an app into a folder that runs without TB installed</td></tr>
             <tr><td><a href="#packages"><code>tb init / add / remove / update / packages</code></a></td><td>Manage a project's packages</td></tr>
@@ -146,6 +148,28 @@ OK: 2 checks passed in 1 test file.</code></pre>
 (tb) backtrace         the functions that are running       [bt]
 (tb) continue          run to the next breakpoint           [c]
 (tb) quit                                                   [q]</code></pre>
+        </section>
+        <section id="profile">
+          <h2>tb profile: find the slow part</h2>
+        <p><code>tb profile file.tb</code> runs the program at full speed while it looks, about a thousand times a second, at which functions are running and on which line. When the program ends you get the functions that took the most time, the busiest lines, and the largest values the program still holds. Time spent inside a library function (like <code>logs.read</code>) is shown under that function.</p>
+        <pre class="md-code"><code>$ tb profile apps/log-triage/main.tb
+...the program's own output...
+Functions (self: its own code and the library calls it makes; total: with the TB
+functions it calls too)
+          self         total  function
+   149 ms  24%   634 ms 100%  &lt;main&gt;
+    55 ms   9%    55 ms   9%  logs.read (library)
+    29 ms   4%    81 ms  13%  triage  (rules.tb:102)
+    20 ms   3%    20 ms   3%  span  (main.tb:57)
+
+Busiest lines
+          time  line
+    55 ms   9%  main.tb:96  records = logs.read(path)
+    25 ms   4%  rules.tb:111  return alerts.sort_by(fn(a) {
+
+Largest values held at the end
+      110.1 KB  all_alerts  (list of 16 items)</code></pre>
+        <p><code>tb profile --html profile.html file.tb</code> also writes a flame graph: each bar is a function, as wide as the time spent in it, with the functions it called underneath. It is one HTML file with no scripts, so you can open it anywhere or attach it to a bug report. Put <code>--html</code> before the file name; anything after the file name goes to your program, as with <code>tb file.tb args</code>. Only the main thread is measured, not <code>parallel</code> tasks.</p>
         </section>
         <section id="doc">
           <h2>tb doc: help for libraries and your own code</h2>

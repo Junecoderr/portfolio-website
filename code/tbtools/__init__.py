@@ -9,7 +9,7 @@ per name, the table below maps each sub-command to (module, first argument)
 and `tbtools.<alias>` is registered as a tiny module in `sys.modules`, so the
 dispatch rule in tb.py needs no special cases.
 
-Wave 1 (TB 3.0): pkg. Wave 2 adds fmt, check, lsp, debug, docgen, build.
+Wave 1 (TB 3.0): pkg. Wave 2 adds fmt, check, lsp, debug, docgen, build. TB 3.2 adds profile.
 """
 
 from __future__ import annotations
