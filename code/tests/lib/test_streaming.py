@@ -161,3 +161,40 @@ def test_damaged_or_ambiguous_archives_give_friendly_errors(tmp_path):
     broken_zip = tmp_path / "broken.evtx.zip"
     broken_zip.write_bytes(b"PK\x03\x04" + b"\x00" * 40)
     assert "zip I can't open" in str(tb_error(f'import evtx\nevtx.read("{tb_path(broken_zip)}")'))
+
+
+def test_read_style_functions_cap_unpacked_size_but_each_does_not(tmp_path, monkeypatch):
+    """A .gz bomb fails read()/summary() with a friendly error naming each(); each() still streams it all.
+    The real ceilings are 2 GiB and 100x past 64 MB; they are scaled down here so the test is quick."""
+    from tblib import _magic
+    monkeypatch.setattr(_magic, "READ_RATIO_FLOOR", 64 * 1024)
+    zeros = ethernet(MAC_WS, MAC_GW, 0x0800, ipv4("192.0.2.10", "192.0.2.1", 17, udp(5555, 9999, b"\0" * 1400)))
+    cap = tmp_path / "bomb.pcap.gz"
+    cap.write_bytes(gzip.compress(pcap_file([(1000.0, zeros)] * 2000), 9))
+    doc = tmp_path / "bomb.json.gz"
+    doc.write_bytes(gzip.compress(b'[{"a": "' + b"A" * 4_000_000 + b'"}]', 9))
+    ev = tmp_path / "big.evtx.gz"
+    ev.write_bytes(gzip.compress(evtx_bytes(4)))
+    for src in (f'pcap.read("{tb_path(cap)}")', f'pcap.summary("{tb_path(cap)}")', f'logs.read("{tb_path(doc)}")'):
+        msg = str(tb_error(f'import pcap\nimport logs\n{src}'))
+        assert "over 100x its packed size" in msg and ".each()" in msg and "Something went wrong" not in msg, msg
+    assert run_tb(f'import pcap\nsay(pcap.each("{tb_path(cap)}", fn(p) {{ return true }}))') == ["2000"]
+    # The absolute ceiling, for inputs that pack only modestly.
+    monkeypatch.setattr(_magic, "READ_MAX_UNPACKED", 100_000)
+    for src in (f'evtx.read("{tb_path(ev)}")', f'evtx.summary("{tb_path(ev)}")'):
+        msg = str(tb_error(f'import evtx\n{src}'))
+        assert "more than 100,000 bytes" in msg and "evtx.each()" in msg, msg
+    n = len(list(evtx.iter_records(evtx_bytes(4))))
+    assert run_tb(f'import evtx\nsay(evtx.each("{tb_path(ev)}", fn(r) {{ return true }}))') == [str(n)]
+
+
+def test_evtx_read_says_so_instead_of_silently_stopping(tmp_path, monkeypatch):
+    monkeypatch.setattr(evtx, "MAX_RECORDS", 5)
+    path = tmp_path / "x.evtx"
+    path.write_bytes(evtx_bytes(1))
+    p = tb_path(path)
+    for src in (f'evtx.read("{p}")', f'evtx.summary("{p}")', f'evtx.read("{p}", {{"limit": 6}})'):
+        msg = str(tb_error(f'import evtx\n{src}'))
+        assert "more than 5 events" in msg and "evtx.each()" in msg, msg
+    assert run_tb(f'import evtx\nsay(len(evtx.read("{p}", {{"limit": 5}})), len(evtx.read("{p}", {{"limit": 2}})))') \
+        == ["5 2"]

@@ -17,6 +17,14 @@ import zlib
 from tblib._api import check_type, fail, fail_os
 
 SNIFF_BYTES = 8192
+# Read-style functions (logs.read, pcap.read, evtx.read, ...) hold everything in memory, so a packed
+# input may unpack to at most READ_MAX_UNPACKED bytes: 1x the 2 GiB MAX_FILE pcap.read had before
+# .gz/.zip streaming. Past READ_RATIO_FLOOR bytes it must also stay under READ_MAX_RATIO times its
+# packed size; real logs and captures pack 2-30x, decompression bombs about 1000x.
+# Streaming functions (fn ending in .each or .stream) are never limited.
+READ_MAX_UNPACKED = 2 * 1024 * 1024 * 1024
+READ_MAX_RATIO = 100
+READ_RATIO_FLOOR = 64 * 1024 * 1024
 
 # (type, description, mime, extension)
 _SIGNATURES = [
@@ -284,8 +292,9 @@ def read_file(line, path, fn: str, max_size: int | None = None) -> bytes:
 class _Unpacked(io.RawIOBase):
     """A .gz or one-file .zip, unpacked as it is read; damage becomes a friendly TB error."""
 
-    def __init__(self, inner, closers, line, path):
+    def __init__(self, inner, closers, line, path, fn=None, packed=0):
         self.inner, self.closers, self.line, self.path = inner, closers, line, path
+        self.fn, self.packed, self.total = fn, packed, 0  # fn is None for streaming readers: no ceiling
 
     def readable(self):
         return True
@@ -295,6 +304,14 @@ class _Unpacked(io.RawIOBase):
             data = self.inner.read(len(buffer))
         except (OSError, EOFError, zlib.error, zipfile.BadZipFile, RuntimeError) as err:
             fail(self.line, f"'{self.path}' is a damaged compressed file: {err}.", path=self.path)
+        self.total += len(data)
+        if self.fn and (self.total > READ_MAX_UNPACKED or
+                        self.total > READ_RATIO_FLOOR and self.total > READ_MAX_RATIO * self.packed):
+            what = (f"more than {READ_MAX_UNPACKED:,} bytes" if self.total > READ_MAX_UNPACKED else
+                    f"over {READ_MAX_RATIO}x its packed size (a decompression bomb?)")
+            each = self.fn.rsplit(".", 1)[0] + ".each"
+            fail(self.line, f"'{self.path}' unpacks to {what}; {self.fn}() keeps everything in memory, "
+                            f"so use {each}(), which reads it a piece at a time.", path=self.path)
         buffer[:len(data)] = data
         return len(data)
 
@@ -307,7 +324,8 @@ class _Unpacked(io.RawIOBase):
 def open_stream(line, path, fn: str):
     """A buffered binary reader over a file, read a piece at a time (supports peek()).
     A file that starts like gzip or zip is unpacked on the fly (a zip must hold one
-    file), so callers stream .gz and .zip inputs without knowing they are packed."""
+    file), so callers stream .gz and .zip inputs without knowing they are packed.
+    Unless fn ends in .each or .stream, the unpacked size is capped (see READ_MAX_UNPACKED)."""
     check_type(line, path, "text", fn, "path")
     if path == "":
         fail(line, f"{fn}() needs a path, but got empty text.")
@@ -337,4 +355,6 @@ def open_stream(line, path, fn: str):
     except BaseException:
         f.close()
         raise
-    return io.BufferedReader(_Unpacked(inner, [inner, f], line, path), 1 << 16)
+    limited = None if fn.endswith((".each", ".stream")) else fn
+    packed = os.fstat(f.fileno()).st_size
+    return io.BufferedReader(_Unpacked(inner, [inner, f], line, path, limited, packed), 1 << 16)

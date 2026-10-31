@@ -134,6 +134,9 @@ def _win():
     w.set_long = getattr(u, "SetWindowLongPtrW", None) or u.SetWindowLongW
     w.set_long.restype = ctypes.c_void_p
     w.set_long.argtypes = [wt.HWND, ctypes.c_int, ctypes.c_void_p]
+    w.get_long = getattr(u, "GetWindowLongPtrW", None) or u.GetWindowLongW
+    w.get_long.restype = ctypes.c_void_p
+    w.get_long.argtypes = [wt.HWND, ctypes.c_int]
     w.call_proc = u.CallWindowProcW
     w.call_proc.restype = w.LRESULT
     w.call_proc.argtypes = [ctypes.c_void_p, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
@@ -204,10 +207,20 @@ class _WinHook:
         return _win().call_proc(self.old, hwnd, msg, wparam, lparam)
 
     def unhook(self):
+        """Puts the old procedure back, but only while ours is still the window's: if something
+        subclassed it after us, it calls our thunk, so the thunk is kept alive instead of freed."""
+        w = _win()
         try:
-            _win().set_long(self.hwnd, GWLP_WNDPROC, self.old)
+            if w.get_long(self.hwnd, GWLP_WNDPROC) == ctypes.cast(self.proc, ctypes.c_void_p).value:
+                w.set_long(self.hwnd, GWLP_WNDPROC, self.old)
+                return
         except Exception:
             pass
+        self.handlers = {}          # still in the chain: just pass every message on
+        _KEPT_HOOKS.append(self)    # shortcut: a few bytes per such window, kept for the process's life
+
+
+_KEPT_HOOKS = []
 
 
 def _frame_hwnd(top):
@@ -217,7 +230,11 @@ def _frame_hwnd(top):
 
 def _win_drop(top, deliver):
     w = _win()
-    state = {"hook": None}
+    state = getattr(top, "_tb_drop_state", None)
+    if state is not None and "deliver" in state:
+        state["deliver"] = deliver   # on_drop again: one hook per window, the new callback
+        return True
+    state = {"hook": None, "deliver": deliver}
 
     def dropped(wparam, lparam):
         hdrop = ctypes.c_void_p(wparam)
@@ -228,7 +245,7 @@ def _win_drop(top, deliver):
             w.query(hdrop, i, buf, size)
             paths.append(buf.value)
         w.finish(hdrop)
-        deliver(paths)
+        state["deliver"](paths)
         return 0
 
     def install(event=None):
@@ -238,6 +255,8 @@ def _win_drop(top, deliver):
         hook = state["hook"]
         if hook is not None and hook.hwnd == hwnd:
             return
+        if hook is not None:
+            hook.unhook()   # never just drop it: a live HWND calling a freed thunk crashes
         # shortcut: Tk rebuilds the frame for a few wm changes; we re-hook on the next <Map>.
         state["hook"] = _WinHook(hwnd)
         state["hook"].handlers[WM_DROPFILES] = dropped

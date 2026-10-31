@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "win32",
                                 reason="needs Windows: exports this machine's own event logs with wevtutil")
 
 NS = "{http://schemas.microsoft.com/win/2004/08/events/event}"
-SAMPLE = 200          # records compared per log, spread evenly through the file
+SAMPLE = 5000         # records compared per log: every record wevtutil renders, so rare events (e.g. boot-time 6009) are always checked
 MAX_RENDERED = 5000   # records wevtutil renders per log (oldest first)
 # (channel, must have records: fail rather than skip when it is empty or can't be exported)
 CHANNELS = [
@@ -167,7 +167,7 @@ def compare(channel, path):
     got, seen, first, tb_error = {}, 0, [], None
     try:
         with open(path, "rb") as f:
-            for r in evtx.iter_records(f):
+            for r in evtx.iter_records(f, want_xml=True):
                 seen += 1
                 if len(first) < 3:
                     first.append({k: r.get(k) for k in ("record_id", "event_id", "provider", "channel")})
@@ -195,7 +195,9 @@ def compare(channel, path):
         fields += 1
         if not same(tb_value, win_value):
             problems.append(f"{channel} record {rid} (event {wanted[rid]['event_id']}): {what}: "
-                            f"TB {norm(tb_value)!r} vs wevtutil {norm(win_value)!r}")
+                            f"TB {norm(tb_value)!r} vs wevtutil {norm(win_value)!r}"
+                            + (f" [TB value {tb_value!r}; TB xml {str(got[rid].get('xml'))[:1500]!r}]"
+                               if what.startswith("EventData") else ""))
 
     for rid, w in wanted.items():
         r = got.get(rid)

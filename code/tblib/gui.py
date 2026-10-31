@@ -1377,9 +1377,11 @@ class _TkWindow:
         """Files dropped on the window (natively on Windows and macOS, with tkdnd
         elsewhere), on the app's Dock icon on a Mac, or pasted into the window."""
         from tblib import _gui_native
+        first = self.drop_cb is None
         self.drop_cb = cb
-        self.drop_kind = _gui_native.enable_drop(self.top, cb)
-        self.top.bind("<<Paste>>", self._paste_paths, add=True)
+        self.drop_kind = _gui_native.enable_drop(self.top, cb)  # a second call swaps the callback
+        if first:
+            self.top.bind("<<Paste>>", self._paste_paths, add=True)
         if sys.platform == "darwin":
             def open_documents(*paths):
                 found = [p for p in paths if os.path.exists(p)]

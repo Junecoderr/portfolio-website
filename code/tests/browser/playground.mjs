@@ -180,6 +180,20 @@ try {
   })()`);
   check("docs Run buttons work", docs.first.status === "Done." && docs.first.output.trim() && docs.askStatus === "Done." && /Ada/.test(docs.askOutput) && docs.crossOrigin.length === 0,
         docs);
+
+  // (6) Stop is per run: stopping queued run B leaves running run A alone.
+  const perRun = await evaluate(`(async () => {
+    const a = window.TB.run("while true { }"), b = window.TB.run('say("b")');
+    await new Promise(r => setTimeout(r, 300));
+    window.TB.stop(b.id);
+    const bResult = await b;
+    await new Promise(r => setTimeout(r, 500));
+    const aStillRunning = window.TB.isRunning();
+    window.TB.stop(a.id);
+    const aResult = await a;
+    return { bStopped: bResult.stopped, aStillRunning, aStopped: aResult.stopped };
+  })()`);
+  check("Stop on a queued run leaves the running one alone", perRun.bStopped && perRun.aStillRunning && perRun.aStopped, perRun);
 } catch (e) {
   check("driver", false, { error: String(e && e.stack || e) });
 } finally {
