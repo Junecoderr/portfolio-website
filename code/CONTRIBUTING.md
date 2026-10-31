@@ -221,6 +221,10 @@ Every release run writes, from the real assets' sha256 sums
   (`apt/`, not the usual `./`: apt would ask for `/apt/./InRelease`, which
   the rewrite may not match.) After the first signed release, check
   `curl -fsSIL https://code.tanisha.ceo/apt/InRelease`.
+- **VS Code extension stores**: the `vscode-publish` job publishes the
+  `.vsix` to the VS Code Marketplace when `VSCE_PAT` is set and to Open VSX
+  when `OVSX_PAT` is set; a missing token skips that store. How to get both
+  tokens is in `editors/README.md`.
 
 ### Code signing
 

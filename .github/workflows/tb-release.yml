@@ -491,9 +491,6 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-    env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
     defaults:
       run:
         shell: bash
@@ -514,6 +511,9 @@ jobs:
 
       - name: Which stores have a token
         id: tokens
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           echo "has_vsce_pat=$([ -n "$VSCE_PAT" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_ovsx_pat=$([ -n "$OVSX_PAT" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -524,10 +524,14 @@ jobs:
       # vsce comes from package-lock.json; it reads the token from VSCE_PAT.
       - name: Publish to the VS Code Marketplace
         if: steps.tokens.outputs.has_vsce_pat == 'true'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           npm ci --no-audit --no-fund
           npx vsce publish --packagePath "$VSIX" --allow-missing-repository
 
       - name: Publish to Open VSX
         if: steps.tokens.outputs.has_ovsx_pat == 'true'
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: npx --yes ovsx@1.2.0 publish "$VSIX" --pat "$OVSX_PAT"

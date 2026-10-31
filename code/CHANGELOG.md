@@ -20,6 +20,23 @@ How to write an entry:
 
 ## Unreleased
 
+The TB book and a SOC cookbook, search across the whole site, dependency trees and a signed package index, Neovim, Helix and JetBrains support, more platforms and Linux packages, and process workers that stay warm between calls.
+
+### Added
+
+- The TB book: 14 chapters from a first program to a SOC tool and a desktop app, and a cookbook of 13 SOC recipes. Every example is tested, and every library page links to a tutorial.
+- Search across the site: press `/` on any page. The index is built with the site, with no outside service.
+- `tb add` installs a package's own dependencies too, and picks the same versions every time. A clash names both packages that disagree.
+- The package index is signed, and `tb` checks the signature. Package pages show each version's checksum and dependencies.
+- A tree-sitter grammar for TB, with setup for Neovim, Helix and JetBrains IDEs: highlighting, hover, go to definition and error messages.
+- Downloads for Intel Macs, one Mac build for both Intel and Apple silicon, and Linux on arm64, plus `.deb` and `.rpm` packages.
+
+### Changed
+
+- `parallel.processes` keeps its worker processes between calls in a program, so a later call starts in milliseconds instead of about a second.
+- The To-do and Care apps save in `.tb/<app>` in your home folder when the app folder is read-only.
+- `tb add <name> --as <other>` is refused for packages from the index.
+
 ## 3.2.0 - 2026-10-31
 
 A faster engine, a profiler, an event loop and process workers for concurrency, streaming for files of any size, Mach-O and much more of YARA, Sigma correlations, official ATT&CK data, debugging from VS Code, and a playground that never freezes the page.
