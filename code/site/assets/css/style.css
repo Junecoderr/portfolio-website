@@ -1320,3 +1320,44 @@ pre.md-code code { font-size: inherit; background: none; border: 0; padding: 0; 
 .pkg { padding-top: 1.5rem; border-top: 1px solid var(--line); margin-top: 2.5rem; }
 .pkg-links a { margin-left: 0.5rem; }
 .steps-list li { margin-bottom: 0.5rem; }
+
+/* ================================================================ book, cookbook */
+.docs-sidebar ol.book-nav { list-style: none; padding: 0; margin: 0; counter-reset: ch -1; }
+.docs-sidebar ol.book-nav li { counter-increment: ch; }
+.docs-sidebar ol.book-nav li + li a::before { content: counter(ch) ". "; font-family: var(--font-code); font-size: 0.85em; color: var(--ink-faint); }
+.doc-version { font-size: 0.9rem; color: var(--ink-soft); margin: 0 0 1.5rem; }
+.version-tag { display: inline-block; font-family: var(--font-code); font-size: 0.78rem; padding: 0.15rem 0.5rem; margin-right: 0.35rem; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink); }
+.book-toc { padding-left: 1.5rem; }
+.book-toc li { margin: 0 0 0.85rem; }
+.book-toc li > a { font-weight: 650; }
+.book-toc li > span { display: block; color: var(--ink-soft); font-size: 0.95rem; }
+.pager { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); margin: 3rem 0 0; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.pager a { display: block; padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: var(--r); text-decoration: none; font-weight: 650; color: var(--ink); }
+.pager a:hover { border-color: var(--accent); }
+.pager a span { display: block; font-size: 0.8rem; font-weight: 500; color: var(--ink-faint); }
+.pager-next { text-align: right; grid-column: -2; }
+.lib-tutorials ul { padding-left: 1.25rem; }
+
+/* ================================================================ search */
+.search-panel { max-width: 44rem; margin: 0 auto; padding: 0.5rem var(--gutter) 1rem; }
+.search-box, .search-row { display: flex; gap: 0.5rem; }
+.search-box input, .search-row input {
+  flex: 1; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm); padding: 0.6rem 0.75rem; min-height: 2.75rem;
+}
+.search-box input:focus-visible, .search-row input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.search-close { appearance: none; font: inherit; font-size: 0.8rem; color: var(--ink-soft); background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0 0.75rem; min-height: 2.75rem; cursor: pointer; }
+#search-list { list-style: none; margin: 0.5rem 0 0; padding: 0; max-height: min(60vh, 32rem); overflow-y: auto; }
+#search-list li a, .search-results-page a { display: block; padding: 0.55rem 0.75rem; border-radius: var(--r-sm); text-decoration: none; color: var(--ink); }
+#search-list li.is-active a, #search-list li a:hover { background: var(--accent-soft); }
+.search-title { display: block; font-weight: 650; overflow-wrap: anywhere; }
+.search-meta { display: block; font-size: 0.8rem; color: var(--ink-faint); }
+.search-text { display: block; font-size: 0.875rem; color: var(--ink-soft); }
+.search-hint { font-size: 0.8rem; color: var(--ink-faint); margin: 0.5rem 0 0; }
+.search-page { max-width: 46rem; padding-top: 1.5rem; }
+.search-form label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+.search-results-page { list-style: none; padding: 0; }
+.search-results-page li { border-bottom: 1px solid var(--line); }
+.search-results-page a:hover { background: var(--bg-soft); }
+.search-status { margin-top: 0.75rem; }
+@media (max-width: 21rem) { .version-badge { display: none; } } /* keeps the header on one row on the smallest phones */

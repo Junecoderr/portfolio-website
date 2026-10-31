@@ -31,6 +31,9 @@ PLAY_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill
 DL_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" '
            'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>')
 
+SEARCH_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" '
+               'stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>')
+
 NAV = [("docs.html", "Learn"), ("library.html", "Library"), ("tools.html", "Tools"),
        ("examples.html", "Examples"), ("playground.html", "Playground"), ("download.html", "Download")]
 
@@ -39,6 +42,12 @@ def stats_script(prefix: str = "") -> str:
     """The <script> tag for assets/js/stats.js (the visit and download
     counters), which every page loads in its <head> right after theme.js."""
     return f'<script src="{prefix}assets/js/stats.js" defer></script>'
+
+
+def search_script(prefix: str = "") -> str:
+    """The <script> tag for assets/js/search.js (the header's search box),
+    which every page loads in its <head> right after stats.js."""
+    return f'<script src="{prefix}assets/js/search.js" defer></script>'
 
 
 def esc(text: str) -> str:
@@ -63,6 +72,7 @@ def header(current: str = "", prefix: str = "", version: str = "3.2.0") -> str:
       <nav class="site-nav" id="site-nav" aria-label="Main">
 {nav}
       </nav>
+      <a class="icon-button search-toggle" href="{prefix}search.html" aria-label="Search (press /)" title="Search (press /)">{SEARCH_ICON}</a>
       <button class="theme-toggle" type="button" aria-label="Switch light or dark mode"></button>
     </div>
   </header>"""
@@ -80,6 +90,8 @@ def footer(prefix: str = "", version: str = "3.2.0") -> str:
         <h2 id="footer-learn">Learn</h2>
         <ul>
           <li><a href="{p}docs.html">Guide</a></li>
+          <li><a href="{p}book/index.html">The TB book</a></li>
+          <li><a href="{p}cookbook/index.html">SOC cookbook</a></li>
           <li><a href="{p}docs.html#tb3">TB 3.0 lessons</a></li>
           <li><a href="{p}docs.html#guides">Tutorials</a></li>
           <li><a href="{p}library.html">Library reference</a></li>
@@ -135,6 +147,7 @@ def page(title: str, description: str, main: str, *, current: str = "", prefix: 
   <script src="{prefix}assets/js/config.js"></script>
   <script src="{prefix}assets/js/theme.js"></script>
   {stats_script(prefix)}
+  {search_script(prefix)}
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>

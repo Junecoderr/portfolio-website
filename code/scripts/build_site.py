@@ -24,7 +24,12 @@ What it does:
     fills the Apps gallery on examples.html from apps/*/main.tb + README.md
   * adds the security examples in scripts/playground_examples/ to the playground
   * generates the library reference (library.html, lib/<name>.html) with
-    scripts/gen_lib_docs.py
+    scripts/gen_lib_docs.py; it stops if a library has no tutorial (a book
+    chapter, cookbook recipe or guide that imports it)
+  * renders the TB book (book/) and the SOC cookbook (cookbook/) from
+    docs/<version>/ with scripts/book.py, plus /v/<version>/ copies
+  * writes search-index.json and search.html (scripts/search_index.py), the
+    site-wide search the header's search box uses
   * renders spec.html (spec/SPEC.md) and migration.html (MIGRATION-3.0.md)
     with scripts/md2html.py
   * writes the TB Package Index pages (packages.html, packages/view.html,
@@ -377,6 +382,8 @@ def main(argv: list[str] | None = None) -> int:
             print("  note: examples.html has no apps gallery marker; skipped the gallery")
     render_spec(out, version)
     render_migration(out, version)
+    import book  # noqa: E402
+    book_pages = book.render(out, version)
     import registry_pages  # noqa: E402
     registry_pages.render(out, version)
     import changelog  # noqa: E402
@@ -390,12 +397,15 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
 
+    import search_index  # noqa: E402  (last: it reads the finished pages)
+    search_entries = search_index.build(out, version)
     check_no_github(out)
     print(f"Built site in {out}")
     print(f"  {len(entries)} example(s): " + ", ".join(e["name"] for e in entries))
     print(f"  language (tbcore): {len(core_files)} files; standard library: {len(lib_files)} files; sample data: {len(data_files)} files")
     print(f"  packages: {', '.join(package_names) or 'none'}")
     print(f"  apps: {', '.join(app_names) or 'none'}; library pages: {len(lib_pages)}")
+    print(f"  book and cookbook: {len(book_pages)} pages ({', '.join(book.versions())}); search index: {search_entries} entries")
     print("  downloads point at /dl/<asset> (TB " + version + ")")
     print(f"Serve it with:  uv run python scripts/serve_site.py --dir {(out.relative_to(ROOT) if out.is_relative_to(ROOT) else out).as_posix()}")
     return 0
