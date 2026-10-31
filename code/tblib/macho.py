@@ -9,6 +9,9 @@ from tblib._api import Module, fail
 from tblib.pe import pkcs7_info
 
 MAX_FILE = 512 * 1024 * 1024
+# Hostile files can point thousands of sections at the same huge range; these keep parse time linear.
+MAX_SECTIONS = 1024     # for the whole file, across every segment (real binaries have under 100)
+ENTROPY_BUDGET = 3      # bytes hashed for entropy, as a multiple of the file size (file + slices + sections)
 
 MAGICS = {b"\xce\xfa\xed\xfe": (32, "<"), b"\xcf\xfa\xed\xfe": (64, "<"),
           b"\xfe\xed\xfa\xce": (32, ">"), b"\xfe\xed\xfa\xcf": (64, ">")}
@@ -93,8 +96,12 @@ def arch_of(cputype: int, subtype: int) -> tuple:
 class MachO:
     """One thin (single-architecture) Mach-O image. `info()` gives the TB map."""
 
-    def __init__(self, data: bytes):
+    def __init__(self, data: bytes, budget: list | None = None):
         self.data = data
+        # [bytes left for entropy, set of limit notes]: shared by every slice of a universal binary.
+        self.budget = budget if budget is not None else [ENTROPY_BUDGET * len(data), set()]
+        self.section_total = 0
+        self.entropy = entropy_within(self.budget, data, 0, len(data))  # before sections can spend the budget
         if len(data) < 28 or data[:4] not in MAGICS:
             raise MachOFormat("it doesn't start with a Mach-O magic number (feedface or feedfacf)")
         self.bits, self.e = MAGICS[data[:4]]
@@ -185,13 +192,17 @@ class MachO:
         for _ in range(min(nsects, 256)):
             if pos + sect_size > len(body):
                 break
+            if self.section_total >= MAX_SECTIONS:
+                self.budget[1].add(f"only the first {MAX_SECTIONS} sections were read")
+                break
+            self.section_total += 1
             sname, sseg, addr, size, offset, _al, _ro, _nr, sflags = struct.unpack_from(sect_fmt, body, pos)[:9]
             pos += sect_size
             zerofill = sflags & 0xFF in (0x1, 0xC, 0x12)
-            chunk = b"" if zerofill or not offset else d[offset:offset + size]
+            n = 0 if zerofill or not offset else max(0, min(len(d), offset + size) - offset)
             sections.append({"name": sname.rstrip(b"\x00").decode("latin-1"),
                              "segment": sseg.rstrip(b"\x00").decode("latin-1"), "address": addr, "size": size,
-                             "offset": offset, "entropy": _magic.entropy(chunk) if chunk else 0.0,
+                             "offset": offset, "entropy": entropy_within(self.budget, d, offset, n),
                              "readable": bool(initprot & 1), "writable": bool(initprot & 2),
                              "executable": bool(initprot & 4 and sflags & 0x80000400)})
         if fileoff + filesize > len(d):
@@ -298,10 +309,22 @@ class MachO:
                 "arc": any(n.startswith("_objc_release") for n in names),
                 "signed": signature is not None, "hardened_runtime": bool(signature and signature["hardened_runtime"]),
                 "encrypted": encrypted},
-            "size": len(self.data), "entropy": _magic.entropy(self.data), "truncated": self.truncated,
+            "size": len(self.data), "entropy": self.entropy,
+            "truncated": self.truncated, "limits": sorted(self.budget[1]),
         }
         info["indicators"] = indicators_for(info)
         return info
+
+
+def entropy_within(budget: list, data: bytes, start: int, n: int):
+    """Entropy of data[start:start+n], or None once the file's entropy budget is spent."""
+    if not n:
+        return 0.0
+    if n > budget[0]:
+        budget[1].add("entropy was skipped for some parts (the file points many sections at the same bytes)")
+        return None
+    budget[0] -= n
+    return _magic.entropy(data[start:start + n])
 
 
 def indicators_for(info: dict) -> list:
@@ -310,11 +333,14 @@ def indicators_for(info: dict) -> list:
     def add(level, name, detail):
         found.append({"level": level, "name": name, "detail": detail})
 
+    if info.get("limits"):
+        add("medium", "analysis_limited", "Parts of the file weren't analysed: " + "; ".join(info["limits"]) + ".")
+
     for seg in info["segments"]:
         if seg["writable"] and seg["executable"]:
             add("high", "writable_executable_segment", f"Segment {seg['name'] or '(unnamed)'} is both writable and executable.")
     for s in info["sections"]:
-        if s["entropy"] >= 7.2 and s["size"] >= 512:
+        if s["entropy"] is not None and s["entropy"] >= 7.2 and s["size"] >= 512:
             add("medium", "high_entropy_section", f"Section {s['name']} has entropy {s['entropy']} (packed or encrypted data).")
         if "upx" in s["name"].lower():
             add("high", "packer_section_name", f"Section {s['name']} belongs to the UPX packer.")
@@ -365,6 +391,8 @@ def parse_fat(data: bytes) -> dict:
     if count == 0 or count >= 0x30:
         raise MachOFormat("this is a Java class file or a damaged universal binary, not Mach-O")
     slices, first = [], None
+    budget = [ENTROPY_BUDGET * len(data), set()]
+    whole = entropy_within(budget, data, 0, len(data))
     for i in range(count):
         o = 8 + entry * i
         if o + entry > len(data):
@@ -376,8 +404,13 @@ def parse_fat(data: bytes) -> dict:
         arch, _ = arch_of(cputype, subtype)
         piece = {"architecture": arch, "offset": offset, "size": size, "align": 1 << min(align, 31),
                  "summary": None, "problem": None}
+        if max(0, min(len(data), offset + size) - offset) > budget[0]:
+            piece["problem"] = "skipped: earlier slices already cover this many bytes"
+            budget[1].add("some universal-binary slices were skipped (they overlap)")
+            slices.append(piece)
+            continue
         try:
-            sub = MachO(data[offset:offset + size]).info()
+            sub = MachO(data[offset:offset + size], budget).info()
             piece["summary"] = describe(sub)
             piece["info"] = sub
             first = first or sub
@@ -388,7 +421,7 @@ def parse_fat(data: bytes) -> dict:
         raise MachOFormat("none of the architectures inside the universal binary could be read")
     info = dict(first)
     info.update({"format": "macho-fat", "is_fat": True, "architectures": [s["architecture"] for s in slices],
-                 "slices": slices, "size": len(data), "entropy": _magic.entropy(data),
+                 "slices": slices, "size": len(data), "entropy": whole, "limits": sorted(budget[1]),
                  "truncated": any(s["offset"] + s["size"] > len(data) for s in slices) or first["truncated"]})
     info["indicators"] = indicators_for(info)
     return info
@@ -466,6 +499,8 @@ def load(api):
         "- \"hardening\": pie, nx_stack, nx_heap, canary, arc, signed, hardened_runtime\n"
         "  and encrypted.\n"
         "- \"entropy\", \"size\", \"truncated\"\n"
+        "- \"limits\": notes on what was skipped in a hostile file (over 1024 sections, or\n"
+        "  sections repeating the same bytes); entropy there is nil. Usually empty.\n"
         "- \"indicators\": a list of {level, name, detail} findings."))
     def parse(line, path):
         data = _magic.read_file(line, path, "macho.parse", MAX_FILE)
