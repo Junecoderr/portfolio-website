@@ -192,3 +192,13 @@ def test_friendly_errors(tmp_path):
     assert "isn't an EVTX log" in str(tb_error(f'import evtx\nevtx.info("{tb_path(text)}")'))
     assert "evtx.read() needs" in str(tb_error('import evtx\nevtx.read(5)'))
     assert run_tb(f'import evtx\nsay(evtx.is_evtx("{tb_path(text)}"))') == ["false"]
+
+
+def test_string_arrays_keep_empty_strings():
+    # Event 6009 stores "10.00.", "26100", "", "Multiprocessor Free", "0" as one string
+    # array; wevtutil shows the empty one, so TB must keep it.
+    from tblib import evtx
+    raw = "".join(s + "\x00" for s in ["10.00.", "26100", "", "Multiprocessor Free", "0"]).encode("utf-16-le")
+    assert evtx.decode_value(0x81, raw) == ["10.00.", "26100", "", "Multiprocessor Free", "0"]
+    assert evtx.decode_value(0x81, b"") == []
+    assert evtx.decode_value(0x81, "a\x00".encode("utf-16-le")) == ["a"]

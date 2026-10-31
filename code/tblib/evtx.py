@@ -204,8 +204,14 @@ def decode_value(kind: int, raw: bytes, parser=None):
             return raw.hex()
         return parser.parse_fragment(raw)
     if kind == 0x81:
+        # Each string ends with a NUL. Empty strings in the middle are real values (event
+        # 6009's empty service-pack field, for one) and Windows shows them, so keep them;
+        # only the last terminator goes.
         text = raw.decode("utf-16-le", "replace")
-        return [part for part in text.split("\x00") if part]
+        if not text:
+            return []
+        parts = text.split("\x00")
+        return parts[:-1] if text.endswith("\x00") else parts
     return raw.hex()
 
 
