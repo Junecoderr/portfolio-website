@@ -1085,6 +1085,7 @@ class Server:
         analysis = self.analysis(uri)
         depth = 0
         commas = 0
+        seg_start = -1  # the comma just before the input being typed
         k = offset - 1
         in_string = None
         while k >= 0:
@@ -1101,9 +1102,11 @@ class Server:
                 depth -= 1
             elif ch == "," and depth == 0:
                 commas += 1
+                seg_start = seg_start if commas > 1 else k
             k -= 1
         if k < 0:
             return None
+        named = re.match(r"\s*([A-Za-z_]\w*)\s*=(?!=)", text[(seg_start if commas else k) + 1:offset])
         name_end = k
         while name_end > 0 and text[name_end - 1] in " \t":
             name_end -= 1
@@ -1137,6 +1140,11 @@ class Server:
             if p.startswith("...") and commas >= i:
                 active = i
                 break
+        if named:  # `workers = |`: highlight the input with that name
+            for i, p in enumerate(params_out):
+                if re.match(rf"{named.group(1)}\b", p):
+                    active = i
+                    break
         return {"signatures": [{"label": label, "documentation": {"kind": "markdown", "value": doc_markdown(doc)},
                                 "parameters": [{"label": p} for p in params_out]}],
                 "activeSignature": 0, "activeParameter": active}

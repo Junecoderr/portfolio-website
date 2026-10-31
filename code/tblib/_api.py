@@ -32,6 +32,10 @@ Rules of the road
 * The doc text: first line is the signature (`read(path) -> text`), the
   rest is a plain-English description. `tb doc <name>` prints it and the
   website is generated from it, so write one for every function.
+  The signature's input names are also what TB programs may pass by name
+  (`hello("T", punctuation = "?")`), so keep them matching min/max: one name
+  per input, optional ones marked `?`. A left-out optional input before a
+  named one gets the Python default.
 * Values crossing the boundary: nil=None, true/false=bool, numbers=int/float,
   text=str, list=list, map=dict (keys are str or numbers). Give back only
   those (convert tuples to lists, sets to sorted lists, bytes to text).

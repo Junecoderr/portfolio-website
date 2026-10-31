@@ -369,4 +369,6 @@ vercel deploy --prod
 - TB: `tb fmt` before committing; `tb check` must report no errors.
 - Errors keep TB's voice: `Oops! On line N: <plain English>` with a hint.
 - Every public function has a doc string whose first line is its signature
-  (`name(args) -> kind`); `tb doc` and the website read it.
+  (`name(args) -> kind`); `tb doc` and the website read it. Its input
+  names are what programs pass by name, so they must match min/max
+  (optional ones end in `?`); `tests/test_native_kwargs.py` checks this.

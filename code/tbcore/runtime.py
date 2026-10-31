@@ -90,11 +90,70 @@ class Function:
         return any(p.kind == "rest" for p in self.params)
 
 
+_IDENT = re.compile(r"[A-Za-z_]\w*\Z")
+
+
+def doc_params(doc: str | None):
+    """The inputs a doc signature line declares, as (names, required, rest):
+    `map(fn, items, workers?) -> list` gives (["fn", "items", "workers"], 2, False).
+    `x?` and `x = default` are optional, `...` / `...args` is the rest.
+    None when the first line isn't a signature we can read."""
+    first = (doc or "").partition("\n")[0]
+    start = first.find("(")
+    if start <= 0 or not _IDENT.match(first[:start].strip()):
+        return None
+    depth, end = 0, -1
+    for i in range(start, len(first)):
+        depth += first[i] in "([{"
+        depth -= first[i] in ")]}"
+        if depth == 0:
+            end = i
+            break
+    if end < 0:
+        return None
+    inside = first[start + 1:end].strip()
+    names, required, rest, optional_seen = [], 0, False, False
+    for piece in (inside.split(",") if inside else []):
+        piece = piece.strip()
+        if rest:
+            return None  # nothing may follow the rest
+        if piece.startswith("..."):
+            rest = True
+            if piece != "..." and not _IDENT.match(piece[3:]):
+                return None
+            continue
+        optional = piece.endswith("?") or "=" in piece
+        name = piece.partition("=")[0].strip().rstrip("?")
+        if not _IDENT.match(name) or name in names or (optional_seen and not optional):
+            return None
+        optional_seen = optional_seen or optional
+        required += not optional
+        names.append(name)
+    return names, required, rest
+
+
 class Builtin:
-    __slots__ = ("name", "fn", "arity", "doc")
+    __slots__ = ("name", "fn", "arity", "doc", "_params")
 
     def __init__(self, name, fn, arity: tuple[int, int], doc: str = ""):
         self.name, self.fn, self.arity, self.doc = name, fn, arity, doc
+        self._params = False
+
+    @property
+    def params(self):
+        """Names of the inputs, read from the doc signature, so calls can give
+        them by name (TB 3.1). None when the doc doesn't match the arity, or
+        the function takes any number of inputs (`join(part, ...)`)."""
+        if self._params is False:
+            self._params = native_params(self.doc, self.arity)
+        return self._params
+
+
+def native_params(doc, arity):
+    """Input names for a function written in Python, or None (see Builtin.params)."""
+    parsed = doc_params(doc)
+    ok = parsed is not None and not parsed[2] and (parsed[1], len(parsed[0])) == tuple(arity)
+    return tuple(parsed[0]) if ok else None
 
 
 class Partial:
