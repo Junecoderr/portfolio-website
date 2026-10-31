@@ -1,0 +1,67 @@
+[
+  {
+    "Id": 1,
+    "Version": 5,
+    "LevelDisplayName": "Information",
+    "LogName": "Microsoft-Windows-Sysmon/Operational",
+    "ProviderName": "Microsoft-Windows-Sysmon",
+    "MachineName": "WS-FIN-12.corp.example.com",
+    "RecordId": 120331,
+    "TaskDisplayName": "Process creation",
+    "KeywordsDisplayNames": [],
+    "TimeCreated": "2026-03-12T08:02:10.4410000+00:00",
+    "Message": "Process Create:\r\nRuleName: technique_id=T1059.001,technique_name=PowerShell\r\nUtcTime: 2026-03-12 08:02:10.441\r\nProcessGuid: {4c1e7a2b-9f3d-65f0-2a01-000000001a00}\r\nProcessId: 6812\r\nImage: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nFileVersion: 10.0.19041.3996 (WinBuild.160101.0800)\r\nDescription: Windows PowerShell\r\nProduct: Microsoft® Windows® Operating System\r\nCompany: Microsoft Corporation\r\nOriginalFileName: PowerShell.EXE\r\nCommandLine: powershell.exe -NoProfile -WindowStyle Hidden -EncodedCommand SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkA\r\nCurrentDirectory: C:\\Users\\dave\\Downloads\\\r\nUser: CORP\\dave\r\nLogonGuid: {4c1e7a2b-11a2-65f0-6c3e-0d0000000000}\r\nLogonId: 0xD3E6C\r\nTerminalSessionId: 1\r\nIntegrityLevel: Medium\r\nHashes: SHA256=9785001B0DCF755EDDB8AF294A373C0B87B2498660F724E76C4D53F9C217C7A3,IMPHASH=AFACF6DC9041114B198160AAB4D0AE77\r\nParentProcessGuid: {4c1e7a2b-9f3d-65f0-1b01-000000001a00}\r\nParentProcessId: 5120\r\nParentImage: C:\\Users\\dave\\Downloads\\invoice_0312.exe\r\nParentCommandLine: \"C:\\Users\\dave\\Downloads\\invoice_0312.exe\"\r\nParentUser: CORP\\dave"
+  },
+  {
+    "Id": 3,
+    "Version": 5,
+    "LevelDisplayName": "Information",
+    "LogName": "Microsoft-Windows-Sysmon/Operational",
+    "ProviderName": "Microsoft-Windows-Sysmon",
+    "MachineName": "WS-FIN-12.corp.example.com",
+    "RecordId": 120332,
+    "TaskDisplayName": "Network connection",
+    "KeywordsDisplayNames": [],
+    "TimeCreated": "2026-03-12T08:03:00.1020000+00:00",
+    "Message": "Network connection detected:\r\nRuleName: technique_id=T1059.001,technique_name=PowerShell\r\nUtcTime: 2026-03-12 08:02:59.990\r\nProcessGuid: {4c1e7a2b-9f3d-65f0-2a01-000000001a00}\r\nProcessId: 6812\r\nImage: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nUser: CORP\\dave\r\nProtocol: tcp\r\nInitiated: true\r\nSourceIsIpv6: false\r\nSourceIp: 192.0.2.31\r\nSourceHostname: WS-FIN-12.corp.example.com\r\nSourcePort: 50890\r\nSourcePortName: -\r\nDestinationIsIpv6: false\r\nDestinationIp: 203.0.113.200\r\nDestinationHostname: -\r\nDestinationPort: 4444\r\nDestinationPortName: -"
+  },
+  {
+    "Id": 22,
+    "Version": 5,
+    "LevelDisplayName": "Information",
+    "LogName": "Microsoft-Windows-Sysmon/Operational",
+    "ProviderName": "Microsoft-Windows-Sysmon",
+    "MachineName": "WS-FIN-12.corp.example.com",
+    "RecordId": 120333,
+    "TaskDisplayName": "DNSEvent (DNS query)",
+    "KeywordsDisplayNames": [],
+    "TimeCreated": "2026-03-12T08:02:15.7730000+00:00",
+    "Message": "Dns query:\r\nRuleName: -\r\nUtcTime: 2026-03-12 08:02:13.902\r\nProcessGuid: {4c1e7a2b-9f3d-65f0-2a01-000000001a00}\r\nProcessId: 6812\r\nQueryName: files.example.net\r\nQueryStatus: 0\r\nQueryResults: ::ffff:198.51.100.77;\r\nImage: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nUser: CORP\\dave"
+  },
+  {
+    "Id": 11,
+    "Version": 5,
+    "LevelDisplayName": "Information",
+    "LogName": "Microsoft-Windows-Sysmon/Operational",
+    "ProviderName": "Microsoft-Windows-Sysmon",
+    "MachineName": "WS-FIN-12.corp.example.com",
+    "RecordId": 120334,
+    "TaskDisplayName": "File created",
+    "KeywordsDisplayNames": [],
+    "TimeCreated": "2026-03-12T08:02:20.0050000+00:00",
+    "Message": "File created:\r\nRuleName: -\r\nUtcTime: 2026-03-12 08:02:20.001\r\nProcessGuid: {4c1e7a2b-9f3d-65f0-2a01-000000001a00}\r\nProcessId: 6812\r\nImage: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nTargetFilename: C:\\Users\\dave\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\updater.lnk\r\nCreationUtcTime: 2026-03-12 08:02:20.001\r\nUser: CORP\\dave"
+  },
+  {
+    "Id": 13,
+    "Version": 5,
+    "LevelDisplayName": "Information",
+    "LogName": "Microsoft-Windows-Sysmon/Operational",
+    "ProviderName": "Microsoft-Windows-Sysmon",
+    "MachineName": "WS-FIN-12.corp.example.com",
+    "RecordId": 120335,
+    "TaskDisplayName": "Registry value set",
+    "KeywordsDisplayNames": [],
+    "TimeCreated": "2026-03-12T08:02:25.3100000+00:00",
+    "Message": "Registry value set:\r\nRuleName: technique_id=T1547.001,technique_name=Registry Run Keys / Start Folder\r\nEventType: SetValue\r\nUtcTime: 2026-03-12 08:02:25.306\r\nProcessGuid: {4c1e7a2b-9f3d-65f0-2a01-000000001a00}\r\nProcessId: 6812\r\nImage: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\r\nTargetObject: HKU\\S-1-5-21-1004336348-1177238915-682003330-1112\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\Updater\r\nDetails: C:\\Users\\dave\\AppData\\Local\\Temp\\updater.exe\r\nUser: CORP\\dave"
+  }
+]
