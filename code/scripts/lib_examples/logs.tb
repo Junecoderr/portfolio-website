@@ -9,3 +9,12 @@ say(f"{len(failed)} failed logins")
 for row in logs.top(failed, "ip", 3) {
   say(row)
 }
+
+# Cloud and security product logs are found too (here AWS CloudTrail).
+let trail = logs.read("apps/data/cloudtrail.json")
+let denied = trail.filter(fn(r) {
+  return r.success == false
+})
+for r in denied {
+  say(f"{r.when} {r.user} {r.action} from {r.ip}")
+}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv as _csv
 import datetime as _dt
 import io
+import ipaddress
 import json as _json
 import os
 import re
@@ -13,7 +14,8 @@ from tblib._api import Module, check_type, fail, fail_os
 
 import tb as _tb
 
-FORMATS = ["auto", "syslog", "auth", "apache", "nginx", "json", "csv", "windows", "text", "evtx"]
+FORMATS = ["auto", "syslog", "auth", "apache", "nginx", "json", "csv", "windows", "text", "evtx",
+           "zeek", "suricata", "cloudtrail", "okta", "m365", "cef", "leef"]
 MAX_RECORDS = 5_000_000
 SNIFF_BYTES = 64 * 1024
 MONTHS = {m: i for i, m in enumerate(
@@ -739,9 +741,22 @@ def windows_record(obj: dict, raw: str):
             value = any_section(label)
             if value is not None:
                 data[name] = value
+    provider = none_if_dash(lookup(obj, ["providername", "source", "provider", "sourcename"], low))
+    channel = lookup(obj, ["channel", "logname"], low)
+    sysmon = "sysmon" in f"{provider} {channel}".lower()
+    if sysmon and message:
+        # Sysmon's Message is "Name: value" lines with the EventData names.
+        for text_line in message.replace("\r", "\n").split("\n")[1:]:
+            name, sep, value = text_line.partition(":")
+            if sep and re.fullmatch(r"[A-Za-z]+", name.strip()):
+                data.setdefault(name.strip(), value.strip())
     data = {k: v for k, v in data.items() if v is not None}
 
     action, description, success = EVENTS.get(event_id, (None, None, None))
+    if sysmon:
+        action, description = SYSMON_EVENTS.get(event_id, (None, None))
+        if ts is None and data.get("UtcTime"):
+            ts, when = parse_time(utc_if_bare(data["UtcTime"]))
     group = none_if_dash(data.get("GroupName"))
     if event_id in GROUP_EVENTS:
         # In group events EventData's TargetUserName is the group; the member is MemberName.
@@ -772,7 +787,7 @@ def windows_record(obj: dict, raw: str):
         "user": user, "domain": none_if_dash(data.get("TargetDomainName") if user == target else data.get("SubjectDomainName")),
         "ip": ip, "port": to_int(data.get("IpPort")),
         "computer": none_if_dash(lookup(obj, ["machinename", "computer", "computername", "hostname"], low)),
-        "provider": none_if_dash(lookup(obj, ["providername", "source", "provider", "sourcename"], low)),
+        "provider": provider,
         "logon_type": logon_type, "logon_type_name": LOGON_TYPES.get(logon_type),
         "target_user": target, "subject_user": subject,
         "process": none_if_dash(data.get("NewProcessName") or data.get("ProcessName")),
@@ -783,6 +798,8 @@ def windows_record(obj: dict, raw: str):
         "failure_reason": none_if_dash(data.get("FailureReason")),
         "status": status, "sub_status": none_if_dash(data.get("SubStatus")),
     }
+    if sysmon:
+        sysmon_fields(data, fields)
     if fields["process"]:
         data.setdefault("Image", fields["process"])
     if fields["parent_process"]:
@@ -791,8 +808,58 @@ def windows_record(obj: dict, raw: str):
         if key not in fields:
             fields[key] = value
     fields["Message"] = message or None
-    text = first or description or (f"Event {event_id}" if event_id is not None else raw)
+    text = (description if sysmon else None) or first or description or (
+        f"Event {event_id}" if event_id is not None else raw)
     return make_record("windows", raw, ts, when, text, fields)
+
+
+# Sysmon event IDs (Microsoft Sysinternals Sysmon documentation): id -> (action, description)
+SYSMON_EVENTS = {
+    1: ("process_created", "Process creation"), 2: ("file_time_changed", "A process changed a file creation time"),
+    3: ("network_connection", "Network connection"), 4: ("sysmon_state_changed", "Sysmon service state changed"),
+    5: ("process_exited", "Process terminated"), 6: ("driver_loaded", "Driver loaded"),
+    7: ("image_loaded", "Image loaded"), 8: ("remote_thread_created", "CreateRemoteThread"),
+    9: ("raw_disk_read", "RawAccessRead"), 10: ("process_accessed", "ProcessAccess"),
+    11: ("file_created", "FileCreate"), 12: ("registry_object_changed", "RegistryEvent (Object create and delete)"),
+    13: ("registry_value_set", "RegistryEvent (Value Set)"), 14: ("registry_renamed", "RegistryEvent (Key and Value Rename)"),
+    15: ("file_stream_created", "FileCreateStreamHash"), 16: ("sysmon_config_changed", "ServiceConfigurationChange"),
+    17: ("pipe_created", "PipeEvent (Pipe Created)"), 18: ("pipe_connected", "PipeEvent (Pipe Connected)"),
+    19: ("wmi_filter", "WmiEvent (WmiEventFilter activity detected)"),
+    20: ("wmi_consumer", "WmiEvent (WmiEventConsumer activity detected)"),
+    21: ("wmi_binding", "WmiEvent (WmiEventConsumerToFilter activity detected)"),
+    22: ("dns_query", "DNSEvent (DNS query)"), 23: ("file_deleted", "FileDelete (File Delete archived)"),
+    24: ("clipboard_changed", "ClipboardChange (New content in the clipboard)"),
+    25: ("process_tampering", "ProcessTampering (Process image change)"),
+    26: ("file_delete_logged", "FileDeleteDetected (File Delete logged)"),
+    27: ("file_block_executable", "FileBlockExecutable"), 28: ("file_block_shredding", "FileBlockShredding"),
+    29: ("file_executable_detected", "FileExecutableDetected"), 255: ("sysmon_error", "Error"),
+}
+
+
+def sysmon_fields(data, fields):
+    """Sysmon EventData names -> the common record names."""
+    def get(*names):
+        for name in names:
+            value = none_if_dash(data.get(name))
+            if value is not None:
+                return value
+        return None
+
+    account = get("User")
+    domain, _, user = account.rpartition("\\") if account else ("", "", None)
+    fields.update(user=user, domain=domain or None, target_user=None, subject_user=None)
+    mapped = {
+        "process": get("Image", "SourceImage"), "command_line": get("CommandLine"),
+        "parent_process": get("ParentImage"), "parent_command_line": get("ParentCommandLine"),
+        "pid": to_int(get("ProcessId", "SourceProcessId")), "target_process": get("TargetImage"),
+        "ip": get("SourceIp"), "src_ip": get("SourceIp"), "src_port": to_int(get("SourcePort")),
+        "dst_ip": get("DestinationIp"), "dst_port": to_int(get("DestinationPort")),
+        "port": to_int(get("DestinationPort")), "proto": get("Protocol"),
+        "src_host": get("SourceHostname"), "dst_host": get("DestinationHostname"),
+        "query": get("QueryName"), "file": get("TargetFilename"), "registry_key": get("TargetObject"),
+        "hashes": get("Hashes"),
+    }
+    fields.update({k: v for k, v in mapped.items() if v is not None})
 
 
 def windows_like(obj) -> bool:
@@ -802,6 +869,403 @@ def windows_like(obj) -> bool:
     if any(k in low for k in ("eventid", "event id", "eventcode", "event_id")):
         return True
     return "id" in low and any(k in low for k in ("timecreated", "providername", "logname", "keywordsdisplaynames"))
+
+
+# =============================================================================
+# Security products: Zeek, Suricata, CloudTrail, Okta, Microsoft 365, CEF, LEEF
+# =============================================================================
+# Each record keeps the product's own fields under their documented names and
+# adds the common names the other formats use (user, ip, src_ip, dst_ip,
+# dst_port, proto, action, success, ...). Where the two clash, the original wins.
+
+def utc_if_bare(value):
+    """ISO text with no zone, from a product that documents its times as UTC."""
+    if isinstance(value, str):
+        m = ISO_TIME.match(value.strip())
+        if m and m.group(8) is None:
+            return value.strip() + "Z"
+    return value
+
+
+def ip_or_none(value):
+    """An IP address, without a ":port" or [brackets]; None for anything else
+    (CloudTrail writes service names like "ec2.amazonaws.com" there)."""
+    value = none_if_dash(value)
+    if value is None:
+        return None
+    m = re.fullmatch(r"\[([0-9A-Fa-f:.]+)\](?::\d+)?|(\d{1,3}(?:\.\d{1,3}){3}):\d+", value)
+    if m:
+        value = m.group(1) or m.group(2)
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    return value
+
+
+def outcome_of(value):
+    """True / False / None from the many ways products write an outcome."""
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().lower()
+    if text in ("success", "succeeded", "true", "allow", "allowed", "ok", "partiallysucceeded"):
+        return True
+    if text in ("failure", "failed", "false", "deny", "denied", "fail", "blocked", "rejected"):
+        return False
+    return None
+
+
+def vendor_record(fmt, raw, obj, time_value, message, norm):
+    """A record with the common names first, then the product's own fields."""
+    ts, when = parse_time(time_value)
+    if not isinstance(message, str) or not message:
+        message = raw
+    return make_record(fmt, raw, ts, when, message, {**norm, **obj})
+
+
+def endpoints(src, sport, dst, dport):
+    return {"ip": src, "src_ip": src, "src_port": sport, "dst_ip": dst, "dst_port": dport, "port": dport}
+
+
+def flow_text(src, sport, dst, dport):
+    if src is None and dst is None:
+        return ""
+    return f"{src}{'' if sport is None else ':' + str(sport)} -> {dst}{'' if dport is None else ':' + str(dport)}"
+
+
+# -- Zeek (TSV with #fields headers, or JSON) ------------------------------------
+
+ZEEK_NUMBERS = {"count", "int", "port", "double", "time", "interval"}
+
+
+def zeek_value(text, kind, state):
+    if text == state["unset"]:
+        return None
+    if "\\x" in text:
+        text = re.sub(r"\\x([0-9a-fA-F]{2})", lambda m: chr(int(m.group(1), 16)), text)
+    kind = kind or "string"
+    if kind.startswith(("set[", "vector[", "table[")):
+        if text == state["empty"]:
+            return []
+        inner = kind[kind.index("[") + 1:-1]
+        return [zeek_value(part, inner, state) for part in text.split(state["set_sep"])]
+    if text == state["empty"]:
+        return ""
+    if kind == "bool":
+        return text == "T"
+    if kind in ZEEK_NUMBERS:
+        try:
+            return _tb.tidy_number(float(text)) if kind in ("double", "time", "interval") else int(text)
+        except ValueError:
+            return text
+    return text
+
+
+def zeek_header(line, state):
+    """Read one '#name value' header line of a Zeek TSV log."""
+    name, _, value = line[1:].partition(state["sep"] if not line.startswith("#separator") else " ")
+    if name == "separator":
+        state["sep"] = value.strip().encode().decode("unicode_escape") or "\t"
+    elif name == "set_separator":
+        state["set_sep"] = value
+    elif name == "empty_field":
+        state["empty"] = value
+    elif name == "unset_field":
+        state["unset"] = value
+    elif name == "path":
+        state["path"] = value
+    elif name == "fields":
+        state["fields"] = value.split(state["sep"])
+    elif name == "types":
+        state["types"] = value.split(state["sep"])
+
+
+def zeek_state():
+    return {"sep": "\t", "set_sep": ",", "empty": "(empty)", "unset": "-", "path": None, "fields": None, "types": None}
+
+
+def zeek_tsv_record(line, state):
+    names = state["fields"]
+    if not names:
+        return None
+    types = state["types"] or []
+    values = line.split(state["sep"])
+    obj = {name: zeek_value(values[i] if i < len(values) else state["unset"], types[i] if i < len(types) else None, state)
+           for i, name in enumerate(names)}
+    return zeek_record(obj, line, state["path"])
+
+
+def zeek_record(obj, raw, path=None):
+    obj = plain(obj)
+    log = obj.get("_path") or path
+    src, dst = lookup(obj, ["id.orig_h"]), lookup(obj, ["id.resp_h"])
+    sport, dport = to_int(lookup(obj, ["id.orig_p"])), to_int(lookup(obj, ["id.resp_p"]))
+    norm = {"log": log, "action": log, "user": obj.get("user") or obj.get("username"),
+            **endpoints(src, sport, dst, dport), "proto": obj.get("proto"),
+            "success": obj.get("auth_success") if isinstance(obj.get("auth_success"), bool) else None}
+    if obj.get("query") is not None:
+        norm["query"] = obj["query"]
+    detail = obj.get("query") or " ".join(str(obj[k]) for k in ("method", "host", "uri") if obj.get(k)) or obj.get("service")
+    message = " ".join(str(p) for p in (log or "zeek", flow_text(src, sport, dst, dport), detail) if p)
+    return vendor_record("zeek", raw, obj, obj.get("ts"), message, norm)
+
+
+# -- Suricata EVE JSON -----------------------------------------------------------
+
+def suricata_record(obj, raw):
+    obj = plain(obj)
+    kind = obj.get("event_type")
+    src, dst = obj.get("src_ip"), obj.get("dest_ip")
+    sport, dport = to_int(obj.get("src_port")), to_int(obj.get("dest_port"))
+    norm = {"action": kind, **endpoints(src, sport, dst, dport), "proto": obj.get("proto"), "user": None,
+            "success": None}
+    alert = obj.get("alert") if isinstance(obj.get("alert"), dict) else {}
+    if alert:
+        norm.update(rule=alert.get("signature"), rule_id=alert.get("signature_id"), category=alert.get("category"))
+    dns = obj.get("dns") if isinstance(obj.get("dns"), dict) else {}
+    queries = dns.get("queries") if isinstance(dns.get("queries"), list) else []  # EVE dns v3
+    query = dns.get("rrname") or (queries[0].get("rrname") if queries and isinstance(queries[0], dict) else None)
+    if query:
+        norm["query"] = query
+    http = obj.get("http") if isinstance(obj.get("http"), dict) else {}
+    if http:
+        norm.update(method=http.get("http_method"), path=http.get("url"), status=to_int(http.get("status")),
+                    agent=http.get("http_user_agent"))
+    if alert:
+        message = alert.get("signature")
+    elif query:
+        message = f"{kind} {query}"
+    elif http:
+        message = f"{kind} {http.get('http_method') or ''} {http.get('hostname') or ''}{http.get('url') or ''}".strip()
+    else:
+        message = f"{kind} {flow_text(src, sport, dst, dport)}".strip()
+    return vendor_record("suricata", raw, obj, obj.get("timestamp"), message, norm)
+
+
+# -- AWS CloudTrail --------------------------------------------------------------
+
+def cloudtrail_record(obj, raw):
+    obj = plain(obj)
+    who = obj.get("userIdentity") if isinstance(obj.get("userIdentity"), dict) else {}
+    issuer = dotted(who, "sessioncontext.sessionissuer.username")
+    arn = who.get("arn") or ""
+    user = who.get("userName") or issuer or (re.split(r"[/:]", arn)[-1] if arn else None) or who.get("principalId") or who.get("invokedBy")
+    error = obj.get("errorCode")
+    success = error is None
+    response = obj.get("responseElements")
+    if isinstance(response, dict) and isinstance(response.get("ConsoleLogin"), str):
+        success = response["ConsoleLogin"] == "Success"
+    action, service = obj.get("eventName"), obj.get("eventSource")
+    norm = {"user": user, "ip": ip_or_none(obj.get("sourceIPAddress")), "action": action, "success": success,
+            "service": service, "region": obj.get("awsRegion"), "agent": obj.get("userAgent"), "error": error}
+    message = f"{action} ({service})" + (f" failed: {error}" if error else "") + (" failed" if not success and not error else "")
+    return vendor_record("cloudtrail", raw, obj, obj.get("eventTime"), message, norm)
+
+
+# -- Okta System Log -------------------------------------------------------------
+
+def okta_record(obj, raw):
+    obj = plain(obj)
+    outcome = obj.get("outcome") if isinstance(obj.get("outcome"), dict) else {}
+    targets = obj.get("target") if isinstance(obj.get("target"), list) else []
+    target_user = next((t.get("alternateId") for t in targets if isinstance(t, dict) and t.get("type") == "User"), None)
+    norm = {"user": dotted(obj, "actor.alternateid"), "ip": ip_or_none(dotted(obj, "client.ipaddress")),
+            "action": obj.get("eventType"), "success": outcome_of(outcome.get("result")),
+            "reason": outcome.get("reason"), "target_user": target_user,
+            "agent": dotted(obj, "client.useragent.rawuseragent")}
+    return vendor_record("okta", raw, obj, obj.get("published"), obj.get("displayMessage"), norm)
+
+
+# -- Microsoft 365 unified audit log ---------------------------------------------
+
+def m365_record(obj, raw):
+    obj = plain(obj)
+    audit = obj.get("AuditData")
+    if isinstance(audit, str):
+        try:
+            audit = _json.loads(audit)
+        except ValueError:
+            audit = None
+    if isinstance(audit, dict):  # a search export row: its columns plus the AuditData JSON
+        obj = {**{k: v for k, v in obj.items() if k != "AuditData"}, **plain(audit)}
+    action = obj.get("Operation") or obj.get("Operations")
+    user = obj.get("UserId") or obj.get("UserIds")
+    norm = {"user": user, "ip": ip_or_none(obj.get("ClientIP") or obj.get("ClientIPAddress") or obj.get("ActorIpAddress")),
+            "action": action, "success": outcome_of(obj.get("ResultStatus")), "service": obj.get("Workload"),
+            "agent": obj.get("UserAgent"), "reason": obj.get("LogonError")}
+    message = f"{action} ({obj['Workload']})" if obj.get("Workload") else action
+    # CreationTime is UTC but written without a zone
+    return vendor_record("m365", raw, obj, utc_if_bare(obj.get("CreationTime") or obj.get("CreationDate")), message, norm)
+
+
+# -- CEF and LEEF (bare, or after a syslog header) -------------------------------
+
+CEF_START = re.compile(r"(?:^|\s)(CEF:\s?\d+\|)")
+LEEF_START = re.compile(r"(?:^|\s)(LEEF:[12]\.0\|)")
+CEF_KEY = re.compile(r"(?:^|\s)([A-Za-z0-9_.\-\[\]]+)=")
+CEF_TIME = re.compile(r"([A-Za-z]{3}) (\d{1,2}) (\d{4}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?: (\S+))?$")
+
+
+def split_pipes(text, count):
+    """Split CEF/LEEF headers on '|' (but not '\\|'), at most count times."""
+    parts, current, i = [], [], 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\" and i + 1 < len(text) and text[i + 1] in "|\\":
+            current.append(text[i + 1])
+            i += 2
+            continue
+        i += 1
+        if ch != "|":
+            current.append(ch)
+            continue
+        parts.append("".join(current))
+        current = []
+        if len(parts) == count:  # the rest (extension / attributes) keeps its own escapes
+            return parts + [text[i:]]
+    parts.append("".join(current))
+    return parts
+
+
+def cef_extension(text):
+    keys = list(CEF_KEY.finditer(text))
+    out = {}
+    for n, m in enumerate(keys):
+        end = keys[n + 1].start() if n + 1 < len(keys) else len(text)
+        value = text[m.end():end].strip()
+        value = re.sub(r"\\(.)", lambda e: {"n": "\n", "r": "\r"}.get(e.group(1), e.group(1)), value)
+        out[m.group(1)] = value
+    return out
+
+
+def device_time(value):
+    """CEF rt/start/end and LEEF devTime: epoch milliseconds, ISO, or 'MMM dd yyyy HH:mm:ss'."""
+    value = none_if_dash(value)
+    if value is None:
+        return None
+    m = CEF_TIME.match(value)
+    if m and m.group(1).lower() in MONTHS:
+        mon, d, y, h, mi, s, frac, zone = m.groups()
+        tz = _offset(zone) if zone and re.fullmatch(r"Z|GMT|UTC|[+-]\d{2}:?\d{2}", zone, re.I) else None
+        return _make(int(y), MONTHS[mon.lower()], int(d), int(h), int(mi), int(s),
+                     int((frac or "0")[:6].ljust(6, "0")), tz)
+    return parse_datetime(value)
+
+
+def syslog_prefix(line, start, years):
+    """host, program and time from a syslog header in front of CEF/LEEF."""
+    if not line[:start].strip():
+        return {}, (None, None)
+    record = parse_syslog(line, years)
+    if record is None:
+        return {}, (None, None)
+    program = record.get("program")
+    info = {"host": record.get("host"), "program": None if program in ("CEF", "LEEF") else program}
+    for key in ("facility", "severity"):
+        if key in record:
+            info["syslog_" + key] = record[key]
+    return info, (record.get("time"), record.get("when"))
+
+
+def finish_device(fmt, line, obj, norm, when, header_time, message):
+    ts, text = _pair(when) if when is not None else header_time
+    return make_record(fmt, line, ts, text, message or line, {**norm, **obj})
+
+
+def parse_cef(line, years):
+    m = CEF_START.search(line)
+    if not m:
+        return None
+    parts = split_pipes(line[m.start(1):], 7)
+    if len(parts) < 8:
+        return None
+    version, vendor, product, product_version, event_id, name, severity, extension = parts
+    head, header_ts = syslog_prefix(line, m.start(1), years)
+    ext = cef_extension(extension)
+    obj = {"cef_version": to_int(version.split(":", 1)[1]), "vendor": vendor, "product": product,
+           "product_version": product_version, "event_id": event_id, "name": name,
+           "severity": to_int(severity) if looks_numeric(severity) else severity, **ext}
+    for key, value in list(ext.items()):  # cs1=... cs1Label=Rule -> "Rule"
+        label = (ext.get(key + "Label") or "").strip('"')
+        if label and label not in obj:
+            obj[label] = value
+    src, dst = none_if_dash(ext.get("src")), none_if_dash(ext.get("dst"))
+    sport, dport = to_int(ext.get("spt")), to_int(ext.get("dpt"))
+    norm = {**head, "host": ext.get("dvchost") or head.get("host"), "user": none_if_dash(ext.get("suser")) or none_if_dash(ext.get("duser")),
+            "target_user": none_if_dash(ext.get("duser")), **endpoints(src, sport, dst, dport), "proto": ext.get("proto"),
+            "action": ext.get("act") or name, "success": outcome_of(ext.get("outcome"))}
+    when = device_time(ext.get("rt") or ext.get("end") or ext.get("start"))
+    return finish_device("cef", line, obj, norm, when, header_ts, ext.get("msg") or name)
+
+
+def parse_leef(line, years):
+    m = LEEF_START.search(line)
+    if not m:
+        return None
+    body = line[m.start(1):]
+    version = body[5:8]
+    parts = split_pipes(body, 6 if version == "2.0" else 5)
+    if len(parts) < 6:
+        return None
+    delimiter, attrs = "\t", parts[5]
+    if version == "2.0" and len(parts) == 7:
+        mark = parts[5]
+        if "=" in mark or len(mark) > 4:
+            attrs = parts[5] + "|" + parts[6]
+        else:
+            attrs = parts[6]
+            hexed = re.fullmatch(r"(?:0?x)([0-9A-Fa-f]{2,4})", mark)
+            delimiter = chr(int(hexed.group(1), 16)) if hexed else (mark or "\t")
+    obj = {"leef_version": version, "vendor": parts[1], "product": parts[2], "product_version": parts[3],
+           "event_id": parts[4]}
+    for item in attrs.split(delimiter):
+        key, sep, value = item.partition("=")
+        if sep and key.strip():
+            obj[key.strip()] = value.strip()
+    head, header_ts = syslog_prefix(line, m.start(1), years)
+    src, dst = none_if_dash(obj.get("src")), none_if_dash(obj.get("dst"))
+    sport, dport = to_int(obj.get("srcPort")), to_int(obj.get("dstPort"))
+    norm = {**head, "user": none_if_dash(obj.get("usrName")) or none_if_dash(obj.get("accountName")), **endpoints(src, sport, dst, dport),
+            "proto": obj.get("proto"), "action": parts[4], "success": None}
+    # shortcut: devTimeFormat isn't applied; epoch ms, ISO and "MMM dd yyyy HH:mm:ss" are read.
+    when = device_time(obj.get("devTime"))
+    message = f"{parts[1]} {parts[2]} {parts[4]}".strip()
+    return finish_device("leef", line, obj, norm, when, header_ts, message)
+
+
+JSON_READERS = {"zeek": zeek_record, "suricata": suricata_record, "cloudtrail": cloudtrail_record,
+                "okta": okta_record, "m365": m365_record, "windows": windows_record}
+JSON_FORMATS = {"json", *JSON_READERS}
+
+
+def classify(obj) -> str:
+    """Which product wrote this JSON object (by its documented field names)."""
+    if not isinstance(obj, dict):
+        return "json"
+    if ("AuditData" in obj and ("Operations" in obj or "Operation" in obj)) or (
+            "Operation" in obj and "Workload" in obj and "CreationTime" in obj):
+        return "m365"
+    if "eventSource" in obj and "eventName" in obj and "eventTime" in obj:
+        return "cloudtrail"
+    if "eventType" in obj and "published" in obj and ("actor" in obj or "uuid" in obj):
+        return "okta"
+    if "event_type" in obj and "timestamp" in obj and any(k in obj for k in ("flow_id", "src_ip", "dest_ip", "in_iface", "stats")):
+        return "suricata"
+    if "id.orig_h" in obj or ("ts" in obj and any(k in obj for k in ("uid", "fuid", "_path"))):
+        return "zeek"
+    if windows_like(obj):
+        return "windows"
+    return "json"
+
+
+def json_record(obj, raw, fmt):
+    """One JSON object as a record of the given format ("auto" asks classify())."""
+    if not isinstance(obj, dict):
+        return make_record("json", raw, message=raw, fields={"value": plain(obj)})
+    if fmt == "auto":
+        fmt = classify(obj)
+    reader = JSON_READERS.get(fmt)
+    return reader(obj, raw) if reader else object_record(obj, raw, "json")
 
 
 # =============================================================================
@@ -830,23 +1294,24 @@ def sniff_text(sample: str) -> str:
     if not stripped:
         return "text"
     lines = [ln for ln in sample.splitlines() if ln.strip()][:30]
-    if stripped.startswith("["):
-        return "windows" if re.search(r'"(?:Id|EventID|EventId|Event ID)"\s*:', stripped[:20000]) else "json"
-    if stripped.startswith("{"):
-        objects = []
-        for ln in lines[:10]:
-            try:
-                objects.append(_json.loads(ln))
-            except ValueError:
-                break
-        if not objects:  # one pretty-printed object
-            try:
-                objects = [_json.loads(stripped)]
-            except ValueError:
-                return "windows" if re.search(r'"(?:EventID|Id)"\s*:', stripped[:20000]) else "json"
-        return "windows" if any(windows_like(o) for o in objects) else "json"
+    if stripped[:1] in ("[", "{"):
+        objects = sample_objects(stripped, lines)
+        kinds = [classify(o) for o in objects]
+        vendor = [k for k in kinds if k not in ("json", "windows")]
+        if vendor and len(vendor) * 2 >= len(kinds):
+            return max(set(vendor), key=vendor.count)
+        if any(k == "windows" for k in kinds):
+            return "windows"
+        if stripped.startswith("[") or not objects:
+            return "windows" if re.search(r'"(?:Id|EventID|EventId|Event ID)"\s*:', stripped[:20000]) else "json"
+        return "json"
     if not lines:
         return "text"
+    if lines[0].startswith("#separator") or any(ln.startswith("#fields\t") for ln in lines[:10]):
+        return "zeek"
+    for fmt, start in (("cef", CEF_START), ("leef", LEEF_START)):
+        if sum(1 for ln in lines if start.search(ln)) >= max(1, len(lines) * 0.6):
+            return fmt
     apache = sum(1 for ln in lines if APACHE.match(ln))
     if apache >= max(1, len(lines) * 0.6):
         return "apache"
@@ -866,12 +1331,70 @@ def sniff_text(sample: str) -> str:
         except _csv.Error:
             header = []
         names = {h.strip().lower() for h in header}
+        if "auditdata" in names and names & {"operations", "operation"}:
+            return "m365"
         if names & {"event id", "eventid", "id", "eventcode"} and names & {
                 "date and time", "timecreated", "timegenerated", "level", "providername", "source", "message"}:
             return "windows"
         if len(header) >= 2 and all(h.strip() and not looks_numeric(h) for h in header):
             return "csv"
     return "text"
+
+
+def sample_objects(stripped, lines, n=10):
+    """The first few JSON objects of a sample (JSON lines, an array, or one
+    document such as CloudTrail's {"Records": [...]}), even when cut short."""
+    if stripped.startswith("{"):
+        objects = []
+        for ln in lines[:n]:
+            try:
+                objects.append(_json.loads(ln))
+            except ValueError:
+                break
+        if objects and not (isinstance(objects[0], dict) and isinstance(objects[0].get("Records"), list)):
+            return objects
+        try:
+            whole = _json.loads(stripped)
+            inner = wrapper_of(whole)
+            return inner[:n] if inner else [whole]
+        except ValueError:
+            m = re.match(r'\{\s*"[^"]+"\s*:\s*\[', stripped)
+            if not m:
+                return []
+            stripped = stripped[m.end() - 1:]
+    decoder = _json.JSONDecoder()
+    objects, i = [], 1
+    while len(objects) < n:
+        while i < len(stripped) and stripped[i] in " \t\r\n,":
+            i += 1
+        try:
+            obj, i = decoder.raw_decode(stripped, i)
+        except ValueError:
+            break
+        objects.append(obj)
+    return objects
+
+
+def wrapper_of(obj):
+    """The event list inside a {"Records": [...]}-style document, or None."""
+    if isinstance(obj, dict):
+        return next((v for v in obj.values() if isinstance(v, list) and v and isinstance(v[0], dict)), None)
+    return None
+
+
+def is_document(stripped):
+    """Whole-file JSON (an array, a pretty-printed object, or a one-line
+    {"Records": [...]}) rather than one object per line."""
+    if stripped[:1] == "[":
+        return True
+    if stripped[:1] != "{":
+        return False
+    first = stripped.split("\n", 1)[0]
+    try:
+        obj = _json.loads(first)
+    except ValueError:
+        return True
+    return isinstance(obj, dict) and isinstance(obj.get("Records"), list)
 
 
 def looks_numeric(text):
@@ -884,6 +1407,7 @@ class LineParser:
     def __init__(self, fmt, year=None):
         self.fmt = fmt
         self.years = YearTracker(year)
+        self.zeek = zeek_state()
 
     def parse(self, line: str):
         line = line.rstrip("\r\n")
@@ -899,14 +1423,23 @@ class LineParser:
             return auth_fields(record) if fmt == "auth" else record
         if fmt in ("apache", "nginx"):
             return parse_apache(line) or text_record(line)
-        if fmt in ("json", "windows"):
+        if fmt == "zeek" and line.startswith("#"):
+            zeek_header(line, self.zeek)
+            return None
+        if fmt in JSON_FORMATS and not (fmt == "zeek" and not line.lstrip().startswith("{")):
             try:
                 obj = _json.loads(line)
             except ValueError:
                 return text_record(line)
             if not isinstance(obj, dict):
                 return make_record(fmt, line, message=line, fields={"value": plain(obj)})
-            return windows_record(obj, line) if fmt == "windows" else object_record(obj, line, "json")
+            return json_record(obj, line, fmt)
+        if fmt == "zeek":
+            return zeek_tsv_record(line, self.zeek) or text_record(line)
+        if fmt == "cef":
+            return parse_cef(line, self.years) or text_record(line)
+        if fmt == "leef":
+            return parse_leef(line, self.years) or text_record(line)
         if fmt == "csv":
             try:
                 row = next(_csv.reader([line]))
@@ -921,10 +1454,10 @@ class LineParser:
             try:
                 obj = _json.loads(text)
                 if isinstance(obj, dict):
-                    return windows_record(obj, line) if windows_like(obj) else object_record(obj, line, "json")
+                    return json_record(obj, line, "auto")
             except ValueError:
                 pass
-        record = parse_apache(line)
+        record = parse_cef(line, self.years) or parse_leef(line, self.years) or parse_apache(line)
         if record:
             return record
         record = parse_syslog(line, self.years)
@@ -963,7 +1496,10 @@ def iter_rows(handle, fmt):
             name = header[i] if i < len(header) else f"column{i + 1}"
             obj[name] = value
         raw = ",".join(row)
-        yield windows_record(obj, raw) if fmt == "windows" else object_record(obj, raw, "csv")
+        if fmt in ("windows", "m365"):
+            yield JSON_READERS[fmt](obj, raw)
+        else:
+            yield object_record(obj, raw, "csv")
 
 
 def iter_json_document(text, fmt, line):
@@ -979,12 +1515,7 @@ def iter_json_document(text, fmt, line):
         fail(line, "That JSON log should be a list of events (or one event per line).")
     for obj in data:
         raw = _json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
-        if not isinstance(obj, dict):
-            yield make_record("json", raw, message=raw, fields={"value": plain(obj)})
-        elif fmt == "windows" or (fmt == "auto" and windows_like(obj)):
-            yield windows_record(obj, raw)
-        else:
-            yield object_record(obj, raw, "json")
+        yield json_record(obj, raw, fmt)
 
 
 def iter_text(text, fmt, line, year=None):
@@ -992,11 +1523,10 @@ def iter_text(text, fmt, line, year=None):
     if fmt == "auto":
         fmt = sniff_text(text[:SNIFF_BYTES])
     stripped = text.lstrip()
-    if fmt in ("json", "windows") and stripped[:1] == "[" or (
-            fmt in ("json", "windows") and stripped[:1] == "{" and not first_line_is_json(stripped)):
+    if fmt in JSON_FORMATS and is_document(stripped):
         yield from iter_json_document(text, fmt, line)
         return
-    if fmt == "csv" or (fmt == "windows" and stripped[:1] not in ("{", "[")):
+    if fmt == "csv" or (fmt in ("windows", "m365") and stripped[:1] not in ("{", "[")):
         yield from iter_rows(io.StringIO(text), fmt)
         return
     parser = LineParser(fmt, year)
@@ -1004,15 +1534,6 @@ def iter_text(text, fmt, line, year=None):
         record = parser.parse(ln)
         if record is not None:
             yield record
-
-
-def first_line_is_json(text):
-    first = text.split("\n", 1)[0]
-    try:
-        _json.loads(first)
-        return True
-    except ValueError:
-        return False
 
 
 def iter_file(path, fmt, line, year=None):
@@ -1038,11 +1559,10 @@ def iter_file(path, fmt, line, year=None):
     stripped = sample.lstrip()
     try:
         with open_text(path) as f:
-            if fmt in ("json", "windows") and (stripped[:1] == "[" or (
-                    stripped[:1] == "{" and not first_line_is_json(stripped))):
+            if fmt in JSON_FORMATS and is_document(stripped):
                 yield from iter_json_document(f.read(), fmt, line)
                 return
-            if fmt == "csv" or (fmt == "windows" and stripped[:1] not in ("{", "[")):
+            if fmt == "csv" or (fmt in ("windows", "m365") and stripped[:1] not in ("{", "[")):
                 yield from iter_rows(f, fmt)
                 return
             parser = LineParser(fmt, year)
@@ -1084,13 +1604,27 @@ def load(api):
     m = Module(
         "logs",
         "Read log files into records (maps) you can search and count: syslog, Linux auth.log (SSH and sudo), "
-        "Apache/nginx access logs, JSON lines, CSV and Windows Security event exports. Every record has "
+        "Apache/nginx access logs, JSON lines, CSV, Windows Security and Sysmon events, Zeek, Suricata EVE, "
+        "AWS CloudTrail, Okta, Microsoft 365 audit logs, CEF and LEEF. Every record has "
         "\"time\" (a UTC timestamp or nil), \"when\" (the time as the log wrote it), \"when_utc\" (the same "
         "instant as UTC text, safe to sort and compare across zones), \"zone\" (\"UTC\", \"+02:00\"), "
         "\"format\", \"message\" and \"raw\" "
         "(the original line), plus the fields of its format.",
     )
-    m.value("formats", list(FORMATS), doc="The formats logs knows: auto, syslog, auth, apache, nginx, json, csv, windows, text, evtx (binary .evtx files, read by the evtx library).")
+    m.value("formats", list(FORMATS), doc=(
+        "The formats logs knows, as a list of names.\n"
+        "\n"
+        "Formats:\n"
+        "- auto: guess from the start of the file (the default).\n"
+        "- syslog, auth, apache, nginx, json, csv, text\n"
+        "- windows: Windows event exports; Sysmon events get their own names too.\n"
+        "- evtx: binary .evtx files, read by the evtx library.\n"
+        "- zeek: Zeek logs, tab-separated with #fields headers, or JSON.\n"
+        "- suricata: Suricata EVE JSON.\n"
+        "- cloudtrail: AWS CloudTrail, the {\"Records\": [...]} file or one event per line.\n"
+        "- okta: the Okta System Log (JSON).\n"
+        "- m365: the Microsoft 365 unified audit log, as JSON or the CSV export with an AuditData column.\n"
+        "- cef, leef: CEF and LEEF lines, bare or after a syslog header."))
 
     def path_arg(line, path, fn):
         check_type(line, path, "text", f"logs.{fn}", "path")
@@ -1112,6 +1646,8 @@ def load(api):
         "- \"auto\": guess the format (the default).\n"
         "- \"syslog\", \"auth\", \"apache\", \"nginx\", \"json\"\n"
         "- \"windows\": one JSON event.\n"
+        "- \"zeek\", \"suricata\", \"cloudtrail\", \"okta\", \"m365\": one JSON event from that product.\n"
+        "- \"cef\", \"leef\": one CEF or LEEF line, with or without a syslog header.\n"
         "- \"csv\": gives {\"fields\": [...]}."))
     def parse_line(line, text, fmt="auto"):
         check_type(line, text, "text", "logs.parse_line", "line")
@@ -1131,17 +1667,30 @@ def load(api):
 
     @m.fn("read", 1, 3, doc=(
         "read(path, format?, options?) -> list\n"
-        "Read a log file into a list of records. Files are read a line at a time, so big logs are fine.\n"
+        "Read a log file into a list of records. Files are read a line at a time, so big logs are fine "
+        "(a JSON array or a pretty-printed JSON file is read whole).\n"
         "\n"
         "Arguments:\n"
         "- format: the layout of the log (default: \"auto\").\n"
         "  \"auto\" looks at the start of the file and picks the format for you.\n"
+        "  See logs.formats for the list.\n"
         "- options: a map of extra settings, listed below.\n"
         "\n"
         "Options:\n"
         "- limit: stop after this many records.\n"
         "- year: the year for syslog lines, which have no year of their own.\n"
         "  Without it, the most recent year that isn't in the future is used.\n"
+        "\n"
+        "Returns:\n"
+        "- time, when, when_utc, zone, format, message, raw: in every record.\n"
+        "- user, ip, action, success: who, from where, what happened and whether it worked.\n"
+        "  ip is the source address; action is the product's own event name.\n"
+        "- src_ip, src_port, dst_ip, dst_port, port, proto: network fields (in network logs port is the destination port).\n"
+        "- host: the machine or sensor that wrote the log; Windows events use computer.\n"
+        "- process, command_line, parent_process, pid, query, file: from Sysmon, Zeek and Suricata.\n"
+        "- service, region, agent, reason, target_user, rule, rule_id: from the cloud and IDS formats.\n"
+        "- The product's own fields stay in the record under their documented names, "
+        "like eventName, id.orig_h, alert or AuditData's fields.\n"
         "\n"
         "Example:\n"
         "    let records = logs.read(\"apps/data/auth.log\", \"auto\", {\"limit\": 4})\n"
@@ -1172,8 +1721,8 @@ def load(api):
 
     @m.fn("sniff", 1, doc=(
         "sniff(path) -> text\n"
-        "Guess a log file's format from its first lines: \"auth\", \"syslog\", \"apache\", \"json\", \"csv\", "
-        "\"windows\" or \"text\". This is what \"auto\" uses."))
+        "Guess a log file's format from its first lines, as one of the names in logs.formats "
+        "(\"auth\", \"zeek\", \"cloudtrail\", ... or \"text\"). This is what \"auto\" uses."))
     def sniff(line, path):
         path = path_arg(line, path, "sniff")
         try:
