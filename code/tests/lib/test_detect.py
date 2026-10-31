@@ -662,12 +662,59 @@ def test_sigma_to_query_backends():
                       '| bin _time span=300s | stats count by _time, src | where count > 10') or \
         out[0].startswith('sourcetype="linux_secure" action="failed_login"')
     assert "| stats count by" in out[0] and "where count > 10" in out[0]
-    assert out[1].startswith("Syslog\n| where action =~ \"failed_login\"")
-    assert 'ipv4_is_in_range(ip, "10.0.0.0/8")' in out[1]
-    assert "| summarize count_ = count() by ip, bin(TimeGenerated, 300s)\n| where count_ > 10" in out[1]
+    assert out[1].startswith('Syslog\n| where Facility in ("auth", "authpriv")\n| extend Action = case(')
+    assert '| where Action =~ "failed_login" and not(ipv4_is_in_range(SrcIp, "10.0.0.0/8"))' in out[1]
+    assert "| summarize count_ = count() by SrcIp, bin(TimeGenerated, 300s)\n| where count_ > 10" in out[1]
     assert out[-1] == "true"
     err = str(tb_error(f"import detect\ndetect.sigma_to_query(detect.sigma({_json.dumps(BRUTE)}), \"elastic\")"))
     assert "can't count or group" in err
+
+
+SYSLOG_COLUMNS = {"TimeGenerated", "Computer", "HostName", "HostIP", "Facility", "SeverityLevel", "ProcessName",
+                  "ProcessID", "SyslogMessage", "EventTime"}
+
+
+def kql_columns(query):
+    """Column names a KQL query reads: identifiers outside strings that aren't keywords/functions."""
+    import re
+    text = re.sub(r'@?"(?:[^"\\]|\\.)*"', '""', query)
+    made = set(re.findall(r"\| extend (\w+) =", text)) | {"count_"}
+    words = set(re.findall(r"\b[A-Za-z_]\w*\b", text)) - made
+    keywords = {"Syslog", "where", "extend", "summarize", "by", "in", "and", "or", "not", "case", "extract", "toint",
+                "matches", "regex", "contains", "startswith", "count", "bin", "s", "ipv4_is_in_range"}
+    return {w for w in words - keywords if not w.isdigit()}
+
+
+def test_sigma_to_query_kql_ssh_brute_force_fits_the_syslog_schema():
+    from conftest import ROOT
+    path = (ROOT / "apps" / "data" / "sigma" / "ssh_brute_force.yml").as_posix()
+    out = run_tb(f'import detect\nlet r = detect.sigma("{path}")\nsay(detect.sigma_to_query(r, "kql"))\n'
+                 'say("----")\nsay(detect.sigma_to_query(r, "splunk"))')
+    cut = out.index("----")
+    kql, splunk = "\n".join(out[:cut]), "\n".join(out[cut + 1:])
+    # Group-by and filter fields go through the field map; only real Syslog columns are read.
+    assert kql_columns(kql) <= SYSLOG_COLUMNS, kql_columns(kql) - SYSLOG_COLUMNS
+    assert "by ip" not in kql and "action =~" not in kql
+    assert '| extend SrcIp = extract(@"(?:from |rhost=)([0-9A-Fa-f:.]+)", 1, SyslogMessage)' in kql
+    assert 'SyslogMessage matches regex @"Failed \\S+ for ", "failed_login"' in kql
+    assert kql.endswith('| where Action =~ "failed_login"\n| summarize count_ = count() by SrcIp, '
+                        'bin(TimeGenerated, 300s)\n| where count_ > 10')
+    assert splunk == ('sourcetype="linux_secure" action="failed_login" | bin _time span=300s | stats count by _time, src '
+                      '| where count > 10')
+
+
+def test_sigma_to_query_kql_syslog_only_parses_what_it_uses():
+    text = ("title: t\nlogsource:\n  product: linux\n  service: sshd\ndetection:\n  sel:\n    user: root\n"
+            "    message|contains: Accepted\n  condition: sel\n")
+    lines = run(f"say(detect.sigma_to_query(detect.sigma({_json.dumps(text)}), \"kql\"))")
+    kql = "\n".join(lines)
+    assert kql.splitlines()[1] == '| where Facility in ("auth", "authpriv") and ProcessName == "sshd"'
+    assert "| extend UserName = extract(" in kql and "Action" not in kql and "SrcIp" not in kql
+    assert kql.endswith('| where UserName =~ "root" and SyslogMessage contains "Accepted"')
+    assert kql_columns(kql) <= SYSLOG_COLUMNS
+    # A table given by hand drops the logsource's Facility filter.
+    lines = run(f"say(detect.sigma_to_query(detect.sigma({_json.dumps(text)}), \"kql\", {{\"table\": \"MySyslog\"}}))")
+    assert "\n".join(lines) == 'MySyslog\n| where user =~ "root" and message contains "Accepted"'
 
 
 @pytest.mark.parametrize("backend,expected", [

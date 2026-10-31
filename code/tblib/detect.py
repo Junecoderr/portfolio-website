@@ -1017,11 +1017,13 @@ LOGSOURCES = [
     {"product": "windows", "formats": ["windows"], "splunk": 'source="WinEventLog:*"', "kql": "SecurityEvent",
      "elastic": "agent.type:winlogbeat"},
     {"product": "linux", "service": "auth", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux_secure"',
-     "kql": "Syslog", "elastic": "event.dataset:system.auth"},
+     "kql": "Syslog", "kql_where": 'Facility in ("auth", "authpriv")', "elastic": "event.dataset:system.auth"},
     {"product": "linux", "service": "sshd", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux_secure"',
-     "kql": "Syslog", "elastic": "event.dataset:system.auth AND process.name:sshd"},
+     "kql": "Syslog", "kql_where": 'Facility in ("auth", "authpriv") and ProcessName == "sshd"',
+     "elastic": "event.dataset:system.auth AND process.name:sshd"},
     {"product": "linux", "service": "sudo", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux_secure"',
-     "kql": "Syslog", "elastic": "event.dataset:system.auth AND process.name:sudo"},
+     "kql": "Syslog", "kql_where": 'Facility in ("auth", "authpriv") and ProcessName == "sudo"',
+     "elastic": "event.dataset:system.auth AND process.name:sudo"},
     {"product": "linux", "service": "auditd", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux:audit"',
      "kql": "AuditLog", "elastic": "event.module:auditd"},
     {"product": "linux", "category": "process_creation", "formats": ["auth", "syslog", "json"],
@@ -1277,13 +1279,39 @@ FIELD_MAPS = {
                                 "ComputerName": "DeviceName", "OriginalFileName": "ProcessVersionInfoOriginalFileName",
                                 "IntegrityLevel": "ProcessIntegrityLevel", "md5": "MD5", "sha256": "SHA256"},
         "SysmonEvent": {"ComputerName": "Computer"},
-        "Syslog": {"message": "SyslogMessage", "host": "Computer", "process": "ProcessName"},
+        "Syslog": {"message": "SyslogMessage", "host": "Computer", "process": "ProcessName", "program": "ProcessName",
+                   "ip": "SrcIp", "src_ip": "SrcIp", "port": "SrcPort", "user": "UserName", "action": "Action"},
         "W3CIISLog": {"path": "csUriStem", "agent": "csUserAgent", "status": "scStatus", "method": "csMethod", "ip": "cIP",
                       "user": "csUserName"},
         "CommonSecurityLog": {"src_ip": "SourceIP", "dst_ip": "DestinationIP", "dst_port": "DestinationPort",
                               "src_port": "SourcePort", "action": "DeviceAction"},
         "default": {"ComputerName": "Computer"},
     },
+}
+
+
+# Sentinel's Syslog table has no columns for what sshd / sudo put in the message, so the
+# KQL backend adds an extend for each of these it uses. Action mirrors logs.AUTH_PATTERNS.
+SYSLOG_ACTIONS = [
+    ('SyslogMessage matches regex @"Failed \\S+ for "', "failed_login"),
+    ('SyslogMessage matches regex @"Accepted \\S+ for "', "login"),
+    ('SyslogMessage contains "maximum authentication attempts exceeded"', "too_many_attempts"),
+    ('SyslogMessage startswith "Invalid user "', "invalid_user"),
+    ('SyslogMessage contains "authentication failure;"', "auth_failure"),
+    ('SyslogMessage contains "incorrect password attempt"', "sudo_failed"),
+    ('SyslogMessage contains "user NOT in sudoers"', "sudo_denied"),
+    ('SyslogMessage contains " COMMAND="', "sudo"),
+    ('SyslogMessage contains "session opened for user"', "session_open"),
+    ('SyslogMessage contains "session closed for user"', "session_close"),
+    ('SyslogMessage matches regex @"^(Connection closed by|Disconnected from|Received disconnect from) "', "disconnect"),
+    ('SyslogMessage startswith "Did not receive identification string"', "probe"),
+    ('SyslogMessage startswith "new user: "', "user_created"),
+]
+SYSLOG_PARSED = {
+    "Action": "case(\n    " + ",\n    ".join(f'{test}, "{action}"' for test, action in SYSLOG_ACTIONS) + ',\n    "")',
+    "SrcIp": 'extract(@"(?:from |rhost=)([0-9A-Fa-f:.]+)", 1, SyslogMessage)',
+    "SrcPort": 'toint(extract(@" port (\\d+)", 1, SyslogMessage))',
+    "UserName": 'extract(@"(?:for (?:invalid user |user )?|Invalid user |user=)([^\\s(;]+)", 1, SyslogMessage)',
 }
 
 
@@ -1670,10 +1698,22 @@ class Kql(Backend):
     def negate(self, text):
         return f"not({text})"
 
+    def field(self, name):
+        column = super().field(name)
+        if self.table == "Syslog" and column in SYSLOG_PARSED and column not in self.parsed:
+            self.parsed.append(column)
+        return column
+
+    def build(self, compiled):
+        self.parsed = []
+        return super().build(compiled)
+
     def finish(self, body):
         lines = [self.table or "Event"]
-        if body:
-            lines.append(f"| where {body}")
+        where = self.entry.get("kql_where") if self.entry and not self.options.get("table") else None
+        if where and not self.options.get("no_logsource"):
+            lines.append(f"| where {where}")
+        tail = []
         agg = self.rule.get("aggregation")
         if agg:
             field = self.field(agg["field"]) if agg["field"] else None
@@ -1685,9 +1725,12 @@ class Kql(Backend):
             within = self.rule.get("within")
             if within:
                 by.append(f"bin(TimeGenerated, {int(within)}s)")
-            lines.append(f"| summarize {name} = {expr}" + (f" by {', '.join(by)}" if by else ""))
-            lines.append(f"| where {name} {agg['op']} {_tb.to_text(agg['value'])}")
-        return "\n".join(lines)
+            tail.append(f"| summarize {name} = {expr}" + (f" by {', '.join(by)}" if by else ""))
+            tail.append(f"| where {name} {agg['op']} {_tb.to_text(agg['value'])}")
+        lines += [f"| extend {column} = {SYSLOG_PARSED[column]}" for column in self.parsed]
+        if body:
+            lines.append(f"| where {body}")
+        return "\n".join(lines + tail)
 
 
 BACKEND_CLASSES = {"splunk": Splunk, "elastic": Elastic, "kql": Kql}
@@ -2094,6 +2137,9 @@ def load(api):
         "\n"
         "The rule's logsource picks the index, source type or table. It also picks the field names, "
         "like EventID -> EventCode in Splunk or Image -> NewProcessName in Sentinel.\n"
+        "\n"
+        "Sentinel's Syslog table keeps sshd and sudo details inside SyslogMessage. "
+        "So ip, user and action become columns parsed from it with | extend (SrcIp, UserName, Action).\n"
         "\n"
         "Options:\n"
         "- fields: a map {sigma_name: siem_name} that adds field mappings.\n"
