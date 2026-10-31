@@ -179,6 +179,13 @@ def compare(channel, path):
         tb_error = f"{type(err).__name__}: {err}"
     if not got:
         import os
+        with open(path, "rb") as f:
+            raw = f.read(4096 + 512 + 64)
+        import struct
+        hdr = struct.unpack_from("<QQQ", raw, 8)  # file header: first chunk, last chunk, next record id
+        ch = evtx.chunk_header(raw[4096:4096 + 65536]) if len(raw) >= 4096 + 128 else {}
+        print(f"{channel}: file header first/last chunk, next record id: {hdr}; chunk 0 header: {ch}; "
+              f"first record header bytes: {raw[4096 + 512:4096 + 512 + 32].hex()}")
         print(f"{channel}: TB read {seen} records (first: {first}); error: {tb_error}; "
               f"file size {os.path.getsize(path)}; wevtutil ids {sorted(wanted)[:3]}...")
     problems, fields = [], 0
