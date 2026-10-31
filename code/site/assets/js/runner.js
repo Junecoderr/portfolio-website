@@ -77,12 +77,13 @@
       bar.appendChild(btn);
 
       var STOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
-      var running = false;
+      var running = false, runId = null, stopEarly = false;
       btn.addEventListener("click", function () {
-        // While it runs, the same button is Stop.
+        // While it runs, the same button is Stop - for this block's run only.
         if (running) {
           status.textContent = "Stopping...";
-          if (window.TB) window.TB.stop();
+          if (runId != null) window.TB.stop(runId);
+          else stopEarly = true;  // TB is still loading: don't start it
           return;
         }
         running = true;
@@ -95,11 +96,14 @@
         ensureTB()
           .then(function (TB) {
             return TB.load().then(function () {
+              if (stopEarly) return { ok: false, error: "You stopped the program.", stopped: true };
               status.textContent = "Running...";
-              return TB.run(source, {
+              var p = TB.run(source, {
                 onOutput: function (line) { output.appendChild(document.createTextNode(line + "\n")); },
                 onAsk: function (prompt, recent) { return TB.askInline(output, prompt, recent); }
               });
+              runId = p.id;
+              return p;
             });
           })
           .then(function (result) {
@@ -112,7 +116,7 @@
             status.textContent = "";
           })
           .then(function () {
-            running = false;
+            running = false; runId = null; stopEarly = false;
             btn.innerHTML = PLAY_ICON + "<span>Run</span>";
           });
       });

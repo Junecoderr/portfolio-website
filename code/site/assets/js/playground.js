@@ -29,7 +29,7 @@
   var examples = [];
   var current = null;      // name of the loaded example, or null for shared code
   var original = "";       // its original text, for Reset
-  var running = false;
+  var running = false, runId = null, stopEarly = false;
 
   if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
     var hint = document.querySelector(".ide-hint-out");
@@ -268,8 +268,9 @@
     setStatus(ready ? "Running..." : "Getting TB ready. The first time takes a few seconds...", true);
     window.TB.load()
       .then(function () {
+        if (stopEarly) return { ok: false, error: "You stopped the program.", stopped: true };
         setStatus("Running...", true);
-        return window.TB.run(code.value, {
+        var p = window.TB.run(code.value, {
           onOutput: function (line) {
             // Follow the output only while the reader is at the bottom.
             var atEnd = output.scrollHeight - output.scrollTop - output.clientHeight < 24;
@@ -278,6 +279,8 @@
           },
           onAsk: function (prompt, recent) { return window.TB.askInline(output, prompt, recent); }
         });
+        runId = p.id;
+        return p;
       })
       .then(function (result) {
         if (result.stopped) {
@@ -299,7 +302,7 @@
         setStatus("");
       })
       .then(function () {
-        running = false;
+        running = false; runId = null; stopEarly = false;
         runBtn.disabled = false;
         var hadFocus = document.activeElement === stopBtn;
         stopBtn.hidden = true;
@@ -309,7 +312,8 @@
   runBtn.addEventListener("click", run);
   stopBtn.addEventListener("click", function () {
     setStatus("Stopping...", true);
-    window.TB.stop();
+    if (runId != null) window.TB.stop(runId);
+    else stopEarly = true;  // TB is still loading: don't start the run
   });
 
   // ------------------------------------------------------------- share
