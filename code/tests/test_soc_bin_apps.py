@@ -95,6 +95,20 @@ def test_evtx_triage_sample(in_tmp):
     assert "EVTX triage" in (in_tmp / "r.html").read_text()
 
 
+def test_evtx_triage_describes_sysmon_and_powershell_events(in_tmp):
+    from evtxwriter import build_evtx, security
+    sysmon = security(1, 1773302400.0, "WS01", {"Image": "C:\\Windows\\System32\\cmd.exe", "CommandLine": "cmd /c whoami"},
+                      record_id=1)
+    sysmon.update(Channel="Microsoft-Windows-Sysmon/Operational", Provider="Microsoft-Windows-Sysmon")
+    script = security(4104, 1773302401.0, "WS01", {"ScriptBlockText": "Get-Process"}, record_id=2)
+    script.update(Channel="Microsoft-Windows-PowerShell/Operational", Provider="Microsoft-Windows-PowerShell")
+    (in_tmp / "s.evtx").write_bytes(build_evtx([sysmon, script]))
+    out = run_app("evtx-triage", "s.evtx")
+    assert "(no description for this event)" not in out
+    assert "process_created" in out and "Process creation: a process was started" in out
+    assert "powershell_script_block" in out and "Script block logging" in out
+
+
 def test_evtx_triage_not_an_evtx(in_tmp):
     (in_tmp / "x.log").write_text("hello")
     out = run_app("evtx-triage", "x.log")

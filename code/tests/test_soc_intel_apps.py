@@ -44,7 +44,7 @@ def test_sigma_studio_tour():
     assert "4 rule(s) OK, 0 file(s) with problems." in out
     assert "ATT&CK T1110.001 Brute Force: Password Guessing" in out
     assert 'sourcetype="linux_secure" action="failed_login" | bin _time span=300s | stats count by _time, src | where count > 10' in out
-    assert "| summarize count_ = count() by ip, bin(TimeGenerated, 300s)" in out
+    assert "| summarize count_ = count() by SrcIp, bin(TimeGenerated, 300s)" in out
     assert "[elastic] not converted" in out and "Queries written: 11." in out
     assert "SSH Brute Force From One Address              203.0.113.42     22" in out
     assert "Credential Access (TA0006): T1110.001" in out

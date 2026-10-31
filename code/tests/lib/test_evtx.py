@@ -88,6 +88,39 @@ def test_each_summary_xml_and_json(tmp_path):
     assert out == ["true", "3", '5 5 {4625: 5} {"203.0.113.7": 5} true', "true true", "4625 false", "true Information"]
 
 
+SYSMON = ("Microsoft-Windows-Sysmon/Operational", "Microsoft-Windows-Sysmon")
+POWERSHELL = ("Microsoft-Windows-PowerShell/Operational", "Microsoft-Windows-PowerShell")
+
+
+def channel_event(i, event_id, where, data=None):
+    ev = security(event_id, T + i, "WS01", data or {"Image": "C:\\x.exe"}, record_id=i + 1)
+    ev.update(Channel=where[0], Provider=where[1], Keywords=0x8000000000000000)
+    return ev
+
+
+def test_descriptions_are_keyed_by_channel_and_event_id(tmp_path):
+    wanted = [(SYSMON, 1, "process_created", "Process creation"), (SYSMON, 3, "network_connection", "Network connection"),
+              (SYSMON, 7, "image_loaded", "Image loaded"), (SYSMON, 8, "remote_thread_created", "CreateRemoteThread"),
+              (SYSMON, 10, "process_accessed", "ProcessAccess"), (SYSMON, 11, "file_created", "FileCreate"),
+              (SYSMON, 12, "registry_key_changed", "Registry object (key or value) created or deleted"),
+              (SYSMON, 13, "registry_value_set", "Registry value set"),
+              (SYSMON, 14, "registry_renamed", "Registry key or value renamed"),
+              (SYSMON, 22, "dns_query", "DNSEvent"),
+              (POWERSHELL, 4103, "powershell_pipeline", "Module logging"),
+              (POWERSHELL, 4104, "powershell_script_block", "Script block logging")]
+    events = [channel_event(i, eid, where) for i, (where, eid, _a, _d) in enumerate(wanted)]
+    events.append(failed_logon(len(events)))
+    # Outside Security/System, the Security table's numbers mean nothing (here 4625 in Application).
+    events.append(channel_event(len(events), 4625, ("Application", "SomeApp")))
+    path = write(tmp_path, events)
+    out = run_tb(f'import evtx\nfor r in evtx.read("{path}") {{\n  say(r.event_id, r.action, "|", r.description, "|", '
+                 'r.message)\n}')
+    for line, (_where, eid, action, text) in zip(out, wanted):
+        assert line.startswith(f"{eid} {action} | {text}"), line
+    assert out[-2] == "4625 failed_login | An account failed to log on | An account failed to log on"
+    assert out[-1] == "4625 nil | nil | Event 4625"
+
+
 def test_sample_story():
     out = run_tb(f'import evtx\nlet rs = evtx.read("{SAMPLE}")\nsay(len(rs))\n'
                  'let ps = rs.filter(fn(r) { return r.event_id == 4688 and r.get("CommandLine", "").contains("-enc") })\n'
