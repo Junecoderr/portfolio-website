@@ -257,6 +257,33 @@ def test_next_on_the_last_line_of_an_imported_module_stops_back_in_main(tmp_path
     assert code == 0
 
 
+def test_malformed_messages_are_skipped_and_the_adapter_keeps_working(tmp_path):
+    client = DapClient(tmp_path, "vm")
+    try:
+        def raw(body: bytes, length=None):
+            n = len(body) if length is None else length
+            client.proc.stdin.write(f"Content-Length: {n}\r\n\r\n".encode("ascii") + body)
+            client.proc.stdin.flush()
+
+        raw(b"[1, 2]")
+        raw(b'"just text"')
+        raw(b"null")
+        raw(b"", length=-5)
+        client.request("initialize")  # the reader thread survived all of that
+        raw(json.dumps({"seq": 50, "type": "request", "command": 7}).encode())
+        raw(json.dumps({"seq": 51, "type": "request", "command": "threads", "arguments": [1]}).encode())
+        answers = {}
+        while len(answers) < 2:
+            message = client.next_message()
+            if message.get("type") == "response":
+                answers[message["request_seq"]] = message
+        assert answers[50]["success"] is False and answers[51]["success"] is False
+        assert "arguments as an object" in answers[51]["message"]
+        assert client.request("threads")["body"]["threads"][0]["id"] == 1
+    finally:
+        client.close()
+
+
 def test_breakpoint_in_an_imported_file_and_friendly_launch_errors(tmp_path):
     helper = tmp_path / "helper.tb"
     helper.write_text(HELPER, encoding="utf-8")
