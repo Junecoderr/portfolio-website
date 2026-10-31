@@ -65,6 +65,45 @@ def test_code_signature_adhoc_and_certificates(tmp_path):
     assert out == ['false nil ["unsigned"]']
 
 
+@pytest.mark.parametrize("sid", ["issuer_serial", "ski"])
+@pytest.mark.parametrize("ber", [False, True])
+@pytest.mark.parametrize("leaf_first", [False, True])
+def test_cms_signer_layouts(tmp_path, sid, ber, leaf_first):
+    """RFC 5652 SignerIdentifier in both forms, DER or BER (indefinite lengths, as Apple's codesign
+    writes), with signedAttrs, and with the leaf certificate first or last in the set."""
+    root = build_cert([("CN", "Demo Root CA")], [("CN", "Demo Root CA")], 1, ski=b"\x01" * 20)
+    mid = build_cert([("CN", "Demo Intermediate CA")], [("CN", "Demo Root CA")], 2, ski=b"\x02" * 20)
+    leaf = build_cert([("CN", "Software Signing"), ("O", "Example Inc.")], [("CN", "Demo Intermediate CA")], 3,
+                      ski=b"\x03" * 20)
+    # A second certificate with the leaf's issuer but a different serial, so a match must use both keys.
+    decoy = build_cert([("CN", "Decoy Signing")], [("CN", "Demo Intermediate CA")], 4, ski=b"\x04" * 20)
+    certs = [leaf, decoy, mid, root] if leaf_first else [root, mid, decoy, leaf]
+    who = ([("CN", "Demo Intermediate CA")], 3) if sid == "issuer_serial" else b"\x03" * 20
+    cms = build_pkcs7(certs, who, signed_attrs=True, ber=ber)
+    path = save(tmp_path, build_macho(signature="cms", cms=cms))
+    out = run_tb(f'import macho\nlet s = macho.parse("{path}").code_signature\n'
+                 'say(s.signer, s.problem)\n'
+                 'say(s.certificates.filter(fn(c) { return c.is_signer }).map(fn(c) { return c.serial }))')
+    assert out == ["CN=Software Signing, O=Example Inc. nil", '["03"]']
+
+
+def test_cms_signer_falls_back_to_leaf(tmp_path):
+    """A sid that names no certificate in the set: the leaf (issuer of nothing else) is the signer."""
+    root = build_cert([("CN", "Demo Root CA")], [("CN", "Demo Root CA")], 1)
+    mid = build_cert([("CN", "Demo Intermediate CA")], [("CN", "Demo Root CA")], 2)
+    leaf = build_cert([("CN", "Leaf Signing")], [("CN", "Demo Intermediate CA")], 3)
+    for who in (b"\x09" * 20, ([("CN", "Somebody Else")], 99)):
+        cms = build_pkcs7([mid, leaf, root], who, ber=True)
+        path = save(tmp_path, build_macho(signature="cms", cms=cms))
+        out = run_tb(f'import macho\nlet s = macho.parse("{path}").code_signature\nsay(s.signer, s.problem)')
+        assert out == ["CN=Leaf Signing nil"]
+    # A BER blob whose end-of-contents marker is missing is reported, not a traceback.
+    cut = build_pkcs7([leaf], ([("CN", "Demo Intermediate CA")], 3), ber=True)[:-2]
+    path = save(tmp_path, build_macho(signature="cms", cms=cut))
+    out = run_tb(f'import macho\nlet s = macho.parse("{path}").code_signature\nsay(s.signer, s.problem)')
+    assert out[0].startswith("nil the signature block is damaged")
+
+
 def test_universal_binary(tmp_path):
     for fat64 in (False, True):
         path = save(tmp_path, build_fat([build_macho(cpu="x64"), build_macho(cpu="arm64e")], fat64=fat64), "fat")
