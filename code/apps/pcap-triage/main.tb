@@ -61,6 +61,7 @@ let queries = pcap.dns_queries(packets)
 let requests = pcap.http_requests(packets)
 let hellos = pcap.sni(packets)
 let scans = pcap.port_scans(packets, 10)
+let objects = pcap.http_objects(packets)
 
 say(
   f"== {fs.name(path)}  ({pcap.format(path)}, {summary.packets} packets, {summary.bytes} bytes, {summary.hosts} hosts, {len(flows)} flows)",
@@ -275,6 +276,18 @@ if requests.is_empty() {
 }
 say("")
 
+say("Files over HTTP")
+if objects.is_empty() {
+  say("  none")
+} else {
+  say(
+    report.table(objects, ["when", "direction", "name", "size", "content_type", "sha256"], {
+      "max_width": 64,
+    }),
+  )
+}
+say("")
+
 say("TLS server names")
 if hellos.is_empty() {
   say("  none")
@@ -351,6 +364,11 @@ if html_path != nil {
         "title": "HTTP requests",
         "rows": requests,
         "columns": ["when", "src", "method", "url", "user_agent"],
+      },
+      {
+        "title": "Files over HTTP",
+        "rows": objects,
+        "columns": ["when", "direction", "name", "size", "content_type", "sha256"],
       },
       {
         "title": "TLS server names",

