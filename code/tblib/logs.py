@@ -20,6 +20,8 @@ FORMATS = ["auto", "syslog", "auth", "apache", "nginx", "json", "csv", "windows"
            "zeek", "suricata", "cloudtrail", "okta", "m365", "cef", "leef"]
 MAX_RECORDS = 5_000_000
 SNIFF_BYTES = 64 * 1024
+MAX_LINE = 4 * 1024 * 1024             # characters kept from one log line; longer lines are cut
+MAX_JSON_DOCUMENT = 64 * 1024 * 1024  # characters of a JSON array/document file read whole
 MONTHS = {m: i for i, m in enumerate(
     ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], start=1)}
 
@@ -1590,19 +1592,19 @@ def iter_text(text, fmt, line, year=None):
             yield record
 
 
-def iter_file(path, fmt, line, year=None):
+def iter_file(path, fmt, line, year=None, fn="logs.read"):
     """Records from a file, read a line at a time where the format allows. Pulled one
     record at a time, so the reader never runs ahead of the consumer."""
     if fmt in ("auto", "evtx"):
         # Binary Windows event logs (.evtx, magic "ElfFile") go to the evtx library.
-        with _magic.open_stream(line, path, "logs.read") as fb:
+        with _magic.open_stream(line, path, fn) as fb:
             head = fb.peek(8)[:8]
         if head == b"ElfFile\x00" or fmt == "evtx":
             from tblib import evtx as _evtx
-            yield from _evtx.iter_path(line, path, "logs.read")
+            yield from _evtx.iter_path(line, path, fn)
             return
     try:
-        with open_text(line, path) as f:
+        with open_text(line, path, fn) as f:
             sample = f.read(SNIFF_BYTES)
     except OSError as err:
         fail_os(line, err, path, "read")
@@ -1610,22 +1612,45 @@ def iter_file(path, fmt, line, year=None):
         fmt = sniff_text(sample)
     stripped = sample.lstrip()
     try:
-        with open_text(line, path) as f:
+        with open_text(line, path, fn) as f:
             if fmt in JSON_FORMATS and is_document(stripped):
-                yield from iter_json_document(f.read(), fmt, line)
+                text = f.read(MAX_JSON_DOCUMENT + 1)
+                if len(text) > MAX_JSON_DOCUMENT:
+                    fail(line, f"That JSON document is over {MAX_JSON_DOCUMENT // 2**20} MB, too big to read "
+                               "whole. Convert it to JSON lines (one event per line) and use logs.each().",
+                         path=path)
+                yield from iter_json_document(text, fmt, line)
                 return
             if fmt == "csv" or (fmt in ("windows", "m365") and stripped[:1] not in ("{", "[")):
-                yield from iter_rows(f, fmt)
+                yield from iter_rows((ln for ln, _cut in bounded_lines(f)), fmt)
                 return
             parser = LineParser(fmt, year)
-            for ln in f:
+            for ln, cut in bounded_lines(f):
                 record = parser.parse(ln)
                 if record is not None:
+                    if cut:
+                        record["truncated"] = True
                     yield record
     except OSError as err:
         fail_os(line, err, path, "read")
     except _csv.Error as err:
         fail(line, f"That CSV log is broken: {err}.")
+
+
+def bounded_lines(f):
+    """(line, cut) pairs. A line longer than MAX_LINE keeps its first MAX_LINE characters (cut is
+    true) and the rest is skipped, so one huge line can't fill memory."""
+    while True:
+        ln = f.readline(MAX_LINE)
+        if not ln:
+            return
+        cut = len(ln) == MAX_LINE and not ln.endswith("\n")
+        if cut:
+            while True:  # skip to the end of this line
+                rest = f.readline(MAX_LINE)
+                if not rest or rest.endswith("\n"):
+                    break
+        yield ln, cut
 
 
 def options_of(line, options, fn):
@@ -1635,6 +1660,8 @@ def options_of(line, options, fn):
     result = {}
     if options.get("limit") is not None:
         result["limit"] = check_type(line, options["limit"], "whole", f"logs.{fn}", "the limit")
+        if result["limit"] < 0:
+            fail(line, f"logs.{fn}() needs a limit of 0 or more, but got {result['limit']}.")
     if options.get("year") is not None:
         result["year"] = check_type(line, options["year"], "whole", f"logs.{fn}", "the year")
     return result
@@ -1720,7 +1747,8 @@ def load(api):
     @m.fn("read", 1, 3, doc=(
         "read(path, format?, options?) -> list\n"
         "Read a log file into a list of records. Files are read a line at a time, so big logs are fine "
-        "(a JSON array or a pretty-printed JSON file is read whole).\n"
+        "(a JSON array or a pretty-printed JSON file is read whole, up to 64 MB).\n"
+        "A line over 4 MB keeps its first 4 MB and its record gets \"truncated\": true.\n"
         "\n"
         "Arguments:\n"
         "- format: the layout of the log (default: \"auto\").\n"
@@ -1729,7 +1757,7 @@ def load(api):
         "- options: a map of extra settings, listed below.\n"
         "\n"
         "Options:\n"
-        "- limit: stop after this many records.\n"
+        "- limit: stop after this many records (0 or more).\n"
         "- year: the year for syslog lines, which have no year of their own.\n"
         "  Without it, the most recent year that isn't in the future is used.\n"
         "\n"
@@ -1757,14 +1785,15 @@ def load(api):
         "each(path, fn, format?, options?) -> number\n"
         "Call fn(record) for every record in a log file without keeping them all in memory (for huge logs). "
         "The file is streamed from disk a line at a time, and .gz and one-file .zip logs are unpacked as they "
-        "are read. Gives back how many records there were. If fn gives back false, reading stops early."))
+        "are read. Gives back how many records there were. If fn gives back false, reading stops early. "
+        "Lines over 4 MB are cut (the record gets \"truncated\": true), so memory stays flat."))
     def each(line, path, fn, fmt="auto", options=None):
         path = path_arg(line, path, "each")
         check_type(line, fn, "function", "logs.each", "fn")
         fmt = check_format(line, fmt, "each")
         opts = options_of(line, options, "each")
         count = 0
-        for record in iter_file(path, fmt, line, opts.get("year")):
+        for record in iter_file(path, fmt, line, opts.get("year"), "logs.each"):
             count += 1
             if api.call(fn, [record], line) is False:
                 break
@@ -1788,7 +1817,7 @@ def load(api):
         path = path_arg(line, path, "stream")
         fmt = check_format(line, fmt, "stream")
         opts = options_of(line, options, "stream")
-        records = iter_file(path, fmt, line, opts.get("year"))
+        records = iter_file(path, fmt, line, opts.get("year"), "logs.stream")
         if opts.get("limit") is not None:
             records = itertools.islice(records, opts["limit"])
         return TBIterator(records)
