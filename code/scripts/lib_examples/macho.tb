@@ -1,0 +1,34 @@
+import binary
+import macho
+
+# A tiny Apple silicon program, built byte by byte: the Mach-O header, a
+# __TEXT segment (readable and runnable), an LC_MAIN entry point and four
+# instructions. It has no code signature, so macOS wouldn't run it.
+let header = binary.pack("<IiiIIIII", 0xfeedfacf, 0x0100000c, 0, 2, 2, 96, 0x200085, 0)
+let text = binary.pack(
+  "<II16sQQQQiiII",
+  0x19,
+  72,
+  b"__TEXT",
+  0x100000000,
+  0x4000,
+  0,
+  0x90,
+  5,
+  5,
+  0,
+  0,
+)
+let entry = binary.pack("<IIQQ", 0x80000028, 24, 0x80, 0)
+let code = b"\x1f\x20\x03\xd5\x1f\x20\x03\xd5\x00\x00\x80\xd2\xc0\x03\x5f\xd6"
+let head = binary.concat(header, text, entry)
+let data = binary.concat(head, binary.zeros(0x80 - len(head)), code)
+
+let info = macho.parse_bytes(data)
+say(f"{info.format} {info.type} for {info.architecture}, entry {info.entry_hex}, PIE {info.is_pie}")
+for seg in info.segments {
+  say(f"  segment {seg.name}: {seg.file_size} bytes, {seg.protection}")
+}
+for hit in macho.indicators(info) {
+  say(f"  [{hit.level}] {hit.detail}")
+}

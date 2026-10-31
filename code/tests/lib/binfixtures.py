@@ -19,13 +19,18 @@ def align(n: int, a: int) -> int:
 
 
 def build_pe(plus=True, sections=None, imports=None, exports=None, signed=False, timestamp=0x65A0_0000,
-             dll=False, subsystem=3, dll_characteristics=0x8160, entry_section=".text", overlay=b""):
+             dll=False, subsystem=3, dll_characteristics=0x8160, entry_section=".text", overlay=b"",
+             rich=None, resources=None, signature=None):
     """A small but well-formed PE32/PE32+ image.
 
     sections: list of (name, data, characteristics) — default .text/.rdata/.data.
     imports: {"KERNEL32.dll": ["CreateFileW", ...]} built into .rdata (an .idata
     table is appended as its own section). exports: list of names (a .edata section).
     signed: add a fake security directory (no real signature).
+    rich: [(product_id, build, count), ...] for a Rich header (with a correct checksum).
+    resources: [(type_id, name_id_or_text, language, data), ...] built into a .rsrc section.
+    signature: PKCS#7 bytes (see build_pkcs7) stored as a real WIN_CERTIFICATE.
+    imports values may hold ints: imported by ordinal.
     """
     file_align, sect_align = 0x200, 0x1000
     if sections is None:
@@ -40,9 +45,12 @@ def build_pe(plus=True, sections=None, imports=None, exports=None, signed=False,
         extra_builders.append(("import", imports))
     if exports:
         extra_builders.append(("export", exports))
+    if resources:
+        extra_builders.append(("resource", resources))
+    pe_off = 0x80 + (24 + 8 * len(rich) if rich else 0)
     opt_size = 240 if plus else 224
     n_sections = len(sections) + len(extra_builders)
-    headers_size = align(0x80 + 24 + opt_size + 40 * n_sections, file_align)
+    headers_size = align(pe_off + 24 + opt_size + 40 * n_sections, file_align)
     # Lay out sections.
     laid = []
     rva = sect_align
@@ -59,6 +67,11 @@ def build_pe(plus=True, sections=None, imports=None, exports=None, signed=False,
             laid.append({"name": ".idata", "data": data, "chars": 0xC0000040, "rva": rva, "raw": raw,
                          "vsize": len(data), "rsize": align(len(data), file_align)})
             directories["import"] = (rva, len(data))
+        elif kind == "resource":
+            data = build_resource_table(spec, rva)
+            laid.append({"name": ".rsrc", "data": data, "chars": 0x40000040, "rva": rva, "raw": raw,
+                         "vsize": len(data), "rsize": align(len(data), file_align)})
+            directories["resource"] = (rva, len(data))
         else:
             data = build_export_table(spec, rva)
             laid.append({"name": ".edata", "data": data, "chars": 0x40000040, "rva": rva, "raw": raw,
@@ -71,15 +84,22 @@ def build_pe(plus=True, sections=None, imports=None, exports=None, signed=False,
     entry_point = entry["rva"] + 0 if entry_section else 0
     if entry_section is None:
         entry_point = image_size + 0x100  # outside every section
-    if signed:
+    cert_blob = b""
+    if signature is not None:
+        cert_blob = struct.pack("<IHH", 8 + len(signature), 0x0200, 0x0002) + signature
+        cert_blob += b"\x00" * (align(len(cert_blob), 8) - len(cert_blob))
+        directories["security"] = (raw + len(overlay), len(cert_blob))
+    elif signed:
         directories["security"] = (raw + len(overlay), 0x800)
 
-    # DOS header + stub.
+    # DOS header + stub (+ Rich header).
     dos = bytearray(0x80)
     dos[:2] = b"MZ"
     struct.pack_into("<H", dos, 0x18, 0x40)
-    struct.pack_into("<I", dos, 0x3C, 0x80)
+    struct.pack_into("<I", dos, 0x3C, pe_off)
     dos[0x40:0x40 + 14] = b"This program cannot be run in DOS mode.\r\n$"[:14]
+    if rich:
+        dos += build_rich_header(bytes(dos), rich)
     characteristics = 0x0002 | (0x2000 if dll else 0) | (0x0020 if plus else 0x0100)
     coff = struct.pack("<HHIIIHH", 0x8664 if plus else 0x14C, n_sections, timestamp, 0, 0, opt_size, characteristics)
     code = next((s for s in laid if s["chars"] & 0x20), laid[0])
@@ -110,7 +130,9 @@ def build_pe(plus=True, sections=None, imports=None, exports=None, signed=False,
         assert len(image) == s["raw"]
         image += s["data"] + b"\x00" * (s["rsize"] - len(s["data"]))
     image += overlay
-    if signed:
+    if signature is not None:
+        image += cert_blob
+    elif signed:
         image += b"\x00\x08\x00\x00\x00\x02\x02\x00" + b"\x30\x82" + b"\x00" * 0x7F6
     return bytes(image)
 
@@ -134,6 +156,9 @@ def build_import_table(imports: dict, base_rva: int, plus: bool) -> bytes:
     for dll, names in dlls:
         offs = []
         for name in names:
+            if isinstance(name, int):
+                offs.append(("ordinal", name))
+                continue
             if len(name_blob) % 2:
                 name_blob += b"\x00"
             offs.append(pos + len(name_blob))
@@ -151,7 +176,10 @@ def build_import_table(imports: dict, base_rva: int, plus: bool) -> bytes:
     for i, (dll, names) in enumerate(dlls):
         for _ in range(2):
             for off in hint_offsets[i]:
-                out += struct.pack("<Q" if plus else "<I", base_rva + off)
+                if isinstance(off, tuple):  # by ordinal
+                    out += struct.pack("<Q" if plus else "<I", (1 << (63 if plus else 31)) | off[1])
+                else:
+                    out += struct.pack("<Q" if plus else "<I", base_rva + off)
             out += b"\x00" * thunk_size
     assert len(out) == pos
     out += name_blob
@@ -183,6 +211,152 @@ def build_export_table(names: list, base_rva: int, dll_name="test.dll") -> bytes
     return out + bytes(blob)
 
 
+def _rol32(value: int, n: int) -> int:
+    n %= 32
+    return ((value << n) | (value >> (32 - n))) & 0xFFFFFFFF
+
+
+def build_rich_header(dos: bytes, entries) -> bytes:
+    """The Rich header MSVC's linker writes after the DOS stub, XOR-ed with its checksum."""
+    start = len(dos)
+    key = start
+    for i, b in enumerate(dos):
+        if 0x3C <= i < 0x40:
+            continue
+        key += _rol32(b, i)
+    comp_ids = [((prod << 16) | build, count) for prod, build, count in entries]
+    for comp, count in comp_ids:
+        key += _rol32(comp, count)
+    key &= 0xFFFFFFFF
+    clear = [0x536E6144, 0, 0, 0] + [v for pair in comp_ids for v in pair]
+    return b"".join(struct.pack("<I", v ^ key) for v in clear) + b"Rich" + struct.pack("<I", key)
+
+
+def build_resource_table(entries, base_rva: int) -> bytes:
+    """A three-level resource tree (type / name / language) with data entries."""
+    tree: dict = {}
+    for type_id, name, lang, data in entries:
+        tree.setdefault(type_id, {}).setdefault(name, []).append((lang, data))
+    dirs = []  # (key, children) in layout order: root, then type dirs, then name dirs
+
+    def dir_size(n):
+        return 16 + 8 * n
+    offsets = {}
+    pos = dir_size(len(tree))
+    for t, names in tree.items():
+        offsets[("t", t)] = pos
+        pos += dir_size(len(names))
+    for t, names in tree.items():
+        for name, langs in names.items():
+            offsets[("n", t, name)] = pos
+            pos += dir_size(len(langs))
+    for t, names in tree.items():
+        for name, langs in names.items():
+            for lang, _ in langs:
+                offsets[("d", t, name, lang)] = pos
+                pos += 16
+    strings = bytearray()
+    for t, names in tree.items():
+        for name in names:
+            if isinstance(name, str):
+                offsets[("s", name)] = pos + len(strings)
+                strings += struct.pack("<H", len(name)) + name.encode("utf-16-le")
+    pos += len(strings)
+    blobs = bytearray()
+    for t, names in tree.items():
+        for name, langs in names.items():
+            for lang, data in langs:
+                pos = align(pos, 4)
+                offsets[("b", t, name, lang)] = pos + len(blobs)
+                blobs += data
+    out = bytearray()
+
+    def directory(children):
+        out.extend(struct.pack("<IIHHHH", 0, 0, 4, 0, 0, len(children)))
+        for ident, target in children:
+            out.extend(struct.pack("<II", ident, target))
+
+    def ident_of(name):
+        return 0x80000000 | offsets[("s", name)] if isinstance(name, str) else name
+    directory([(t, 0x80000000 | offsets[("t", t)]) for t in tree])
+    for t, names in tree.items():
+        directory([(ident_of(name), 0x80000000 | offsets[("n", t, name)]) for name in names])
+    for t, names in tree.items():
+        for name, langs in names.items():
+            directory([(lang, offsets[("d", t, name, lang)]) for lang, _ in langs])
+    for t, names in tree.items():
+        for name, langs in names.items():
+            for lang, data in langs:
+                out.extend(struct.pack("<IIII", base_rva + offsets[("b", t, name, lang)], len(data), 1252, 0))
+    out += strings
+    out += b"\x00" * (align(len(out), 4) - len(out))
+    out += blobs
+    return bytes(out)
+
+
+# -- DER, X.509 and PKCS#7 (structure only: the signatures are not real) ------
+
+def der(tag: int, content: bytes) -> bytes:
+    n = len(content)
+    if n < 0x80:
+        length = bytes([n])
+    else:
+        raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+        length = bytes([0x80 | len(raw)]) + raw
+    return bytes([tag]) + length + content
+
+
+def der_oid(dotted: str) -> bytes:
+    parts = [int(p) for p in dotted.split(".")]
+    body = bytearray([40 * parts[0] + parts[1]])
+    for p in parts[2:]:
+        chunk = [p & 0x7F]
+        p >>= 7
+        while p:
+            chunk.append(0x80 | (p & 0x7F))
+            p >>= 7
+        body += bytes(reversed(chunk))
+    return der(0x06, bytes(body))
+
+
+def der_int(n: int) -> bytes:
+    raw = n.to_bytes(max(1, (n.bit_length() + 8) // 8), "big")
+    return der(0x02, raw)
+
+
+def der_seq(*items) -> bytes:
+    return der(0x30, b"".join(items))
+
+
+def der_set(*items) -> bytes:
+    return der(0x31, b"".join(items))
+
+
+NAME_OIDS = {"CN": "2.5.4.3", "C": "2.5.4.6", "L": "2.5.4.7", "ST": "2.5.4.8", "O": "2.5.4.10", "OU": "2.5.4.11"}
+
+
+def der_name(pairs) -> bytes:
+    return der_seq(*[der_set(der_seq(der_oid(NAME_OIDS[k]), der(0x0C, v.encode()))) for k, v in pairs])
+
+
+def build_cert(subject, issuer, serial, not_before="240101000000Z", not_after="270101000000Z") -> bytes:
+    sha256_rsa = der_seq(der_oid("1.2.840.113549.1.1.11"), der(0x05, b""))
+    tbs = der_seq(der(0xA0, der_int(2)), der_int(serial), sha256_rsa, der_name(issuer),
+                  der_seq(der(0x17, not_before.encode()), der(0x17, not_after.encode())), der_name(subject),
+                  der_seq(der_seq(der_oid("1.2.840.113549.1.1.1"), der(0x05, b"")), der(0x03, b"\x00" + b"\x01" * 16)))
+    return der_seq(tbs, sha256_rsa, der(0x03, b"\x00" + b"\x02" * 32))
+
+
+def build_pkcs7(certs, signer, digest="2.16.840.1.101.3.4.2.1") -> bytes:
+    """Authenticode-shaped SignedData. certs: DER certificates; signer: (issuer pairs, serial)."""
+    alg = der_seq(der_oid(digest), der(0x05, b""))
+    content = der_seq(der_oid("1.3.6.1.4.1.311.2.1.4"), der(0xA0, der_seq(b"")))
+    signer_info = der_seq(der_int(1), der_seq(der_name(signer[0]), der_int(signer[1])), alg,
+                          der_seq(der_oid("1.2.840.113549.1.1.1"), der(0x05, b"")), der(0x04, b"\x03" * 32))
+    signed = der_seq(der_int(1), der_set(alg), content, der(0xA0, b"".join(certs)), der_set(signer_info))
+    return der_seq(der_oid("1.2.840.113549.1.7.2"), der(0xA0, signed))
+
+
 # =============================================================================
 # ELF
 # =============================================================================
@@ -190,9 +364,11 @@ def build_export_table(names: list, base_rva: int, dll_name="test.dll") -> bytes
 
 def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",), imports=("puts", "socket"),
               exports=(), interp="/lib64/ld-linux-x86-64.so.2", wx_segment=False, symtab=True, entry_section=".text",
-              little=True, no_section_headers=False):
+              little=True, no_section_headers=False, versions=None, relro=None):
     """A small, well-formed ELF image with .text/.rodata/.data, .interp, .dynstr/.dynsym/.dynamic
-    (so DT_NEEDED and imports are real), .symtab (unless stripped) and .shstrtab."""
+    (so DT_NEEDED and imports are real), .symtab (unless stripped) and .shstrtab.
+    versions: {"puts": ("libc.so.6", "GLIBC_2.2.5")} adds .gnu.version/.gnu.version_r.
+    relro: "partial" adds a GNU_RELRO segment; "full" also asks for BIND_NOW."""
     e = "<" if little else ">"
     is64 = bits == 64
     base = 0x400000
@@ -234,9 +410,46 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
     for off in export_offs:
         dynsym += sym(off, base + 0x1000, 16, (1 << 4) | 2, text_shndx)
     dyn_entries = [(1, off) for off in needed_offs]
+    if relro == "full":
+        dyn_entries += [(30, 0x8), (0x6FFFFFFB, 0x1)]
+    version_sections = []
+    if versions:
+        libs: dict = {}
+        for name in imports:
+            if name in versions:
+                lib, ver = versions[name]
+                libs.setdefault(lib, [])
+                if ver not in libs[lib]:
+                    libs[lib].append(ver)
+        index = {}
+        verneed = bytearray()
+        next_index = 2
+        lib_items = list(libs.items())
+        for li, (lib, vers) in enumerate(lib_items):
+            file_off = dyn_name(lib)
+            size = 16 + 16 * len(vers)
+            verneed += struct.pack(e + "HHIII", 1, len(vers), file_off, 16, size if li + 1 < len(lib_items) else 0)
+            for vi, ver in enumerate(vers):
+                index[(lib, ver)] = next_index
+                h = 0
+                for ch in ver.encode():
+                    h = ((h << 4) + ch) & 0xFFFFFFFF
+                    g = h & 0xF0000000
+                    if g:
+                        h ^= g >> 24
+                    h &= ~g & 0xFFFFFFFF
+                verneed += struct.pack(e + "IHHII", h, 0, next_index, dyn_name(ver), 16 if vi + 1 < len(vers) else 0)
+                next_index += 1
+        versym = struct.pack(e + "H", 0)
+        for name in imports:
+            versym += struct.pack(e + "H", index[versions[name]] if name in versions else 1)
+        versym += struct.pack(e + "H", 1) * len(exports)
+        version_sections = [(".gnu.version", versym, 0x6FFFFFFF, 0x2), (".gnu.version_r", bytes(verneed), 0x6FFFFFFE, 0x2)]
+        version_need_count = len(lib_items)
     # placeholders for strtab/symtab addresses filled after layout
     ordered.append((".dynstr", bytes(dynstr), 3, 0x2))
     ordered.append((".dynsym", bytes(dynsym), 11, 0x2))
+    ordered.extend(version_sections)
     ordered.append((".dynamic", None, 6, 0x3))
     strtab = bytearray(b"\x00")
     symtab_data = bytearray(sym(0, 0, 0, 0, 0))
@@ -255,7 +468,7 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
     ordered.append((".shstrtab", bytes(shstr), 3, 0))
 
     # Layout: headers, then one LOAD segment covering everything (RX, or RWX if wx_segment)
-    n_ph = 2 + (1 if interp else 0) + 1  # LOAD, DYNAMIC, [INTERP], GNU_STACK
+    n_ph = 2 + (1 if interp else 0) + 1 + (1 if relro else 0)  # LOAD, DYNAMIC, [INTERP], GNU_STACK, [GNU_RELRO]
     off = ehsize + phentsize * n_ph
     laid = []
     for name, data, s_type, flags in ordered:
@@ -303,6 +516,8 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
     s = by_name[".dynamic"]
     phdrs += phdr(2, 0x6, s["offset"], s["addr"], s["size"], s["size"], 8)
     phdrs += phdr(0x6474E551, 0x6, 0, 0, 0, 0, 16)
+    if relro:
+        phdrs += phdr(0x6474E552, 0x4, s["offset"], s["addr"], s["size"], s["size"], 1)
     image = bytearray(ehdr + phdrs)
     for s in laid:
         image += b"\x00" * (s["offset"] - len(image))
@@ -316,17 +531,181 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
                 link = 1 + laid.index(by_name[".dynstr"])
             if s["name"] == ".symtab":
                 link = 1 + laid.index(by_name[".strtab"])
-            if s["name"] == ".dynamic":
+            if s["name"] in (".dynamic", ".gnu.version_r"):
                 link = 1 + laid.index(by_name[".dynstr"])
+            if s["name"] == ".gnu.version":
+                link = 1 + laid.index(by_name[".dynsym"])
+            info = version_need_count if s["name"] == ".gnu.version_r" else 0
             entsize = sym_size if s["name"] in (".dynsym", ".symtab") else (16 if is64 else 8) if s["name"] == ".dynamic" else 0
             if is64:
                 image += struct.pack(e + "IIQQQQIIQQ", shname[s["name"]], s["type"], s["flags"], s["addr"], s["offset"],
-                                     s["size"], link, 0, 16, entsize)
+                                     s["size"], link, info, 16, entsize)
             else:
                 image += struct.pack(e + "IIIIIIIIII", shname[s["name"]], s["type"], s["flags"], s["addr"], s["offset"],
-                                     s["size"], link, 0, 16, entsize)
+                                     s["size"], link, info, 16, entsize)
         # The section name table index was set to len(laid) (.shstrtab is last).
     return bytes(image)
+
+
+# =============================================================================
+# Mach-O
+# =============================================================================
+
+MACHO_CPUS = {"x64": (0x01000007, 3), "arm64": (0x0100000C, 0), "arm64e": (0x0100000C, 2), "x86": (7, 3),
+              "arm": (12, 9), "powerpc": (18, 0)}
+
+
+def build_code_signature(identifier, adhoc=True, team=None, entitlements=None, cms=b"", runtime=False) -> bytes:
+    """A SuperBlob with a CodeDirectory (fake hashes), optional entitlements and a CMS wrapper (big-endian)."""
+    ident = identifier.encode() + b"\x00"
+    team_b = team.encode() + b"\x00" if team else b""
+    header = 88
+    hash_off = header + len(ident) + len(team_b)
+    flags = (0x2 if adhoc else 0) | (0x10000 if runtime else 0)
+    cd = struct.pack(">IIIIIIIII", 0xFADE0C02, hash_off + 32, 0x20400, flags, hash_off, header, 0, 1, 0x1000)
+    cd += struct.pack(">BBBBIIIIQQQQ", 32, 2, 0, 12, 0, 0, header + len(ident) if team else 0, 0, 0, 0, 0, 0)
+    assert len(cd) == header
+    cd += ident + team_b + b"\x11" * 32
+    blobs = [(0, cd)]
+    if entitlements:
+        text = entitlements.encode()
+        blobs.append((5, struct.pack(">II", 0xFADE7171, 8 + len(text)) + text))
+    blobs.append((0x10000, struct.pack(">II", 0xFADE0B01, 8 + len(cms)) + cms))
+    pos = 12 + 8 * len(blobs)
+    index, body = b"", b""
+    for kind, blob in blobs:
+        index += struct.pack(">II", kind, pos + len(body))
+        body += blob
+    return struct.pack(">III", 0xFADE0CC0, 12 + len(index) + len(body), len(blobs)) + index + body
+
+
+def build_macho(bits=64, cpu="arm64", filetype=2, pie=True, dylibs=("/usr/lib/libSystem.B.dylib",),
+                imports=("_printf", "_socket"), exports=("_main",), text=None, cstring=b"Hello from a test Mach-O\x00",
+                signature="adhoc", identifier="com.example.demo", team=None, entitlements=None, cms=b"",
+                encrypted=False, stack_exec=False, wx=False, rpaths=(), little=True, extra_sections=(), page=0x4000):
+    """A small, well-formed Mach-O: __PAGEZERO, __TEXT (__text, __cstring), __DATA, __LINKEDIT with a
+    symbol table and (unless signature is None) a code signature. extra_sections: [(name, data)] in __DATA."""
+    e = "<" if little else ">"
+    is64 = bits == 64
+    cputype, subtype = MACHO_CPUS[cpu]
+    text = text if text is not None else b"\xfd\x7b\xbf\xa9" + b"\x1f\x20\x03\xd5" * 30 + b"\xc0\x03\x5f\xd6"
+    seg_cmd, seg_size, sect_size = (0x19, 72, 80) if is64 else (0x1, 56, 68)
+    base = 0x100000000 if is64 and filetype == 2 else 0
+
+    def cstr_cmd(cmd, fixed: bytes, text_: str) -> bytes:
+        raw = text_.encode() + b"\x00"
+        size = align(8 + len(fixed) + 4 + len(raw), 8)
+        return (struct.pack(e + "III", cmd, size, 8 + len(fixed) + 4) + fixed + raw).ljust(size, b"\x00")
+
+    def section(name, seg, addr, size, offset, flags=0):
+        n, s = name.encode().ljust(16, b"\x00"), seg.encode().ljust(16, b"\x00")
+        if is64:
+            return struct.pack(e + "16s16sQQIIIIIIII", n, s, addr, size, offset, 2, 0, 0, flags, 0, 0, 0)
+        return struct.pack(e + "16s16sIIIIIIIII", n, s, addr, size, offset, 2, 0, 0, flags, 0, 0)
+
+    def segment(name, vmaddr, vmsize, fileoff, filesize, maxprot, initprot, sections=()):
+        n = name.encode().ljust(16, b"\x00")
+        size = seg_size + sect_size * len(sections)
+        if is64:
+            head = struct.pack(e + "II16sQQQQiiII", seg_cmd, size, n, vmaddr, vmsize, fileoff, filesize, maxprot,
+                               initprot, len(sections), 0)
+        else:
+            head = struct.pack(e + "II16sIIIIiiII", seg_cmd, size, n, vmaddr, vmsize, fileoff, filesize, maxprot,
+                               initprot, len(sections), 0)
+        return head + b"".join(sections)
+
+    # Symbols and strings.
+    strtab = bytearray(b"\x00")
+    syms = []
+    for name in exports:
+        syms.append((len(strtab), 0x0F, 1, 0, base + page))
+        strtab += name.encode() + b"\x00"
+    for name in imports:
+        syms.append((len(strtab), 0x01, 0, 0x0100, 0))
+        strtab += name.encode() + b"\x00"
+    symtab = b"".join(struct.pack(e + ("IBBHQ" if is64 else "IBBHI"), *s) for s in syms)
+    strtab += b"\x00" * (align(len(strtab), 8) - len(strtab))
+
+    def commands(text_off, data_off, link_off, sig_off, sig_size, data_blob):
+        cmds = []
+        if filetype == 2:
+            cmds.append(segment("__PAGEZERO", 0, base or 0x1000, 0, 0, 0, 0))
+        text_size = text_off + len(text) + len(cstring)
+        rx = 7 if wx else 5
+        cmds.append(segment("__TEXT", base, align(text_size, page), 0, align(text_size, page), rx, rx, [
+            section("__text", "__TEXT", base + text_off, len(text), text_off, 0x80000400),
+            section("__cstring", "__TEXT", base + text_off + len(text), len(cstring), text_off + len(text), 2)]))
+        data_secs, pos = [], data_off
+        for name, blob in [("__data", b"\x01\x02\x03\x04" * 8)] + list(extra_sections):
+            data_secs.append(section(name, "__DATA", base + pos, len(blob), pos))
+            pos += len(blob)
+        cmds.append(segment("__DATA", base + data_off, align(len(data_blob), page) or page, data_off,
+                            align(len(data_blob), page), 3, 3, data_secs))
+        link_size = sig_off + sig_size - link_off if sig_size else len(symtab) + len(strtab)
+        cmds.append(segment("__LINKEDIT", base + link_off, align(link_size, page), link_off, link_size, 1, 1))
+        versions = struct.pack(e + "III", 2, 0x10000, 0x10000)
+        if filetype == 6:
+            cmds.append(cstr_cmd(0xD, versions, "@rpath/libdemo.dylib"))
+        else:
+            cmds.append(cstr_cmd(0xE, b"", "/usr/lib/dyld"))
+        cmds.append(struct.pack(e + "II", 0x1B, 24) + bytes(range(16)))
+        cmds.append(struct.pack(e + "IIIIII", 0x32, 24, 1, 0x000D0000, 0x000E0000, 0))
+        if filetype == 2:
+            cmds.append(struct.pack(e + "IIQQ", 0x80000028, 24, text_off, 0))
+        for lib in dylibs:  # a path, or (load command, path) for weak/re-exported libraries
+            kind, path = lib if isinstance(lib, tuple) else (0xC, lib)
+            cmds.append(cstr_cmd(kind, versions, path))
+        for path in rpaths:
+            cmds.append(cstr_cmd(0x8000001C, b"", path))
+        cmds.append(struct.pack(e + "IIIIII", 0x2, 24, link_off, len(syms), link_off + len(symtab), len(strtab)))
+        if encrypted:
+            cmds.append(struct.pack(e + "IIIII", 0x2C if is64 else 0x21, 24 if is64 else 20, text_off, len(text), 1)
+                        + (b"\x00" * 4 if is64 else b""))
+        if sig_size:
+            cmds.append(struct.pack(e + "IIII", 0x1D, 16, sig_off, sig_size))
+        return cmds
+
+    sig = b""
+    if signature is not None:
+        sig = build_code_signature(identifier, adhoc=signature == "adhoc", team=team, entitlements=entitlements, cms=cms)
+    data_blob = b"\x01\x02\x03\x04" * 8 + b"".join(blob for _, blob in extra_sections)
+    header_size = 32 if is64 else 28
+    probe = commands(0, 0, 0, 0, len(sig), data_blob)
+    cmds_size = sum(len(c) for c in probe)
+    text_off = align(header_size + cmds_size, 16)
+    data_off = align(text_off + len(text) + len(cstring), page)
+    link_off = align(data_off + len(data_blob), page)
+    sig_off = align(link_off + len(symtab) + len(strtab), 16)
+    cmds = commands(text_off, data_off, link_off, sig_off, len(sig), data_blob)
+    flags = 0x1 | 0x4 | 0x80 | (0x200000 if pie and filetype == 2 else 0) | (0x20000 if stack_exec else 0)
+    head = struct.pack(e + "IiiIIII", 0xFEEDFACF if is64 else 0xFEEDFACE, cputype, subtype, filetype, len(cmds),
+                       sum(len(c) for c in cmds), flags) + (b"\x00" * 4 if is64 else b"")
+    image = bytearray(head + b"".join(cmds))
+    image += b"\x00" * (text_off - len(image)) + text + cstring
+    image += b"\x00" * (data_off - len(image)) + data_blob
+    image += b"\x00" * (link_off - len(image)) + symtab + strtab
+    if sig:
+        image += b"\x00" * (sig_off - len(image)) + sig
+    return bytes(image)
+
+
+def build_fat(slices, fat64=False) -> bytes:
+    """A universal binary holding the given thin Mach-O images (big-endian fat header)."""
+    out_head = struct.pack(">II", 0xCAFEBABF if fat64 else 0xCAFEBABE, len(slices))
+    entry = 32 if fat64 else 20
+    pos = align(8 + entry * len(slices), 0x4000)
+    table, body = b"", b""
+    for data in slices:
+        e = "<" if data[:4] in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe") else ">"
+        cputype, subtype = struct.unpack_from(e + "ii", data, 4)
+        offset = pos + len(body)
+        if fat64:
+            table += struct.pack(">iiQQII", cputype, subtype, offset, len(data), 14, 0)
+        else:
+            table += struct.pack(">iiIII", cputype, subtype, offset, len(data), 14)
+        body += data + b"\x00" * (align(len(data), 0x4000) - len(data))
+    head = out_head + table
+    return head + b"\x00" * (pos - len(head)) + body
 
 
 # =============================================================================

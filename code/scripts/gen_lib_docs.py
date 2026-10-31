@@ -45,7 +45,7 @@ GROUPS = [
     ("security", "Security operations", "Parse logs, packet captures and Windows event logs, detect attacks (with "
      "Sigma), look inside executables, scan with YARA-like rules, handle indicators and threat intel, encrypt, "
      "and report to people and SIEMs.",
-     ["logs", "detect", "ioc", "hash", "encode", "crypto", "report", "pcap", "evtx", "pe", "elf", "scan",
+     ["logs", "detect", "ioc", "hash", "encode", "crypto", "report", "pcap", "evtx", "pe", "elf", "macho", "scan",
       "attack", "stix", "siem", "intel"]),
     ("network", "Networking", "IP and CIDR maths, port checks, DNS, TLS certificates, web requests, WebSockets "
      "and a small web server.", ["net", "http", "dns", "tls", "websocket", "server"]),

@@ -1,4 +1,4 @@
-// Rules for file-inspector, in the YARA subset TB's scan library reads.
+// Rules for file-inspector, in the YARA dialect TB's scan library reads.
 // Each rule describes something worth a second look, not proof of malware.
 
 rule PowerShell_Download_Cradle : script downloader {
@@ -20,14 +20,11 @@ rule Encoded_PowerShell : script {
     severity = "high"
     description = "PowerShell started with a base64-encoded command"
   strings:
-    $ps = "powershell" nocase
-    $enc = /-(e|ec|enc|encodedcommand)\s+[A-Za-z0-9+\/=]{20,}/ nocase
-    // the same in UTF-16 (Windows event logs, memory dumps); regexes can't be wide
-    $ps_w = "powershell" wide nocase
-    $enc_w1 = " -enc " wide nocase
-    $enc_w2 = " -encodedcommand " wide nocase
+    // ascii and wide: also UTF-16 text (Windows event logs, memory dumps)
+    $ps = "powershell" ascii wide nocase
+    $enc = /-(e|ec|enc|encodedcommand)\s+[A-Za-z0-9+\/=]{20,}/ ascii wide nocase
   condition:
-    ($ps and $enc) or ($ps_w and ($enc_w1 or $enc_w2))
+    $ps and $enc
 }
 
 rule URL_To_Bare_IP : network {

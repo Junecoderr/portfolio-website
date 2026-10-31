@@ -93,3 +93,60 @@ def test_parse_bytes_and_errors(tmp_path):
     msg = str(tb_error(f'import pe\npe.parse("{head}")'))
     assert "PE" in msg and "Something went wrong" not in msg
     assert "pe.indicators() needs" in str(tb_error('import pe\npe.indicators({"a": 1})'))
+
+
+def test_imphash_matches_pefile(tmp_path):
+    """pefile's get_imphash(): "dll.function" lower-cased, .dll/.ocx/.sys dropped, ordinals named from its
+    ordlookup tables (ws2_32 23 is socket) or "ordN", joined with commas, then md5."""
+    import hashlib
+    cases = [
+        ({"KERNEL32.dll": ["CreateFileW"], "WS2_32.dll": [23, "connect"]},
+         "kernel32.createfilew,ws2_32.socket,ws2_32.connect", "8d512191eb8f00c8013cad542266dae6"),
+        ({"MSVBVM60.DLL": [100, "__vbaFreeStr"], "comctl32.ocx": ["InitCommonControls"], "drv.sys": ["Go"],
+          "lib.v2.so": ["X"]},
+         "msvbvm60.ord100,msvbvm60.__vbafreestr,comctl32.initcommoncontrols,drv.go,lib.v2.so.x", None),
+    ]
+    for imports, canonical, known in cases:
+        path = save(tmp_path, build_pe(imports=imports))
+        digest = hashlib.md5(canonical.encode()).hexdigest()
+        assert known is None or digest == known
+        assert run_tb(f'import pe\nsay(pe.parse("{path}").imphash)') == [digest]
+    assert run_tb(f'import pe\nsay(pe.parse("{save(tmp_path, build_pe(), "none.exe")}").imphash)') == ["nil"]
+
+
+def test_rich_header_resources_and_signature(tmp_path):
+    from binfixtures import build_cert, build_pkcs7
+    signer = build_cert([("CN", "Demo Signer"), ("O", "Example Org")], [("CN", "Demo CA")], 0x1234,
+                        "240101000000Z", "270101000000Z")
+    ca = build_cert([("CN", "Demo CA")], [("CN", "Demo CA")], 1)
+    data = build_pe(rich=[(259, 30795, 10), (260, 30795, 3)],
+                    resources=[(16, 1, 1033, b"VERSIONINFO"), (3, "APPICON", 1033, b"\x89PNG"),
+                               (10, 7, 0, os.urandom(4096))],
+                    signature=build_pkcs7([ca, signer], ([("CN", "Demo CA")], 0x1234)),
+                    imports={"KERNEL32.dll": ["CreateFileW", "ReadFile", "CloseHandle", "WriteFile",
+                                              "GetLastError", "ExitProcess"]})
+    path = save(tmp_path, data)
+    out = run_tb(f'import pe\nlet i = pe.parse("{path}")\nlet r = i.rich_header\n'
+                 'say(r.offset, r.checksum_valid, r.entries, len(r.hash))\n'
+                 'say(i.resources.map(fn(x) { return f"{x.type}/{x.name}/{x.language}/{x.size}" }))\n'
+                 'let s = i.signature\nsay(s.type, s.digest_algorithm, s.signer, s.verified, s.problem)\n'
+                 'say(s.certificates.map(fn(c) { return c.subject + " | " + c.serial + " | " + str(c.is_signer) }))\n'
+                 'say(s.certificates[1].not_before, s.certificates[1].not_after)\n'
+                 'say(i.indicators.map(fn(x) { return x.name }))')
+    assert out[0] == ('128 true [{"product_id": 259, "build": 30795, "count": 10}, '
+                      '{"product_id": 260, "build": 30795, "count": 3}] 32')
+    assert out[1] == '["version/1/1033/11", "icon/APPICON/1033/4", "rcdata/7/0/4096"]'
+    assert out[2] == "pkcs7 sha256 CN=Demo Signer, O=Example Org false nil"
+    assert out[3] == '["CN=Demo CA | 01 | false", "CN=Demo Signer, O=Example Org | 12:34 | true"]'
+    assert out[4] == "2024-01-01 00:00:00 UTC 2027-01-01 00:00:00 UTC"
+    assert out[5] == '["high_entropy_section", "high_entropy_resource"]'  # the random rcdata fills .rsrc
+    # A Rich header edited by hand fails its checksum; a self-signed signer and a garbage signature are flagged.
+    tampered = bytearray(data)
+    tampered[0x80 + 16] ^= 0x01
+    selfsigned = build_pe(signature=build_pkcs7([ca], ([("CN", "Demo CA")], 1)))
+    for blob, name in [(bytes(tampered), "rich_header_tampered"), (selfsigned, "self_signed_signer"),
+                       (build_pe(signed=True), "damaged_signature")]:
+        p = save(tmp_path, blob, name + ".exe")
+        assert name in run_tb(f'import pe\nsay(pe.parse("{p}").indicators.map(fn(x) {{ return x.name }}))')[0]
+    assert run_tb(f'import pe\nlet i = pe.parse("{save(tmp_path, build_pe(), "plain.exe")}")\n'
+                  'say(i.rich_header, i.resources, i.signature)') == ["nil [] nil"]

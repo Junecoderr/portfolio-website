@@ -1,6 +1,6 @@
 # file-inspector: what is this file, really? Looks inside files without
 # running them: real type (from the bytes, not the name), hashes, entropy,
-# PE/ELF headers, sections, imports, suspicious indicators, YARA-style rule
+# PE/ELF/Mach-O headers, sections, imports, signers, suspicious indicators, YARA rule
 # matches (rules.yar) and the interesting strings (URLs, IPs, commands...).
 #
 #   tb apps/file-inspector/main.tb                     overview of apps/data
@@ -108,13 +108,18 @@ fn show_one(r) {
       if d.pdb != nil {
         say("   pdb path: " + d.pdb)
       }
-    } else {
+    } else if r.type == "elf" {
       say(
         f"   {d.type} for {d.architecture}   entry {d.entry_hex} in {d.entry_section}   interpreter {d.interpreter}",
       )
       if not d.needed.is_empty() {
         say("   needs: " + d.needed.join(", "))
       }
+    } else {
+      say(f"   entry {d.entry_hex} in {d.entry_section}   uuid {d.uuid}")
+    }
+    for row in inspect.extra_facts(r) {
+      say(f"   {row[0].lower()}: {row[1]}")
     }
     say("")
     let rows = []

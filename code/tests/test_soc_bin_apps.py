@@ -156,6 +156,31 @@ def test_file_inspector_elf_and_custom_rules(in_tmp):
     assert "Verdict: WORTH A LOOK" in out
 
 
+def test_file_inspector_new_fields(in_tmp):
+    from binfixtures import build_cert, build_fat, build_macho, build_pkcs7
+    signature = build_pkcs7([build_cert([("CN", "Demo Signer")], [("CN", "Demo CA")], 0x1234)],
+                            ([("CN", "Demo CA")], 0x1234))
+    (in_tmp / "signed.exe").write_bytes(build_pe(imports={"KERNEL32.dll": ["CreateFileW"], "WS2_32.dll": [23, "connect"]},
+                                                 rich=[(259, 30795, 10)], signature=signature,
+                                                 resources=[(16, 1, 1033, b"VERSION")]))
+    out = run_app("file-inspector", "signed.exe")
+    for line in ("   imphash: 8d512191eb8f00c8013cad542266dae6", "   rich header: 1 build tools, checksum ok",
+                 "   signed by: CN=Demo Signer (read, not verified)", "   resources: 1 (version)"):
+        assert line in out, line
+    (in_tmp / "hardened").write_bytes(build_elf(e_type=3, relro="full", versions={"puts": ("libc.so.6", "GLIBC_2.2.5")},
+                                                imports=("puts", "__stack_chk_fail")))
+    out = run_app("file-inspector", "hardened")
+    assert "   hardening: RELRO full, NX yes, PIE yes, canary yes, fortify no" in out
+    assert "   versions: libc.so.6: GLIBC_2.2.5" in out
+    (in_tmp / "Demo").write_bytes(build_fat([build_macho(cpu="x64"), build_macho(imports=("_task_for_pid", "_ptrace"))]))
+    out = run_app("file-inspector", "Demo")
+    assert "macho-fat x64+arm64 executable (PIE), 4 segments" in out
+    assert "   kind: executable for x64 + arm64" in out
+    assert "   signed by: ad hoc (no certificate), identifier com.example.demo" in out
+    assert "   hardening: PIE yes, NX stack yes, canary no, hardened runtime no, encrypted no" in out
+    assert "__DATA,__data" in out and "rw-" in out and "imports: _printf, _socket" in out
+
+
 def test_file_inspector_errors(in_tmp):
     assert "I couldn't find 'nope.bin'" in run_app("file-inspector", "nope.bin")
     (in_tmp / "bad.yar").write_text("rule {")
@@ -249,6 +274,18 @@ def test_file_inspector_gui_samples_drop_and_errors(fake, tmp_path):
     assert facts_map["Needs"] == "libc.so.6" and facts_map["Kind"] == "executable"
     assert win.widgets("badge")[0].text == "nothing found"  # imports socket: a low finding only
     assert win.widgets("table")[1].rows == [["LOW", "imports_network", "Imports network functions: socket."]]
+
+    assert facts_map["Hardening"] == "RELRO none, NX yes, PIE no, canary no, fortify no"
+
+    from binfixtures import build_macho
+    app = tmp_path / "Demo"
+    app.write_bytes(build_macho(team="ABCDE12345", signature="cms"))
+    win.drop([str(app)])
+    facts_map = {r[0]: r[1] for r in win.widgets("table")[0].rows}
+    assert facts_map["Kind"] == "executable for arm64" and facts_map["Entry point"].endswith("in __TEXT,__text")
+    assert facts_map["Signed by"] == "an unreadable certificate, team ABCDE12345 (read, not verified)"
+    assert [r[0] for r in win.widgets("table")[2].rows] == ["__TEXT,__text", "__TEXT,__cstring", "__DATA,__data"]
+    assert ["(shared libraries)", "_printf"] in win.widgets("table")[3].rows
 
     fake.answers = [str(tmp_path / "missing.bin")]
     win.find("button", "Open file…").click()

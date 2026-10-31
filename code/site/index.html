@@ -37,7 +37,7 @@
         <div>
           <h1 class="hero-title" id="hero-title">TB<span class="cursor" aria-hidden="true"></span></h1>
           <p class="hero-tagline">A friendly programming language for desktop apps, security tools and everything in between.</p>
-          <p class="hero-sub">Plain words and gentle error messages, now with classes, pattern matching, generators and tasks, a formatter, a language server and a VS Code extension, and <span data-lib-count>43</span> libraries built in: windows, logs, packet captures, Sigma rules, IOCs, crypto, SQLite, a web server and more.</p>
+          <p class="hero-sub">Plain words and gentle error messages, now with classes, pattern matching, generators and tasks, a formatter, a language server and a VS Code extension, and <span data-lib-count>44</span> libraries built in: windows, logs, packet captures, Sigma rules, IOCs, crypto, SQLite, a web server and more.</p>
           <div class="button-row">
             <a class="button button-primary button-big" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 3.1</a>
             <a class="button button-big" href="playground.html">Try it in your browser</a>
@@ -278,7 +278,7 @@ for t in tasks {
       <section class="section" aria-labelledby="libs-title">
         <div class="section-head">
           <h2 id="libs-title">Batteries included</h2>
-          <p><span data-lib-count>43</span> libraries ship inside the TB app, from text and dates to packet captures, Windows event logs, executables, Sigma rules and a web server. Write <code>import pcap</code> and go.</p>
+          <p><span data-lib-count>44</span> libraries ship inside the TB app, from text and dates to packet captures, Windows event logs, executables, Sigma rules and a web server. Write <code>import pcap</code> and go.</p>
         </div>
         <ul class="lib-grid">
           <!-- LIBRARIES GRID (scripts/sync_pages.py) -->
@@ -311,7 +311,8 @@ for t in tasks {
           <li><a class="lib-card" href="lib/evtx.html"><span class="lib-card-name"><code>evtx</code></span><span class="lib-card-doc">Read binary Windows event logs (.evtx, the files in C:\Windows\System32\winevt\Logs) straight from the file, with no Windows needed.</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
           <li><a class="lib-card" href="lib/pe.html"><span class="lib-card-name"><code>pe</code></span><span class="lib-card-doc">Read Windows executables (PE: .exe, .dll, .sys) without running them: architecture, compile time, entry point, sections with their entropy and permissions, imports and exports, whether the file is signed, and a list of suspicious indicators (packer section names, writable+executable sections, injection or keylogging imports, odd entry points).</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
           <li><a class="lib-card" href="lib/elf.html"><span class="lib-card-name"><code>elf</code></span><span class="lib-card-doc">Read Linux/Unix executables and shared libraries (ELF) without running them: architecture, type, entry point, sections and segments with entropy and permissions, the libraries it needs, imported and exported symbols, the program interpreter, and suspicious indicators (writable+executable memory, UPX section names, ptrace/dlopen imports, odd interpreters).</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
-          <li><a class="lib-card" href="lib/scan.html"><span class="lib-card-name"><code>scan</code></span><span class="lib-card-doc">Look for patterns in files and bytes with YARA-like rules: text (with nocase, wide and fullword), hex byte patterns with ??</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
+          <li><a class="lib-card" href="lib/macho.html"><span class="lib-card-name"><code>macho</code></span><span class="lib-card-doc">Read macOS and iOS executables (Mach-O, including universal binaries) without running them: architectures, type, load commands, segments and sections with entropy and permissions, the libraries it needs, imported and exported symbols, the code signature (identifier, team, certificates, entitlements), a hardening report and suspicious indicators.</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
+          <li><a class="lib-card" href="lib/scan.html"><span class="lib-card-name"><code>scan</code></span><span class="lib-card-doc">Look for patterns in files and bytes with YARA rules: text (with nocase, wide, fullword, xor and base64), hex byte patterns with ??</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
           <li><a class="lib-card" href="lib/attack.html"><span class="lib-card-name"><code>attack</code></span><span class="lib-card-doc">MITRE ATT&amp;CK Enterprise at your fingertips: look up a technique by id (attack.technique("T1110")), search by words, list a tactic's techniques, and map detect alerts to techniques through their Sigma tags (attack.t1110.001).</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
           <li><a class="lib-card" href="lib/stix.html"><span class="lib-card-name"><code>stix</code></span><span class="lib-card-doc">Threat intelligence in STIX 2.1: read bundles, pull out indicators and their IOCs (IPs, domains, URLs, hashes, emails) from STIX patterns, turn them into detect rules you can run on logs, write your own IOCs as a bundle, and download from TAXII 2.1 servers.</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
           <li><a class="lib-card" href="lib/siem.html"><span class="lib-card-name"><code>siem</code></span><span class="lib-card-doc">Get alerts into a SIEM: format any map (or an alert from detect.run()) as CEF, LEEF or a syslog line, send syslog over UDP/TCP, and forward events to Splunk (HTTP Event Collector), Elasticsearch (bulk API) or Microsoft Sentinel (Log Analytics data collector API).</span><span class="lib-card-meta"><span>Security operations</span></span></a></li>
@@ -612,7 +613,7 @@ Hello, world!</pre>
           </li>
           <li>
             <h3>Batteries included</h3>
-            <p><span data-lib-count>43</span> libraries ship with the language: windows and buttons, files and data formats, logs, detection rules, hashing, crypto and networking. Packages add more when you need them.</p>
+            <p><span data-lib-count>44</span> libraries ship with the language: windows and buttons, files and data formats, logs, detection rules, hashing, crypto and networking. Packages add more when you need them.</p>
           </li>
           <li>
             <h3>Runs everywhere</h3>
