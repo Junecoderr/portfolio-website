@@ -22,6 +22,14 @@ and hand the frame to tbcore/tasks.py, which resumes it on a task thread.
 
 The interpreter's per-thread state (depth, call_stack, trace, ...) is the
 same as the tree-walker's, so fork()/current() work unchanged.
+
+Fast tier
+---------
+Code that gets hot (JIT_HOT runs, or JIT_HOT_LOOPS turns of a loop) is
+translated into a Python function by tbcore/jit.py and stored in code.fast;
+_run() then calls it instead of this loop. A loop that gets hot while its
+frame is running here switches over at its back-edge (LOOP). Traced code
+(debugger, coverage) always stays in this loop.
 """
 
 from __future__ import annotations
@@ -59,6 +67,19 @@ NOBASE = C.NOBASE
 
 # frame kinds
 FUNC, GEN, MAIN, BLOCK, ASYNC = 0, 1, 2, 3, 4
+
+# The fast tier (tbcore/jit.py): code that runs JIT_HOT times, or whose loop turns
+# JIT_HOT_LOOPS times, is translated to Python. TB_JIT=off turns it off, TB_JIT=always
+# translates everything on its first run (the test suite runs that way too).
+_JIT_MODE = os.environ.get("TB_JIT", "").strip().lower()
+JIT_HOT, JIT_HOT_LOOPS = (1, 1) if _JIT_MODE == "always" else (16, 200)
+if _JIT_MODE in ("off", "0", "no", "false"):
+    JIT_HOT = JIT_HOT_LOOPS = 1 << 62
+
+
+def _jit_compile(code):
+    from .jit import compile_code  # loaded the first time something gets hot
+    return compile_code(code)
 
 
 class Cell:
@@ -773,8 +794,15 @@ class VMInterpreter(Interpreter):
 
     def _run(self, frame):
         """Run frame (and the TB calls it makes) until it returns or yields."""
-        base = frame
         code = frame.code
+        fastfn = code.fast
+        if fastfn is None and not code.traced:
+            code.hot += 1
+            if code.hot >= JIT_HOT:
+                fastfn = _jit_compile(code)
+        if fastfn is not None:
+            return fastfn(self, frame)
+        base = frame
         ops = code.ops
         opargs = code.args
         lines = code.lines
@@ -847,6 +875,11 @@ class VMInterpreter(Interpreter):
                                         frame.pc = pc
                                         self.depth += 1
                                         call_stack.append(new)
+                                        if code2.fast is not None or code2.hot >= JIT_HOT - 1:
+                                            new.pc = code2.entry + 1
+                                            stack.append(self._run(new))  # hot: the fast tier
+                                            continue
+                                        code2.hot += 1
                                         frame = new
                                         code = code2
                                         ops = code.ops
@@ -1057,6 +1090,11 @@ class VMInterpreter(Interpreter):
                                         frame.pc = pc
                                         self.depth += 1
                                         call_stack.append(new)
+                                        if code2.fast is not None or code2.hot >= JIT_HOT - 1:
+                                            new.pc = code2.entry + 1
+                                            stack.append(self._run(new))  # hot: the fast tier
+                                            continue
+                                        code2.hot += 1
                                         frame = new
                                         code = code2
                                         ops = code.ops
@@ -1199,6 +1237,27 @@ class VMInterpreter(Interpreter):
                                 if self.trace is not None:
                                     frame.pc = pc
                                     self._trace_tick(frame)
+                                elif code.fast is not None or (
+                                        not code.traced and code.hot >= JIT_HOT_LOOPS
+                                        and _jit_compile(code) is not None):
+                                    # a hot loop: carry on in the fast tier (tbcore/jit.py)
+                                    frame.pc = pc
+                                    if frame is base:
+                                        break  # (below, outside the try)
+                                    # an inline call: its caller gets the result, or the error
+                                    callee = frame
+                                    frame = frame.back
+                                    code = frame.code
+                                    ops = code.ops
+                                    opargs = code.args
+                                    lines = code.lines
+                                    fast = frame.fast
+                                    stack = frame.stack
+                                    gvars = frame.gvars
+                                    pc = frame.pc
+                                    stack.append(callee.code.fast(self, callee))
+                                else:
+                                    code.hot += 1
                             elif op == 29:  # LINE (traced code only)
                                 frame.tline = arg
                                 trace = self.trace
@@ -1457,6 +1516,10 @@ class VMInterpreter(Interpreter):
                 gvars = frame.gvars
                 pc = target
                 stack.append(err)
+                continue
+            # a hot loop in the base frame: switch it to its translated code (tbcore/jit.py)
+            frame.pc = pc
+            return code.fast(self, frame)
 
 
 _END = object()

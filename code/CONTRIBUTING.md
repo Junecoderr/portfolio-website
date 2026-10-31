@@ -33,6 +33,9 @@ uv run pytest                          # everything
 uv run pytest tests/lib/test_ioc.py    # one library
 uv run pytest tests/lang3              # 3.0 language features
 TB_ENGINE=tree uv run pytest           # the suite on the tree-walking engine
+TB_JIT=always uv run pytest            # the suite with all VM code translated (tbcore/jit.py)
+uv run python bench/bench.py           # benchmarks: tree vs VM vs Python
+uv run python bench/bench.py --against ../../old/code   # no benchmark more than 10% slower?
 ```
 
 - `tests/` covers the lexer, parser, both engines, every language feature, the
@@ -157,7 +160,9 @@ extension (`npm ci` + `npm run package` in `editors/vscode/` ->
 with `SHA256SUMS.txt` with `--latest=false`.
 `.github/workflows/tb-ci.yml` runs the tests on all three systems whenever
 something under `code/` changes, once on the VM and once with
-`TB_ENGINE=tree`.
+`TB_ENGINE=tree` (on Linux also with `TB_JIT=always`), and fails when a
+benchmark in `bench/` gets more than 10% slower than the commit the change
+starts from (both are run in the same job; see `bench/bench.py`).
 
 The website's download links are site-relative (`/dl/<asset>`); the rewrite
 in `vercel.json` maps them to the release for the current version, so update

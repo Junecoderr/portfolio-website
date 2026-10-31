@@ -104,7 +104,8 @@ class Code:
         "ops", "args", "lines", "stmt_lines", "nlocals", "name", "file", "kind", "traced",
         "varinfo", "fallbacks", "entry", "simple", "nparams", "is_method", "pos_params",
         "pos_param_nodes", "rest_slot", "kwrest_slot", "free_base", "nfree", "cell_params",
-        "entry_cells", "top_names", "free_names",
+        "entry_cells", "top_names", "free_names", "targets", "fast", "hot",
+        "fastcall", "fastmeth",
     )
 
     def __init__(self):
@@ -133,6 +134,11 @@ class Code:
         self.entry_cells: tuple = ()  # other function-level slots that are cells
         self.top_names: list = []    # (name, slot, is_cell) declared at the function's top level
         self.free_names: list = []   # (name, slot) of free variables
+        self.targets = frozenset()   # pcs that jumps go to (block starts for tbcore/jit.py)
+        self.fast = None             # the translated Python function, once hot (tbcore/jit.py)
+        self.hot = 0                 # runs and loop turns so far, until it is translated
+        self.fastcall = -1           # translated, simple, no cells: its nparams (jit.py inlines such calls)
+        self.fastmeth = -1           # the same for a method
 
     def dis(self) -> str:  # pragma: no cover - a debugging aid
         out = []
@@ -465,6 +471,7 @@ class FuncCompiler:
                 targets.update(a.pos for a in arg if type(a) is Label)
                 args[i] = tuple(a.pos if type(a) is Label else a for a in arg)
         code.nlocals = max(self.nlocals, 1)
+        code.targets = frozenset(targets)
         self.peephole(targets)
         return code
 
