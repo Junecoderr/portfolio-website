@@ -53,9 +53,11 @@ jobs:
       # this runner's own Security, System, Application and PowerShell logs.
       # Sysmon (Microsoft Sysinternals, signature checked before it runs) adds a
       # Sysmon log to that comparison; if this step fails, the Sysmon case is
-      # reported as skipped. Note: -accepteula accepts the Sysinternals licence.
+      # reported as skipped. Note: -accepteula accepts the Sysinternals licence,
+      # so this step only runs once the repository variable TB_CI_INSTALL_SYSMON
+      # is set to "true" by the owner.
       - name: Install Sysmon (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && vars.TB_CI_INSTALL_SYSMON == 'true'
         continue-on-error: true
         shell: pwsh
         run: |
