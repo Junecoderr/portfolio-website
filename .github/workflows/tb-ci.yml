@@ -147,3 +147,8 @@ jobs:
       - name: Compare the benchmarks (fails on more than 10% slower)
         if: steps.base.outputs.found == 'true'
         run: uv run --locked python bench/bench.py --against "$RUNNER_TEMP/base/code" --max-slowdown 10
+
+      # Report only (no pass/fail): how much parallel.processes speeds up CPU-bound
+      # work with 4 workers on this 4-vCPU runner (issue #35).
+      - name: Process workers speed-up (report)
+        run: uv run --locked python tb.py bench/processes.tb 28 16
