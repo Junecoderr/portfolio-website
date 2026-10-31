@@ -102,9 +102,10 @@ def test_descriptions_are_keyed_by_channel_and_event_id(tmp_path):
     wanted = [(SYSMON, 1, "process_created", "Process creation"), (SYSMON, 3, "network_connection", "Network connection"),
               (SYSMON, 7, "image_loaded", "Image loaded"), (SYSMON, 8, "remote_thread_created", "CreateRemoteThread"),
               (SYSMON, 10, "process_accessed", "ProcessAccess"), (SYSMON, 11, "file_created", "FileCreate"),
-              (SYSMON, 12, "registry_key_changed", "Registry object (key or value) created or deleted"),
-              (SYSMON, 13, "registry_value_set", "Registry value set"),
-              (SYSMON, 14, "registry_renamed", "Registry key or value renamed"),
+              (SYSMON, 12, "registry_object_changed", "RegistryEvent (Object create and delete)"),
+              (SYSMON, 13, "registry_value_set", "RegistryEvent (Value Set)"),
+              (SYSMON, 14, "registry_renamed", "RegistryEvent (Key and Value Rename)"),
+              (SYSMON, 26, "file_delete_logged", "FileDeleteDetected"),
               (SYSMON, 22, "dns_query", "DNSEvent"),
               (POWERSHELL, 4103, "powershell_pipeline", "Module logging"),
               (POWERSHELL, 4104, "powershell_script_block", "Script block logging")]
@@ -119,6 +120,29 @@ def test_descriptions_are_keyed_by_channel_and_event_id(tmp_path):
         assert line.startswith(f"{eid} {action} | {text}"), line
     assert out[-2] == "4625 failed_login | An account failed to log on | An account failed to log on"
     assert out[-1] == "4625 nil | nil | Event 4625"
+
+
+def test_sysmon_reads_the_same_from_evtx_and_from_a_json_export(tmp_path):
+    import json
+    from tblib import evtx, logs
+    data = {"Image": "C:\\Windows\\System32\\reg.exe", "TargetObject": "HKLM\\Software\\x", "User": "CORP\\dave"}
+    events = [channel_event(i, eid, SYSMON, data) for i, eid in enumerate(sorted(logs.SYSMON_EVENTS))]
+    for ev, rec in zip(events, evtx.iter_records(build_evtx(events))):
+        export = {"Id": ev["EventID"], "ProviderName": SYSMON[1], "LogName": SYSMON[0], "EventData": data}
+        js = logs.windows_record(export, json.dumps(export))
+        assert (rec["action"], rec["description"]) == (js["action"], js["description"]) == logs.SYSMON_EVENTS[
+            ev["EventID"]]
+        assert (rec["user"], rec["registry_key"]) == (js["user"], js["registry_key"]) == ("dave", "HKLM\\Software\\x")
+
+
+def test_security_ids_in_another_channel_keep_no_security_meaning(tmp_path):
+    from tblib import evtx
+    data = {"TargetUserName": "bob", "SubjectUserName": "svc", "LogonType": "3", "Status": "0xC000006D"}
+    rec, = evtx.iter_records(build_evtx([channel_event(0, 4625, ("Application", "SomeApp"), data)]))
+    assert (rec["action"], rec["description"], rec["success"], rec["user"]) == (None, None, None, "bob")
+    sec, = evtx.iter_records(build_evtx([channel_event(0, 4625, ("Security", "Microsoft-Windows-Security-Auditing"),
+                                                       data)]))
+    assert (sec["action"], sec["success"]) == ("failed_login", False)
 
 
 def test_sample_story():

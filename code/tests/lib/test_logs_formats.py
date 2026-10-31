@@ -30,7 +30,7 @@ def parse(line, fmt="auto"):
     ("sysmon.json", "windows", 5),
 ])
 def test_sample_files_sniff_and_read(root, name, fmt, count):
-    path = str(root / "apps" / "data" / name)
+    path = (root / "apps" / "data" / name).as_posix()
     out = run_tb(f'import logs\nlet rs = logs.read("{path}")\nsay(logs.sniff("{path}"), len(rs), rs[0].format)')
     assert out == [f"{fmt} {count} {fmt}"]
 
@@ -68,6 +68,25 @@ def test_zeek_tsv_types_headers_and_crlf():
     assert a["id.orig_h"] == "203.0.113.66" and a["uid"] == "C3n8"
     assert (b["success"], b["tunnel_parents"]) == (True, ["A", "B"])
     assert a["raw"].startswith("1773302441.552910\tC3n8")
+
+
+def test_zeek_bad_separator_headers_fall_back_to_defaults():
+    text = ("#separator \\x\n#set_separator\n#fields\tts\tuid\tid.orig_h\tnames\n"
+            "#types\ttime\tstring\taddr\tset[string]\n1773302441.5\tC3n8\t192.0.2.9\ta,b\n")
+    (r,) = records(text)
+    assert (r["format"], r["ip"], r["names"]) == ("zeek", "192.0.2.9", ["a", "b"])
+    (z,) = records(text, "zeek")
+    assert z["names"] == ["a", "b"]
+
+
+def test_generic_json_with_ts_and_uid_stays_json():
+    text = ('{"ts": "2024-01-01T00:00:00Z", "uid": 42, "level": "info", "message": "user logged in"}\n'
+            '{"ts": 1704067201, "uid": "u-43", "level": "warn", "message": "bad password"}\n')
+    assert sniff_text(text) == "json"
+    assert [(r["format"], r["message"]) for r in records(text)] == [("json", "user logged in"), ("json", "bad password")]
+    # A Zeek-shaped uid (C + base62) with an epoch ts is still Zeek, as is a files.log fuid.
+    assert parse('{"ts": 1773302413.01, "uid": "CkT6bB1o1Gm7Wq2nUd", "proto": "udp"}')["format"] == "zeek"
+    assert parse('{"ts": 1773302413.01, "fuid": "FMnxxt3xjVcWNS2141", "mime_type": "text/plain"}')["format"] == "zeek"
 
 
 def test_zeek_json_lines_and_nested_id():
@@ -113,7 +132,10 @@ def test_cloudtrail_records_file_one_line_and_json_lines(tmp_path):
     events = [trail("CreateUser"), trail("StopLogging", errorCode="AccessDenied", sourceIPAddress="AWS Internal",
                                          userIdentity={"type": "Root", "arn": "arn:aws:iam::123456789012:root"})]
     for name, text in [("a.json", json.dumps({"Records": events}, indent=2)), ("b.json", json.dumps({"Records": events})),
-                       ("c.json", "\r\n".join(json.dumps(e) for e in events) + "\r\n")]:
+                       ("c.json", "\r\n".join(json.dumps(e) for e in events) + "\r\n"),
+                       # zcat *.json.gz > all.json: one document per line, or pretty-printed ones back to back
+                       ("d.json", "".join(json.dumps({"Records": [e]}) + "\n" for e in events)),
+                       ("e.json", "".join(json.dumps({"Records": [e]}, indent=2) for e in events))]:
         (tmp_path / name).write_bytes(text.encode())
         a, b = list(iter_file(str(tmp_path / name), "auto", 1))
         assert (a["format"], a["user"], a["ip"], a["action"], a["success"], a["service"], a["region"]) == (
@@ -229,7 +251,7 @@ def test_sysmon_eventdata_and_message_forms():
                                 "DestinationPort": "4444", "DestinationHostname": "-"}}
     r = parse(json.dumps(evtx_style), "windows")
     assert (r["format"], r["action"], r["message"], r["user"], r["domain"], r["computer"]) == (
-        "windows", "network_connection", "Network connection", "dave", "CORP", "WS01")
+        "windows", "network_connection", "Network connection: a process made a TCP/UDP connection", "dave", "CORP", "WS01")
     assert (r["ip"], r["src_port"], r["dst_ip"], r["dst_port"], r["port"], r["proto"], r["process"]) == (
         "192.0.2.31", 50890, "203.0.113.200", 4444, 4444, "tcp", "C:\\Windows\\System32\\cmd.exe")
     assert r["DestinationIp"] == "203.0.113.200" and "dst_host" not in r
@@ -258,7 +280,7 @@ def test_lookalike_json_stays_generic():
 
 
 def test_tb_reads_a_new_format(root):
-    path = str(root / "apps" / "data" / "cloudtrail.json")
+    path = (root / "apps" / "data" / "cloudtrail.json").as_posix()
     src = f'''import logs
 let rs = logs.read("{path}")
 let failed = rs.filter(fn(r) {{ return r.success == false }})
