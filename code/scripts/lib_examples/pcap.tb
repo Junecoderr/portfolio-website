@@ -16,3 +16,7 @@ for hello in pcap.sni(packets) {
 for s in pcap.port_scans(packets) {
   say(f"{s.src} probed {s.count} ports on {s.dst}")
 }
+# Reassemble the TCP streams, then pull out the files that crossed plain HTTP.
+for f in pcap.http_objects(packets) {
+  say(f"{f.name}: {f.size} bytes from {f.url}, sha256 {f.sha256.slice(0, 16)}...")
+}

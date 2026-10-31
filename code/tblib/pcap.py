@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import bisect
 import datetime as dt
+import hashlib
 import ipaddress
 import os
+import re
 import struct
+import urllib.parse
+import zlib
 
 from tblib import _magic
 from tblib._api import Module, check_type, fail, fail_os
@@ -292,10 +297,11 @@ def decode_ipv4(p: dict, body: bytes):
     p["protocol"] = IP_PROTOCOLS.get(proto, f"ip_proto_{proto}")
     offset = (frag & 0x1FFF) * 8
     more = bool(frag & 0x2000)
-    if offset or more:
-        p["fragment"] = {"offset": offset, "more": more}
     end = min(total, len(body)) if total >= ihl else len(body)
     payload = body[ihl:end]
+    if offset or more:
+        p["fragment"] = {"offset": offset, "more": more, "id": ident, "protocol": proto, "data": payload,
+                         "ip_at": len(p["raw"]) - len(body)}
     if offset:
         p["payload"], p["payload_length"] = payload, len(payload)
         return
@@ -314,9 +320,10 @@ def decode_ipv6(p: dict, body: bytes):
     end = min(40 + plen, len(body)) if plen else len(body)
     while nxt in (0, 43, 60, 51, 44, 135) and pos + 8 <= len(body):
         if nxt == 44:
-            nxt_header, _res, frag_off = struct.unpack_from(">BBH", body, pos)
-            p["fragment"] = {"offset": (frag_off >> 3) * 8, "more": bool(frag_off & 1)}
+            nxt_header, _res, frag_off, ident = struct.unpack_from(">BBHI", body, pos)
             nxt, pos = nxt_header, pos + 8
+            p["fragment"] = {"offset": (frag_off >> 3) * 8, "more": bool(frag_off & 1), "id": ident,
+                             "protocol": nxt, "data": body[pos:end], "ip_at": len(p["raw"]) - len(body)}
             if p["fragment"]["offset"]:
                 p["protocol"] = IP_PROTOCOLS.get(nxt, f"ip_proto_{nxt}")
                 p["payload"] = body[pos:end]
@@ -911,6 +918,383 @@ def summary_of(packets: list, fmt: str, path=None) -> dict:
 
 
 # =============================================================================
+# Reassembly: IP fragments, TCP streams, HTTP over them
+# =============================================================================
+
+MAX_STREAM_BYTES = 16 * 1024 * 1024   # default cap on the bytes kept per stream direction
+MAX_DATAGRAM = 65535
+
+
+def ip_checksum(data) -> int:
+    if len(data) % 2:
+        data = bytes(data) + b"\x00"
+    total = sum(struct.unpack(f">{len(data) // 2}H", data))
+    while total >> 16:
+        total = (total & 0xFFFF) + (total >> 16)
+    return (~total) & 0xFFFF
+
+
+def join_fragments(parts: list):
+    """The whole IP payload once every byte from 0 to the last fragment's end has arrived, else None.
+    Where fragments overlap, the one that arrived first wins."""
+    last = [p["fragment"] for p in parts if not p["fragment"]["more"]]
+    if not last:
+        return None
+    total = last[0]["offset"] + len(last[0]["data"])
+    if total > MAX_DATAGRAM:
+        return None
+    spans = sorted((f["offset"], f["offset"] + len(f["data"])) for f in (p["fragment"] for p in parts))
+    reach = 0
+    for start, end in spans:
+        if start > reach:
+            return None
+        reach = max(reach, end)
+    if reach < total:
+        return None
+    buf = bytearray(total)
+    for p in reversed(parts):  # earliest written last, so it wins
+        f = p["fragment"]
+        piece = f["data"][:max(0, total - f["offset"])]
+        buf[f["offset"]:f["offset"] + len(piece)] = piece
+    return bytes(buf)
+
+
+def rebuild_datagram(first: dict, data: bytes) -> bytes:
+    """The first fragment's frame with its IP header fixed up to carry the whole payload."""
+    raw, at = first["raw"], first["fragment"]["ip_at"]
+    if first.get("ip_version") == 4:
+        ihl = (raw[at] & 0x0F) * 4
+        head = bytearray(raw[at:at + ihl])
+        struct.pack_into(">H", head, 2, ihl + len(data))
+        struct.pack_into(">H", head, 6, 0)   # no more fragments, offset 0
+        struct.pack_into(">H", head, 10, 0)  # checksum, recomputed next
+        struct.pack_into(">H", head, 10, ip_checksum(head))
+    else:
+        # shortcut: IPv6 extension headers before the fragment header are dropped; they only matter for routing.
+        head = bytearray(raw[at:at + 40])
+        struct.pack_into(">H", head, 4, len(data))
+        head[6] = first["fragment"]["protocol"]
+    return bytes(raw[:at]) + bytes(head) + data
+
+
+def defragment(packets: list) -> list:
+    """Packets with each complete set of IP fragments replaced by one decoded packet (where the last piece
+    arrived). Incomplete sets are left as they are."""
+    groups, whole, used = {}, {}, set()
+    for i, p in enumerate(packets):
+        f = p.get("fragment")
+        if not f or "data" not in f:
+            continue
+        key = (p.get("ip_version"), p.get("src"), p.get("dst"), f["id"], f["protocol"])
+        parts = groups.setdefault(key, [])
+        parts.append((i, p))
+        data = join_fragments([q for _, q in parts])
+        if data is None:
+            continue
+        del groups[key]  # the id may be reused later for a new datagram
+        first = min((q for _, q in parts), key=lambda q: q["fragment"]["offset"])
+        frame = rebuild_datagram(first, data)
+        out = decode_frame(p["time"], len(frame), p.get("link_type", 1), frame, p.get("interface"), p["number"])
+        out["fragments"] = sorted(q["number"] for _, q in parts)
+        whole[i] = out
+        used.update(j for j, _ in parts)
+    return [whole.get(i, p) for i, p in enumerate(packets) if i in whole or i not in used]
+
+
+def seq_offset(seq: int, anchor: int) -> int:
+    r = (seq - anchor) & 0xFFFFFFFF
+    return r - (1 << 32) if r >= (1 << 31) else r
+
+
+def assemble_direction(pkts: list, cap: int):
+    """One direction of a TCP connection as ordered bytes plus (offset, packet) marks for timing."""
+    d = {"data": b"", "bytes": 0, "packets": len(pkts), "gaps": [], "missing": 0, "retransmissions": 0,
+         "out_of_order": 0, "overlaps": 0, "truncated": False,
+         "fin": any("FIN" in p["flags"] for p in pkts)}
+    syn = next((p for p in pkts if "SYN" in p["flags"]), None)
+    data_pkts = [p for p in pkts if p.get("payload")]
+    if not data_pkts:
+        return d, []
+    anchor = (syn["seq"] + 1) & 0xFFFFFFFF if syn else data_pkts[0]["seq"]
+    segs = sorted(((seq_offset(p["seq"], anchor), i, p) for i, p in enumerate(data_pkts)), key=lambda s: s[:2])
+    pos = 0 if syn else segs[0][0]
+    chunks, marks, fresh, size = [], [], set(), 0
+    for start, i, p in segs:
+        data = p["payload"]
+        end = start + len(data)
+        if end <= pos:
+            d["retransmissions"] += 1
+            continue
+        if start > pos:
+            d["gaps"].append({"at": size, "length": start - pos})
+            d["missing"] += start - pos
+        elif start < pos:
+            d["overlaps"] += 1
+            data = data[pos - start:]
+        if size + len(data) > cap:
+            data = data[:cap - size]
+            d["truncated"] = True
+        if data:
+            marks.append((size, p))
+            chunks.append(data)
+            size += len(data)
+            fresh.add(i)
+        pos = end
+        if d["truncated"]:
+            break
+    highest = None
+    for start, i, _p in sorted(segs, key=lambda s: s[1]):
+        if i in fresh and highest is not None and start < highest:
+            d["out_of_order"] += 1
+        highest = start if highest is None else max(highest, start)
+    d["data"] = b"".join(chunks)
+    d["bytes"] = size
+    return d, marks
+
+
+def stream_state(cf: set, sf: set) -> str:
+    if "RST" in cf or "RST" in sf:
+        return "refused" if "SYN" in cf and "SYN" not in sf else "reset"
+    if "FIN" in cf and "FIN" in sf:
+        return "closed"
+    if "FIN" in cf or "FIN" in sf:
+        return "closing"
+    if "SYN" in cf and "SYN" in sf:
+        return "established"
+    if "SYN" in cf:
+        return "no_reply"
+    return "partial"
+
+
+def stream_app(client: bytes, server: bytes):
+    if client.startswith(HTTP_METHODS) or server.startswith(b"HTTP/1."):
+        return "http"
+    if client[:2] == b"\x16\x03" or server[:2] == b"\x16\x03":
+        return "tls"
+    if client.startswith(b"SSH-") or server.startswith(b"SSH-"):
+        return "ssh"
+    return None
+
+
+def reassemble(packets: list, cap: int) -> list:
+    """[(stream map, {"client": marks, "server": marks})] for every TCP connection, oldest first."""
+    conns, found = {}, []
+    for p in defragment(packets):
+        if p.get("protocol") != "tcp" or p.get("seq") is None or p.get("fragment"):
+            continue
+        a, b = (p["src"], p["sport"]), (p["dst"], p["dport"])
+        key = (a, b) if (str(a[0]), a[1]) <= (str(b[0]), b[1]) else (b, a)
+        flags = p["flags"]
+        opening = "SYN" in flags and "ACK" not in flags
+        s = conns.get(key)
+        if s is not None and opening and s["closed"] and p["seq"] != s["isn"]:
+            s = None  # the same ports reused for a new connection
+        if s is None:
+            client = a
+            if "SYN" in flags and "ACK" in flags:
+                client = b
+            elif "SYN" not in flags and p["sport"] in WELL_KNOWN_PORTS and p["dport"] not in WELL_KNOWN_PORTS:
+                client = b
+            s = {"client": client, "pkts": [], "closed": False, "isn": p["seq"] if opening else None}
+            conns[key] = s
+            found.append(s)
+        s["pkts"].append(p)
+        if "FIN" in flags or "RST" in flags:
+            s["closed"] = True
+    out = []
+    for n, s in enumerate(found, 1):
+        (cip, cport), pkts = s["client"], s["pkts"]
+        mine = [p for p in pkts if (p["src"], p["sport"]) == s["client"]]
+        theirs = [p for p in pkts if (p["src"], p["sport"]) != s["client"]]
+        cdir, cmarks = assemble_direction(mine, cap)
+        sdir, smarks = assemble_direction(theirs, cap)
+        server = theirs[0] if theirs else None
+        sip = server["src"] if server else mine[0]["dst"]
+        sport = server["sport"] if server else mine[0]["dport"]
+        first, last = min(p["time"] for p in pkts), max(p["time"] for p in pkts)
+        cf = {f for p in mine for f in p["flags"]}
+        sf = {f for p in theirs for f in p["flags"]}
+        out.append(({"id": n, "src": cip, "sport": cport, "dst": sip, "dport": sport,
+                     "state": stream_state(cf, sf), "handshake": "SYN" in cf and "SYN" in sf,
+                     "packets": len(pkts), "first": first, "last": last, "first_when": when_text(first),
+                     "last_when": when_text(last), "duration": round(last - first, 6),
+                     "app": stream_app(cdir["data"], sdir["data"]),
+                     "service": WELL_KNOWN_PORTS.get(sport) or WELL_KNOWN_PORTS.get(cport),
+                     "client": cdir, "server": sdir},
+                    {"client": cmarks, "server": smarks}))
+    return out
+
+
+# -- HTTP over reassembled streams ----------------------------------------------------
+
+def http_head(data: bytes, pos: int):
+    end = data.find(b"\r\n\r\n", pos)
+    if end < 0:
+        return None
+    lines = data[pos:end].split(b"\r\n")
+    headers = {}
+    for raw in lines[1:]:
+        key, sep, value = raw.partition(b":")
+        if sep:
+            headers[key.decode("latin-1").strip().lower()] = value.decode("latin-1", "replace").strip()
+    return lines[0].decode("latin-1", "replace"), headers, end + 4
+
+
+def dechunk(data: bytes, pos: int):
+    out = []
+    while True:
+        nl = data.find(b"\r\n", pos)
+        if nl < 0:
+            return b"".join(out), len(data), False
+        try:
+            size = int(data[pos:nl].split(b";")[0].strip(), 16)
+        except ValueError:
+            return b"".join(out), len(data), False
+        pos = nl + 2
+        if size == 0:
+            if data[pos:pos + 2] == b"\r\n":
+                return b"".join(out), pos + 2, True
+            end = data.find(b"\r\n\r\n", pos)  # trailer headers
+            return b"".join(out), (end + 4 if end >= 0 else len(data)), end >= 0
+        piece = data[pos:pos + size]
+        out.append(piece)
+        if len(piece) < size:
+            return b"".join(out), len(data), False
+        pos += size + 2
+
+
+def http_body(data: bytes, pos: int, headers: dict, to_end: bool):
+    """(body, next position, complete)."""
+    if "chunked" in headers.get("transfer-encoding", "").lower():
+        return dechunk(data, pos)
+    length = headers.get("content-length", "").strip()
+    if length.isdigit():
+        body = data[pos:pos + int(length)]
+        return body, pos + len(body), len(body) == int(length)
+    if to_end:
+        return data[pos:], len(data), True
+    return b"", pos, True
+
+
+def decode_content(body: bytes, headers: dict, cap: int) -> bytes:
+    coding = headers.get("content-encoding", "").lower().strip()
+    if not body or coding not in ("gzip", "x-gzip", "deflate"):
+        return body
+    for wbits in (47, -15):  # gzip or zlib, then raw deflate
+        try:
+            z = zlib.decompressobj(wbits)
+            return z.decompress(body, cap)  # cap stops decompression bombs
+        except zlib.error:
+            continue
+    return body
+
+
+def http_messages(data: bytes, requests: bool, methods=None) -> list:
+    out, pos = [], 0
+    while pos < len(data) and len(out) < 10000:
+        start = pos
+        head = http_head(data, pos)
+        if head is None:
+            break
+        first, headers, pos = head
+        parts = first.split(" ", 2)
+        if requests:
+            if not (first + " ").encode("latin-1").startswith(HTTP_METHODS) or len(parts) < 2:
+                break
+            body, pos, complete = http_body(data, pos, headers, to_end=False)
+            out.append({"at": start, "method": parts[0], "path": parts[1], "headers": headers, "body": body,
+                        "complete": complete})
+            continue
+        if not first.startswith("HTTP/1.") or len(parts) < 2 or not parts[1].isdigit():
+            break
+        status = int(parts[1])
+        if status < 200:
+            continue  # 100 Continue and friends: a real response follows
+        method = methods[len(out)] if methods and len(out) < len(methods) else None
+        if method == "HEAD" or status in (204, 304):
+            body, complete = b"", True
+        else:
+            body, pos, complete = http_body(data, pos, headers, to_end=True)
+        out.append({"at": start, "status": status, "reason": parts[2] if len(parts) > 2 else "",
+                    "headers": headers, "body": body, "complete": complete})
+    return out
+
+
+def mark_at(marks: list, offset: int):
+    if not marks:
+        return None
+    i = bisect.bisect_right([m[0] for m in marks], offset) - 1
+    return marks[max(i, 0)][1]
+
+
+def http_exchanges(packets: list, cap: int) -> list:
+    out = []
+    for s, marks in reassemble(packets, cap):
+        if s["app"] != "http":
+            continue
+        reqs = http_messages(s["client"]["data"], True)
+        resps = http_messages(s["server"]["data"], False, [r["method"] for r in reqs])
+        for k in range(max(len(reqs), len(resps))):
+            req = reqs[k] if k < len(reqs) else None
+            resp = resps[k] if k < len(resps) else None
+            when = mark_at(marks["client"], req["at"]) if req else mark_at(marks["server"], resp["at"])
+            rh = req["headers"] if req else {}
+            host = rh.get("host")
+            path = req["path"] if req else None
+            url = path if path is None or path.startswith("http") or not host else f"http://{host}{path}"
+            sh = resp["headers"] if resp else {}
+            out.append({"stream": s["id"], "time": when["time"] if when else None,
+                        "when": when["when"] if when else None, "src": s["src"], "sport": s["sport"],
+                        "dst": s["dst"], "dport": s["dport"], "method": req["method"] if req else None,
+                        "host": host, "path": path, "url": url, "user_agent": rh.get("user-agent"),
+                        "request_headers": rh, "request_body": decode_content(req["body"], rh, cap) if req else b"",
+                        "status": resp["status"] if resp else None, "reason": resp["reason"] if resp else None,
+                        "response_headers": sh, "content_type": sh.get("content-type"),
+                        "response_body": decode_content(resp["body"], sh, cap) if resp else b"",
+                        "complete": bool(req and resp and req["complete"] and resp["complete"])})
+    return out
+
+
+def object_name(url, headers: dict, content_type) -> str:
+    disposition = headers.get("content-disposition", "")
+    name = ""
+    m = re.search(r"filename\*\s*=\s*(?:[\w!#$%&+^`{}~-]+'[^']*')?\"?([^\";]+)", disposition, re.I)
+    if m:
+        name = urllib.parse.unquote(m.group(1).strip())
+    else:
+        m = re.search(r'filename\s*=\s*(?:"([^"]*)"|([^;]+))', disposition, re.I)
+        if m:
+            name = (m.group(1) if m.group(1) is not None else m.group(2)).strip()
+    if not name and url:
+        name = urllib.parse.unquote(urllib.parse.urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1])
+    # never a path: a hostile server can send "../../x" or "C:\\x"
+    name = re.sub(r"[\x00-\x1f]", "", name.replace("\\", "/").rsplit("/", 1)[-1]).strip().lstrip(".")
+    name = name.split(":")[-1].strip()
+    if not name:
+        name = "index.html" if "html" in (content_type or "") else "object"
+    return name[:200]
+
+
+def http_objects(packets: list, cap: int) -> list:
+    out = []
+    for e in http_exchanges(packets, cap):
+        found = []
+        if e["response_body"] and e["status"] is not None:
+            found.append(("download", e["response_body"], e["response_headers"]))
+        if e["request_body"]:
+            found.append(("upload", e["request_body"], e["request_headers"]))
+        for direction, data, headers in found:
+            ctype = headers.get("content-type")
+            out.append({"name": object_name(e["url"], headers, ctype), "direction": direction, "url": e["url"],
+                        "host": e["host"], "status": e["status"], "content_type": ctype, "size": len(data),
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                        "md5": hashlib.md5(data, usedforsecurity=False).hexdigest(),
+                        "data": data, "stream": e["stream"], "time": e["time"], "when": e["when"],
+                        "src": e["src"], "dst": e["dst"], "dport": e["dport"]})
+    return out
+
+
+# =============================================================================
 # Writing
 # =============================================================================
 
@@ -938,7 +1322,9 @@ def load(api):
         "Read network captures (pcap and pcapng) into packet maps: Ethernet and VLAN, IPv4/IPv6, ARP, TCP, UDP "
         "and ICMP, with DNS questions and answers, HTTP requests, and the server name (SNI) from TLS hellos. "
         "Then group packets into flows, find top talkers, list DNS lookups, HTTP requests and TLS names, spot "
-        "port scans, and write filtered packets back out as pcap. Times are UTC. Pure Python, no tcpdump needed.",
+        "port scans, and write filtered packets back out as pcap. Reassemble IP fragments and TCP streams to read "
+        "whole HTTP exchanges and pull out the files they carried, with hashes. Times are UTC. Pure Python, no "
+        "tcpdump needed.",
     )
     m.value("MAX_PACKETS", MAX_PACKETS, doc="The most packets pcap.read() will load from one file.")
 
@@ -1124,6 +1510,109 @@ def load(api):
         except OSError as err:
             fail_os(line, err, path, "write")
         return len(packets)
+
+    def cap_of(line, options, fn):
+        if options is None:
+            return MAX_STREAM_BYTES
+        check_type(line, options, "map", fn, "options")
+        for key in options:
+            if key != "max_bytes":
+                fail(line, f'{fn}() doesn\'t know the option "{key}". Options: max_bytes.')
+        cap = check_type(line, options.get("max_bytes", MAX_STREAM_BYTES), "whole", fn, "max_bytes")
+        if cap < 1:
+            fail(line, f"{fn}() needs max_bytes to be at least 1, not {cap}.")
+        return cap
+
+    @m.fn("defragment", 1, doc=(
+        "defragment(packets) -> list\n"
+        "Put fragmented IPv4 and IPv6 packets back together. Each complete set of fragments becomes one\n"
+        "packet, decoded again (so TCP, UDP, DNS and HTTP inside it show up), in the place where its last\n"
+        "fragment arrived. Sets with a piece missing are left as they are.\n"
+        "\n"
+        "Fields added to a reassembled packet:\n"
+        "- fragments: the numbers of the packets it was built from.\n"
+        "\n"
+        "Fragments that are left over keep a \"fragment\" map with \"offset\", \"more\" and \"id\"."))
+    def defrag(line, packets):
+        return defragment(check_packets(line, packets, "pcap.defragment"))
+
+    @m.fn("streams", 1, 2, doc=(
+        "streams(packets, options?) -> list\n"
+        "Every TCP connection with the bytes each side sent, in order. Fragments are joined first, segments\n"
+        "that arrived out of order are sorted, and repeated bytes (retransmissions and overlaps) are kept\n"
+        "once; where the same bytes arrive twice, the first copy wins.\n"
+        "\n"
+        "Options:\n"
+        "- max_bytes: the most bytes kept for each side of a connection (default: 16 MB).\n"
+        "\n"
+        "Fields of each stream:\n"
+        "- id: 1 for the oldest connection, then 2, 3 and so on.\n"
+        "- src, sport: the client (the side that sent the first SYN).\n"
+        "- dst, dport: the server.\n"
+        "- state: how the connection went, one of:\n"
+        "  - \"established\", \"closing\", \"closed\" (FIN both ways), \"reset\", \"refused\", \"no_reply\"\n"
+        "  - \"partial\": the capture started after the handshake.\n"
+        "- handshake: true when both SYNs were seen.\n"
+        "- packets, first, last, first_when, last_when, duration\n"
+        "- app: \"http\", \"tls\", \"ssh\" or nil, from the first bytes.\n"
+        "- service: the usual name for the port.\n"
+        "- client, server: what each side sent, as a map.\n"
+        "\n"
+        "Fields of client and server:\n"
+        "- data: the bytes, in order.\n"
+        "- bytes, packets\n"
+        "- gaps: holes where segments were never captured, as maps of \"at\" (where in data) and \"length\".\n"
+        "- missing: how many bytes the gaps add up to.\n"
+        "- retransmissions, overlaps, out_of_order: how many segments were repeats, partly repeats, or late.\n"
+        "- truncated: true when max_bytes cut the data short.\n"
+        "- fin: true when this side sent FIN."))
+    def streams(line, packets, options=None):
+        cap = cap_of(line, options, "pcap.streams")
+        return [s for s, _marks in reassemble(check_packets(line, packets, "pcap.streams"), cap)]
+
+    @m.fn("http_exchanges", 1, 2, doc=(
+        "http_exchanges(packets, options?) -> list\n"
+        "Every HTTP request with its response, read from the reassembled TCP streams, so bodies split over\n"
+        "many packets come out whole. Handles keep-alive, Content-Length, chunked transfer encoding and\n"
+        "gzip or deflate content.\n"
+        "\n"
+        "Options:\n"
+        "- max_bytes: the most bytes kept for each side of a connection (default: 16 MB).\n"
+        "\n"
+        "Fields of each exchange:\n"
+        "- stream: the id from pcap.streams().\n"
+        "- time, when: when the request was sent.\n"
+        "- src, sport, dst, dport\n"
+        "- method, host, path, url, user_agent\n"
+        "- request_headers, request_body\n"
+        "- status, reason, response_headers, content_type, response_body\n"
+        "- complete: true when both bodies arrived in full.\n"
+        "\n"
+        "A request with no answer has status nil."))
+    def exchanges(line, packets, options=None):
+        cap = cap_of(line, options, "pcap.http_exchanges")
+        return http_exchanges(check_packets(line, packets, "pcap.http_exchanges"), cap)
+
+    @m.fn("http_objects", 1, 2, doc=(
+        "http_objects(packets, options?) -> list\n"
+        "The files carried over plain HTTP: response bodies (downloads) and request bodies (uploads), with\n"
+        "their hashes, ready to check against threat intelligence or save with fs.write_bytes().\n"
+        "\n"
+        "Options:\n"
+        "- max_bytes: the most bytes kept for each side of a connection (default: 16 MB).\n"
+        "\n"
+        "Fields of each object:\n"
+        "- name: from the Content-Disposition header or the end of the URL, never a folder path.\n"
+        "- direction: \"download\" or \"upload\".\n"
+        "- url, host, status, content_type\n"
+        "- size: the number of bytes.\n"
+        "- sha256, md5: hashes of the bytes, as hex text.\n"
+        "- data: the bytes themselves.\n"
+        "- stream, time, when\n"
+        "- src, dst, dport: the client and the server."))
+    def objects(line, packets, options=None):
+        cap = cap_of(line, options, "pcap.http_objects")
+        return http_objects(check_packets(line, packets, "pcap.http_objects"), cap)
 
     @m.fn("service", 1, doc="service(port) -> text\nThe usual service name for a port (443 -> \"https\"), or nil.")
     def service(line, port):
