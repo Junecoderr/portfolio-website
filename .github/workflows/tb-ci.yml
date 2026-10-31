@@ -61,6 +61,14 @@ jobs:
           TB_ENGINE: tree
         run: xvfb-run -a uv run --locked pytest
 
+      # The VM translates hot code to Python (tbcore/jit.py); most test programs
+      # are too short to get hot, so run them all translated once as well.
+      - name: Run tests, VM with all code translated (Linux, virtual display)
+        if: runner.os == 'Linux'
+        env:
+          TB_JIT: always
+        run: xvfb-run -a uv run --locked pytest
+
       - name: Run tests, VM engine
         if: runner.os != 'Linux'
         run: uv run --locked pytest
@@ -70,3 +78,48 @@ jobs:
         env:
           TB_ENGINE: tree
         run: uv run --locked pytest
+
+  # Benchmarks: fail when the VM gets more than 10% slower on any of
+  # code/bench/*.tb. CI machines are noisy, so the check doesn't compare with
+  # stored numbers: it checks out the commit this change starts from (a pull
+  # request's base, or the previous commit on main) and runs both versions in
+  # this job, taking turns, keeping each one's best CPU time, and measuring a
+  # suspect benchmark again before failing (see code/bench/bench.py).
+  bench:
+    name: Benchmarks (no more than 10% slower)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      UV_PYTHON_PREFERENCE: only-system
+      PYTHONUTF8: "1"
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    defaults:
+      run:
+        working-directory: code
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.2"
+
+      - name: Check out the version to compare with
+        id: base
+        run: |
+          if [ -n "$BASE_SHA" ] && git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null \
+              && git cat-file -e "$BASE_SHA:code/tb.py" 2>/dev/null; then
+            git worktree add --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No earlier version of TB to compare with; skipping the benchmark check."
+          fi
+
+      - name: Compare the benchmarks (fails on more than 10% slower)
+        if: steps.base.outputs.found == 'true'
+        run: uv run --locked python bench/bench.py --against "$RUNNER_TEMP/base/code" --max-slowdown 10
