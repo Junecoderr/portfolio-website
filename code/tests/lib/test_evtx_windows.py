@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(sys.platform != "win32",
                                 reason="needs Windows: exports this machine's own event logs with wevtutil")
 
 NS = "{http://schemas.microsoft.com/win/2004/08/events/event}"
-SAMPLE = 200          # records compared per log, spread evenly through the file
+SAMPLE = 5000         # records compared per log: every record wevtutil renders, so rare events (e.g. boot-time 6009) are always checked
 MAX_RENDERED = 5000   # records wevtutil renders per log (oldest first)
 # (channel, must have records: fail rather than skip when it is empty or can't be exported)
 CHANNELS = [
