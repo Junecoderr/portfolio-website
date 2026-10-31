@@ -23,6 +23,7 @@ Files (all pure Python 3.10+, standard library only):
     compiler.py   the bytecode compiler: syntax tree -> Code objects
     vm.py         VMInterpreter: the default engine, a stack VM that runs
                   the compiled code (same API and messages as interp.py)
+    jit.py        the VM's fast tier: hot bytecode translated to Python functions
     types.py      the gradual type checker used by `tb check` and the LSP
     docfmt.py     the structure of doc strings (summary, Options:, bullets,
                   Example:) and its HTML, terminal and Markdown forms
@@ -39,6 +40,7 @@ FILES = [
     "tasks.py",
     "compiler.py",
     "vm.py",
+    "jit.py",
     "types.py",
     "docfmt.py",
 ]
