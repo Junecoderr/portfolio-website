@@ -17,7 +17,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a class="brand" href="index.html" aria-label="TB home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b3123e"/><path d="M9.5 7.5v11.2c0 1.7.9 2.6 2.6 2.6M6.6 11.8h6.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.4 6.8v14.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="20.4" cy="17.3" r="4.1" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="25.6" y="19.4" width="3.6" height="2.8" rx="0.8" fill="#f2a93b"/></svg><span>TB</span></a>
-      <a class="version-badge" href="releases.html" aria-label="Version 3.0.0: release notes">v<span data-version>3.0.0</span></a>
+      <a class="version-badge" href="releases.html" aria-label="Version 3.1.0: release notes">v<span data-version>3.1.0</span></a>
       <button class="icon-button nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <nav class="site-nav" id="site-nav" aria-label="Main">
         <a href="docs.html">Learn</a>
@@ -39,10 +39,10 @@
           <p class="hero-tagline">A friendly programming language for desktop apps, security tools and everything in between.</p>
           <p class="hero-sub">Plain words and gentle error messages, now with classes, pattern matching, generators and tasks, a formatter, a language server and a VS Code extension, and <span data-lib-count>43</span> libraries built in: windows, logs, packet captures, Sigma rules, IOCs, crypto, SQLite, a web server and more.</p>
           <div class="button-row">
-            <a class="button button-primary button-big" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 3.0</a>
+            <a class="button button-primary button-big" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 3.1</a>
             <a class="button button-big" href="playground.html">Try it in your browser</a>
           </div>
-          <p class="hero-meta">Version <span data-version>3.0.0</span> for Windows, macOS and Linux. <a href="whats-new.html">What's new in 3.0</a></p>
+          <p class="hero-meta">Version <span data-version>3.1.0</span> for Windows, macOS and Linux. <a href="releases.html#v3.1.0">What's new in 3.1</a></p>
         </div>
 
         <div class="window" id="hero-window">
@@ -365,7 +365,7 @@ for t in tasks {
             <h3>VS Code extension</h3>
             <p>Highlighting, completion, hover help, errors as you type, go to definition, formatting and Run buttons, from <code>tb lsp</code>. <a href="tools.html#vscode">Install it</a> from the download.</p>
             <div class="specimen">
-              <pre>tb-vscode-<span data-version>3.0.0</span>.vsix</pre>
+              <pre>tb-vscode-<span data-version>3.1.0</span>.vsix</pre>
             </div>
           </article>
         </div>
@@ -393,7 +393,7 @@ say(greeting + ", " + nmae)</code></pre>
             <p>The Windows installer needs no admin rights and brings the whole standard library and the apps with it. Then just double-click a <code>.tb</code> file to run it.</p>
             <div class="specimen">
               <pre><span class="tok-op">&gt;</span> tb --version</pre>
-              <pre class="specimen-out">TB 3.0.0</pre>
+              <pre class="specimen-out">TB 3.1.0</pre>
             </div>
           </article>
           <article class="feature">
@@ -564,7 +564,7 @@ for i, n in fibonacci().take(3).enumerate() {
           <h2 id="install-title" class="flush">Install</h2>
           <p class="lead">On Windows, run the installer; on a Mac or Linux, unzip one folder. The standard library and the apps come inside, and the download page walks through every click.</p>
           <div class="button-row">
-            <a class="button button-primary" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 3.0</a>
+            <a class="button button-primary" href="download.html"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>Download TB 3.1</a>
             <a class="button" href="examples.html#apps">See the example apps</a>
           </div>
         </div>
@@ -580,7 +580,7 @@ for i, n in fibonacci().take(3).enumerate() {
           <div class="window-panel" id="ipanel-windows" role="tabpanel" aria-labelledby="itab-windows">
             <pre><span class="c"># After tb-windows-x64-setup.exe, open TB Prompt:</span>
 <span class="p">&gt; </span>tb --version
-TB 3.0.0
+TB 3.1.0
 <span class="p">&gt; </span>tb hello.tb
 Hello, world!
 <span class="c"># Or double-click any .tb file.</span></pre>
@@ -679,7 +679,7 @@ Hello, world!</pre>
     <div class="footer-bottom">
       <p>TB — a friendly programming language.</p>
       <p class="footer-stats" data-stats hidden><span data-stat-wrap hidden><span data-stat="downloads"></span> downloads</span><span data-stat-wrap hidden><span data-stat="visits"></span> visits</span></p>
-      <p>TB <span data-version>3.0.0</span>, released 26 October 2026.</p>
+      <p>TB <span data-version>3.1.0</span>, released 31 October 2026.</p>
     </div>
   </footer>
   <script src="assets/js/highlight.js" defer></script>

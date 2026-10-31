@@ -2,7 +2,7 @@
 ;
 ; Built by packaging/build.py on Windows (CI: windows-latest), from the
 ; PyInstaller one-folder build in dist\tb\. By hand, from code\:
-;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=3.0.0 ^
+;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=3.1.0 ^
 ;       /DSourceDir=dist\tb /DRepoDir=. /DOutputDir=dist packaging\windows\tb.iss
 ;
 ; What it does (per-user by default, no admin rights needed):
@@ -20,7 +20,7 @@
 ; list, saved next to their app) are left in place on uninstall.
 
 #ifndef AppVersion
-  #define AppVersion "3.0.0"
+  #define AppVersion "3.1.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\..\dist\tb"

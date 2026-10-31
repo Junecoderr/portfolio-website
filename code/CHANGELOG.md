@@ -18,6 +18,10 @@ How to write an entry:
 
 ## Unreleased
 
+## 3.1.0 - 2026-10-31
+
+Named inputs for standard-library functions, packet-capture stream reassembly with HTTP file extraction, seven more log formats for security teams, and clearer messages across the tools.
+
 ### Added
 
 - Standard-library functions take named inputs, like functions you write: `parallel.map(scan, hosts, workers = 8)`, `round(x, digits = 2)`. A misspelled name gets a "Did you mean" hint, and `tb check` and the language server know the names too.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.0
+
+- Released alongside TB 3.1. Signature help highlights the input you are typing, including named inputs (`workers = 8`) for standard-library functions.
+
 ## 3.0.0
 
 - First release, alongside TB 3.0.

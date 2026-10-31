@@ -196,4 +196,4 @@ def test_tb_test_skips_tb_packages(tmp_path):
 def test_help_mentions_tools():
     done = run_cli("--help")
     assert "tb fmt" in done.stdout and "tb test --coverage" in done.stdout
-    assert run_cli("--version").stdout.strip() == "TB 3.0.0"
+    assert run_cli("--version").stdout.strip() == "TB 3.1.0"

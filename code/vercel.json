@@ -13,7 +13,7 @@
     },
     {
       "source": "/dl/:file",
-      "destination": "https://github.com/Junecoderr/portfolio-website/releases/download/tb-v3.0.0/:file"
+      "destination": "https://github.com/Junecoderr/portfolio-website/releases/download/tb-v3.1.0/:file"
     }
   ],
   "headers": [

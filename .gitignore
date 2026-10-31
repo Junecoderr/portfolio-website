@@ -18,3 +18,4 @@ brag-output/
 .agents/
 skills-lock.json
 .env*
+brag-output-*/

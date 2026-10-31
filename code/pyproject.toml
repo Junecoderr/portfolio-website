@@ -1,6 +1,6 @@
 [project]
 name = "tb-lang"
-version = "3.0.0"
+version = "3.1.0"
 description = "TB - a small, friendly programming language"
 requires-python = ">=3.10"
 # tzdata: the IANA time-zone database (from the Python core team, pure data).

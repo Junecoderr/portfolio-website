@@ -43,13 +43,13 @@ def feed_input(monkeypatch, lines):
 
 def test_version(capsys):
     assert tb.main(["--version"]) == 0
-    assert capsys.readouterr().out.strip() == "TB 3.0.0"
+    assert capsys.readouterr().out.strip() == "TB 3.1.0"
     assert tb.main(["-V"]) == 0
-    assert capsys.readouterr().out.strip() == "TB 3.0.0"
+    assert capsys.readouterr().out.strip() == "TB 3.1.0"
 
 
 def test_version_constant():
-    assert tb.__version__ == "3.0.0"
+    assert tb.__version__ == "3.1.0"
 
 
 def test_help(capsys):
@@ -162,7 +162,7 @@ def test_ask_from_cli_uses_input(capsys, script, monkeypatch):
 def test_main_uses_sys_argv(capsys, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["tb", "--version"])
     assert tb.main() == 0
-    assert "TB 3.0.0" in capsys.readouterr().out
+    assert "TB 3.1.0" in capsys.readouterr().out
 
 
 # -- REPL ---------------------------------------------------------------------
@@ -171,7 +171,7 @@ def test_repl_expressions_and_statements(capsys, monkeypatch):
     prompts = feed_input(monkeypatch, ["1 + 2", 'let x = "hi"', "x", 'say(x + "!")', "[1, x]", "nil", "exit"])
     assert tb.main([]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[0].startswith("TB 3.0.0")
+    assert out[0].startswith("TB 3.1.0")
     assert out[1:] == ["3", '"hi"', "hi!", '[1, "hi"]']
     assert set(prompts) == {"tb> "}
 

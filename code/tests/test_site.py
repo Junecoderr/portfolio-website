@@ -467,7 +467,8 @@ def test_changelog_matches_the_version_and_renders(tmp_path):
     assert rels[0].version == tb.__version__, "add a CHANGELOG.md entry for the new version"
     assert [r.date for r in rels] == sorted((r.date for r in rels), reverse=True)
     assert all(r.summary and r.sections for r in rels)
-    assert [changelog.kind(r, rels[i + 1] if i + 1 < len(rels) else None) for i, r in enumerate(rels)][:2] == ["Major", "Patch"]
+    kinds = {r.version: changelog.kind(r, rels[i + 1] if i + 1 < len(rels) else None) for i, r in enumerate(rels)}
+    assert (kinds["3.0.0"], kinds["2.0.1"], kinds.get("3.1.0", "Minor")) == ("Major", "Patch", "Minor")
     changelog.render(tmp_path, tb.__version__)
     page = (tmp_path / "releases.html").read_text(encoding="utf-8")
     for r in rels:

@@ -99,7 +99,7 @@ def test_real_process_library_errors_are_catchable(tmp_path):
 
 def test_real_process_version():
     done = subprocess.run([sys.executable, str(ROOT / "tb.py"), "--version"], capture_output=True, text=True, timeout=60)
-    assert done.stdout.strip() == "TB 3.0.0"
+    assert done.stdout.strip() == "TB 3.1.0"
 
 
 # -- tb doc -----------------------------------------------------------------------------
@@ -107,7 +107,7 @@ def test_real_process_version():
 def test_doc_lists_every_library(capsys):
     assert tb.main(["doc"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("TB 3.0.0 standard library.")
+    assert out.startswith("TB 3.1.0 standard library.")
     for name in STDLIB:
         assert f"\n  {name} " in out
     assert "Read and write CSV files." in out

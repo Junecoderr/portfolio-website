@@ -3,7 +3,7 @@ TB - run it with Python
 
 This folder has everything TB needs:
 
-  tb.py            starts TB (version 3.0.0)
+  tb.py            starts TB (version 3.1.0)
   tbcore\          the TB language itself       (keep these three folders
   tbtools\         tb fmt, tb check, tb build... next to tb.py)
   tblib\           TB's standard library
