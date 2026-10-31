@@ -216,6 +216,32 @@ say("loop ended")'''
     assert run_tb(src) == ["{1: false, 2: false}", "started", "second", "loop ended"]
 
 
+@pytest.mark.parametrize("engine", ["vm", "tree"])
+def test_generator_waiting_inside_a_loop_hands_the_baton_on(engine):
+    """The tree engine runs a generator body on a helper thread: a wait in it
+    must still let the loop's other tasks run (and both engines agree)."""
+    from tbcore.interp import Interpreter as Tree
+    from tbcore.vm import VMInterpreter as VM
+
+    src = '''import parallel
+fn producer(q) { parallel.sleep(0.1); q.put(42) }
+fn gen(q) {
+  yield q.get(3)
+  parallel.sleep(0.05)
+  yield "after"
+}
+say(parallel.loop(fn() {
+  let q = parallel.Queue()
+  parallel.run(producer, q)
+  let out = []
+  for v in gen(q) { push(out, v) }
+  return out
+}))'''
+    lines = []
+    tb.run(src, interpreter=(VM if engine == "vm" else Tree)(output=lines.append))
+    assert lines == ['[42, "after"]']
+
+
 def test_new_functions_check_inputs(monkeypatch):
     assert "parallel.loop() needs fn to be a function" in str(tb_error('import parallel\nparallel.loop(1)'))
     assert "parallel.group() needs fn to be a function" in str(tb_error('import parallel\nparallel.group(1)'))

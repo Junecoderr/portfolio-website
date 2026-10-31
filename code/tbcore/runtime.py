@@ -440,7 +440,7 @@ class GenChannel:
     own thread. Only one side runs at a time (the other waits on a semaphore)."""
 
     __slots__ = ("to_gen", "to_main", "value", "error", "finished", "abort", "started",
-                 "thread", "state")
+                 "thread", "state", "ctx")
 
     def __init__(self):
         self.to_gen = threading.Semaphore(0)
@@ -452,12 +452,28 @@ class GenChannel:
         self.started = False
         self.thread = None
         self.state = None
+        self.ctx = None   # the consumer's task/loop/baton state (tbcore.tasks), handed over on each resume
+
+    def resume(self):
+        """Called on the consumer's thread: let the body run until its next yield."""
+        from . import tasks
+        self.ctx = tasks.context()
+        self.to_gen.release()
+        self.to_main.acquire()
+
+    def wait_resume(self):
+        """Called on the generator thread: wait until resumed, then act for the consumer
+        (so a wait inside the body hands a parallel.loop baton on, and cancel() reaches it)."""
+        from . import tasks
+        self.to_gen.acquire()
+        if self.ctx is not None and not self.abort:  # an abort comes from the garbage collector, not the consumer
+            tasks.adopt(self.ctx)
 
     def yield_(self, value):
         """Called on the generator thread by `yield`."""
         self.value = value
         self.to_main.release()
-        self.to_gen.acquire()
+        self.wait_resume()
         if self.abort:
             raise _GenAbort()
         return None
@@ -502,8 +518,7 @@ class ThreadGenerator:
             thread.start()
         main_state = interp.save_state()
         interp.restore_state(self.state)
-        channel.to_gen.release()
-        channel.to_main.acquire()
+        channel.resume()
         self.state = interp.save_state()
         interp.restore_state(main_state)
         if channel.error is not None:

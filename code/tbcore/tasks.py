@@ -183,6 +183,16 @@ def current_loop():
     return getattr(_local, "loop", None)
 
 
+def context():
+    """This thread's task, loop and baton state, for a helper thread that runs
+    TB code on its behalf while it waits (tree-engine generator bodies)."""
+    return (getattr(_local, "task", None), getattr(_local, "loop", None), getattr(_local, "holding", False))
+
+
+def adopt(ctx) -> None:
+    _local.task, _local.loop, _local.holding = ctx
+
+
 def _hold(loop) -> None:
     loop.baton.acquire()
     _local.holding = True

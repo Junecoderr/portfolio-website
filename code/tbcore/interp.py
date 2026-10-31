@@ -1979,7 +1979,7 @@ class Interpreter:
     def run_generator_body(self, fn: Function, scope: Env, channel) -> None:
         """Runs on the generator's thread: wait to be resumed, run the body,
         hand each yield back, finish."""
-        channel.to_gen.acquire()
+        channel.wait_resume()
         self._local.interp = self  # library callbacks on this thread use this view
         if channel.abort:
             channel.finished = True
