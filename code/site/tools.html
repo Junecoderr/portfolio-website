@@ -96,6 +96,10 @@ let people = ["Tanisha", "world"]
 for p in people {
   say(greet(p))
 }</code></pre>
+        <p>A project can choose its own line width and indent in the <code>[fmt]</code> table of its <code>tb.toml</code>. <code>tb fmt</code>, the language server's formatting and VS Code's Format Document all follow it:</p>
+        <pre class="md-code"><code>[fmt]
+line_width = 80   # 40 to 200, normally 100
+indent = 4        # 1 to 8 spaces, normally 2</code></pre>
         </section>
         <section id="check">
           <h2>tb check: find mistakes early</h2>
@@ -146,6 +150,7 @@ OK: 2 checks passed in 1 test file.</code></pre>
 (tb) backtrace         the functions that are running       [bt]
 (tb) continue          run to the next breakpoint           [c]
 (tb) quit                                                   [q]</code></pre>
+        <p><code>tb debug --dap</code> is the same debugger for editors: it speaks the Debug Adapter Protocol on standard input and output. The <a href="#vscode">VS Code extension</a> starts it when you press F5, so you can click in the margin to set breakpoints, step, watch expressions and look at variables. It works the same on the virtual machine and the tree engine. While debugging in an editor, <code>ask()</code> gets no typed answer (it returns <code>""</code>).</p>
         </section>
         <section id="doc">
           <h2>tb doc: help for libraries and your own code</h2>
@@ -190,6 +195,11 @@ $ tb yank tb-greet@1.0.1 --reason "breaks on Windows"</code></pre>
         <section id="lsp">
           <h2>tb lsp: the language server</h2>
         <p><code>tb lsp</code> speaks the Language Server Protocol over standard input and output, so any editor with LSP support can use it: errors as you type (from <code>tb check</code>), completion of keywords, built-ins, libraries and your own names, hover help, signature help, go to definition, document symbols, rename and formatting. The VS Code extension starts it for you.</p>
+        <ul>
+          <li><strong>Find references and rename across files.</strong> For a top-level function, class or value, both follow your imports (<code>import "helpers.tb" as h</code>, <code>from "helpers.tb" import greet</code>) through every <code>.tb</code> file in the workspace, including packages in <code>tb_packages/</code>. Rename changes the definition, the imports and every use in one step. Local names and fields stay within their file.</li>
+          <li><strong>Quick fixes.</strong> When <code>tb check</code> asks "Did you mean 'total'?", one click makes the change. When you use a library you haven't imported, such as <code>json.parse(...)</code>, the fix adds <code>import json</code> under your other imports.</li>
+          <li><strong>Organise imports.</strong> Sorts the imports at the top of a file and drops repeated ones: libraries first, then your own files (VS Code: Shift+Alt+O, or <strong>Organize Imports</strong> from the command palette).</li>
+        </ul>
         </section>
         <section id="vscode">
           <h2>VS Code extension</h2>
@@ -201,6 +211,16 @@ $ tb yank tb-greet@1.0.1 --reason "breaks on Windows"</code></pre>
           <li>In VS Code, open the <strong>Extensions</strong> view (Cmd+Shift+X or Ctrl+Shift+X), click the <strong>…</strong> menu at the top of the view and choose <strong>Install from VSIX…</strong>, then pick the file. Or, in a terminal: <code>code --install-extension tb-vscode-3.1.0.vsix</code>.</li>
           <li>Open any <code>.tb</code> file. If <code>tb</code> isn't on your PATH, set <strong>TB: Path</strong> (<code>tb.path</code>) in Settings to the full path of the program.</li>
         </ol>
+        <p><strong>Debugging.</strong> Open a <code>.tb</code> file, click in the margin next to a line to set a breakpoint and press F5. The program runs until it reaches the line, then you can step over (F10), into (F11) and out of (Shift+F11) functions, read the Variables and Call Stack panels, add watch expressions and type expressions in the Debug Console. The program's output appears in the Debug Console. To keep settings, add a launch configuration (Run, Add Configuration, <strong>TB: Debug a file</strong>):</p>
+        <pre class="md-code"><code>{
+  "type": "tb",
+  "request": "launch",
+  "name": "Debug TB file",
+  "program": "${file}",
+  "cwd": "${fileDirname}",
+  "args": [],
+  "stopOnEntry": false
+}</code></pre>
         <p>Settings: <code>tb.path</code> (the tb program), <code>tb.languageServer.enabled</code>, <code>tb.check.onSave</code>, <code>tb.run.saveBeforeRun</code>. With TB 2.x only highlighting, snippets and Run File work; the rest needs TB 3.0.</p>
         </section>
       </article>

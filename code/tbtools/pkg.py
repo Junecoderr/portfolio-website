@@ -352,6 +352,39 @@ def read_manifest(root: str) -> dict:
     return data
 
 
+FMT_OPTIONS = {"line_width": (40, 200), "indent": (1, 8)}
+
+
+def fmt_options(start: str | None) -> dict:
+    """The [fmt] table of the tb.toml at or above `start` (a file or folder),
+    checked: {"line_width": 40..200, "indent": 1..8}. {} without a tb.toml or
+    a [fmt] table. Raises PkgError for a bad value or a damaged tb.toml."""
+    if start and os.path.isfile(start):
+        start = os.path.dirname(start)
+    root = find_project_root(start)
+    if root is None:
+        return {}
+    path = os.path.join(root, MANIFEST)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            table = parse_toml(fh.read()).get("fmt", {})
+        path = path.replace(os.sep, "/")
+    except (OSError, UnicodeDecodeError) as err:
+        raise PkgError(f"I couldn't read {path}: {err}.") from None
+    if not isinstance(table, dict):
+        raise PkgError(f"[fmt] in {path} must be a table, like: [fmt] line_width = 80")
+    options = {}
+    for key, value in table.items():
+        if key not in FMT_OPTIONS:
+            raise PkgError(f"[fmt] in {path} has an option I don't know: '{key}'.",
+                           f"The options are: {', '.join(FMT_OPTIONS)}.")
+        low, high = FMT_OPTIONS[key]
+        if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+            raise PkgError(f"[fmt] {key} in {path} must be a whole number from {low} to {high}.")
+        options[key] = value
+    return options
+
+
 def write_manifest(root: str, data: dict) -> None:
     ordered = {"package": data.get("package", {})}
     for key, value in data.items():
