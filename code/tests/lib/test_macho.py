@@ -137,8 +137,15 @@ def test_parse_bytes_truncation_and_errors(tmp_path):
 
 @pytest.mark.skipif(sys.platform != "darwin" or not os.path.exists("/bin/ls"), reason="needs macOS system binaries")
 def test_real_system_binary():
+    import subprocess
     out = run_tb('import macho\nlet i = macho.parse("/bin/ls")\n'
                  'say(i.type, i.is_signed, i.code_signature.identifier, i.code_signature.has_cms)\n'
                  'say(i.needed.contains("/usr/lib/libSystem.B.dylib"), len(i.imports) > 20, i.hardening.canary)\n'
-                 'say(i.code_signature.signer.contains("Apple"))')
-    assert out == ["executable true com.apple.ls true", "true true true", "true"]
+                 'say(i.code_signature.signer)')
+    assert out[:2] == ["executable true com.apple.ls true", "true true true"]
+    # The signer TB reads must be the first Authority codesign reports on this same machine
+    # (it differs between macOS versions, so the test asks codesign rather than assuming).
+    shown = subprocess.run(["codesign", "-dvvv", "/bin/ls"], capture_output=True, text=True).stderr
+    authorities = [line.split("=", 1)[1] for line in shown.splitlines() if line.startswith("Authority=")]
+    if authorities:
+        assert f"CN={authorities[0]}" in out[2], (out[2], authorities)

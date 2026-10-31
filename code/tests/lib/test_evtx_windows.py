@@ -164,13 +164,23 @@ def compare(channel, path):
     for ev in events[::step][:SAMPLE]:
         w = windows_fields(ev)
         wanted[w["record_id"]] = w
-    got = {}
-    with open(path, "rb") as f:
-        for r in evtx.iter_records(f):
-            if r.get("record_id") in wanted:
-                got[r["record_id"]] = r
-                if len(got) == len(wanted):
-                    break
+    got, seen, first, tb_error = {}, 0, [], None
+    try:
+        with open(path, "rb") as f:
+            for r in evtx.iter_records(f):
+                seen += 1
+                if len(first) < 3:
+                    first.append({k: r.get(k) for k in ("record_id", "event_id", "provider", "channel")})
+                if r.get("record_id") in wanted:
+                    got[r["record_id"]] = r
+                    if len(got) == len(wanted):
+                        break
+    except Exception as err:  # reported below, so CI shows why TB found nothing
+        tb_error = f"{type(err).__name__}: {err}"
+    if not got:
+        import os
+        print(f"{channel}: TB read {seen} records (first: {first}); error: {tb_error}; "
+              f"file size {os.path.getsize(path)}; wevtutil ids {sorted(wanted)[:3]}...")
     problems, fields = [], 0
 
     def check(rid, what, tb_value, win_value):

@@ -252,7 +252,8 @@ def run(interp, fn, items, workers: int, line):
                                       callback=lambda _: finished.set(), error_callback=lambda _: finished.set())
         _tasks.wait_event(finished)
         try:
-            rows = async_result.get(0)
+            # The pool calls back just before it marks the result ready, so wait for that too.
+            rows = async_result.get(timeout=30)
         except Exception as err:  # e.g. a value pickle refused
             fail(line, f"parallel.processes(): a worker process failed: {err}")
     finally:
