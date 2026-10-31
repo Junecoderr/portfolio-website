@@ -7,7 +7,7 @@ tb add tb-colors
 ```
 
 ```tb
-import "tb_packages/tb-colors/lib.tb" as colors
+import "tb-colors" as colors
 
 say(colors.green("ok"), colors.bold("Tanisha's report"), colors.dim("(3 ms)"))
 say(colors.on("warning", "yellow"), colors.rgb("orange", 255, 136, 0), colors.hex("teal", "#008080"))

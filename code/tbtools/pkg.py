@@ -974,8 +974,8 @@ def cmd_add(args: list[str]) -> int:
         write_manifest(root, manifest)
         write_lock(root, lock)
     last = source["name"]
-    rel = os.path.relpath(os.path.join(root, PACKAGES_DIR, last, lock[last]["entry"]))
-    print(f"Done. Use it with: import \"{rel.replace(os.sep, '/')}\" as {last.replace('-', '_')}")
+    # import "<name>" finds tb_packages/<name>/ from anywhere in the project
+    print(f"Done. Use it with: import \"{last}\" as {last.replace('-', '_')}")
     return 0
 
 

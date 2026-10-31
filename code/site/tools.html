@@ -134,14 +134,15 @@ OK: 2 checks passed in 1 test file.</code></pre>
         </section>
         <section id="debug">
           <h2>tb debug: step through a program</h2>
-        <p><code>tb debug file.tb</code> stops before the first line and waits at a <code>(tb)</code> prompt. Set breakpoints, step into or over functions, print any expression and list the variables in the current function.</p>
+        <p><code>tb debug file.tb</code> stops before the first line and waits at a <code>(tb)</code> prompt. Set breakpoints, step into or over functions, print any expression, list the parameters and variables of the current function (<code>locals</code>) and the module-level names (<code>globals</code>).</p>
         <pre class="md-code"><code>$ tb debug main.tb
 (tb) break 12          stop when line 12 is about to run   [b]
 (tb) run               start the program                    [r]
 (tb) next              run one line, stepping over calls    [n]
 (tb) step              run one line, going into calls       [s]
 (tb) print total * 2   show the value of an expression      [p]
-(tb) locals            names in this function, with values  [l]
+(tb) locals            this function's parameters and vars  [l]
+(tb) globals           module-level names, with values      [g]
 (tb) backtrace         the functions that are running       [bt]
 (tb) continue          run to the next breakpoint           [c]
 (tb) quit                                                   [q]</code></pre>

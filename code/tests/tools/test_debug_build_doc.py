@@ -56,6 +56,41 @@ def test_debugger_breakpoints_step_print_locals(tmp_path):
     assert "total 14" in out and "The program finished." in out
 
 
+SCOPES = """let total = 0
+let label = "x"
+fn outer(a) {
+  let b = a + 1
+  for i in [1] {
+    let c = i
+    say(c)
+  }
+  return b
+}
+for k in [5] {
+  total += outer(k)
+}
+say(total)
+"""
+
+
+@pytest.mark.parametrize("engine", ["vm", "tree"])
+def test_debugger_locals_and_globals(tmp_path, engine):
+    (tmp_path / "prog.tb").write_text(SCOPES, encoding="utf-8")
+    script = "break 7\nbreak 14\nrun\nlocals\nprint 0\nglobals\nprint 1\ncontinue\nlocals\nquit\n"
+    out = run_tb(["debug", "prog.tb"], tmp_path, script, env={"TB_ENGINE": engine}).stdout
+    # "print 0" / "print 1" mark where each command's output ends
+    in_fn, rest = out.split("-> prog.tb:7")[1].split("(tb) 0\n", 1)
+    in_globals = rest.split("(tb) 1\n")[0]
+    top = out.split("-> prog.tb:14")[1]
+    for name in ("a = 5", "b = 6", "i = 1", "c = 1"):
+        assert f"  {name}" in in_fn
+    assert "total" not in in_fn and "label" not in in_fn and "outer" not in in_fn
+    assert "  total = 0" in in_globals and '  label = "x"' in in_globals
+    assert "  a = " not in in_globals and "  b = " not in in_globals
+    assert "  total = 6" in top   # at the top level, locals are the module's names
+    assert "globals" in run_tb(["debug", "--help"], tmp_path).stdout
+
+
 def test_debugger_step_into_and_out(tmp_path):
     (tmp_path / "prog.tb").write_text(PROGRAM, encoding="utf-8")
     script = "step\nstep\nstep\nstep\nstep\nout\nprint total\nquit\n"

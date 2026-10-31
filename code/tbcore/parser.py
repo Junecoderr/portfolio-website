@@ -475,11 +475,24 @@ class Parser:
         name = self.expect_name(f"a name after '{word}'")
         annotation = None
         if self.check_op(","):
+            start = self.pos - 1
             names = [NamePattern(name.value, name.line)]
             while self.match("OP", ","):
                 names.append(self.pattern())
+            lhs = "".join(str(t.value) + (" " if t.value == "," else "") for t in self.tokens[start:self.pos])
             self.expect("OP", "=", f"'=' after the names")
-            return Let(ListPattern(names, None, tok.line), self.expression(), tok.line, is_const)
+            start_value = self.pos
+            value = self.expression()
+            if self.check_op(","):
+                # let a, b = 0, 1: several values need to be one list
+                parts = [self._short_text(start_value, self.pos)]
+                while self.match("OP", ","):
+                    start_value = self.pos
+                    self.expression()
+                    parts.append(self._short_text(start_value, self.pos))
+                raise TBError(f"To give several names their values at once, put the values in a list: "
+                              f"{word} {lhs} = [{', '.join(parts)}]", tok.line)
+            return Let(ListPattern(names, None, tok.line), value, tok.line, is_const)
         if self.match("OP", ":"):
             annotation = self.type_annotation()
         if self.check_op("=="):
@@ -488,6 +501,17 @@ class Parser:
             raise TBError(f"A const needs a value: const {name.value} = ...", tok.line)
         self.expect("OP", "=", f"'=' after '{word} {name.value}'")
         return Let(name.value, self.expression(), tok.line, is_const, annotation)
+
+    def _short_text(self, start: int, end: int) -> str:
+        """The source of tokens[start:end] for a hint when it is one simple
+        token (tokens keep no columns), else a placeholder."""
+        if end - start == 1:
+            t = self.tokens[start]
+            if t.kind in ("NUMBER", "IDENT") or (t.kind == "KEYWORD" and t.value in ("true", "false", "nil")):
+                return str(t.value)
+            if t.kind == "STRING" and not any(c in t.value for c in '"\\\n{'):
+                return f'"{t.value}"'
+        return "<value>"
 
     # -- patterns (destructuring) -------------------------------------------
 

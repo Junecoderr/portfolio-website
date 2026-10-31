@@ -47,6 +47,7 @@ def parse_text(text: str, line, where: str = "That text"):
         return from_json(_json.loads(text, parse_constant=_reject_constant))
     except _json.JSONDecodeError as err:
         fail(line, f"{where} isn't valid JSON: {err.msg} (line {err.lineno}, column {err.colno} of the JSON).",
+             data_line=err.lineno, data_column=err.colno,
              json_line=err.lineno, json_column=err.colno, cls="ParseError")
     except ValueError as err:
         fail(line, f"{where} isn't valid JSON: {err}.", cls="ParseError")
@@ -68,7 +69,11 @@ def dump(value, line, pretty=False) -> str:
 def load(api):
     m = Module("json", "Read and write JSON, the data format of the web and of most security tools.")
 
-    @m.fn("parse", 1, doc="parse(text) -> value\nTurn JSON text into TB values (objects become maps, arrays become lists).")
+    @m.fn("parse", 1, doc=("parse(text) -> value\nTurn JSON text into TB values (objects become maps, arrays become lists)."
+        "\n\nErrors:\n"
+        "A ParseError when the text isn't valid JSON. Its fields say where:\n"
+        "- data_line: the line of the JSON where it went wrong (1 is the first).\n"
+        "- data_column: the column on that line."))
     def parse(line, text):
         check_type(line, text, "text", "json.parse", "text")
         return parse_text(text, line)
@@ -77,7 +82,11 @@ def load(api):
     def stringify(line, value, pretty=False):
         return dump(value, line, _tb.truthy(pretty))
 
-    @m.fn("read", 1, doc="read(path) -> value\nRead a .json file into TB values.")
+    @m.fn("read", 1, doc=("read(path) -> value\nRead a .json file into TB values."
+        "\n\nErrors:\n"
+        "A ParseError when the file isn't valid JSON. Its fields say where:\n"
+        "- data_line: the line of the JSON where it went wrong (1 is the first).\n"
+        "- data_column: the column on that line."))
     def read(line, path):
         check_type(line, path, "text", "json.read", "path")
         try:
