@@ -246,6 +246,7 @@ def test_page_shell(page):
     assert len(re.findall(r"<h1[\s>]", text)) == 1
     head = text.split("</head>", 1)[0]
     assert site_shell.stats_script("") in head, f"{page.name}: run scripts/sync_pages.py (stats.js missing)"
+    assert site_shell.search_script("") in head, f"{page.name}: run scripts/sync_pages.py (search.js missing)"
     assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", text), "inline <script> blocks break the CSP"
     assert not re.search(r"\son[a-z]+\s*=\s*\"", text), "inline event handlers break the CSP"
     assert not name_guard.contains_name(text)
@@ -272,6 +273,10 @@ def test_full_build(tmp_path):
             assert f'id="app-{app.name}"' in gallery, app.name
             assert (out / "apps" / app.name / "main.tb").exists()
     assert (out / "lib" / "ioc.html").exists()
+    assert (out / "book" / "index.html").exists() and (out / "cookbook" / "index.html").exists()
+    assert (out / "v" / (tb.__version__.split(".")[0] + ".x") / "book" / "index.html").exists()
+    assert (out / "search.html").exists() and json.loads((out / "search-index.json").read_text(encoding="utf-8"))
+    assert 'id="tutorials"' in (out / "lib" / "ioc.html").read_text(encoding="utf-8")
     # The counters' functions are deployed by Vercel from api/, never served as files.
     assert not (out / "api").exists() and not list(out.rglob("hit.js"))
     assert (out / "assets" / "js" / "stats.js").exists()

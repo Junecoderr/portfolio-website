@@ -42,6 +42,8 @@ def _link(label: str, url: str, prefix: str) -> str:
     if base in LINK_MAP:
         frag = url[len(base):]
         return f'<a href="{prefix}{LINK_MAP[base]}{html.escape(frag, quote=True)}">{label}</a>'
+    if url.startswith("site:"):  # a page of this site, from the site root
+        return f'<a href="{prefix}{html.escape(url[5:], quote=True)}">{label}</a>'
     if url.startswith("#"):
         return f'<a href="{html.escape(url, quote=True)}">{label}</a>'
     if re.match(r"https?://", url) and "github" not in url.lower():
@@ -100,11 +102,22 @@ def _code(code: str, lang: str) -> str:
     return f'<pre class="md-code"><code>{body}</code></pre>'
 
 
+def tb_block(code: str, mode: str) -> str:
+    """A TB code block of the book or cookbook: ```tb gets a Run button;
+    ```tb desktop and ```tb norun are shown with a note and no Run button."""
+    body = html.escape(code.rstrip("\n"), quote=False)
+    if mode in ("desktop", "norun"):
+        return ('<p class="ex-note">Needs the TB app on your computer, so there is no Run button here.</p>\n'
+                f'<pre class="tb-code" data-desktop><code>{body}</code></pre>')
+    return f'<pre class="tb-code" data-runnable><code>{body}</code></pre>'
+
+
 def convert(text: str, *, shift: int = 0, prefix: str = "", drop_title: bool = False,
-            id_prefix: str = "") -> tuple[str, str, list[tuple[int, str, str]]]:
+            id_prefix: str = "", tb_blocks: bool = False) -> tuple[str, str, list[tuple[int, str, str]]]:
     """Markdown -> (html, title, headings). title is the first level-1 heading;
     with drop_title it is left out of the HTML. shift adds to heading levels.
-    headings: [(level, id, text)] for a table of contents."""
+    headings: [(level, id, text)] for a table of contents. tb_blocks: ```tb
+    fences become runnable blocks (see tb_block)."""
     lines = text.replace("\r\n", "\n").split("\n")
     out: list[str] = []
     headings: list[tuple[int, str, str]] = []
@@ -121,7 +134,7 @@ def convert(text: str, *, shift: int = 0, prefix: str = "", drop_title: bool = F
     while i < len(lines):
         line = lines[i]
         stripped = line.strip()
-        fence = re.match(r"^(\s*)(```+|~~~+)\s*([\w+-]*)", line)
+        fence = re.match(r"^(\s*)(```+|~~~+)\s*([\w+-]*)[ \t]*(\w*)", line)
         if fence:
             flush()
             marker, lang = fence.group(2), fence.group(3)
@@ -131,7 +144,10 @@ def convert(text: str, *, shift: int = 0, prefix: str = "", drop_title: bool = F
                 block.append(lines[i][len(fence.group(1)):] if lines[i].startswith(fence.group(1)) else lines[i])
                 i += 1
             i += 1
-            out.append(_code("\n".join(block), lang))
+            if tb_blocks and lang == "tb":
+                out.append(tb_block("\n".join(block), fence.group(4)))
+            else:
+                out.append(_code("\n".join(block), lang))
             continue
         h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
         if h:

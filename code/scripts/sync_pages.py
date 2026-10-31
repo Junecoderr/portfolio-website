@@ -6,7 +6,8 @@
   class="site-footer"> with the shared markup (keeping the page's current
   nav item), for the version in tb.py
 * makes sure each page loads assets/js/stats.js (the visit and download
-  counters) in its <head>, right after theme.js
+  counters) in its <head>, right after theme.js, and assets/js/search.js
+  (the search box) right after that
 * fills the libraries grid on site/index.html (between the LIBRARIES GRID
   markers) from tb.list_libraries() and the groups in gen_lib_docs.py, and
   the "N libraries" counts marked with data-lib-count
@@ -63,6 +64,9 @@ def sync_page(path: Path, version: str) -> bool:
     stats = site_shell.stats_script("")
     if stats not in text and THEME_TAG in text:
         text = text.replace(THEME_TAG, f"{THEME_TAG}  {stats}\n", 1)
+    search = site_shell.search_script("")
+    if search not in text and stats in text:
+        text = text.replace(f"  {stats}\n", f"  {stats}\n  {search}\n", 1)
     if GRID_START in text and GRID_END in text:
         start = text.index(GRID_START)
         end = text.index(GRID_END) + len(GRID_END)

@@ -190,6 +190,34 @@ runtime by `site/assets/js/highlight.js`. The site's CSP allows no inline
 scripts or event handlers, and the site never links to the source
 repository.
 
+### The book, the cookbook and search
+
+The TB book and the SOC cookbook are Markdown files in `docs/<version>/book/`
+and `docs/<version>/cookbook/` (`index.md` is the front page; the other files
+are chapters or recipes in file-name order). `scripts/book.py` renders them
+through the shared shell with a table of contents, prev/next links and a
+version label. Code fences: ` ```tb ` gets a Run button, ` ```tb desktop `
+runs in the tests but needs the TB app (threads), ` ```tb norun ` is only
+checked (network, windows). `tests/test_book.py` runs every ` ```tb ` and
+` ```tb desktop ` block on both engines (same output, no error) from a folder
+with `apps/data/`, and runs `tb check` on every block. Link to other pages
+with `[text](site:lib/ioc.html)`.
+
+Versions: each `docs/<major>.x/` folder is one version. The one that matches
+`tb.__version__` is written at `/book/` and `/cookbook/`; every version is
+also written at `/v/<major>.x/...`, so versioned links keep working when the
+next major version takes over `/book/`. For TB 4.0, copy `docs/3.x/` to
+`docs/4.x/` and edit it; leave `docs/3.x/` as it is.
+
+Every library page lists the tutorials that use it: the chapters, recipes and
+`site/guide-*.html` whose code imports the library. The build stops if a
+library has none, so a new library needs a chapter, recipe or guide.
+
+`scripts/search_index.py` runs last in the build. It reads the finished pages
+and writes `search-index.json` (pages, sections, chapters, recipes, library
+functions) and `search.html`. `site/assets/js/search.js` (loaded by every
+page) opens the search box under the header (the search icon, or `/`).
+
 Programs run in a Web Worker (`site/assets/js/tb-worker.js`, driven by
 `tb-pyodide.js`), shared by the playground and every Run button on a page.
 `vercel.json` makes the whole site cross-origin isolated (COOP/COEP), which

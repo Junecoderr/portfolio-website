@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import tb  # noqa: E402
+import book  # noqa: E402
 import name_guard  # noqa: E402
 import site_shell as shell  # noqa: E402
 import visuals  # noqa: E402
@@ -172,7 +173,18 @@ def availability(name: str) -> str:
     return ""
 
 
-def lib_page(name: str, version: str) -> str:
+def tutorials_html(links: list[tuple[str, str]], prefix: str) -> str:
+    """The "Learn it in a tutorial" list: book chapters, cookbook recipes and guides that use the library."""
+    items = "\n".join(f'          <li><a href="{prefix}{url}">{esc(title)}</a></li>' for title, url in links)
+    return f"""      <section id="tutorials" class="lib-tutorials">
+        <h2>Learn it in a tutorial</h2>
+        <ul>
+{items}
+        </ul>
+      </section>"""
+
+
+def lib_page(name: str, version: str, tutorials: list[tuple[str, str]] | None = None) -> str:
     d = tb.describe_library(name)
     prefix = "../"
     funcs = []
@@ -232,8 +244,10 @@ def lib_page(name: str, version: str) -> str:
         <h1 class="lib-title"><code>{esc(name)}</code></h1>
         <p class="lead">{rich(d['doc'])}</p>
         {availability(name)}
+        <p class="doc-version"><span class="version-tag">TB {book.current_version(version)}</span> This page is for TB {esc(version)}.</p>
         <pre class="tb-code"><code>import {esc(name)}</code></pre>
 {examples}
+{tutorials_html(tutorials, prefix) if tutorials else ""}
       <section id="functions">
         <h2>Functions</h2>
         <div class="sig-list">
@@ -344,14 +358,22 @@ say(found.urls, found.ips)</code></pre>
 PLURAL = {"text": "text", "list": "lists", "map": "maps", "number": "numbers"}
 
 
-def build(out: Path, version: str | None = None) -> list[Path]:
+def build(out: Path, version: str | None = None, tutorials: dict | None = None) -> list[Path]:
+    """tutorials: {library: [(title, url)]} (default: book.tutorial_map). Every
+    library page must link to at least one tutorial, or the build stops."""
     version = version or tb.__version__
     out = Path(out)
+    if tutorials is None:
+        tutorials = book.tutorial_map(version, tb.list_libraries())
+    missing = book.missing_tutorials({n: tutorials.get(n, []) for n in tb.list_libraries()})
+    if missing:
+        raise SystemExit("gen_lib_docs: these libraries have no tutorial (a book chapter, cookbook recipe or "
+                         "guide whose code imports them): " + ", ".join(missing))
     (out / "lib").mkdir(parents=True, exist_ok=True)
     written = []
     pages = {out / "library.html": index_page(version)}
     for name in tb.list_libraries():
-        pages[out / "lib" / f"{name}.html"] = lib_page(name, version)
+        pages[out / "lib" / f"{name}.html"] = lib_page(name, version, tutorials[name])
     for path, text in pages.items():
         if name_guard.contains_name(text):
             raise SystemExit(f"gen_lib_docs: {path.name} would contain the author's name; refusing to write it.")
