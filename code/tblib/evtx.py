@@ -919,7 +919,10 @@ def records_or_fail(line, src, path, opts, fn):
     out = []
     for record in records_of(line, src, path, opts):
         if len(out) >= MAX_RECORDS:
-            break
+            # Never a silent cut: a wrong count is worse than an error that says what to do.
+            fix = "evtx.each()" if fn == "evtx.summary" else "evtx.each() or a smaller limit"
+            fail(line, f"That log has more than {MAX_RECORDS:,} events; {fn}() keeps them all in memory, "
+                       f"so use {fix}.", path=path)
         out.append(record)
     return out
 
@@ -1001,7 +1004,11 @@ def load(api):
         "- \"partial\": true when parts of the event used binary XML this reader doesn't know.\n"
         "- \"raw\": the XML.\n"
         "\n"
-        "A .gz or one-file .zip of an .evtx file is unpacked as it is read."))
+        "A .gz or one-file .zip of an .evtx file is unpacked as it is read.\n"
+        "\n"
+        "Errors:\n"
+        "- more than 500,000 events (without a smaller limit): use evtx.each().\n"
+        "- a .gz or .zip that unpacks to over 2 GiB, or over 100x its packed size."))
     def read(line, path, options=None):
         opts = options_of(line, options, "evtx.read")
         with _magic.open_stream(line, path, "evtx.read") as f:
