@@ -558,6 +558,15 @@ def _loop_protocol(app, Handler):
             if self.ws is not None:
                 self.ws.feed(None)
 
+        # the transport's write buffer is over (under) its limit: WebSocket senders wait (go on)
+        def pause_writing(self):
+            if self.ws is not None:
+                self.ws.write_paused(True)
+
+        def resume_writing(self):
+            if self.ws is not None:
+                self.ws.write_paused(False)
+
         def data_received(self, data):
             if self.ws is not None:
                 self.ws.feed(data)
@@ -610,7 +619,13 @@ def _loop_protocol(app, Handler):
 class _TransportSock:
     """Just enough of a socket for websocket.Connection, over a loop's
     transport: recv waits (its caller has handed on the loop's baton),
-    sendall and close are passed to the loop's thread."""
+    sendall and close are passed to the loop's thread. Both directions are
+    bounded: reading pauses while READ_HIGH bytes wait for a slow handler, and
+    sendall waits while the transport can't get rid of what it has."""
+
+    READ_HIGH = 256 * 1024   # pause reading above this many unread bytes ...
+    READ_LOW = 64 * 1024     # ... and read again once below this
+    WRITE_HIGH = 64 * 1024   # sendall waits while more than this is on its way to the transport
 
     def __init__(self, loop, transport):
         self.loop, self.transport = loop, transport
@@ -618,14 +633,38 @@ class _TransportSock:
         self.eof = False
         self.timeout = None
         self.cond = threading.Condition()
+        self.paused = False
+        self.wcond = threading.Condition()
+        self.pending = 0          # bytes sendall has handed to the loop's thread, not yet written
+        self.blocked = False      # the transport's buffer is full (pause_writing)
 
     def feed(self, data):  # on the loop's thread; None: the connection ended
         with self.cond:
             if data is None:
                 self.eof = True
+                self.write_paused(False)
             else:
                 self.buf += data
+                if len(self.buf) > self.READ_HIGH and not self.paused:
+                    self.paused = True
+                    self.transport.pause_reading()
             self.cond.notify_all()
+
+    def write_paused(self, paused):  # on the loop's thread
+        with self.wcond:
+            self.blocked = paused
+            self.wcond.notify_all()
+
+    def _write(self, data):  # on the loop's thread
+        with self.wcond:
+            self.pending -= len(data)
+            self.wcond.notify_all()
+        if not self.transport.is_closing():
+            self.transport.write(data)
+
+    def _resume(self):  # on the loop's thread
+        if not self.paused and not self.transport.is_closing():
+            self.transport.resume_reading()
 
     def settimeout(self, timeout):
         self.timeout = timeout
@@ -641,6 +680,12 @@ class _TransportSock:
                 self.cond.wait(step)
             data = bytes(self.buf[:n])
             del self.buf[:n]
+            if self.paused and len(self.buf) < self.READ_LOW:
+                self.paused = False
+                try:
+                    self._soon(self._resume)
+                except BrokenPipeError:
+                    pass
             return data
 
     def _soon(self, fn, *args):
@@ -650,9 +695,20 @@ class _TransportSock:
             raise BrokenPipeError("the connection is closed") from None
 
     def sendall(self, data):
-        if self.transport.is_closing():
-            raise BrokenPipeError("the connection is closed")
-        self._soon(self.transport.write, bytes(data))
+        data = bytes(data)
+        deadline = None if self.timeout is None else time.monotonic() + self.timeout
+        with self.wcond:
+            while (self.blocked or self.pending > self.WRITE_HIGH) and not self.eof:  # a slow reader: wait
+                _tasks.check_cancelled()
+                if self.transport.is_closing():
+                    break
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TimeoutError("timed out")
+                self.wcond.wait(0.05)
+            if self.transport.is_closing():
+                raise BrokenPipeError("the connection is closed")
+            self.pending += len(data)
+        self._soon(self._write, data)
 
     def close(self):
         try:

@@ -242,6 +242,126 @@ say(parallel.loop(fn() {
     assert lines == ['[42, "after"]']
 
 
+def _ws_client(port, path):
+    import base64
+    import os
+    import socket
+
+    sock = socket.create_connection(("127.0.0.1", port), timeout=30)
+    key = base64.b64encode(os.urandom(16)).decode()
+    sock.sendall(f"GET {path} HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                 f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n".encode())
+    head = b""
+    while b"\r\n\r\n" not in head:
+        head += sock.recv(1)
+    assert b" 101 " in head.split(b"\r\n")[0], head
+    return sock
+
+
+def _ws_frame(payload: bytes) -> bytes:
+    n = len(payload)
+    size = bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + n.to_bytes(2, "big")
+    return b"\x81" + size + b"\0\0\0\0" + payload  # a zero mask leaves the payload as it is
+
+
+def _ws_read(sock) -> bytes:
+    def exactly(n):
+        data = b""
+        while len(data) < n:
+            chunk = sock.recv(n - len(data))
+            assert chunk, "connection closed"
+            data += chunk
+        return data
+
+    b1, b2 = exactly(2)
+    n = b2 & 0x7F
+    if n == 126:
+        n = int.from_bytes(exactly(2), "big")
+    elif n == 127:
+        n = int.from_bytes(exactly(8), "big")
+    return exactly(n)
+
+
+def test_websockets_in_a_loop_have_backpressure(monkeypatch):
+    """A client flooding a slow handler, and a handler flooding a slow client:
+    memory stays bounded in both directions."""
+    import socket
+
+    peak = {"read": 0, "write": 0}
+    feed, write = serverlib._TransportSock.feed, serverlib._TransportSock._write
+
+    def counting_feed(self, data):
+        feed(self, data)
+        peak["read"] = max(peak["read"], len(self.buf))
+
+    def counting_write(self, data):
+        write(self, data)
+        peak["write"] = max(peak["write"], self.transport.get_write_buffer_size() + self.pending)
+
+    monkeypatch.setattr(serverlib._TransportSock, "feed", counting_feed)
+    monkeypatch.setattr(serverlib._TransportSock, "_write", counting_write)
+    probe = socket.socket()
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+    count, size = 1500, 8192   # 12 MB each way
+    src = f'''import parallel
+import server
+parallel.loop(fn() {{
+  let app = server.create({{"log": false}})
+  app.ws("/flood", fn(ws, req) {{
+    parallel.sleep(1)
+    let n = {{"v": 0}}
+    ws.each(fn(msg) {{
+      n.v += 1
+      if n.v == {count} {{ return false }}
+    }})
+    ws.send(str(n.v))
+  }})
+  app.ws("/drown", fn(ws, req) {{
+    let big = "x" * {size}
+    for i in range({count}) {{ ws.send(big) }}
+    ws.send("end")
+  }})
+  app.get("/stop", fn(req) {{
+    app.stop()
+    return "bye"
+  }})
+  app.listen({port})
+}})'''
+    runner = threading.Thread(target=run_tb, args=(src,), daemon=True)
+    runner.start()
+    for _ in range(100):
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=1).close()
+            break
+        except OSError:
+            time.sleep(0.05)
+    message = _ws_frame(b"y" * size)
+    flood = _ws_client(port, "/flood")
+    sender = threading.Thread(target=lambda: flood.sendall(message * count), daemon=True)
+    sender.start()
+    assert _ws_read(flood) == str(count).encode()
+    sender.join(10)
+    flood.close()
+    drown = _ws_client(port, "/drown")
+    time.sleep(1)   # the handler sends while this client reads nothing
+    got = 0
+    while _ws_read(drown) != b"end":
+        got += 1
+    drown.close()
+    assert got == count
+    stop = socket.create_connection(("127.0.0.1", port), timeout=10)
+    stop.sendall(b"GET /stop HTTP/1.1\r\nHost: x\r\n\r\n")
+    stop.recv(100)
+    stop.close()
+    runner.join(10)
+    assert not runner.is_alive()
+    print(f"\n[ws backpressure] peak unread {peak['read']:,} bytes, peak unsent {peak['write']:,} bytes "
+          f"(each side sent {count * size:,})")
+    assert peak["read"] < 1024 * 1024 and peak["write"] < 1024 * 1024, peak
+
+
 def test_new_functions_check_inputs(monkeypatch):
     assert "parallel.loop() needs fn to be a function" in str(tb_error('import parallel\nparallel.loop(1)'))
     assert "parallel.group() needs fn to be a function" in str(tb_error('import parallel\nparallel.group(1)'))
