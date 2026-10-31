@@ -376,13 +376,14 @@ def load(api):
         ip = resolve_one(line, host, "check_ports")
         if not wanted:
             return {}
+        def threads():
+            with _tasks.blocking(), ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(wanted))) as pool:
+                return list(pool.map(lambda p: is_open(ip, p, timeout), wanted))
+
         loop = _tasks.current_loop()
         if loop is not None and not loop.on_loop_thread():  # non-blocking sockets on the loop: no threads
-            return dict(zip(wanted, loop.call(_probe_all(ip, wanted, timeout))))
-        workers = min(MAX_WORKERS, len(wanted))
-        with _tasks.blocking(), ThreadPoolExecutor(max_workers=workers) as pool:
-            states = list(pool.map(lambda p: is_open(ip, p, timeout), wanted))
-        return dict(zip(wanted, states))
+            return dict(zip(wanted, loop.call(_probe_all(ip, wanted, timeout), threads)))
+        return dict(zip(wanted, threads()))
 
     @m.fn("banner", 2, 3, doc=(
         f"banner(host, port, timeout?) -> text\n"

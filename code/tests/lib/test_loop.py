@@ -180,6 +180,42 @@ say(parallel.loop(fn() {{ return net.check_ports("127.0.0.1", [{port}]) }}))''')
     assert out == [f"{{{port}: true}}"]
 
 
+def test_handler_waiting_on_a_task_that_needs_the_loop():
+    """A request handler runs on the loop thread; a task it waits for must not
+    need that thread (check_ports falls back to threads, a server starts once
+    the handler is done)."""
+    src = '''import parallel
+import server
+import http
+import net
+parallel.loop(fn() {
+  let app = server.create({"log": false})
+  let other = {"url": nil, "app": nil}
+  app.get("/scan", fn(req) {
+    let t = parallel.run(fn() { return net.check_ports("127.0.0.1", [1, 2]) })
+    return str(t.wait(5))
+  })
+  app.get("/start", fn(req) {
+    let t = parallel.run(fn() {
+      let a2 = server.create({"log": false})
+      a2.get("/", fn(r) { return "second" })
+      other.app = a2
+      return a2.start(0)
+    })
+    other.url = t.wait(5)
+    return "started"
+  })
+  let url = app.start(0)
+  say(http.get(url + "/scan", {"timeout": 8}).text)
+  say(http.get(url + "/start", {"timeout": 8}).text)
+  say(http.get(other.url + "/", {"timeout": 8}).text)
+  other.app.stop()
+  app.stop()
+})
+say("loop ended")'''
+    assert run_tb(src) == ["{1: false, 2: false}", "started", "second", "loop ended"]
+
+
 def test_new_functions_check_inputs(monkeypatch):
     assert "parallel.loop() needs fn to be a function" in str(tb_error('import parallel\nparallel.loop(1)'))
     assert "parallel.group() needs fn to be a function" in str(tb_error('import parallel\nparallel.group(1)'))

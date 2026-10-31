@@ -204,7 +204,17 @@ class App:
             ignore_sigpipe()  # on the loop's thread
             return await loop.aio.create_server(protocol, sock=sock)
 
-        self.aserver = loop.call(serve())
+        import asyncio
+
+        # Wait for the loop to start serving, unless the loop thread is itself parked
+        # (a handler waiting for this task): then it serves once free; the socket listens already.
+        future = asyncio.run_coroutine_threadsafe(serve(), loop.aio)
+        started = threading.Event()
+        future.add_done_callback(lambda f: started.set())
+        with _tasks.blocking():
+            while not _tasks._wait_event(started, 0.05) and not loop.parked:
+                pass
+        self.aserver = future.result() if future.done() else future
         self.loop = loop
         self.stopped.clear()
         loop.closers.append(self.shutdown)
@@ -263,7 +273,15 @@ class App:
             loop = self.loop
 
             def close():
-                aserver.close()
+                server = aserver
+                if hasattr(server, "add_done_callback"):  # still starting (see bind_loop)
+                    if not server.done():
+                        server.add_done_callback(lambda f: loop.aio.call_soon_threadsafe(close))
+                        return
+                    if server.cancelled() or server.exception() is not None:
+                        return
+                    server = server.result()
+                server.close()
                 for conn in list(self.conns):
                     conn.transport.close()
 
