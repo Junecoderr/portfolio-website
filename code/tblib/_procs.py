@@ -104,6 +104,36 @@ def _lookup(fn, name):
     return True, env.vars[name]
 
 
+def _free_names(fn) -> set:
+    """The names fn's body (and the functions inside it) look up outside fn:
+    names bound inside (let, for, catch, nested parameters, ...) are left
+    out. Found by compiling the body with the VM's compiler, which resolves
+    every use to a local or a global exactly as running it would."""
+    from tbcore import compiler as C
+
+    found: set = set()
+    pending: list = []
+
+    class Finder(C.FuncCompiler):
+        def resolve(self, name):
+            where, info = C.FuncCompiler.resolve(self, name)
+            if where == "global" or (where == "fast" and info.maybe):  # maybe: bound on some paths only
+                found.add(name)
+            return where, info
+
+        def make_template(self, *args, **kwargs):
+            tmpl = C.FuncCompiler.make_template(self, *args, **kwargs)
+            pending.append(tmpl)
+            return tmpl
+
+    tmpl = C.FnTemplate(fn.name, fn.params, fn.body, 0, fn.file, is_generator=fn.is_generator,
+                        is_async=fn.is_async)
+    pending.append(tmpl)
+    while pending:
+        Finder(pending.pop(), traced=False).compile_function()
+    return found
+
+
 class Packer:
     def __init__(self):
         self.table: list = []
@@ -130,11 +160,14 @@ class Packer:
             return self.index[key]
         at = self.index[key] = len(self.table)
         self.table.append(None)
-        names: set = set()
-        _names(fn.body, names)
-        for param in fn.params:
-            _names(param.default, names)
-        names -= {p.target for p in fn.params if isinstance(p.target, str)}
+        try:
+            names = _free_names(fn)
+        except Exception:  # pragma: no cover - fall back to every name mentioned
+            names = set()
+            _names(fn.body, names)
+            for param in fn.params:
+                _names(param.default, names)
+            names -= {p.target for p in fn.params if isinstance(p.target, str)}
         owner = "fn" if fn.name == "anonymous" else f"'{fn.name}'"
         free = {}
         for name in sorted(names):

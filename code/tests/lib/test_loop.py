@@ -431,6 +431,28 @@ def test_processes_explain_values_that_cannot_cross():
     assert "needs fn to be a function written in TB" in err.message
 
 
+def test_processes_send_only_names_the_function_really_uses_from_outside():
+    src = '''import parallel
+let lock = parallel.Lock()
+let item = parallel.Lock()
+let k = parallel.Lock()
+let base = 100
+fn work(x) {
+  let lock = x * 2
+  let total = 0
+  for item in [1, 2] { total += item }
+  let add = fn(k) { return k + base }
+  try { throw "no" } catch k { total += 0 }
+  return add(lock + total)
+}
+say(parallel.processes(work, [1, 2, 3], 2))'''
+    assert run_tb(src) == ["[105, 107, 109]"]
+    # a name bound only after its use (or only inside a block) is still the outside one
+    err = tb_error('import parallel\nlet lock = parallel.Lock()\nfn f(x) {\n  if x { let lock = 1 }\n  return lock\n}\n'
+                   'parallel.processes(f, [1])')
+    assert "can't send a Lock object (the name 'lock' in 'f')" in err.message
+
+
 def test_shared_queue_crosses_processes():
     src = '''import parallel
 let q = parallel.shared_queue()
