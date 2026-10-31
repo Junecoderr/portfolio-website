@@ -11,7 +11,8 @@ Commands (type them at the `(tb)` prompt; short forms in brackets):
     out                     [o]   run until the current function returns
     continue                [c]   run until the next breakpoint
     print EXPR              [p]   show the value of an expression (or run a statement)
-    locals                  [l]   the names in the current function and their values
+    locals                  [l]   the current function's parameters and variables
+    globals                 [g]   the module-level names and their values
     backtrace               [bt]  the functions that are running, innermost last
     list                          the source around the current line
     help                    [h]   this list
@@ -217,6 +218,8 @@ class Debugger:
                 self.cmd_print(rest, running)
             elif word in ("l", "locals"):
                 self.cmd_locals(running)
+            elif word in ("g", "globals"):
+                self.cmd_globals(running)
             elif word in ("bt", "backtrace", "where", "stack"):
                 self.cmd_backtrace(running)
             else:
@@ -294,14 +297,40 @@ class Debugger:
             return
         self.say(tb.to_text(value, nested=True))
 
+    def scopes(self) -> tuple[dict, dict]:
+        """(locals, globals) at the current stop. The env chain ends in the
+        module's globals, whose parent is the builtins (the root, no parent)."""
+        chain = []
+        env = self.env
+        while env is not None and env.parent is not None:
+            chain.append(env)
+            env = env.parent
+        if not chain:
+            return {}, {}
+        frames = self.interp.frames()
+        in_function = bool(frames) and frames[-1]["fn"] != "<main>"
+        # at the top level the "current function" is the module itself
+        local_vars: dict = {}
+        for scope in (chain[:-1] if in_function else chain):
+            for k, v in scope.vars.items():
+                local_vars.setdefault(k, v)
+        return local_vars, dict(chain[-1].vars)
+
     def cmd_locals(self, running: bool) -> None:
         if not running or self.interp is None:
             self.say("The program isn't running yet. Type 'run' or 'step' first.")
             return
+        self.show_names(self.scopes()[0])
+
+    def cmd_globals(self, running: bool) -> None:
+        if not running or self.interp is None:
+            self.say("The program isn't running yet. Type 'run' or 'step' first.")
+            return
+        self.show_names(self.scopes()[1])
+
+    def show_names(self, names: dict) -> None:
         import tb
 
-        frames = self.interp.frames()
-        names = dict(frames[-1]["locals"]) if frames else {}
         shown = 0
         for name in sorted(names):
             value = names[name]
