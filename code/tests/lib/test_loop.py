@@ -453,6 +453,35 @@ say(parallel.processes(work, [1, 2, 3], 2))'''
     assert "can't send a Lock object (the name 'lock' in 'f')" in err.message
 
 
+def test_processes_report_a_worker_that_dies():
+    import multiprocessing
+
+    before = {p.pid for p in multiprocessing.active_children()}
+    outcome = {}
+
+    def go():
+        try:
+            run_tb('import parallel\nparallel.processes(fn(x) { parallel.sleep(60) }, [1, 2], 2)')
+        except tb.TBError as err:
+            outcome["error"] = err
+
+    runner = threading.Thread(target=go, daemon=True)
+    runner.start()
+    deadline = time.monotonic() + 20
+    workers = []
+    while not workers and time.monotonic() < deadline:
+        time.sleep(0.1)
+        workers = [p for p in multiprocessing.active_children() if p.pid not in before]
+    assert workers, "no worker process started"
+    time.sleep(1)  # let the workers start their items
+    workers[0].terminate()  # like the system killing it (out of memory)
+    runner.join(20)
+    assert not runner.is_alive(), "parallel.processes() kept waiting for a dead worker"
+    assert "a worker process stopped suddenly" in outcome["error"].message
+    time.sleep(0.5)
+    assert not [p for p in multiprocessing.active_children() if p.pid not in before]
+
+
 def test_shared_queue_crosses_processes():
     src = '''import parallel
 let q = parallel.shared_queue()
