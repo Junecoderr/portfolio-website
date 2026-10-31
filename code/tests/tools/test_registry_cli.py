@@ -5,8 +5,12 @@ The real server is tested in tests/api/registry.test.mjs."""
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import http.server
+import random
+import shutil
+import subprocess
 import io
 import json
 import os
@@ -25,7 +29,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import tb  # noqa: E402
-from tbtools import pkg  # noqa: E402
+from tbtools import ed25519, pkg  # noqa: E402
 
 TOKEN = "tbr_" + "A" * 43
 OTHER_TOKEN = "tbr_" + "B" * 43
@@ -36,8 +40,9 @@ def write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def make_package(folder: Path, name: str, version: str, body: str | None = None) -> Path:
-    write(folder / "tb.toml", f'[package]\nname = "{name}"\nversion = "{version}"\ndescription = "Says hello nicely."\nmain = "lib.tb"\nkeywords = ["greeting"]\n\n[dependencies]\n')
+def make_package(folder: Path, name: str, version: str, body: str | None = None, deps: dict | None = None) -> Path:
+    needs = "".join(f'{d} = "{r}"\n' for d, r in (deps or {}).items())
+    write(folder / "tb.toml", f'[package]\nname = "{name}"\nversion = "{version}"\ndescription = "Says hello nicely."\nmain = "lib.tb"\nkeywords = ["greeting"]\n\n[dependencies]\n{needs}')
     write(folder / "lib.tb", body or f'export fn hello(n) {{ return "Hello " + n }}\nexport let VERSION = "{version}"\n')
     write(folder / "README.md", f"# {name}\n\nVersion {version}.\n")
     write(folder / "lib_test.tb", 'import "lib.tb" as g\ntest.check(g.hello("x") == "Hello x")\n')
@@ -49,6 +54,25 @@ def archive_of(folder: Path, name: str) -> bytes:
     return pkg.build_archive(str(folder), name, checked["files"])
 
 
+def ed25519_sign(seed: bytes, message: bytes) -> tuple[bytes, bytes]:
+    """(public key, signature) per RFC 8032 5.1.6. Tests only: not constant-time."""
+    def encode(point):
+        zi = pow(point[2], ed25519.P - 2, ed25519.P)
+        x, y = point[0] * zi % ed25519.P, point[1] * zi % ed25519.P
+        return (y | (x & 1) << 255).to_bytes(32, "little")
+
+    def h(data):
+        return int.from_bytes(hashlib.sha512(data).digest(), "little") % ed25519.L
+
+    digest = hashlib.sha512(seed).digest()
+    a = int.from_bytes(digest[:32], "little") & ((1 << 254) - 8) | (1 << 254)
+    public = encode(ed25519._mul(a, ed25519.G))
+    r = h(digest[32:] + message)
+    big_r = encode(ed25519._mul(r, ed25519.G))
+    s = (r + h(big_r + public + message) * a) % ed25519.L
+    return public, big_r + s.to_bytes(32, "little")
+
+
 class FakeRegistry:
     """Just enough of /api/registry for the CLI."""
 
@@ -58,10 +82,14 @@ class FakeRegistry:
         self.uploads: list[tuple[str, str, bytes]] = []
         self.requests: list[tuple[str, str, dict]] = []
         self.base = ""
+        self.old_index = False  # an index from before TB 3.3: no dependencies per version
+        self.shuffle = None  # a random.Random: list packages and versions in a random order
+        self.signing_seed = None  # an Ed25519 seed: sign the index
 
     def add(self, name, version, data, status="approved", owner="bob"):
         p = self.packages.setdefault(name, {"owner": owner, "versions": {}, "description": "Says hello nicely.", "keywords": ["greeting"]})
-        p["versions"][version] = {"zip": data, "sha256": hashlib.sha256(data).hexdigest(), "status": status, "downloads": 0}
+        p["versions"][version] = {"zip": data, "sha256": hashlib.sha256(data).hexdigest(), "status": status, "downloads": 0,
+                                  "dependencies": pkg._zip_manifest(data)}
 
     def listed(self):
         out = {}
@@ -77,6 +105,17 @@ class FakeRegistry:
                 "versions": {v: ({"sha256": i["sha256"], "yanked": True} if i["status"] == "yanked" else {"sha256": i["sha256"]})
                              for v, i in visible.items()},
             }
+            if not self.old_index:
+                for v, info in out[name]["versions"].items():
+                    info["dependencies"] = visible[v]["dependencies"]
+        if self.shuffle:
+            for entry in out.values():
+                items = list(entry["versions"].items())
+                self.shuffle.shuffle(items)
+                entry["versions"] = dict(items)
+            items = list(out.items())
+            self.shuffle.shuffle(items)
+            out = dict(items)
         return out
 
     def handle(self, method, path, headers, body):
@@ -155,6 +194,9 @@ def registry(tmp_path, monkeypatch):
             self.send_response(status)
             self.send_header("Content-Type", "application/zip" if isinstance(payload, bytes) else "application/json")
             self.send_header("Content-Length", str(len(data)))
+            if fake.signing_seed and self.path.endswith("/index"):
+                signature = ed25519_sign(fake.signing_seed, pkg.SIGNATURE_CONTEXT + data)[1]
+                self.send_header("X-TB-Signature", "ed25519 " + base64.b64encode(signature).decode())
             self.end_headers()
             self.wfile.write(data)
 
@@ -494,3 +536,250 @@ def test_registry_base(monkeypatch):
     assert pkg.registry_base() == "https://code.tanisha.ceo/api/registry"
     monkeypatch.setenv("TB_REGISTRY", "https://example.com/api/registry/")
     assert pkg.registry_base() == "https://example.com/api/registry"
+
+
+# --- dependency trees -------------------------------------------------------------------
+# webby -> fetchy -> utilz is three levels; utilz is also reached through logger
+# (a diamond); fetchy 1.2.0 is yanked; clash needs a utilz no one else accepts.
+
+TREE = {
+    ("webby", "1.0.0"): {"fetchy": "^1.0", "logger": "^1.0"},
+    ("webby", "1.1.0"): {"fetchy": "^1.1", "logger": "^1.2"},
+    ("fetchy", "1.0.0"): {"utilz": "^1.0"},
+    ("fetchy", "1.1.0"): {"utilz": "^1.0"},
+    ("fetchy", "1.2.0"): {"utilz": "^1.0"},
+    ("logger", "1.0.0"): {"utilz": "^1.0"},
+    ("logger", "1.2.0"): {"utilz": ">=1.1 <2"},
+    ("utilz", "1.0.0"): {},
+    ("utilz", "1.1.0"): {},
+    ("utilz", "2.0.0"): {},
+    ("clash", "1.0.0"): {"utilz": "^2.0"},
+}
+RESOLVED = {"fetchy": "1.1.0", "logger": "1.2.0", "utilz": "1.1.0", "webby": "1.1.0"}
+
+
+def publish_tree(registry, folder: Path) -> None:
+    for (name, version), deps in TREE.items():
+        registry.add(name, version, archive_of(make_package(folder / f"{name}-{version}", name, version, deps=deps), name))
+    registry.packages["fetchy"]["versions"]["1.2.0"]["status"] = "yanked"
+
+
+def tree_project(folder: Path, deps: list[str]) -> Path:
+    write(folder / "tb.toml", '[package]\nname = "demo"\nversion = "0.1.0"\n\n[dependencies]\n'
+          + "".join(f'{name} = "^1.0"\n' for name in deps))
+    return folder
+
+
+def snapshot(folder: Path) -> dict:
+    return {p.relative_to(folder).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(folder.rglob("*")) if p.is_file()}
+
+
+def test_dependency_tree_resolves_deterministically(registry, tmp_path, monkeypatch, capsys):
+    publish_tree(registry, tmp_path / "src")
+    results = []
+    for seed, order in ((1, ["webby", "logger"]), (2, ["logger", "webby"]), (3, ["webby", "logger"])):
+        registry.shuffle = random.Random(seed)  # the index lists packages and versions in another order each time
+        folder = tree_project(tmp_path / f"p{seed}", order)
+        monkeypatch.chdir(folder)
+        assert pkg.main(["add"]) == 0, capsys.readouterr().err
+        results.append(((folder / "tb.lock").read_bytes(), snapshot(folder / "tb_packages")))
+    assert results[0] == results[1] == results[2]
+    lock = pkg.parse_toml(results[0][0].decode("utf-8"))
+    assert {name: entry["version"] for name, entry in lock.items()} == RESOLVED
+    assert lock["webby"]["dependencies"] == {"fetchy": "^1.1", "logger": "^1.2"}
+    assert "dependencies" not in lock["utilz"]
+    for name, version in RESOLVED.items():
+        assert lock[name]["sha256"] == registry.packages[name]["versions"][version]["sha256"]
+    # The same again from scratch, and from an index that doesn't list dependencies
+    # (TB 3.2 and older: tb reads each package's own tb.toml instead).
+    for old in (False, True):
+        registry.old_index = old
+        shutil.rmtree(folder / "tb_packages")
+        (folder / "tb.lock").unlink()
+        assert pkg.main(["add"]) == 0
+        assert ((folder / "tb.lock").read_bytes(), snapshot(folder / "tb_packages")) == results[0]
+    # Deeper packages are importable by name from the project.
+    lines = []
+    tb.run('import "utilz" as u\nsay(u.VERSION)\n', interpreter=tb.Interpreter(output=lines.append), path=str(folder / "main.tb"))
+    assert lines == ["1.1.0"]
+
+
+def test_dependency_conflict_names_both_sides(registry, tmp_path, monkeypatch, capsys):
+    publish_tree(registry, tmp_path / "src")
+    folder = tree_project(tmp_path / "proj", ["clash", "logger", "webby"])
+    monkeypatch.chdir(folder)
+    assert pkg.main(["add"]) == 1
+    err = capsys.readouterr().err
+    assert "No version of 'utilz' works for everything that needs it" in err
+    assert "clash 1.0.0 needs utilz ^2.0" in err and "logger 1.2.0 needs utilz >=1.1 <2" in err
+    assert "Traceback" not in err
+    assert not (folder / "tb_packages").exists() and not (folder / "tb.lock").exists()
+
+
+def test_lock_wins_until_update_and_remove_prunes(project, registry, tmp_path, capsys):
+    publish_tree(registry, tmp_path / "src")
+    assert pkg.main(["add", "webby"]) == 0
+    assert pkg.read_manifest(str(project))["dependencies"] == {"webby": "^1.1.0"}
+    first = (project / "tb.lock").read_bytes()
+    assert {n: e["version"] for n, e in pkg.read_lock(str(project)).items()} == RESOLVED
+    # A newer utilz appears, then the locked one is yanked: tb.lock still decides.
+    registry.add("utilz", "1.2.0", archive_of(make_package(tmp_path / "u12", "utilz", "1.2.0"), "utilz"))
+    assert pkg.main(["add"]) == 0
+    assert (project / "tb.lock").read_bytes() == first
+    registry.packages["utilz"]["versions"]["1.1.0"]["status"] = "yanked"
+    assert pkg.main(["add"]) == 0
+    assert (project / "tb.lock").read_bytes() == first
+    capsys.readouterr()
+    assert pkg.main(["update"]) == 0
+    assert "Updating utilz" in capsys.readouterr().out
+    assert pkg.read_lock(str(project))["utilz"]["version"] == "1.2.0"
+    # Removing webby drops what only it needed.
+    assert pkg.main(["remove", "webby"]) == 0
+    out = capsys.readouterr().out
+    assert "- fetchy (nothing needs it any more)" in out and "- utilz (nothing needs it any more)" in out
+    assert pkg.read_lock(str(project)) == {}
+    assert not any((project / "tb_packages").iterdir())
+
+
+def test_reinstall_checks_every_sha256(project, registry, tmp_path, capsys):
+    publish_tree(registry, tmp_path / "src")
+    assert pkg.main(["add", "webby"]) == 0
+    shutil.rmtree(project / "tb_packages")
+    other = archive_of(make_package(tmp_path / "evil", "fetchy", "1.1.0", "say(1)\n", deps={"utilz": "^1.0"}), "fetchy")
+    info = registry.packages["fetchy"]["versions"]["1.1.0"]
+    info["zip"] = other  # the download changes, the index's checksum doesn't
+    assert pkg.main(["add"]) == 1
+    assert "doesn't match the index's checksum" in capsys.readouterr().err
+    info["sha256"] = hashlib.sha256(other).hexdigest()  # now the index agrees, but tb.lock doesn't
+    assert pkg.main(["add"]) == 1
+    assert "isn't the one in tb.lock" in capsys.readouterr().err
+    assert not (project / "tb_packages" / "fetchy").exists()
+
+
+def test_resolver_cycles_pins_and_order():
+    def index_of(tree, yanked=()):
+        index = {}
+        for (name, version), _deps in tree.items():
+            index.setdefault(name, {"versions": {}})["versions"][version] = {"yanked": True} if (name, version) in yanked else {}
+        return index
+
+    tree = {("a", "1.0.0"): {"b": "^1"}, ("b", "1.0.0"): {"a": "^1"}, ("b", "1.1.0"): {"a": "^1"}}
+    deps = lambda n, v: tree[(n, v)]  # noqa: E731
+    assert pkg.resolve_tree({"a": [("tb.toml", "*")]}, index_of(tree), deps) == {"a": "1.0.0", "b": "1.1.0"}
+    # tb.lock's version first; a yanked one only when pinned exactly or locked.
+    index = index_of(tree, yanked={("b", "1.1.0")})
+    assert pkg.resolve_tree({"a": [("tb.toml", "*")]}, index, deps)["b"] == "1.0.0"
+    assert pkg.resolve_tree({"a": [("tb.toml", "*")]}, index, deps, locked={"b": "1.1.0"})["b"] == "1.1.0"
+    assert pkg.resolve_tree({"a": [("tb.toml", "*")], "b": [("tb.toml", "1.1.0")]}, index, deps)["b"] == "1.1.0"
+    # Backtracking: the newest webby needs logger ^1.2, so a tb.toml pin on logger 1.0 picks webby 1.0.
+    full = index_of(TREE, yanked={("fetchy", "1.2.0")})
+    tree_deps = lambda n, v: TREE[(n, v)]  # noqa: E731
+    picked = pkg.resolve_tree({"webby": [("tb.toml", "^1")], "logger": [("tb.toml", "1.0.0")]}, full, tree_deps)
+    assert picked == {"fetchy": "1.1.0", "logger": "1.0.0", "utilz": "1.1.0", "webby": "1.0.0"}
+    # The answer doesn't depend on the order of anything.
+    rng = random.Random(7)
+    for _ in range(5):
+        shuffled = {}
+        for name in rng.sample(sorted(full), len(full)):
+            versions = list(full[name]["versions"].items())
+            rng.shuffle(versions)
+            shuffled[name] = {"versions": dict(versions)}
+        reqs = [("logger", [("tb.toml", "^1.0")]), ("webby", [("tb.toml", "^1.0")])]
+        rng.shuffle(reqs)
+        assert pkg.resolve_tree(dict(reqs), shuffled, tree_deps) == RESOLVED
+    with pytest.raises(pkg.PkgError, match="couldn't find a package called 'nope'"):
+        pkg.resolve_tree({"nope": [("tb.toml", "*")]}, full, tree_deps)
+    with pytest.raises(pkg.PkgError, match="from a git, zip or folder source"):
+        pkg._dependency_ranges("webby", "1.0.0", {"x": {"git": "https://example.com/x.git"}}, {})
+    assert pkg._dependency_ranges("webby", "1.0.0", {"x": {"git": "u"}, "y": {"version": "^2"}}, {"x": "*"}) == {"y": "^2"}
+
+
+# --- the signed index -------------------------------------------------------------------
+
+RFC8032 = [  # RFC 8032 section 7.1, tests 1 to 3: secret key, public key, message, signature
+    ("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+     "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", "",
+     "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"),
+    ("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+     "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c", "72",
+     "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00"),
+    ("c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+     "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025", "af82",
+     "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a"),
+]
+
+
+@pytest.mark.parametrize("secret,public,message,signature", RFC8032)
+def test_ed25519_rfc8032_vectors(secret, public, message, signature):
+    pub, msg, sig = bytes.fromhex(public), bytes.fromhex(message), bytes.fromhex(signature)
+    assert ed25519.verify(pub, msg, sig)
+    assert ed25519_sign(bytes.fromhex(secret), msg) == (pub, sig)  # the test signer is right too
+    assert not ed25519.verify(pub, msg + b"x", sig)
+    assert not ed25519.verify(pub, msg, sig[:63] + bytes([sig[63] ^ 1]))
+    assert not ed25519.verify(pub, msg, bytes([sig[0] ^ 1]) + sig[1:])
+    assert not ed25519.verify(bytes([pub[0] ^ 1]) + pub[1:], msg, sig)
+    s = int.from_bytes(sig[32:], "little") + ed25519.L  # same point, S not reduced: refused (malleability)
+    assert not ed25519.verify(pub, msg, sig[:32] + s.to_bytes(32, "little"))
+    for bad in (b"", sig[:63], sig + b"\0", None, "text"):
+        assert not ed25519.verify(pub, msg, bad)
+    assert not ed25519.verify(pub[:31], msg, sig)
+    assert not ed25519.verify(b"\xff" * 32, msg, sig)  # y >= p doesn't decode
+
+
+def test_ed25519_matches_node():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    script = ("const c=require('crypto');const k=c.generateKeyPairSync('ed25519');const m=Buffer.from('tb index \\u00e9');"
+              "console.log(k.publicKey.export({format:'der',type:'spki'}).subarray(12).toString('hex'),"
+              "c.sign(null,m,k.privateKey).toString('hex'),m.toString('hex'))")
+    out = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=30, check=True).stdout.split()
+    pub, sig, msg = (bytes.fromhex(x) for x in out)
+    assert ed25519.verify(pub, msg, sig) and not ed25519.verify(pub, msg + b"!", sig)
+
+
+def test_signed_index_is_required_once_a_key_is_pinned(project, registry, monkeypatch, capsys):
+    seed = bytes(range(32))
+    public = base64.b64encode(ed25519_sign(seed, b"")[0]).decode()
+    registry.signing_seed = seed
+    monkeypatch.setenv("TB_REGISTRY_PUBLIC_KEY", public)
+    assert pkg.main(["add", "greet"]) == 0
+    other = base64.b64encode(ed25519_sign(b"\1" * 32, b"")[0]).decode()
+    monkeypatch.setenv("TB_REGISTRY_PUBLIC_KEY", other)
+    assert pkg.main(["add", "greet"]) == 1
+    assert "doesn't match TB's key" in capsys.readouterr().err
+    monkeypatch.setenv("TB_REGISTRY_PUBLIC_KEY", f"{other},{public}")  # a second key, as in a key rotation
+    assert pkg.main(["add", "greet"]) == 0
+    registry.signing_seed = None
+    assert pkg.main(["add", "greet"]) == 1
+    assert "isn't signed, so I won't use it" in capsys.readouterr().err
+    monkeypatch.setenv("TB_REGISTRY_PUBLIC_KEY", "not-a-key")
+    assert pkg.main(["add", "greet"]) == 1
+    assert "isn't an Ed25519 public key" in capsys.readouterr().err
+    # No key pinned for a self-hosted index: unsigned is fine, and quiet.
+    monkeypatch.delenv("TB_REGISTRY_PUBLIC_KEY")
+    capsys.readouterr()
+    assert pkg.main(["add", "greet"]) == 0
+    assert "signed" not in capsys.readouterr().err
+
+
+def test_official_index_signature_policy(monkeypatch, capsys):
+    monkeypatch.delenv("TB_REGISTRY_PUBLIC_KEY", raising=False)
+    body = b'{"format": "tb-registry-1", "packages": {}}'
+    # Until TB ships with the index's public key: accepted, with a note.
+    assert pkg.check_index_signature(pkg.DEFAULT_INDEX, body, None) is False
+    assert "isn't signed yet" in capsys.readouterr().err
+    seed = b"\7" * 32
+    public, signature = ed25519_sign(seed, pkg.SIGNATURE_CONTEXT + body)
+    monkeypatch.setattr(pkg, "OFFICIAL_INDEX_KEYS", (base64.b64encode(public).decode(),))
+    header = "ed25519 " + base64.b64encode(signature).decode()
+    assert pkg.check_index_signature(pkg.DEFAULT_INDEX, body, header) is True
+    with pytest.raises(pkg.PkgError, match="isn't signed"):
+        pkg.check_index_signature(pkg.DEFAULT_INDEX, body, None)
+    with pytest.raises(pkg.PkgError, match="doesn't match"):
+        pkg.check_index_signature(pkg.DEFAULT_INDEX, body + b" ", header)
+    with pytest.raises(pkg.PkgError, match="doesn't match"):
+        pkg.check_index_signature(pkg.DEFAULT_INDEX, body, "rsa " + header.split()[1])
+    # The pinned key is only for the official index.
+    assert pkg.check_index_signature("https://example.com/index", body, None) is False
