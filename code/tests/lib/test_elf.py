@@ -86,3 +86,25 @@ def test_parse_bytes_truncation_and_errors(tmp_path):
     msg = str(tb_error(f'import elf\nelf.parse("{tiny}")'))
     assert "ELF" in msg and "Something went wrong" not in msg
     assert "I couldn't find" in str(tb_error('import elf\nelf.parse("missing")'))
+
+
+def test_symbol_versions_and_hardening(tmp_path):
+    versions = {"puts": ("libc.so.6", "GLIBC_2.2.5"), "__printf_chk": ("libc.so.6", "GLIBC_2.3.4"),
+                "SSL_new": ("libssl.so.3", "OPENSSL_3.0.0")}
+    full = save(tmp_path, build_elf(e_type=3, needed=("libc.so.6", "libssl.so.3"),
+                                    imports=("puts", "__printf_chk", "__stack_chk_fail", "SSL_new"),
+                                    versions=versions, relro="full"), "pie")
+    out = run_tb(f'import elf\nlet i = elf.parse("{full}")\n'
+                 'say(i.version_needs, i.version_definitions)\nsay(i.symbol_versions)\nsay(i.hardening)\n'
+                 f'say(elf.summary("{full}"))')
+    assert out[0] == '{"libc.so.6": ["GLIBC_2.2.5", "GLIBC_2.3.4"], "libssl.so.3": ["OPENSSL_3.0.0"]} []'
+    assert out[1] == '{"puts": "GLIBC_2.2.5", "__printf_chk": "GLIBC_2.3.4", "SSL_new": "OPENSSL_3.0.0"}'
+    assert out[2] == ('{"relro": "full", "bind_now": true, "nx": true, "pie": true, "canary": true, '
+                      '"fortify": true, "rpath": false, "runpath": false}')
+    assert "(PIE)" in out[3]
+    partial = save(tmp_path, build_elf(relro="partial"), "partial")
+    none = save(tmp_path, build_elf(), "none")
+    out = run_tb(f'import elf\nlet a = elf.parse("{partial}").hardening\nlet b = elf.parse("{none}").hardening\n'
+                 'say(a.relro, a.pie, a.canary, b.relro, b.nx)\n'
+                 f'say(elf.parse("{none}").version_needs, elf.parse("{none}").symbol_versions)')
+    assert out == ["partial false false none true", "{} {}"]

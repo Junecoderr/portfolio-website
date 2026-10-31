@@ -582,7 +582,7 @@ def build_code_signature(identifier, adhoc=True, team=None, entitlements=None, c
 def build_macho(bits=64, cpu="arm64", filetype=2, pie=True, dylibs=("/usr/lib/libSystem.B.dylib",),
                 imports=("_printf", "_socket"), exports=("_main",), text=None, cstring=b"Hello from a test Mach-O\x00",
                 signature="adhoc", identifier="com.example.demo", team=None, entitlements=None, cms=b"",
-                encrypted=False, stack_exec=False, wx=False, rpaths=(), little=True, extra_sections=()):
+                encrypted=False, stack_exec=False, wx=False, rpaths=(), little=True, extra_sections=(), page=0x4000):
     """A small, well-formed Mach-O: __PAGEZERO, __TEXT (__text, __cstring), __DATA, __LINKEDIT with a
     symbol table and (unless signature is None) a code signature. extra_sections: [(name, data)] in __DATA."""
     e = "<" if little else ">"
@@ -590,7 +590,6 @@ def build_macho(bits=64, cpu="arm64", filetype=2, pie=True, dylibs=("/usr/lib/li
     cputype, subtype = MACHO_CPUS[cpu]
     text = text if text is not None else b"\xfd\x7b\xbf\xa9" + b"\x1f\x20\x03\xd5" * 30 + b"\xc0\x03\x5f\xd6"
     seg_cmd, seg_size, sect_size = (0x19, 72, 80) if is64 else (0x1, 56, 68)
-    page = 0x4000
     base = 0x100000000 if is64 and filetype == 2 else 0
 
     def cstr_cmd(cmd, fixed: bytes, text_: str) -> bytes:
