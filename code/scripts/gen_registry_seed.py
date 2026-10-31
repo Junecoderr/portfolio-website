@@ -117,6 +117,9 @@ def main(argv: list[str] | None = None) -> int:
     if "--check" in args:
         if current != text:
             print("api/_lib/registry/seed.js is out of date: run uv run python scripts/gen_registry_seed.py", file=sys.stderr)
+            import difflib
+            diff = difflib.unified_diff(current.splitlines(), text.splitlines(), "seed.js", "expected", lineterm="", n=0)
+            print("\n".join(line[:200] for line in list(diff)[:12]), file=sys.stderr)
             return 1
         print("seed.js is up to date")
         return 0
