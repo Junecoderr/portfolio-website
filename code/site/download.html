@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Install TB · TB</title>
-  <meta name="description" content="Download TB 3.2 for Windows (installer or portable zip), macOS or Linux, plus the VS Code extension, with step-by-step help and an honest note about security warnings.">
+  <meta name="description" content="Download TB 3.2 for Windows (installer or portable zip), macOS (Apple silicon and Intel) or Linux (x64 and arm64, .deb and .rpm), plus the VS Code extension, with step-by-step help and an honest note about security warnings.">
   <meta name="theme-color" content="#b3123e">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -58,8 +58,15 @@
             <tbody>
               <tr><td><a data-download="tb-windows-x64-setup.exe" href="/dl/tb-windows-x64-setup.exe"><code>tb-windows-x64-setup.exe</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-windows-x64-setup.exe"></span> downloads</span></td><td>Windows 10 and 11, 64-bit <strong>(recommended)</strong></td><td>Installer: Start menu, double-click .tb files, tb on your PATH</td></tr>
               <tr><td><a data-download="tb-windows-x64.zip" href="/dl/tb-windows-x64.zip"><code>tb-windows-x64.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-windows-x64.zip"></span> downloads</span></td><td>Windows 10 and 11, 64-bit</td><td>Portable folder, nothing installed</td></tr>
-              <tr><td><a data-download="tb-macos-arm64.zip" href="/dl/tb-macos-arm64.zip"><code>tb-macos-arm64.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-macos-arm64.zip"></span> downloads</span></td><td>macOS on Apple silicon (M1 and newer)</td><td>A <code>tb</code> folder</td></tr>
+              <tr><td><a data-download="tb-macos-universal.zip" href="/dl/tb-macos-universal.zip"><code>tb-macos-universal.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-macos-universal.zip"></span> downloads</span></td><td>macOS 11 or newer, any Mac <strong>(recommended)</strong></td><td>A <code>tb</code> folder that runs on Apple silicon and Intel</td></tr>
+              <tr><td><a data-download="tb-macos-arm64.zip" href="/dl/tb-macos-arm64.zip"><code>tb-macos-arm64.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-macos-arm64.zip"></span> downloads</span></td><td>macOS on Apple silicon (M1 and newer)</td><td>A smaller <code>tb</code> folder, Apple silicon only</td></tr>
+              <tr><td><a data-download="tb-macos-x64.zip" href="/dl/tb-macos-x64.zip"><code>tb-macos-x64.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-macos-x64.zip"></span> downloads</span></td><td>macOS on an Intel Mac</td><td>A smaller <code>tb</code> folder, Intel only</td></tr>
               <tr><td><a data-download="tb-linux-x64.tar.gz" href="/dl/tb-linux-x64.tar.gz"><code>tb-linux-x64.tar.gz</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-linux-x64.tar.gz"></span> downloads</span></td><td>Linux, 64-bit Intel or AMD</td><td>A <code>tb</code> folder</td></tr>
+              <tr><td><a data-download="tb-linux-arm64.tar.gz" href="/dl/tb-linux-arm64.tar.gz"><code>tb-linux-arm64.tar.gz</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-linux-arm64.tar.gz"></span> downloads</span></td><td>Linux, 64-bit ARM (arm64)</td><td>A <code>tb</code> folder</td></tr>
+              <tr><td><a data-download="tb_3.2.0_amd64.deb" href="/dl/tb_3.2.0_amd64.deb"><code>tb_3.2.0_amd64.deb</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb_3.2.0_amd64.deb"></span> downloads</span></td><td>Debian, Ubuntu and friends, 64-bit Intel or AMD</td><td>Package: installs to <code>/usr/lib/tb</code>, <code>tb</code> on your PATH</td></tr>
+              <tr><td><a data-download="tb_3.2.0_arm64.deb" href="/dl/tb_3.2.0_arm64.deb"><code>tb_3.2.0_arm64.deb</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb_3.2.0_arm64.deb"></span> downloads</span></td><td>Debian, Ubuntu and friends, arm64</td><td>Package: installs to <code>/usr/lib/tb</code>, <code>tb</code> on your PATH</td></tr>
+              <tr><td><a data-download="tb-3.2.0-1.x86_64.rpm" href="/dl/tb-3.2.0-1.x86_64.rpm"><code>tb-3.2.0-1.x86_64.rpm</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-3.2.0-1.x86_64.rpm"></span> downloads</span></td><td>Fedora, RHEL and friends, 64-bit Intel or AMD</td><td>Package: installs to <code>/usr/lib/tb</code>, <code>tb</code> on your PATH</td></tr>
+              <tr><td><a data-download="tb-3.2.0-1.aarch64.rpm" href="/dl/tb-3.2.0-1.aarch64.rpm"><code>tb-3.2.0-1.aarch64.rpm</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-3.2.0-1.aarch64.rpm"></span> downloads</span></td><td>Fedora, RHEL and friends, arm64</td><td>Package: installs to <code>/usr/lib/tb</code>, <code>tb</code> on your PATH</td></tr>
               <tr><td><a data-download="tb-python.zip" href="/dl/tb-python.zip"><code>tb-python.zip</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-python.zip"></span> downloads</span></td><td>Any computer with Python 3.10 or newer</td><td><code>tb.py</code>, the standard library, examples and apps</td></tr>
               <tr><td><a data-download="tb-vscode-3.2.0.vsix" href="/dl/tb-vscode-3.2.0.vsix"><code>tb-vscode-3.2.0.vsix</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:tb-vscode-3.2.0.vsix"></span> downloads</span></td><td>Visual Studio Code, on any computer with TB installed</td><td>The TB extension: highlighting, completion, errors as you type, Run buttons (<a href="tools.html#vscode">how to install</a>)</td></tr>
               <tr><td><a data-download="SHA256SUMS.txt" href="/dl/SHA256SUMS.txt"><code>SHA256SUMS.txt</code></a><span class="dl-count" data-stat-wrap hidden><span data-stat="dl:SHA256SUMS.txt"></span> downloads</span></td><td>Checking your download</td><td>SHA-256 fingerprints of every file</td></tr>
@@ -246,8 +253,8 @@ Press Enter to close</div>
           <ol class="steps steps-wide">
             <li>
               <h4>Download and unzip</h4>
-              <p>Download <code>tb-macos-arm64.zip</code>. Safari unzips it for you; otherwise double-click it in <strong>Downloads</strong>. You get a folder called <code>tb</code> with the <code>tb</code> program, an <code>_internal</code> folder it needs, <code>apps</code>, <code>examples</code> and <code>welcome.tb</code>.</p>
-              <p>This version is for Macs with Apple silicon (M1 and newer). On an older Intel Mac, use the <a href="#python">Python version</a>.</p>
+              <p>Download <code>tb-macos-universal.zip</code>. Safari unzips it for you; otherwise double-click it in <strong>Downloads</strong>. You get a folder called <code>tb</code> with the <code>tb</code> program, an <code>_internal</code> folder it needs, <code>apps</code>, <code>examples</code> and <code>welcome.tb</code>.</p>
+              <p>It runs on every Mac with macOS 11 or newer, Apple silicon or Intel. (<code>tb-macos-arm64.zip</code> and <code>tb-macos-x64.zip</code> are smaller downloads for just one kind.)</p>
             </li>
             <li>
               <h4>Give it a home</h4>
@@ -294,10 +301,15 @@ TB 3.2.0</div>
         <!-- ============================================================== Linux -->
         <div class="os-panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux">
           <h3 class="visually-hidden">Linux</h3>
+          <p><strong>Debian or Ubuntu:</strong> download the <code>.deb</code> for your computer (<code>amd64</code> for Intel or AMD, <code>arm64</code> for ARM) and install it; <code>tb</code> is then on your PATH and <code>sudo apt remove tb</code> removes it again.</p>
+          <pre class="cmd"><code>sudo apt install ./tb_3.2.0_amd64.deb</code></pre>
+          <p><strong>Fedora:</strong> the same with the <code>.rpm</code>.</p>
+          <pre class="cmd"><code>sudo dnf install ./tb-3.2.0-1.x86_64.rpm</code></pre>
+          <p><strong>Any other Linux</strong>, or without installing anything:</p>
           <ol class="steps">
             <li>
               <h4>Download and unpack</h4>
-              <p>Download <code>tb-linux-x64.tar.gz</code>, open a terminal where it landed, and unpack it. You get a <code>tb</code> folder (keep <code>tb</code> next to <code>_internal</code>).</p>
+              <p>Download <code>tb-linux-x64.tar.gz</code> (<code>tb-linux-arm64.tar.gz</code> on an ARM computer), open a terminal where it landed, and unpack it. You get a <code>tb</code> folder (keep <code>tb</code> next to <code>_internal</code>).</p>
               <pre class="cmd"><code>tar xzf tb-linux-x64.tar.gz</code></pre>
             </li>
             <li>
@@ -354,7 +366,7 @@ TB 3.2.0</div>
             <thead><tr><th scope="col">Computer</th><th scope="col">Command</th></tr></thead>
             <tbody>
               <tr><td>Windows</td><td><code>certutil -hashfile tb-windows-x64-setup.exe SHA256</code></td></tr>
-              <tr><td>Mac</td><td><code>shasum -a 256 tb-macos-arm64.zip</code></td></tr>
+              <tr><td>Mac</td><td><code>shasum -a 256 tb-macos-universal.zip</code></td></tr>
               <tr><td>Linux</td><td><code>sha256sum -c SHA256SUMS.txt --ignore-missing</code></td></tr>
             </tbody>
           </table>

@@ -50,8 +50,8 @@ report.save("alerts.html", report.html("SSH brute force", alerts))
 | Platform | Package |
 |---|---|
 | Windows 10/11 (x64) | `tb-windows-x64-setup.exe`: per-user installer, no administrator rights. Adds `tb` to `PATH` and registers `.tb` files. A portable `tb-windows-x64.zip` is also available. |
-| macOS (Apple silicon) | `tb-macos-arm64.zip` |
-| Linux (x64) | `tb-linux-x64.tar.gz` |
+| macOS 11+ (any Mac) | `tb-macos-universal.zip` (Apple silicon and Intel); `tb-macos-arm64.zip` and `tb-macos-x64.zip` are smaller single-architecture builds |
+| Linux (x64, arm64) | `tb-linux-x64.tar.gz`, `tb-linux-arm64.tar.gz`; Debian/Ubuntu `tb_<version>_amd64.deb` / `_arm64.deb` and Fedora `tb-<version>-1.x86_64.rpm` / `.aarch64.rpm` (install to `/usr/lib/tb`, `tb` on `PATH`) |
 | Any OS with Python 3.10+ | `tb-python.zip`: runs from source with your own Python |
 
 All packages are listed at https://code.tanisha.ceo/download with

@@ -95,8 +95,18 @@ updates `dist/SHA256SUMS.txt`.
 | OS | Assets |
 |---|---|
 | Windows x64 | `tb-windows-x64-setup.exe` (Inno Setup), `tb-windows-x64.zip` (portable) |
-| macOS Apple silicon | `tb-macos-arm64.zip` |
-| Linux x64 | `tb-linux-x64.tar.gz` |
+| macOS | `tb-macos-universal.zip` (Apple silicon + Intel, the site's default), `tb-macos-arm64.zip`, `tb-macos-x64.zip` |
+| Linux x64 | `tb-linux-x64.tar.gz`, `tb_<version>_amd64.deb`, `tb-<version>-1.x86_64.rpm` |
+| Linux arm64 | `tb-linux-arm64.tar.gz`, `tb_<version>_arm64.deb`, `tb-<version>-1.aarch64.rpm` |
+
+`TB_TARGET_ARCH=universal2` makes `build.py` build the universal binary
+(PyInstaller's `target_arch`; it needs a universal2 Python such as python.org's,
+which is what `actions/setup-python` installs on macOS). On Linux,
+`python packaging/linux_packages.py` turns `dist/tb/` into the `.deb`
+(`dpkg-deb`) and `.rpm` (`rpmbuild`), installing to `/usr/lib/tb` with a
+`/usr/bin/tb` symlink, and `bash packaging/test_linux_packages.sh dist`
+installs them in clean Ubuntu, Debian and Fedora containers (Docker) and runs
+TB there.
 
 PyInstaller cannot cross-compile; CI builds each OS on its own runner. For a
 local build with GUI support use a Python with Tk:
@@ -166,7 +176,114 @@ starts from (both are run in the same job; see `bench/bench.py`).
 
 The website's download links are site-relative (`/dl/<asset>`); the rewrite
 in `vercel.json` maps them to the release for the current version, so update
-it when releasing and release before deploying a version bump.
+it (and the `/apt/:file` rewrite) when releasing and release before deploying
+a version bump. `/dl/<version>/<asset>` reaches any release; the package
+managers use it, so their manifests keep working after the next release. The
+`.deb`/`.rpm` rows on `site/download.html` carry the version in their names
+(like the `.vsix`), so update them too.
+
+"Run workflow" on `tb-release.yml` (workflow_dispatch) is a dry run: it
+builds, signs (when the secrets exist) and tests every target and writes the
+checksums, the apt index and the package-manager manifests, kept as the
+`release-dry-run` and `package-manager-manifests` artifacts, and never
+creates a release. Run it before tagging when the build matrix changes.
+
+### Package managers
+
+Every release run writes, from the real assets' sha256 sums
+(`packaging/release_manifests.py`), the `package-manager-manifests` artifact:
+
+- **Homebrew**: `homebrew/tb.rb`. One-time: create a public tap repository
+  named `homebrew-tb`; each release: copy `tb.rb` to `Formula/tb.rb` in it.
+  Then `brew install <owner>/tb/tb`. (homebrew-core does not take formulas
+  that install prebuilt binaries.)
+- **winget**: `winget/manifests/t/TBLang/TB/<version>/` (three files). Each
+  release: open a pull request adding that folder to `microsoft/winget-pkgs`
+  (`wingetcreate submit <folder>` does it). After review,
+  `winget install TBLang.TB`. Unsigned installers are accepted, but
+  SmartScreen warnings make reviewers and users wary; sign first.
+- **apt**: a flat apt repository made of release assets (`InRelease`,
+  `Release`, `Release.gpg`, `Packages`, `Packages.gz`, the `.deb`s and
+  `tb-archive-keyring.gpg`), served at `https://code.tanisha.ceo/apt/` by the
+  `vercel.json` rewrite. It is only published when `APT_GPG_PRIVATE_KEY` is
+  set. One-time: make a signing key offline,
+  `gpg --quick-gen-key "TB apt repository" ed25519 sign never`, store
+  `gpg --armor --export-secret-keys <fingerprint>` as the secret
+  `APT_GPG_PRIVATE_KEY` (and its passphrase as `APT_GPG_PASSPHRASE`; empty
+  if none), and keep a backup of the key. Users then run:
+
+  ```sh
+  sudo curl -fsSLo /usr/share/keyrings/tb.gpg https://code.tanisha.ceo/dl/tb-archive-keyring.gpg
+  echo "deb [signed-by=/usr/share/keyrings/tb.gpg] https://code.tanisha.ceo apt/" | sudo tee /etc/apt/sources.list.d/tb.list
+  sudo apt update && sudo apt install tb
+  ```
+
+  (`apt/`, not the usual `./`: apt would ask for `/apt/./InRelease`, which
+  the rewrite may not match.) After the first signed release, check
+  `curl -fsSIL https://code.tanisha.ceo/apt/InRelease`.
+
+### Code signing
+
+Unsigned builds make Windows SmartScreen and macOS Gatekeeper warn on first
+run. `tb-release.yml` signs when (and only when) these repository secrets
+exist; otherwise each signing step logs why it skipped and the build is
+unsigned as before. The keys live only in GitHub Actions secrets
+(Settings, Secrets and variables, Actions).
+
+**macOS** (Apple Developer Program, 99 USD a year; the account holder
+creates a *Developer ID Application* certificate in Xcode or on
+developer.apple.com, then exports it from Keychain Access as a `.p12` with a
+password):
+
+| Secret | Value |
+|---|---|
+| `MACOS_CERT_P12_BASE64` | `base64 -i DeveloperID.p12 \| pbcopy` |
+| `MACOS_CERT_PASSWORD` | the `.p12` export password |
+| `MACOS_SIGN_IDENTITY` | `Developer ID Application: <Name> (<TEAMID>)` (`security find-identity -v -p codesigning`) |
+| `APPLE_ID` | the Apple ID email of the developer account |
+| `APPLE_TEAM_ID` | the 10-character team ID |
+| `APPLE_APP_PASSWORD` | an app-specific password from account.apple.com (for `notarytool`) |
+
+`packaging/macos/sign.py` signs every Mach-O file in `dist/tb/` with the
+hardened runtime and a secure timestamp, and `tb`/`tblaunch` with
+`packaging/macos/entitlements.plist`; then the zip is notarised with
+`xcrun notarytool submit --wait`, and CI runs a quarantined copy to prove
+Gatekeeper accepts it. A ticket cannot be stapled to a zip or a bare program
+(only to an .app, .pkg or .dmg), so Gatekeeper fetches it online the first
+time; Homebrew downloads are not quarantined at all.
+`python packaging/macos/sign.py dist/tb -` signs ad hoc, to try the hardened
+runtime locally.
+
+**Windows**, either of:
+
+- *Azure Artifact Signing* (formerly Trusted Signing; about 10 USD a month,
+  identity validation by Microsoft; check that it is offered for your country
+  and whether as an individual or organisation). Create an Artifact Signing
+  account and a public-trust certificate profile, and an app registration
+  (service principal) with the *Artifact Signing Certificate Profile Signer*
+  role on it:
+
+  | Secret | Value |
+  |---|---|
+  | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | the app registration |
+  | `AZURE_SIGNING_ENDPOINT` | the account's region endpoint, e.g. `https://eus.codesigning.azure.net/` |
+  | `AZURE_SIGNING_ACCOUNT` | the Artifact Signing account name |
+  | `AZURE_CERT_PROFILE` | the certificate profile name |
+
+- *A code-signing certificate as a `.pfx` file* (OV or EV, from a CA). New
+  certificates from public CAs come on a hardware token or cloud HSM and
+  cannot be exported; this route is only for a certificate you can export:
+
+  | Secret | Value |
+  |---|---|
+  | `WINDOWS_CERT_PFX_BASE64` | `base64 -w0 cert.pfx` (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))`) |
+  | `WINDOWS_CERT_PASSWORD` | the `.pfx` password |
+
+`tb.exe`, `tbw.exe`, `tblaunch.exe` and `tblaunchw.exe` are signed before
+they are zipped and put in the installer, then the installer itself;
+`signtool verify /pa` checks them. SmartScreen also weighs a file's
+reputation: a newly signed file can still warn until it has been downloaded
+enough, though the publisher name then shows instead of "Unknown publisher".
 
 ## The website
 

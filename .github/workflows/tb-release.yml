@@ -1,10 +1,13 @@
 name: TB Release
 
-# Push a tag like tb-v3.0.0 to build TB for Windows (installer + portable zip),
-# macOS and Linux, plus the VS Code extension (tb-vscode-<version>.vsix) and the
+# Push a tag like tb-v3.0.0 to build TB for Windows x64 (installer + portable zip),
+# macOS (arm64, Intel and universal) and Linux (x64 and arm64: tar.gz, .deb and
+# .rpm), plus the VS Code extension (tb-vscode-<version>.vsix) and the
 # run-with-Python zip, and publish them, with checksums, as a GitHub Release. The website at
 # code.tanisha.ceo links to the release whose tag matches tb.__version__.
-# "Run workflow" (workflow_dispatch) only builds and tests the binaries.
+# "Run workflow" (workflow_dispatch) is a dry run: it builds, signs (when the
+# secrets exist) and tests every target and writes the checksums and
+# package-manager manifests, but never creates a release.
 
 on:
   push:
@@ -26,18 +29,37 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # PyInstaller cannot cross-compile, so every OS builds on its own runner.
-          # Each builds the one-folder app dist/tb/ and packages it.
+          # PyInstaller cannot cross-compile, so every OS/CPU builds on its own runner.
+          # Each builds the one-folder app dist/tb/ and packages it as tb-<name>.<zip|tar.gz>.
           - os: windows-latest      # tb-windows-x64-setup.exe + tb-windows-x64.zip
             name: windows-x64
             binary: dist/tb/tb.exe
           - os: macos-14            # Apple Silicon (arm64): tb-macos-arm64.zip
             name: macos-arm64
             binary: dist/tb/tb
+          - os: macos-15-intel      # Intel: tb-macos-x64.zip (macos-13 is retired)
+            name: macos-x64
+            binary: dist/tb/tb
+          # One binary for both kinds of Mac (the website's default Mac download).
+          # PyInstaller's target_arch=universal2, not lipo: setup-python's macOS
+          # Python is python.org's universal2 build (checked below), so
+          # PyInstaller can collect fat copies of Python, its extension modules
+          # and Tcl/Tk. Merging two thin builds with lipo would break the
+          # archive PyInstaller appends to tb and tblaunch. The test suites are
+          # the same as macos-arm64's on the same runner, so they are skipped.
+          - os: macos-14            # tb-macos-universal.zip
+            name: macos-universal
+            binary: dist/tb/tb
+            target_arch: universal2
+            skip_tests: true
           - os: ubuntu-22.04        # older glibc (2.35) so it runs on more Linux systems: tb-linux-x64.tar.gz
-            name: linux-x64
+            name: linux-x64         # + tb_<version>_amd64.deb, tb-<version>-1.x86_64.rpm
             binary: dist/tb/tb
             xvfb: xvfb-run -a       # virtual display for the gui checks
+          - os: ubuntu-22.04-arm    # arm64 (free for public repositories): tb-linux-arm64.tar.gz
+            name: linux-arm64       # + tb_<version>_arm64.deb, tb-<version>-1.aarch64.rpm
+            binary: dist/tb/tb
+            xvfb: xvfb-run -a
     runs-on: ${{ matrix.os }}
     timeout-minutes: 75
     permissions:
@@ -46,6 +68,7 @@ jobs:
       UV_PYTHON_PREFERENCE: only-system
       PYTHONUTF8: "1"
       XVFB: ${{ matrix.xvfb }}
+      TB_TARGET_ARCH: ${{ matrix.target_arch }}
     defaults:
       run:
         shell: bash
@@ -69,6 +92,14 @@ jobs:
           echo "tag: $want  tb.py: $have"
           test "$want" = "$have"
 
+      - name: Check the build Python is universal2 (macOS universal)
+        if: matrix.target_arch == 'universal2'
+        run: |
+          py="$(uv run --locked python -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+          archs="$(lipo -archs "$py")"
+          echo "$py: $archs"
+          [[ "$archs" == *x86_64* && "$archs" == *arm64* ]] || { echo "::error::$py is not universal2"; exit 1; }
+
       # Windows and macOS runners have a desktop; Linux gets a virtual X
       # display so the gui library and a GUI app can really open a window.
       - name: Install Xvfb (Linux)
@@ -78,9 +109,11 @@ jobs:
       # Every test runs on both engines: the bytecode VM (default) and the
       # tree-walking interpreter (TB_ENGINE=tree).
       - name: Run tests (VM engine)
+        if: ${{ !matrix.skip_tests }}
         run: $XVFB uv run --locked pytest
 
       - name: Run tests (tree engine)
+        if: ${{ !matrix.skip_tests }}
         env:
           TB_ENGINE: tree
         run: $XVFB uv run --locked pytest
@@ -94,27 +127,183 @@ jobs:
             choco install innosetup -y --no-progress
           fi
 
-      # build.py builds dist/tb/ (tb, tblaunch; Windows also tbw.exe and
-      # tblaunchw.exe), smoke-tests it (--version, welcome.tb, tb check,
-      # tb fmt --check, tb doc, a json/re/hash/ioc/logs/sqlite program, a 3.0
+      # PyInstaller first (dist/tb/), so the programs can be signed before
+      # they are packaged.
+      - name: Build dist/tb/
+        run: uv run --locked --group build python packaging/build.py --build-only
+
+      # ---- Code signing (#40). Every signing step runs only when its secrets
+      # exist and otherwise logs why it skipped; the secret names and how to
+      # make them are in CONTRIBUTING.md ("Code signing").
+      - name: Which signing secrets exist
+        id: signing
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          windows=none
+          if [ "$RUNNER_OS" = Windows ]; then
+            if [ -n "$AZURE_CLIENT_ID" ]; then windows=azure; elif [ -n "$WINDOWS_CERT_PFX_BASE64" ]; then windows=pfx; fi
+            [ "$windows" = none ] && echo "::notice::Windows signing skipped: neither AZURE_CLIENT_ID (Artifact Signing) nor WINDOWS_CERT_PFX_BASE64 is set"
+          fi
+          macos=no; notarize=no
+          if [ "$RUNNER_OS" = macOS ]; then
+            if [ -n "$MACOS_CERT_P12_BASE64" ]; then macos=yes; else echo "::notice::macOS signing skipped: MACOS_CERT_P12_BASE64 is not set"; fi
+            if [ "$macos" = yes ] && [ -n "$APPLE_APP_PASSWORD" ]; then notarize=yes; elif [ "$macos" = yes ]; then echo "::notice::notarisation skipped: APPLE_APP_PASSWORD is not set"; fi
+          fi
+          { echo "windows=$windows"; echo "macos=$macos"; echo "notarize=$notarize"; } >> "$GITHUB_OUTPUT"
+          echo "windows=$windows macos=$macos notarize=$notarize"
+
+      - name: Sign the programs (Windows, Azure Artifact Signing)
+        if: steps.signing.outputs.windows == 'azure'
+        uses: azure/artifact-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba  # v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files: |
+            ${{ github.workspace }}\code\dist\tb\tb.exe
+            ${{ github.workspace }}\code\dist\tb\tbw.exe
+            ${{ github.workspace }}\code\dist\tb\tblaunch.exe
+            ${{ github.workspace }}\code\dist\tb\tblaunchw.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Sign the programs (Windows, certificate file)
+        if: steps.signing.outputs.windows == 'pfx'
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          echo "$WINDOWS_CERT_PFX_BASE64" | base64 --decode > "$RUNNER_TEMP/tb-cert.pfx"
+          signtool="$(ls "/c/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe | sort -V | tail -1)"
+          "$signtool" sign /f "$(cygpath -w "$RUNNER_TEMP/tb-cert.pfx")" /p "$WINDOWS_CERT_PASSWORD" \
+            /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 \
+            dist/tb/tb.exe dist/tb/tbw.exe dist/tb/tblaunch.exe dist/tb/tblaunchw.exe
+          rm -f "$RUNNER_TEMP/tb-cert.pfx"
+
+      - name: Sign the programs (macOS, Developer ID + hardened runtime)
+        if: steps.signing.outputs.macos == 'yes'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          keychain="$RUNNER_TEMP/tb-signing.keychain-db"
+          kpass="$(uuidgen)"
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/tb-cert.p12"
+          security create-keychain -p "$kpass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kpass" "$keychain"
+          security import "$RUNNER_TEMP/tb-cert.p12" -k "$keychain" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kpass" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm -f "$RUNNER_TEMP/tb-cert.p12"
+          uv run --locked python packaging/macos/sign.py dist/tb "$MACOS_SIGN_IDENTITY"
+
+      # build.py smoke-tests dist/tb/ (tb, tblaunch; Windows also tbw.exe and
+      # tblaunchw.exe): --version, welcome.tb, tb check, tb fmt --check,
+      # tb doc, a json/re/hash/ioc/logs/sqlite program, a 3.0
       # class/match/generator program on both engines, tb build + running the
-      # built launcher, and a GUI app that closes itself), packages it, unpacks
+      # built launcher, and a GUI app that closes itself; packages it, unpacks
       # the archive and tests that copy too (every example and app, tb test
       # spec / apps/log-triage / packages), and on Windows builds the installer.
       # TB_REQUIRE_GUI=1 turns a missing Tk/display into a failure.
-      - name: Build
+      - name: Test and package
         env:
           TB_REQUIRE_GUI: "1"
-        run: $XVFB uv run --locked --group build python packaging/build.py
+        run: $XVFB uv run --locked --group build python packaging/build.py --skip-build
 
       - name: Run examples, apps and test suites through the build
         run: $XVFB uv run --locked python packaging/run_examples.py "${{ matrix.binary }}" --root dist/tb --gui
 
-      # Silent per-user install into a temp folder, run the installed tb.exe
-      # (--version, every example/app, tbw.exe with a GUI app, tb build --gui
-      # and the resulting tblaunchw-based app.exe), check the Start menu
-      # shortcuts and the .tb icon, then a silent uninstall that must remove
-      # the folder, the PATH entry, .tb and the Start menu folder.
+      - name: Check both halves of the universal binary (macOS universal)
+        if: matrix.target_arch == 'universal2'
+        run: |
+          lipo -archs dist/tb/tb | tee /dev/stderr | grep -q "x86_64 arm64"
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            arch -x86_64 dist/tb/tb --version
+            arch -x86_64 dist/tb/tb dist/tb/examples/hello.tb
+          else
+            echo "::notice::Rosetta 2 is not installed on this runner: the x86_64 half was not run"
+          fi
+
+      - name: Sign the installer (Windows, Azure Artifact Signing)
+        if: steps.signing.outputs.windows == 'azure'
+        uses: azure/artifact-signing-action@208f8af4bf26cf2af8597424e3cb5582801523ba  # v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files: ${{ github.workspace }}\code\dist\tb-windows-x64-setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Sign the installer (Windows, certificate file)
+        if: steps.signing.outputs.windows == 'pfx'
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          echo "$WINDOWS_CERT_PFX_BASE64" | base64 --decode > "$RUNNER_TEMP/tb-cert.pfx"
+          signtool="$(ls "/c/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe | sort -V | tail -1)"
+          "$signtool" sign /f "$(cygpath -w "$RUNNER_TEMP/tb-cert.pfx")" /p "$WINDOWS_CERT_PASSWORD" \
+            /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 dist/tb-windows-x64-setup.exe
+          rm -f "$RUNNER_TEMP/tb-cert.pfx"
+
+      - name: Verify the signatures (Windows)
+        if: steps.signing.outputs.windows != 'none' && runner.os == 'Windows'
+        run: |
+          signtool="$(ls "/c/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe | sort -V | tail -1)"
+          "$signtool" verify /pa /v dist/tb-windows-x64-setup.exe dist/tb/tb.exe dist/tb/tbw.exe dist/tb/tblaunch.exe dist/tb/tblaunchw.exe
+
+      # Apple checks the signatures and scans the zip; Gatekeeper then finds
+      # the notarisation ticket online the first time a downloaded tb runs.
+      # (stapler can staple a ticket only to an .app, .pkg or .dmg, never to
+      # a zip or a bare program, so there is nothing to staple here.)
+      - name: Notarise (macOS)
+        if: steps.signing.outputs.notarize == 'yes'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          zip="dist/tb-${{ matrix.name }}.zip"
+          auth=(--apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD")
+          xcrun notarytool submit "$zip" "${auth[@]}" --wait --timeout 30m --output-format json | tee "$RUNNER_TEMP/notary.json"
+          status="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["status"])' "$RUNNER_TEMP/notary.json")"
+          if [ "$status" != Accepted ]; then
+            id="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["id"])' "$RUNNER_TEMP/notary.json")"
+            xcrun notarytool log "$id" "${auth[@]}"
+            exit 1
+          fi
+          # A fresh "download": quarantine every file, as Safari would, and run it.
+          mkdir "$RUNNER_TEMP/fresh" && unzip -q "$zip" -d "$RUNNER_TEMP/fresh"
+          find "$RUNNER_TEMP/fresh" -type f -exec xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");Safari;" {} +
+          spctl --status || true
+          "$RUNNER_TEMP/fresh/tb/tb" --version
+
+      # Install the .deb on a clean Ubuntu and Debian (both directly and through
+      # a flat apt repository, as `apt install tb` will) and the .rpm on a clean
+      # Fedora, then run tb --version, welcome.tb and an example in each.
+      - name: Build and test the .deb and .rpm (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          command -v rpmbuild >/dev/null || (sudo apt-get update && sudo apt-get install -y rpm)
+          uv run --locked python packaging/linux_packages.py
+          uv run --locked python packaging/release_manifests.py --only apt
+          bash packaging/test_linux_packages.sh dist
+
       - name: Test the installer (Windows)
         if: runner.os == 'Windows'
         run: uv run --locked python packaging/windows/test_installer.py dist/tb-windows-x64-setup.exe
@@ -126,6 +315,8 @@ jobs:
             code/dist/tb-*.zip
             code/dist/tb-*.tar.gz
             code/dist/tb-*-setup.exe
+            code/dist/tb_*.deb
+            code/dist/tb-*.rpm
           if-no-files-found: error
           retention-days: 7
 
@@ -168,10 +359,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # On a tag push: publish the GitHub Release. From "Run workflow"
+  # (workflow_dispatch, on any branch or tag) this is a dry run: everything is
+  # built, checksummed and turned into package-manager manifests, and the
+  # result is kept as the "release-dry-run" artifact, but nothing is published.
   release:
-    name: GitHub Release
+    name: Release (a dry run unless a tag was pushed)
     needs: [build, vscode]
-    if: startsWith(github.ref, 'refs/tags/tb-v')
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -205,26 +399,82 @@ jobs:
           uv run --locked python packaging/build.py --checksums-only
           cd dist && sha256sum --check SHA256SUMS.txt
 
+      # Homebrew formula + winget manifests (dist/manifests/, kept as the
+      # "package-manager-manifests" artifact for the owner to submit) and the
+      # flat apt repository index (dist/Packages, Packages.gz, Release).
+      - name: Package-manager manifests and apt index
+        run: uv run --locked python packaging/release_manifests.py
+
+      - name: Sign the apt repository
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          if [ -z "$APT_GPG_PRIVATE_KEY" ]; then
+            echo "::notice::apt repository not signed (APT_GPG_PRIVATE_KEY is not set): it is not published"
+            rm -f dist/Packages dist/Packages.gz dist/Release
+            exit 0
+          fi
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          echo "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          sign=(gpg --batch --yes --pinentry-mode loopback --passphrase "$APT_GPG_PASSPHRASE")
+          "${sign[@]}" --clearsign -o dist/InRelease dist/Release
+          "${sign[@]}" --detach-sign -o dist/Release.gpg dist/Release
+          gpg --export > dist/tb-archive-keyring.gpg
+          gpg --no-default-keyring --keyring "$PWD/dist/tb-archive-keyring.gpg" --verify dist/InRelease
+          rm -rf "$GNUPGHOME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-manager-manifests
+          path: code/dist/manifests
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Keep the dry run's files
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run
+          path: |
+            code/dist/*
+            !code/dist/manifests
+          retention-days: 7
+
       - name: Create or update the release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/tb-v')
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          version="${TAG#tb-v}"
           assets=(
             dist/tb-windows-x64-setup.exe
             dist/tb-windows-x64.zip
             dist/tb-macos-arm64.zip
+            dist/tb-macos-x64.zip
+            dist/tb-macos-universal.zip
             dist/tb-linux-x64.tar.gz
+            dist/tb-linux-arm64.tar.gz
+            "dist/tb_${version}_amd64.deb"
+            "dist/tb_${version}_arm64.deb"
+            "dist/tb-${version}-1.x86_64.rpm"
+            "dist/tb-${version}-1.aarch64.rpm"
             dist/tb-python.zip
             dist/tb-vscode-*.vsix
             dist/SHA256SUMS.txt
           )
+          # The signed apt index (code.tanisha.ceo/apt/<file> serves these).
+          if [ -f dist/InRelease ]; then
+            assets+=(dist/InRelease dist/Release dist/Release.gpg dist/Packages dist/Packages.gz dist/tb-archive-keyring.gpg)
+          fi
           ls -l "${assets[@]}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${assets[@]}" --clobber
           else
             # --latest=false keeps TB releases from being shown as the site's "latest release".
             # The notes are this version's section of CHANGELOG.md (also on code.tanisha.ceo/releases).
-            uv run --locked python scripts/changelog.py notes "${TAG#tb-v}" > "$RUNNER_TEMP/notes.md"
-            gh release create "$TAG" "${assets[@]}" --title "TB ${TAG#tb-v}" --notes-file "$RUNNER_TEMP/notes.md" --latest=false
+            uv run --locked python scripts/changelog.py notes "$version" > "$RUNNER_TEMP/notes.md"
+            gh release create "$TAG" "${assets[@]}" --title "TB $version" --notes-file "$RUNNER_TEMP/notes.md" --latest=false
           fi
