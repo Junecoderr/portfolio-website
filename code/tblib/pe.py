@@ -122,34 +122,44 @@ def rol32(value: int, n: int) -> int:
 
 OIDS = {
     "2.5.4.3": "CN", "2.5.4.6": "C", "2.5.4.7": "L", "2.5.4.8": "ST", "2.5.4.10": "O", "2.5.4.11": "OU",
-    "2.5.4.5": "serialNumber", "1.2.840.113549.1.9.1": "emailAddress",
+    "2.5.4.5": "serialNumber", "1.2.840.113549.1.9.1": "emailAddress", "0.9.2342.19200300.100.1.1": "UID",
     "1.3.14.3.2.26": "sha1", "2.16.840.1.101.3.4.2.1": "sha256", "2.16.840.1.101.3.4.2.2": "sha384",
     "2.16.840.1.101.3.4.2.3": "sha512", "1.2.840.113549.2.5": "md5",
 }
 
 
-def der_item(data: bytes, pos: int, end: int, depth: int = 0) -> tuple:
-    """One DER (or BER) element at pos: (tag, content_start, content_end, next_pos). BER's
-    indefinite length (0x80, constructed elements only) runs to a 00 00 end-of-contents marker;
-    Authenticode signers such as signtool's older versions write it."""
+def der_element(data: bytes, pos: int, end: int, depth: int = 0) -> tuple:
+    """One BER/DER element at pos: (tag, content_start, content_end, next_pos).
+
+    Apple's codesign and many Authenticode tools write CMS in BER with indefinite
+    lengths (0x80 ... 00 00), so those are read as well as definite DER lengths."""
     if depth > 64:
-        raise ValueError("the DER nesting is too deep")
+        raise ValueError("DER elements are nested too deeply")
     if pos + 2 > end:
         raise ValueError("a DER element is cut off")
-    tag, length = data[pos], data[pos + 1]
-    pos += 2
+    tag = data[pos]
+    pos += 1
+    if tag & 0x1F == 0x1F:  # high tag number: skip its base-128 continuation bytes
+        while pos < end and data[pos] & 0x80:
+            pos += 1
+        pos += 1
+    if pos >= end:
+        raise ValueError("a DER element is cut off")
+    length = data[pos]
+    pos += 1
     if length == 0x80:
         if not tag & 0x20:
             raise ValueError("a DER length is damaged")
         inner = pos
-        while not (inner + 2 <= end and data[inner] == 0 and data[inner + 1] == 0):
+        while True:
             if inner + 2 > end:
-                raise ValueError("an indefinite-length element is never closed")
-            inner = der_item(data, inner, end, depth + 1)[3]
-        return tag, pos, inner, inner + 2
+                raise ValueError("an indefinite-length element has no end marker")
+            if data[inner] == 0 and data[inner + 1] == 0:
+                return tag, pos, inner, inner + 2
+            inner = der_element(data, inner, end, depth + 1)[3]
     if length & 0x80:
         n = length & 0x7F
-        if n == 0 or n > 4 or pos + n > end:
+        if n > 4 or pos + n > end:
             raise ValueError("a DER length is damaged")
         length = int.from_bytes(data[pos:pos + n], "big")
         pos += n
@@ -159,13 +169,13 @@ def der_item(data: bytes, pos: int, end: int, depth: int = 0) -> tuple:
 
 
 def der_items(data: bytes, start: int = 0, end: int | None = None) -> list:
-    """The DER elements between start and end: [(tag, content_start, content_end)]."""
+    """The BER/DER elements between start and end: [(tag, content_start, content_end)]."""
     end = len(data) if end is None else end
     out = []
     pos = start
     while pos < end:
-        tag, s, e, pos = der_item(data, pos, end)
-        out.append((tag, s, e))
+        tag, cs, ce, pos = der_element(data, pos, end)
+        out.append((tag, cs, ce))
     return out
 
 
@@ -212,41 +222,63 @@ def der_time(tag: int, raw: bytes):
         return None
 
 
-def hexid(raw: bytes) -> str:
-    return ":".join(f"{b:02x}" for b in raw.lstrip(b"\x00") or b"\x00")
-
-
 def x509_info(data: bytes, start: int, end: int) -> dict:
-    """Subject, issuer, serial and validity of the certificate whose content is data[start:end]
-    (plus "_ski", its subjectKeyIdentifier, which pkcs7_info uses and removes)."""
+    """Subject, issuer, serial and validity of the certificate whose content is data[start:end].
+    A damaged validity date loses only that field."""
     tbs = der_items(data, *der_items(data, start, end)[0][1:])
     if tbs and tbs[0][0] == 0xA0:
         tbs = tbs[1:]
     serial = data[tbs[0][1]:tbs[0][2]]
     try:
-        validity = der_items(data, tbs[3][1], tbs[3][2])
-        times = [der_time(t, data[s:e]) for t, s, e in validity[:2]]
+        times = [der_time(t, data[s:e]) for t, s, e in der_items(data, tbs[3][1], tbs[3][2])[:2]]
     except (ValueError, IndexError):
         times = []
     times += [None] * (2 - len(times))
-    ski = None
-    for tag, s, e in tbs[5:]:
-        if tag != 0xA3:  # [3] extensions
-            continue
-        try:
-            for _, xs, xe in der_items(data, *der_items(data, s, e)[0][1:]):
-                ext = der_items(data, xs, xe)
-                if der_oid(data[ext[0][1]:ext[0][2]]) == "2.5.29.14":  # subjectKeyIdentifier
-                    value = der_items(data, ext[-1][1], ext[-1][2])[0]
-                    ski = data[value[1]:value[2]].hex()
-        except (ValueError, IndexError):
-            pass
     return {"subject": der_name(data, tbs[4][1], tbs[4][2]), "issuer": der_name(data, tbs[2][1], tbs[2][2]),
-            "serial": hexid(serial), "not_before": times[0], "not_after": times[1], "_ski": ski}
+            "serial": hex_serial(serial), "not_before": times[0], "not_after": times[1]}
+
+
+def hex_serial(raw: bytes) -> str:
+    return ":".join(f"{b:02x}" for b in raw.lstrip(b"\x00") or b"\x00")
+
+
+def x509_keys(data: bytes, start: int, end: int) -> tuple:
+    """(issuer DER, serial, subject DER, subjectKeyIdentifier or None): what a CMS SignerInfo can point at."""
+    tbs = der_items(data, *der_items(data, start, end)[0][1:])
+    if tbs and tbs[0][0] == 0xA0:
+        tbs = tbs[1:]
+    ski = None
+    for tag, s, e in tbs[6:]:
+        if tag != 0xA3:  # [3] extensions; [1] and [2] are the old unique IDs
+            continue
+        for _, xs, xe in der_items(data, *der_items(data, s, e)[0][1:]):
+            ext = der_items(data, xs, xe)
+            if len(ext) >= 2 and der_oid(data[ext[0][1]:ext[0][2]]) == "2.5.29.14":
+                inner = der_items(data, ext[-1][1], ext[-1][2])  # OCTET STRING wrapping OCTET STRING
+                ski = bytes(data[inner[0][1]:inner[0][2]]) if inner else None
+    return (bytes(data[tbs[2][1]:tbs[2][2]]), hex_serial(data[tbs[0][1]:tbs[0][2]]),
+            bytes(data[tbs[4][1]:tbs[4][2]]), ski)
+
+
+def signer_id(blob: bytes, info: tuple):
+    """A SignerInfo's sid: ("issuer", issuer DER, serial) or ("ski", key id)."""
+    who = der_items(blob, info[1], info[2])[1]
+    if who[0] == 0x30:  # IssuerAndSerialNumber (SignerInfo version 1)
+        parts = der_items(blob, who[1], who[2])
+        return "issuer", bytes(blob[parts[0][1]:parts[0][2]]), hex_serial(blob[parts[1][1]:parts[1][2]])
+    raw = blob[who[1]:who[2]]
+    if who[0] == 0xA0:  # [0] written constructed (explicit) by some encoders
+        inner = der_items(blob, who[1], who[2])
+        raw = blob[inner[0][1]:inner[0][2]] if inner else raw
+    return "ski", bytes(raw)  # [0] SubjectKeyIdentifier (SignerInfo version 3)
 
 
 def pkcs7_info(blob: bytes) -> dict:
-    """Certificates, digest algorithm and signer from a PKCS#7 SignedData (nothing is verified)."""
+    """Certificates, digest algorithm and signer from a CMS / PKCS#7 SignedData (RFC 5652; nothing is verified).
+
+    The signer is the certificate the first SignerInfo's sid names, by IssuerAndSerialNumber
+    or by SubjectKeyIdentifier. If none matches, it is the leaf certificate: the one that
+    issued no other certificate in the set."""
     out = {"digest_algorithm": None, "signer": None, "certificates": [], "problem": None}
     try:
         top = der_items(blob, 0, len(blob))[0]
@@ -256,28 +288,28 @@ def pkcs7_info(blob: bytes) -> dict:
         if algs:
             oid = der_oid(blob[slice(*der_items(blob, algs[0][1], algs[0][2])[0][1:])])
             out["digest_algorithm"] = OIDS.get(oid, oid)
-        signer_key = None
+        keys, sid = [], None
         for tag, s, e in signed[3:]:
             if tag == 0xA0:
-                for _, cs, ce in der_items(blob, s, e):
-                    out["certificates"].append(x509_info(blob, cs, ce))
+                for ctag, cs, ce in der_items(blob, s, e):
+                    if ctag == 0x30:  # other CertificateChoices are attribute certificates: not signers
+                        out["certificates"].append(x509_info(blob, cs, ce))
+                        keys.append(x509_keys(blob, cs, ce))
             elif tag == 0x31:
                 infos = der_items(blob, s, e)
                 if infos:
-                    sid_tag, sid_s, sid_e = der_items(blob, infos[0][1], infos[0][2])[1]
-                    if sid_tag == 0x80:  # [0] subjectKeyIdentifier (SignerInfo version 3)
-                        signer_key = ("ski", blob[sid_s:sid_e].hex())
-                    else:  # issuerAndSerialNumber
-                        who = der_items(blob, sid_s, sid_e)
-                        signer_key = (der_name(blob, who[0][1], who[0][2]), hexid(blob[who[1][1]:who[1][2]]))
-        for cert in out["certificates"]:
-            cert["is_signer"] = signer_key in ((cert["issuer"], cert["serial"]), ("ski", cert["_ski"]))
-            if cert["is_signer"]:
-                out["signer"] = cert["subject"]
+                    sid = signer_id(blob, infos[0])
+        match = next((i for i, (issuer, serial, _subject, ski) in enumerate(keys)
+                      if sid and (sid == ("issuer", issuer, serial) or sid == ("ski", ski))), None)
+        if match is None and keys:
+            issuers = {issuer for issuer, _serial, subject, _ski in keys if issuer != subject}
+            match = next((i for i, k in enumerate(keys) if k[2] not in issuers), 0)
+        for i, cert in enumerate(out["certificates"]):
+            cert["is_signer"] = i == match
+        if match is not None:
+            out["signer"] = out["certificates"][match]["subject"]
     except (ValueError, IndexError) as err:
         out["problem"] = f"the signature block is damaged ({err})"
-    for cert in out["certificates"]:
-        cert.pop("_ski", None)
     return out
 
 

@@ -65,6 +65,86 @@ def test_code_signature_adhoc_and_certificates(tmp_path):
     assert out == ['false nil ["unsigned"]']
 
 
+@pytest.mark.parametrize("sid", ["issuer_serial", "ski"])
+@pytest.mark.parametrize("ber", [False, True])
+@pytest.mark.parametrize("leaf_first", [False, True])
+def test_cms_signer_layouts(tmp_path, sid, ber, leaf_first):
+    """RFC 5652 SignerIdentifier in both forms, DER or BER (indefinite lengths, as Apple's codesign
+    writes), with signedAttrs, and with the leaf certificate first or last in the set."""
+    root = build_cert([("CN", "Demo Root CA")], [("CN", "Demo Root CA")], 1, ski=b"\x01" * 20)
+    mid = build_cert([("CN", "Demo Intermediate CA")], [("CN", "Demo Root CA")], 2, ski=b"\x02" * 20)
+    leaf = build_cert([("CN", "Software Signing"), ("O", "Example Inc.")], [("CN", "Demo Intermediate CA")], 3,
+                      ski=b"\x03" * 20)
+    # A second certificate with the leaf's issuer but a different serial, so a match must use both keys.
+    decoy = build_cert([("CN", "Decoy Signing")], [("CN", "Demo Intermediate CA")], 4, ski=b"\x04" * 20)
+    certs = [leaf, decoy, mid, root] if leaf_first else [root, mid, decoy, leaf]
+    who = ([("CN", "Demo Intermediate CA")], 3) if sid == "issuer_serial" else b"\x03" * 20
+    cms = build_pkcs7(certs, who, signed_attrs=True, ber=ber)
+    path = save(tmp_path, build_macho(signature="cms", cms=cms))
+    out = run_tb(f'import macho\nlet s = macho.parse("{path}").code_signature\n'
+                 'say(s.signer, s.problem)\n'
+                 'say(s.certificates.filter(fn(c) { return c.is_signer }).map(fn(c) { return c.serial }))')
+    assert out == ["CN=Software Signing, O=Example Inc. nil", '["03"]']
+
+
+def test_cms_signer_falls_back_to_leaf(tmp_path):
+    """A sid that names no certificate in the set: the leaf (issuer of nothing else) is the signer."""
+    root = build_cert([("CN", "Demo Root CA")], [("CN", "Demo Root CA")], 1)
+    mid = build_cert([("CN", "Demo Intermediate CA")], [("CN", "Demo Root CA")], 2)
+    leaf = build_cert([("CN", "Leaf Signing")], [("CN", "Demo Intermediate CA")], 3)
+    for who in (b"\x09" * 20, ([("CN", "Somebody Else")], 99)):
+        cms = build_pkcs7([mid, leaf, root], who, ber=True)
+        path = save(tmp_path, build_macho(signature="cms", cms=cms))
+        out = run_tb(f'import macho\nlet s = macho.parse("{path}").code_signature\nsay(s.signer, s.problem)')
+        assert out == ["CN=Leaf Signing nil"]
+    # A BER blob whose end-of-contents marker is missing is reported, not a traceback.
+    cut = build_pkcs7([leaf], ([("CN", "Demo Intermediate CA")], 3), ber=True)[:-2]
+    path = save(tmp_path, build_macho(signature="cms", cms=cut))
+    out = run_tb(f'import macho\nlet s = macho.parse("{path}").code_signature\nsay(s.signer, s.problem)')
+    assert out[0].startswith("nil the signature block is damaged")
+
+
+def hostile_sections(commands=64, size=2 * 1024 * 1024) -> bytes:
+    """64 segments x 256 sections, every one covering the whole file: about 32 GB of entropy work unbounded."""
+    import struct
+    sect = struct.pack("<16s16sQQIIIIIIII", b"__x", b"__X", 0, size, 1, 0, 0, 0, 0, 0, 0, 0)
+    cmd = struct.pack("<II16sQQQQiiII", 0x19, 72 + 80 * 256, b"__X", 0, size, 0, size, 7, 5, 256, 0) + sect * 256
+    header = struct.pack("<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 2, commands, len(cmd) * commands, 0, 0)
+    data = header + cmd * commands
+    return data + os.urandom(size - len(data))
+
+
+def test_entropy_budget_on_hostile_sections(tmp_path):
+    import time
+
+    from tblib import macho
+    data = hostile_sections()
+    start = time.perf_counter()
+    macho.parse_bytes(data)
+    assert time.perf_counter() - start < 1.0  # unbounded, this ran for over 20 s and kept going
+    path = save(tmp_path, data)
+    start = time.perf_counter()
+    out = run_tb(f'import macho\nlet i = macho.parse("{path}")\n'
+                 'say(len(i.sections), len(i.sections.filter(fn(s) { return s.entropy == nil })) > 1000)\n'
+                 'say(len(i.limits) == 2, i.entropy != nil)\n'
+                 'say(i.indicators.filter(fn(x) { return x.name == "analysis_limited" })[0].detail)')
+    elapsed = time.perf_counter() - start
+    assert out[:2] == ["1024 true", "true true"]
+    assert "1024 sections" in out[2] and "entropy was skipped" in out[2]
+    assert elapsed < 1.5, elapsed  # includes starting TB; the unbounded version ran for minutes
+    # Universal binary whose slices all repeat the same bytes: later slices are skipped, not re-hashed.
+    thin = build_macho()
+    fat = bytearray(build_fat([thin]))
+    fat[4:8] = (40).to_bytes(4, "big")
+    entry = bytes(fat[8:28])
+    fat[8:8 + 20 * 40] = entry * 40
+    path = save(tmp_path, bytes(fat), "fat")
+    out = run_tb(f'import macho\nlet i = macho.parse("{path}")\n'
+                 'say(len(i.slices), i.slices[0].problem, i.slices[-1].problem, i.limits)')
+    assert out[0].startswith("40 nil skipped: earlier slices")
+    assert "slices were skipped" in out[0]
+
+
 def test_universal_binary(tmp_path):
     for fat64 in (False, True):
         path = save(tmp_path, build_fat([build_macho(cpu="x64"), build_macho(cpu="arm64e")], fat64=fat64), "fat")

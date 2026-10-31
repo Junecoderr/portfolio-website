@@ -52,13 +52,7 @@ class FakeDns:
         self.nxdomain = set(nxdomain)
         self.servfail = set(servfail)
         self.questions = []
-        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.udp.bind(("127.0.0.1", 0))
-        self.port = self.udp.getsockname()[1]
-        self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.tcp.bind(("127.0.0.1", self.port))
-        self.tcp.listen(5)
+        self.udp, self.tcp, self.port = self.bind_pair()
         self.udp.settimeout(0.2)
         self.tcp.settimeout(0.2)
         self.stop = threading.Event()
@@ -66,6 +60,25 @@ class FakeDns:
                         threading.Thread(target=self.serve_tcp, daemon=True)]
         for t in self.threads:
             t.start()
+
+    @staticmethod
+    def bind_pair(attempts=50):
+        """A UDP and a TCP socket on the same free port (DNS retries over TCP at the same address).
+        The OS picks a free UDP port, but another program may hold that number for TCP
+        (EADDRINUSE on busy CI runners), so try again with a new port when it does."""
+        for _ in range(attempts):
+            udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            udp.bind(("127.0.0.1", 0))
+            port = udp.getsockname()[1]
+            tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                tcp.bind(("127.0.0.1", port))
+                tcp.listen(5)
+                return udp, tcp, port
+            except OSError:
+                udp.close()
+                tcp.close()
+        raise OSError(f"no free port for both UDP and TCP after {attempts} tries")
 
     @property
     def address(self):

@@ -775,7 +775,12 @@ def build_record(root, record_id: int, written: int, chunk_index: int, want_xml:
     record = logs.windows_record(obj, xml_text)
     describe(record, fields.get("Channel"))
     record["source"] = "evtx"
-    record["record_id"] = record_id
+    # Exported logs (wevtutil epl, Save As) renumber the record headers from 1, but each
+    # record's own System/EventRecordID keeps the number Windows gave it; Event Viewer and
+    # wevtutil show that one, so it wins. record_number is the position in this file.
+    own = fields.get("EventRecordID")
+    record["record_id"] = own if isinstance(own, int) and not isinstance(own, bool) and own > 0 else record_id
+    record["record_number"] = record_id
     record["chunk"] = chunk_index
     record["written"] = filetime_stamp(written)
     record["level"] = fields.get("Level")
@@ -919,7 +924,10 @@ def records_or_fail(line, src, path, opts, fn):
     out = []
     for record in records_of(line, src, path, opts):
         if len(out) >= MAX_RECORDS:
-            break
+            # Never a silent cut: a wrong count is worse than an error that says what to do.
+            fix = "evtx.each()" if fn == "evtx.summary" else "evtx.each() or a smaller limit"
+            fail(line, f"That log has more than {MAX_RECORDS:,} events; {fn}() keeps them all in memory, "
+                       f"so use {fix}.", path=path)
         out.append(record)
     return out
 
@@ -994,14 +1002,18 @@ def load(api):
         "- \"time\", \"when\"\n"
         "- \"event_id\", \"action\", \"description\"\n"
         "- \"user\", \"ip\", \"success\"\n"
-        "- \"computer\", \"channel\", \"provider\", \"level_name\", \"record_id\"\n"
+        "- \"computer\", \"channel\", \"provider\", \"level_name\", \"record_id\" (Windows' EventRecordID), \"record_number\" (position in the file)\n"
         "- \"task_name\", \"opcode_name\": when known (Security task categories, standard opcodes).\n"
         "- \"event_data\": a map of the EventData fields.\n"
         "  Every EventData field is also its own key.\n"
         "- \"partial\": true when parts of the event used binary XML this reader doesn't know.\n"
         "- \"raw\": the XML.\n"
         "\n"
-        "A .gz or one-file .zip of an .evtx file is unpacked as it is read."))
+        "A .gz or one-file .zip of an .evtx file is unpacked as it is read.\n"
+        "\n"
+        "Errors:\n"
+        "- more than 500,000 events (without a smaller limit): use evtx.each().\n"
+        "- a .gz or .zip that unpacks to over 2 GiB, or over 100x its packed size."))
     def read(line, path, options=None):
         opts = options_of(line, options, "evtx.read")
         with _magic.open_stream(line, path, "evtx.read") as f:

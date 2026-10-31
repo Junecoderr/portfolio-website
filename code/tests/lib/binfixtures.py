@@ -340,26 +340,53 @@ def der_name(pairs) -> bytes:
 
 
 def build_cert(subject, issuer, serial, not_before="240101000000Z", not_after="270101000000Z", ski=None) -> bytes:
-    """ski: bytes for a subjectKeyIdentifier extension."""
+    """ski: bytes for a subjectKeyIdentifier extension (with a basicConstraints one before it)."""
     sha256_rsa = der_seq(der_oid("1.2.840.113549.1.1.11"), der(0x05, b""))
-    ext = der(0xA3, der_seq(der_seq(der_oid("2.5.29.14"), der(0x04, der(0x04, ski))))) if ski else b""
+    extensions = b""
+    if ski is not None:
+        extensions = der(0xA3, der_seq(der_seq(der_oid("2.5.29.19"), der(0x01, b"\xff"), der(0x04, der_seq(b""))),
+                                       der_seq(der_oid("2.5.29.14"), der(0x04, der(0x04, ski)))))
     tbs = der_seq(der(0xA0, der_int(2)), der_int(serial), sha256_rsa, der_name(issuer),
                   der_seq(der(0x17, not_before.encode()), der(0x17, not_after.encode())), der_name(subject),
                   der_seq(der_seq(der_oid("1.2.840.113549.1.1.1"), der(0x05, b"")), der(0x03, b"\x00" + b"\x01" * 16)),
-                  ext)
+                  extensions)
     return der_seq(tbs, sha256_rsa, der(0x03, b"\x00" + b"\x02" * 32))
 
 
-def build_pkcs7(certs, signer, digest="2.16.840.1.101.3.4.2.1") -> bytes:
-    """Authenticode-shaped SignedData. certs: DER certificates; signer: (issuer pairs, serial), or
-    the signer certificate's subjectKeyIdentifier bytes (SignerInfo version 3)."""
+def build_pkcs7(certs, signer, digest="2.16.840.1.101.3.4.2.1", signed_attrs=False, ber=False) -> bytes:
+    """Authenticode-shaped SignedData. certs: DER certificates; signer: (issuer pairs, serial) for an
+    IssuerAndSerialNumber sid, or bytes for a [0] SubjectKeyIdentifier sid (SignerInfo version 3).
+    signed_attrs adds a [0] signedAttrs block; ber re-encodes every constructed element with
+    indefinite lengths, the way Apple's codesign writes it."""
     alg = der_seq(der_oid(digest), der(0x05, b""))
     content = der_seq(der_oid("1.3.6.1.4.1.311.2.1.4"), der(0xA0, der_seq(b"")))
-    sid = der(0x80, signer) if isinstance(signer, bytes) else der_seq(der_name(signer[0]), der_int(signer[1]))
-    signer_info = der_seq(der_int(3 if isinstance(signer, bytes) else 1), sid, alg,
+    if isinstance(signer, bytes):
+        version, sid = 3, der(0x80, signer)
+    else:
+        version, sid = 1, der_seq(der_name(signer[0]), der_int(signer[1]))
+    attrs = der(0xA0, der_seq(der_oid("1.2.840.113549.1.9.3"), der_set(der_oid("1.2.840.113549.1.7.1")))) \
+        if signed_attrs else b""
+    signer_info = der_seq(der_int(version), sid, alg, attrs,
                           der_seq(der_oid("1.2.840.113549.1.1.1"), der(0x05, b"")), der(0x04, b"\x03" * 32))
-    signed = der_seq(der_int(1), der_set(alg), content, der(0xA0, b"".join(certs)), der_set(signer_info))
-    return der_seq(der_oid("1.2.840.113549.1.7.2"), der(0xA0, signed))
+    signed = der_seq(der_int(version), der_set(alg), content, der(0xA0, b"".join(certs)), der_set(signer_info))
+    out = der_seq(der_oid("1.2.840.113549.1.7.2"), der(0xA0, signed))
+    return to_ber(out) if ber else out
+
+
+def to_ber(data: bytes) -> bytes:
+    """Re-encode DER with indefinite lengths (0x80 ... 00 00) on every constructed element."""
+    out, pos = b"", 0
+    while pos < len(data):
+        tag, n = data[pos], data[pos + 1]
+        pos += 2
+        if n & 0x80:
+            k = n & 0x7F
+            n = int.from_bytes(data[pos:pos + k], "big")
+            pos += k
+        body = data[pos:pos + n]
+        pos += n
+        out += bytes([tag, 0x80]) + to_ber(body) + b"\x00\x00" if tag & 0x20 else der(tag, body)
+    return out
 
 
 # =============================================================================
