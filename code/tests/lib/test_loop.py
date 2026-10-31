@@ -26,12 +26,14 @@ def test_async_fns_take_turns_on_the_loop():
     src = '''import parallel
 import time
 async fn twice(x) {
-  parallel.sleep(0.2)
+  parallel.sleep(0.3)
   return x * 2
 }
 let start = time.timestamp()
 say(parallel.loop(fn() { return parallel.all([twice(1), twice(2), twice(3)]) }))
-say(time.timestamp() - start < 0.6)
+# One after another would take 0.9 s; together they take about 0.3 s. A wide margin
+# keeps busy CI machines from failing this.
+say(time.timestamp() - start < 0.75)
 let n = {"v": 0}
 parallel.loop(fn() {
   parallel.map(fn(i) {
