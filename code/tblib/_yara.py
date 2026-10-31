@@ -1207,7 +1207,10 @@ class Ctx:
 
     def module(self, name):
         if name not in self.modules:
-            self.modules[name] = BUILDERS[name](self.data)
+            try:
+                self.modules[name] = BUILDERS[name](self.data)
+            except Exception:  # a file too damaged to describe: its fields are undefined, as in YARA
+                self.modules[name] = {}
         return self.modules[name]
 
     def entrypoint(self):
