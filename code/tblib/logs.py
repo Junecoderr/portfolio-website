@@ -6,10 +6,12 @@ import csv as _csv
 import datetime as _dt
 import io
 import ipaddress
+import itertools
 import json as _json
 import os
 import re
 
+from tblib import _magic
 from tblib._api import Module, check_type, fail, fail_os
 
 import tb as _tb
@@ -1311,11 +1313,12 @@ def json_record(obj, raw, fmt):
 # Readers
 # =============================================================================
 
-def open_text(path):
+def open_text(line, path, fn="logs.read"):
     """Open a log file as text, whatever its encoding (UTF-8, UTF-16 from
-    PowerShell, or Windows code page bytes)."""
-    with open(path, "rb") as f:
-        head = f.read(4)
+    PowerShell, or Windows code page bytes), streamed from disk; .gz and
+    one-file .zip logs are unpacked as they are read."""
+    f = _magic.open_stream(line, path, fn)
+    head = f.peek(4)[:4]
     if head.startswith(b"\xff\xfe") or head.startswith(b"\xfe\xff"):
         encoding = "utf-16"
     elif head.startswith(b"\xef\xbb\xbf"):
@@ -1324,7 +1327,7 @@ def open_text(path):
         encoding = "utf-16-le"
     else:
         encoding = "utf-8"
-    return open(path, encoding=encoding, errors="replace", newline="")
+    return io.TextIOWrapper(f, encoding=encoding, errors="replace", newline="")
 
 
 def sniff_text(sample: str) -> str:
@@ -1588,20 +1591,18 @@ def iter_text(text, fmt, line, year=None):
 
 
 def iter_file(path, fmt, line, year=None):
-    """Records from a file, read a line at a time where the format allows."""
+    """Records from a file, read a line at a time where the format allows. Pulled one
+    record at a time, so the reader never runs ahead of the consumer."""
     if fmt in ("auto", "evtx"):
         # Binary Windows event logs (.evtx, magic "ElfFile") go to the evtx library.
-        try:
-            with open(path, "rb") as fb:
-                head = fb.read(8)
-        except OSError as err:
-            fail_os(line, err, path, "read")
+        with _magic.open_stream(line, path, "logs.read") as fb:
+            head = fb.peek(8)[:8]
         if head == b"ElfFile\x00" or fmt == "evtx":
             from tblib import evtx as _evtx
             yield from _evtx.iter_path(line, path, "logs.read")
             return
     try:
-        with open_text(path) as f:
+        with open_text(line, path) as f:
             sample = f.read(SNIFF_BYTES)
     except OSError as err:
         fail_os(line, err, path, "read")
@@ -1609,7 +1610,7 @@ def iter_file(path, fmt, line, year=None):
         fmt = sniff_text(sample)
     stripped = sample.lstrip()
     try:
-        with open_text(path) as f:
+        with open_text(line, path) as f:
             if fmt in JSON_FORMATS and is_document(stripped):
                 yield from iter_json_document(f.read(), fmt, line)
                 return
@@ -1755,7 +1756,8 @@ def load(api):
     @m.fn("each", 2, 4, doc=(
         "each(path, fn, format?, options?) -> number\n"
         "Call fn(record) for every record in a log file without keeping them all in memory (for huge logs). "
-        "Gives back how many records there were. If fn gives back false, reading stops early."))
+        "The file is streamed from disk a line at a time, and .gz and one-file .zip logs are unpacked as they "
+        "are read. Gives back how many records there were. If fn gives back false, reading stops early."))
     def each(line, path, fn, fmt="auto", options=None):
         path = path_arg(line, path, "each")
         check_type(line, fn, "function", "logs.each", "fn")
@@ -1770,6 +1772,27 @@ def load(api):
                 break
         return count
 
+    @m.fn("stream", 1, 3, doc=(
+        "stream(path, format?, options?) -> generator\n"
+        "A generator over the records of a log file, for for loops and .filter(), .map(), .take().\n"
+        "It reads the next record only when the loop asks for it, so it never runs ahead of your code "
+        "and memory stays flat however big the file is. Same formats and options as read(); "
+        ".gz and one-file .zip logs are unpacked as they are read.\n"
+        "\n"
+        "Example:\n"
+        "    for r in logs.stream(\"apps/data/auth.log\").take(2) {\n"
+        "      say(r.format)\n"
+        "    }"))
+    def stream(line, path, fmt="auto", options=None):
+        from tbcore.runtime import TBIterator
+        path = path_arg(line, path, "stream")
+        fmt = check_format(line, fmt, "stream")
+        opts = options_of(line, options, "stream")
+        records = iter_file(path, fmt, line, opts.get("year"))
+        if opts.get("limit") is not None:
+            records = itertools.islice(records, opts["limit"])
+        return TBIterator(records)
+
     @m.fn("sniff", 1, doc=(
         "sniff(path) -> text\n"
         "Guess a log file's format from its first lines, as one of the names in logs.formats "
@@ -1777,7 +1800,7 @@ def load(api):
     def sniff(line, path):
         path = path_arg(line, path, "sniff")
         try:
-            with open_text(path) as f:
+            with open_text(line, path, "logs.sniff") as f:
                 return sniff_text(f.read(SNIFF_BYTES))
         except OSError as err:
             fail_os(line, err, path, "read")

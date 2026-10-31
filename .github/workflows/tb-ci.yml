@@ -49,6 +49,28 @@ jobs:
         if: runner.os == 'Linux'
         run: command -v xvfb-run || (sudo apt-get update && sudo apt-get install -y xvfb)
 
+      # tests/lib/test_evtx_windows.py compares the EVTX reader with wevtutil on
+      # this runner's own Security, System, Application and PowerShell logs.
+      # Sysmon (Microsoft Sysinternals, signature checked before it runs) adds a
+      # Sysmon log to that comparison; if this step fails, the Sysmon case is
+      # reported as skipped. Note: -accepteula accepts the Sysinternals licence.
+      - name: Install Sysmon (Windows)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "Sysmon.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "Sysmon"
+          Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Sysmon.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $exe = Join-Path $dir "Sysmon64.exe"
+          $sig = Get-AuthenticodeSignature $exe
+          if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
+            throw "Sysmon64.exe is not validly signed by Microsoft: $($sig.Status) $($sig.SignerCertificate.Subject)"
+          }
+          & $exe -accepteula -i
+          wevtutil gli Microsoft-Windows-Sysmon/Operational
+
       # Every test runs twice: on the bytecode VM (the default engine) and
       # on the tree-walking interpreter kept for one release (TB_ENGINE=tree).
       - name: Run tests, VM engine (Linux, virtual display)

@@ -12,34 +12,40 @@ EVTX fidelity (what is and isn't handled, honestly):
   the format (strings, ANSI, signed/unsigned ints, float/double, bool,
   binary, GUID, FILETIME, SYSTEMTIME, SID, HexInt32/64, arrays, nested
   BinXml used for EventData/UserData). Broken records become placeholders
-  with "broken": true unless options {"strict": true}.
+  with "broken": true unless options {"strict": true}. Files are streamed a
+  chunk at a time (also from .gz and one-file .zip).
+* Damage: in a file marked dirty, whole records past a chunk's stale free
+  space offset still count. Unknown binary XML tokens are skipped to the end
+  of their element (whose size is known) and the record is marked "partial".
+  options {"recover": true} carves records from chunk slack space (and from
+  chunks whose header signature is gone), marked "recovered".
+* Names: task names for the Security auditing provider, the standard opcode
+  names, and whatever a RenderingInfo block (forwarded events) carries.
 * Not handled: the event *message* text. Windows renders it from the
   provider's message DLL, which isn't in the file, so records get the
   description from EVENTS, keyed by channel + event ID (Security, System,
-  Sysmon, PowerShell), or "Event N"; task, opcode and
-  keyword names are only known for the common audit keywords. No carving of
-  deleted records from chunk slack space, and no repair of half-written
-  chunks beyond skipping what doesn't parse.
-* Tested against synthetic files from tests/lib/evtxwriter.py (written from
-  the published format notes), not yet against a corpus of logs produced by
-  Windows itself, so unusual providers may still show surprises.
+  Sysmon, PowerShell), or "Event N".
+* Tested against synthetic files from tests/lib/evtxwriter.py, a fuzz test of
+  damaged copies, and (in CI on Windows) the runner's own exported logs
+  compared with wevtutil's rendering: tests/lib/test_evtx_windows.py.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import io
 import json as _json
-import os
 import struct
 import uuid
 import zlib
 from xml.sax.saxutils import escape, quoteattr
 
-from tblib import logs
-from tblib._api import Module, check_type, fail, fail_os
+from tblib import _magic, logs
+from tblib._api import Module, check_type, fail
 
 MAX_RECORDS = 500_000
 
+SECURITY_PROVIDER = "Microsoft-Windows-Security-Auditing"
 SYSMON = "microsoft-windows-sysmon/operational"
 POWERSHELL = "microsoft-windows-powershell/operational"
 # (lowercased channel, event id) -> (action, description). Sysmon titles come from
@@ -68,12 +74,45 @@ CHUNK_SIZE = 65536
 FILETIME_EPOCH = 116444736000000000
 
 LEVELS = {0: "LogAlways", 1: "Critical", 2: "Error", 3: "Warning", 4: "Information", 5: "Verbose"}
+# Standard opcodes every provider shares (winmeta.xml); providers' own opcodes start at 10.
+OPCODES = {0: "Info", 1: "Start", 2: "Stop", 3: "DCStart", 4: "DCStop", 5: "Extension", 6: "Reply",
+           7: "Resume", 8: "Suspend", 9: "Send", 240: "Receive"}
+# Task categories of Microsoft-Windows-Security-Auditing: the audit subcategory names Event Viewer shows.
+SECURITY_TASKS = {
+    12288: "Security State Change", 12289: "Security System Extension", 12290: "System Integrity",
+    12291: "IPsec Driver", 12292: "Other System Events", 12544: "Logon", 12545: "Logoff",
+    12546: "Account Lockout", 12547: "IPsec Main Mode", 12548: "Special Logon", 12549: "IPsec Quick Mode",
+    12550: "IPsec Extended Mode", 12551: "Other Logon/Logoff Events", 12552: "Network Policy Server",
+    12553: "User / Device Claims", 12554: "Group Membership", 12800: "File System", 12801: "Registry",
+    12802: "Kernel Object", 12803: "SAM", 12804: "Other Object Access Events", 12805: "Certification Services",
+    12806: "Application Generated", 12807: "Handle Manipulation", 12808: "File Share",
+    12809: "Filtering Platform Packet Drop", 12810: "Filtering Platform Connection", 12811: "Detailed File Share",
+    12812: "Removable Storage", 12813: "Central Policy Staging", 13056: "Sensitive Privilege Use",
+    13057: "Non Sensitive Privilege Use", 13058: "Other Privilege Use Events", 13312: "Process Creation",
+    13313: "Process Termination", 13314: "DPAPI Activity", 13315: "RPC Events", 13316: "Plug and Play Events",
+    13317: "Token Right Adjusted Events", 13568: "Audit Policy Change", 13569: "Authentication Policy Change",
+    13570: "Authorization Policy Change", 13571: "MPSSVC Rule-Level Policy Change",
+    13572: "Filtering Platform Policy Change", 13573: "Other Policy Change Events",
+    13824: "User Account Management", 13825: "Computer Account Management", 13826: "Security Group Management",
+    13827: "Distribution Group Management", 13828: "Application Group Management",
+    13829: "Other Account Management Events", 14080: "Directory Service Access", 14081: "Directory Service Changes",
+    14082: "Directory Service Replication", 14083: "Detailed Directory Service Replication",
+    14336: "Credential Validation", 14337: "Kerberos Service Ticket Operations", 14338: "Other Account Logon Events",
+    14339: "Kerberos Authentication Service",
+}
 KEYWORD_NAMES = {0x8020000000000000: "Audit Success", 0x8010000000000000: "Audit Failure",
                  0x8080000000000000: "Classic", 0x8000000000000000: "None"}
 
 
 class EvtxFormat(Exception):
     pass
+
+
+class UnknownToken(EvtxFormat):
+    """A binary XML token (or inline value type) this reader doesn't know; its size is unknown."""
+
+
+MAX_DEPTH = 64  # nested elements and templates; real events stay far below this
 
 
 # =============================================================================
@@ -174,6 +213,13 @@ def decode_value(kind: int, raw: bytes, parser=None):
 # Binary XML
 # =============================================================================
 
+def xml_str(value) -> str:
+    """A value as Windows writes it in event XML (booleans are true/false)."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 class Element:
     __slots__ = ("name", "attrs", "children")
 
@@ -188,9 +234,9 @@ class Element:
             if isinstance(c, Element):
                 continue
             if isinstance(c, list):
-                parts.append(", ".join(str(x) for x in c))
+                parts.append(", ".join(xml_str(x) for x in c))
             elif c is not None:
-                parts.append(str(c))
+                parts.append(xml_str(c))
         return "".join(parts)
 
     def find(self, name):
@@ -200,15 +246,15 @@ class Element:
         return None
 
     def to_xml(self) -> str:
-        attrs = "".join(f" {k}={quoteattr(str(v))}" for k, v in self.attrs.items() if v is not None)
+        attrs = "".join(f" {k}={quoteattr(xml_str(v))}" for k, v in self.attrs.items() if v is not None)
         inner = ""
         for c in self.children:
             if isinstance(c, Element):
                 inner += c.to_xml()
             elif isinstance(c, list):
-                inner += escape(", ".join(str(x) for x in c))
+                inner += escape(", ".join(xml_str(x) for x in c))
             elif c is not None:
-                inner += escape(str(c))
+                inner += escape(xml_str(c))
         if not inner:
             return f"<{self.name}{attrs}/>"
         return f"<{self.name}{attrs}>{inner}</{self.name}>"
@@ -228,6 +274,13 @@ class ChunkParser:
         self.chunk = chunk
         self.names = {}
         self.templates = {}
+        self.depth = 0
+        self.skipped = 0  # unknown tokens skipped in the current record
+
+    def enter(self):
+        self.depth += 1
+        if self.depth > MAX_DEPTH:
+            raise EvtxFormat(f"elements or templates nest deeper than {MAX_DEPTH} levels")
 
     # -- names --------------------------------------------------------------------
 
@@ -276,13 +329,24 @@ class ChunkParser:
                 node, pos = self.parse_element(pos, subs)
                 nodes.append(node)
                 continue
-            value, pos = self.parse_value_token(pos, subs)
+            try:
+                value, pos = self.parse_value_token(pos, subs)
+            except UnknownToken:
+                self.skipped += 1  # no size to skip by at this level: keep what came before
+                break
             nodes.append(value)
         if len(nodes) == 1:
             return nodes[0]
         return nodes
 
     def parse_template_instance(self, pos: int):
+        self.enter()
+        try:
+            return self._template_instance(pos)
+        finally:
+            self.depth -= 1
+
+    def _template_instance(self, pos: int):
         _token, _version, _template_id, def_offset = struct.unpack_from("<BBII", self.chunk, pos)
         pos += 10
         if def_offset == pos:
@@ -316,17 +380,26 @@ class ChunkParser:
 
     def template_at(self, offset: int):
         cached = self.templates.get(offset)
-        if cached is not None:
-            return cached
-        if offset + 24 > len(self.chunk):
-            raise EvtxFormat(f"a template offset {offset} points outside the chunk")
-        _next, size = struct.unpack_from("<I16xI", self.chunk, offset)
-        start = offset + 24
-        tree = self.parse_at(start, start + size, "template")
-        self.templates[offset] = tree
-        return tree
+        if cached is None:
+            if offset + 24 > len(self.chunk):
+                raise EvtxFormat(f"a template offset {offset} points outside the chunk")
+            _next, size = struct.unpack_from("<I16xI", self.chunk, offset)
+            start = offset + 24
+            before = self.skipped
+            tree = self.parse_at(start, start + size, "template")
+            cached = self.templates[offset] = (tree, self.skipped - before)
+        if cached[1]:
+            self.skipped += 1  # every record built from a damaged template is partial
+        return cached[0]
 
     def parse_element(self, pos: int, subs):
+        self.enter()
+        try:
+            return self._element(pos, subs)
+        finally:
+            self.depth -= 1
+
+    def _element(self, pos: int, subs):
         token = self.chunk[pos]
         has_attrs = bool(token & 0x40)
         pos += 1
@@ -346,7 +419,11 @@ class ChunkParser:
                     raise EvtxFormat(f"expected an attribute token at {pos}, found 0x{atoken:02x}")
                 pos += 1
                 aname, pos = self.read_name(pos)
-                value, pos = self.parse_value_token(pos, subs)
+                try:
+                    value, pos = self.parse_value_token(pos, subs)
+                except UnknownToken:
+                    self.skipped += 1  # the attribute list's size says where it ends
+                    break
                 element.attrs[aname] = value
             pos = attr_end
         closer = self.chunk[pos]
@@ -370,7 +447,13 @@ class ChunkParser:
                 pos += 1
                 break
             else:
-                value, pos = self.parse_value_token(pos, subs)
+                try:
+                    value, pos = self.parse_value_token(pos, subs)
+                except UnknownToken:
+                    if not pos < end <= len(self.chunk):
+                        raise
+                    self.skipped += 1  # the element's size says where it ends: keep what came before
+                    return element, end
                 element.children.append(value)
         return element, pos
 
@@ -393,7 +476,7 @@ class ChunkParser:
             size = {0x03: 1, 0x04: 1, 0x05: 2, 0x06: 2, 0x07: 4, 0x08: 4, 0x09: 8, 0x0A: 8, 0x0B: 4, 0x0C: 8,
                     0x0D: 4, 0x0F: 16, 0x11: 8, 0x12: 16, 0x14: 4, 0x15: 8}.get(kind)
             if size is None:
-                raise EvtxFormat(f"an inline value of type 0x{kind:02x} has no known size")
+                raise UnknownToken(f"an inline value of type 0x{kind:02x} has no known size")
             return decode_value(kind, self.chunk[pos:pos + size]), pos + size
         if base in (0x0D, 0x0E):  # substitution
             index, kind = struct.unpack_from("<HB", self.chunk, pos)
@@ -415,7 +498,7 @@ class ChunkParser:
             count = struct.unpack_from("<H", self.chunk, pos)[0]
             pos += 2
             return self.chunk[pos:pos + 2 * count].decode("utf-16-le", "replace") + "?>", pos + 2 * count
-        raise EvtxFormat(f"unknown binary XML token 0x{token:02x} at offset {pos - 1}")
+        raise UnknownToken(f"unknown binary XML token 0x{token:02x} at offset {pos - 1}")
 
     # -- template instantiation ------------------------------------------------------
 
@@ -463,14 +546,20 @@ def parse_file_header(data: bytes) -> dict:
             "checksum_ok": (zlib.crc32(data[:120]) & 0xFFFFFFFF) == checksum}
 
 
-def iter_chunks(data: bytes):
-    pos = 4096
+def as_stream(src):
+    return io.BytesIO(src) if isinstance(src, (bytes, bytearray, memoryview)) else src
+
+
+def iter_chunks(f, damaged=False):
+    """(index, chunk) for every 64 KB chunk after the file header, read one at a time from f.
+    damaged=True also yields chunks whose signature is gone (for record recovery)."""
     index = 0
-    while pos + 512 <= len(data):
-        chunk = data[pos:pos + CHUNK_SIZE]
-        if chunk[:8] == b"ElfChnk\x00":
+    while True:
+        chunk = f.read(CHUNK_SIZE)
+        if len(chunk) < 512:
+            return
+        if damaged or chunk[:8] == b"ElfChnk\x00":
             yield index, chunk
-        pos += CHUNK_SIZE
         index += 1
 
 
@@ -485,16 +574,61 @@ def chunk_header(chunk: bytes) -> dict:
             "header_checksum_ok": calc_header == header_crc, "records_checksum_ok": calc_records == records_crc}
 
 
-def iter_raw_records(chunk: bytes, header: dict):
+RECORD_MAGIC = b"\x2a\x2a\x00\x00"
+
+
+def record_at(chunk: bytes, pos: int, careful: bool):
+    """(size, record_id, written) if an event record starts at pos, else None. careful also
+    wants the size copy at the record's end and the binary XML fragment header, which is
+    how records are told apart from leftover bytes past the chunk's last known record."""
+    if pos + 28 > len(chunk):
+        return None
+    magic, size = struct.unpack_from("<II", chunk, pos)
+    if magic != 0x00002A2A or size < 28 or pos + size > len(chunk):
+        return None
+    if careful and (struct.unpack_from("<I", chunk, pos + size - 4)[0] != size
+                    or chunk[pos + 24:pos + 28] != b"\x0f\x01\x01\x00"):
+        return None
+    record_id, written = struct.unpack_from("<QQ", chunk, pos + 8)
+    return size, record_id, written
+
+
+def iter_raw_records(chunk: bytes, header: dict, dirty: bool = False, recover: bool = False):
+    """(pos, size, record_id, written, recovered) for each record in a chunk.
+
+    Live records run from offset 512 up to the header's free space offset. In a file
+    marked dirty the chunk header may be stale, so whole records past that offset
+    still count. recover=True then scans the rest of the chunk (its slack space) for
+    the signatures of older, overwritten or deleted records; those come back with
+    recovered=True."""
     pos = 512
-    end = header["free_space_offset"] if 512 <= header["free_space_offset"] <= len(chunk) else len(chunk)
-    while pos + 24 <= end:
-        magic, size = struct.unpack_from("<II", chunk, pos)
-        if magic != 0x00002A2A or size < 28 or pos + size > len(chunk):
-            break
-        record_id, written = struct.unpack_from("<QQ", chunk, pos + 8)
-        yield pos, size, record_id, written
-        pos += size
+    free = header["free_space_offset"]
+    end = free if 512 <= free <= len(chunk) else len(chunk)
+    if chunk[:8] == b"ElfChnk\x00":
+        while pos < end:
+            hit = record_at(chunk, pos, False)
+            if not hit:
+                break
+            yield pos, hit[0], hit[1], hit[2], False
+            pos += hit[0]
+        while dirty:
+            hit = record_at(chunk, pos, True)
+            if not hit:
+                break
+            yield pos, hit[0], hit[1], hit[2], False
+            pos += hit[0]
+    if not recover:
+        return
+    while True:
+        pos = chunk.find(RECORD_MAGIC, pos)
+        if pos < 0:
+            return
+        hit = record_at(chunk, pos, True)
+        if hit:
+            yield pos, hit[0], hit[1], hit[2], True
+            pos += hit[0]
+        else:
+            pos += 1
 
 
 # =============================================================================
@@ -649,6 +783,17 @@ def build_record(root, record_id: int, written: int, chunk_index: int, want_xml:
     record["channel"] = fields.get("Channel")
     record["task"] = fields.get("Task")
     record["opcode"] = fields.get("Opcode")
+    record["task_name"] = SECURITY_TASKS.get(record["task"]) if record["provider"] == SECURITY_PROVIDER else None
+    record["opcode_name"] = OPCODES.get(record["opcode"])
+    rendering = root.find("RenderingInfo")  # forwarded and rendered events carry the names Windows showed
+    if rendering is not None:
+        for name, key in (("Task", "task_name"), ("Opcode", "opcode_name"), ("Level", "level_name")):
+            el = rendering.find(name)
+            if el is not None and el.text():
+                record[key] = el.text()
+        message = rendering.find("Message")
+        if message is not None and message.text():
+            record["message"] = message.text()
     record["keywords"] = obj["Keywords"]
     record["keywords_hex"] = fields.get("Keywords")
     record["provider_guid"] = fields.get("ProviderGuid")
@@ -668,23 +813,27 @@ def build_record(root, record_id: int, written: int, chunk_index: int, want_xml:
     return record
 
 
-def iter_records(data: bytes, want_xml: bool = False, strict: bool = False):
-    """Yield record maps from EVTX bytes. Broken records are skipped (or raise when strict)."""
-    header = parse_file_header(data)
-    count = 0
-    for index, chunk in iter_chunks(data):
-        try:
-            ch = chunk_header(chunk)
-        except struct.error:
-            if strict:
-                raise EvtxFormat(f"chunk {index} has a cut-off header")
-            continue
+# What a damaged record can raise while it is decoded; it then becomes a "broken" placeholder.
+DAMAGE = (EvtxFormat, struct.error, IndexError, ValueError, UnicodeError, OverflowError, TypeError, KeyError)
+
+
+def iter_records(src, want_xml: bool = False, strict: bool = False, recover: bool = False):
+    """Yield record maps from EVTX bytes or a binary file object, read a chunk at a time.
+    Broken records become placeholders (or raise when strict); recover adds records
+    carved from chunk slack space, marked "recovered": true."""
+    f = as_stream(src)
+    header = parse_file_header(f.read(4096))
+    for index, chunk in iter_chunks(f, recover):
+        ch = chunk_header(chunk)
         parser = ChunkParser(chunk)
-        for pos, size, record_id, written in iter_raw_records(chunk, ch):
+        for pos, size, record_id, written, recovered in iter_raw_records(chunk, ch, header["dirty"], recover):
+            parser.skipped = 0
             try:
                 root = parser.parse_at(pos + 24, pos + size - 4, None)
                 record = build_record(root, record_id, written, index, want_xml)
-            except (EvtxFormat, struct.error, IndexError, ValueError, UnicodeDecodeError) as err:
+            except DAMAGE as err:
+                if recovered:
+                    continue  # leftover bytes that only looked like a record
                 if strict:
                     raise EvtxFormat(f"record {record_id} in chunk {index} is broken: {err}")
                 yield {"time": filetime_stamp(written), "when": None, "format": "windows", "source": "evtx",
@@ -692,20 +841,21 @@ def iter_records(data: bytes, want_xml: bool = False, strict: bool = False):
                        "message": f"Record {record_id} could not be decoded: {err}", "raw": "", "event_id": None,
                        "EventID": None, "action": None, "description": None}
                 continue
+            if parser.skipped:
+                record["partial"] = True  # unknown binary XML tokens were skipped
+            if recovered:
+                record["recovered"] = True
             yield record
-            count += 1
-            if count >= MAX_RECORDS:
-                return
-    return header
 
 
-def file_info(data: bytes) -> dict:
-    header = parse_file_header(data)
+def file_info(src) -> dict:
+    f = as_stream(src)
+    header = parse_file_header(f.read(4096))
     chunks = []
-    for index, chunk in iter_chunks(data):
+    for index, chunk in iter_chunks(f):
         ch = chunk_header(chunk)
         ch["index"] = index
-        ch["records"] = sum(1 for _ in iter_raw_records(chunk, ch))
+        ch["records"] = sum(1 for _ in iter_raw_records(chunk, ch, header["dirty"]))
         chunks.append(ch)
     header["chunks"] = chunks
     header["records"] = sum(c["records"] for c in chunks)
@@ -721,55 +871,56 @@ def is_evtx(data: bytes) -> bool:
 # The module
 # =============================================================================
 
-def read_bytes(line, path, fn):
-    check_type(line, path, "text", fn, "path")
-    if path == "":
-        fail(line, f"{fn}() needs a path, but got empty text.")
-    full = os.path.expanduser(path)
-    if os.path.isdir(full):
-        fail(line, f"'{path}' is a folder, not a file.", path=path)
-    try:
-        with open(full, "rb") as f:
-            return f.read()
-    except OSError as err:
-        fail_os(line, err, path, "read")
-
-
 def iter_path(line, path, fn="evtx.read"):
     """iter_path(line, path, fn) -> generator of records
-    Records from an .evtx file for other libraries (logs.read delegates here).
-    Fails with a friendly TB error if the file isn't an EVTX log."""
-    data = read_bytes(line, path, fn)
-    if not is_evtx(data):
-        fail(line, f"'{path}' isn't an EVTX log: it doesn't start with the EVTX signature (ElfFile).", path=path)
-    try:
-        yield from iter_records(data)
-    except EvtxFormat as err:
-        fail(line, f"'{path}' isn't an EVTX log I can read: {err}.", path=path)
+    Records from an .evtx file (also .gz or one-file .zip), streamed a chunk at a time,
+    for other libraries (logs.read delegates here). Fails with a friendly TB error if
+    the file isn't an EVTX log."""
+    with _magic.open_stream(line, path, fn) as f:
+        if not is_evtx(f.peek(8)[:8]):
+            fail(line, f"'{path}' isn't an EVTX log: it doesn't start with the EVTX signature (ElfFile).", path=path)
+        yield from records_of(line, f, path, options_of(line, None, fn))
 
 
 def options_of(line, options, fn):
-    opts = {"limit": None, "xml": False, "strict": False}
+    opts = {"limit": None, "xml": False, "strict": False, "recover": False}
     if options is None:
         return opts
     check_type(line, options, "map", fn, "options")
     if options.get("limit") is not None:
         opts["limit"] = check_type(line, options["limit"], "whole", fn, "the limit")
-    opts["xml"] = bool(options.get("xml", False))
-    opts["strict"] = bool(options.get("strict", False))
+    for name in ("xml", "strict", "recover"):
+        opts[name] = bool(options.get(name, False))
     return opts
 
 
-def records_or_fail(line, data: bytes, path, opts, fn):
-    out = []
+def records_of(line, src, path, opts):
+    """Records from EVTX bytes or a file object, one at a time, with friendly TB errors."""
     try:
-        for record in iter_records(data, opts["xml"], opts["strict"]):
-            if opts["limit"] is not None and len(out) >= opts["limit"]:
-                break
-            out.append(record)
-    except EvtxFormat as err:
+        records = iter_records(src, opts["xml"], opts["strict"], opts["recover"])
+        for n, record in enumerate(records):
+            if opts["limit"] is not None and n >= opts["limit"]:
+                return
+            yield record
+    except (EvtxFormat, struct.error) as err:
         what = f"'{path}'" if path else "that data"
         fail(line, f"{what} isn't an EVTX log I can read: {err}.", path=path)
+
+
+def info_of(line, path, fn):
+    with _magic.open_stream(line, path, fn) as f:
+        try:
+            return file_info(f)
+        except (EvtxFormat, struct.error) as err:
+            fail(line, f"'{path}' isn't an EVTX log I can read: {err}.", path=path)
+
+
+def records_or_fail(line, src, path, opts, fn):
+    out = []
+    for record in records_of(line, src, path, opts):
+        if len(out) >= MAX_RECORDS:
+            break
+        out.append(record)
     return out
 
 
@@ -836,44 +987,45 @@ def load(api):
         "- xml: true adds the event's XML as \"xml\".\n"
         "- strict: true fails on a broken record.\n"
         "  Without it, a broken record is kept as a placeholder with \"broken\": true.\n"
+        "- recover: true also carves old or deleted records out of the chunks' slack space.\n"
+        "  They come back with \"recovered\": true; Windows itself no longer shows them.\n"
         "\n"
         "Fields of each record:\n"
         "- \"time\", \"when\"\n"
         "- \"event_id\", \"action\", \"description\"\n"
         "- \"user\", \"ip\", \"success\"\n"
         "- \"computer\", \"channel\", \"provider\", \"level_name\", \"record_id\"\n"
+        "- \"task_name\", \"opcode_name\": when known (Security task categories, standard opcodes).\n"
         "- \"event_data\": a map of the EventData fields.\n"
         "  Every EventData field is also its own key.\n"
-        "- \"raw\": the XML."))
+        "- \"partial\": true when parts of the event used binary XML this reader doesn't know.\n"
+        "- \"raw\": the XML.\n"
+        "\n"
+        "A .gz or one-file .zip of an .evtx file is unpacked as it is read."))
     def read(line, path, options=None):
         opts = options_of(line, options, "evtx.read")
-        data = read_bytes(line, path, "evtx.read")
-        return records_or_fail(line, data, path, opts, "evtx.read")
+        with _magic.open_stream(line, path, "evtx.read") as f:
+            return records_or_fail(line, f, path, opts, "evtx.read")
 
     @m.fn("parse", 1, 2, doc="parse(data, options?) -> list\nLike evtx.read() for EVTX bytes already in memory.")
     def parse(line, data, options=None):
-        from tblib import _magic
         raw = _magic.to_bytes(line, data, "evtx.parse")
         opts = options_of(line, options, "evtx.parse")
         return records_or_fail(line, raw, None, opts, "evtx.parse")
 
-    @m.fn("each", 2, 3, doc="each(path, fn, options?) -> number\nCall fn(record) for every event, one at a time, without "
-                            "building the whole list of records (the file's bytes are still read in one go). "
-                            "Return false from fn to stop early. Gives back how many events fn saw.")
+    @m.fn("each", 2, 3, doc="each(path, fn, options?) -> number\nCall fn(record) for every event, one at a time, "
+                            "streaming the file from disk a chunk at a time, so logs of any size use little memory. "
+                            "Takes the same options as read(). Return false from fn to stop early. "
+                            "Gives back how many events fn saw.")
     def each(line, path, fn, options=None):
         check_type(line, fn, "function", "evtx.each", "fn")
         opts = options_of(line, options, "evtx.each")
-        data = read_bytes(line, path, "evtx.each")
-        try:
-            count = 0
-            for record in iter_records(data, opts["xml"], opts["strict"]):
-                if opts["limit"] is not None and count >= opts["limit"]:
-                    break
+        count = 0
+        with _magic.open_stream(line, path, "evtx.each") as f:
+            for record in records_of(line, f, path, opts):
                 count += 1
                 if api.call(fn, [record], line) is False:
                     break
-        except EvtxFormat as err:
-            fail(line, f"'{path}' isn't an EVTX log I can read: {err}.", path=path)
         return count
 
     @m.fn("summary", 1, doc=(
@@ -889,12 +1041,9 @@ def load(api):
     def summary(line, target):
         if isinstance(target, list):
             return summary_of(target, None)
-        data = read_bytes(line, target, "evtx.summary")
-        try:
-            info = file_info(data)
-        except (EvtxFormat, struct.error) as err:
-            fail(line, f"'{target}' isn't an EVTX log I can read: {err}.", path=target)
-        records = records_or_fail(line, data, target, {"limit": None, "xml": False, "strict": False}, "evtx.summary")
+        info = info_of(line, target, "evtx.summary")
+        with _magic.open_stream(line, target, "evtx.summary") as f:
+            records = records_or_fail(line, f, target, options_of(line, None, "evtx.summary"), "evtx.summary")
         return summary_of(records, info)
 
     @m.fn("info", 1, doc=(
@@ -909,15 +1058,10 @@ def load(api):
         "  - \"index\", \"first_record_id\", \"last_record_id\", \"records\"\n"
         "  - \"header_checksum_ok\", \"records_checksum_ok\""))
     def info(line, path):
-        data = read_bytes(line, path, "evtx.info")
-        try:
-            return file_info(data)
-        except (EvtxFormat, struct.error) as err:
-            fail(line, f"'{path}' isn't an EVTX log I can read: {err}.", path=path)
+        return info_of(line, path, "evtx.info")
 
     @m.fn("is_evtx", 1, doc="is_evtx(path) -> bool\nTrue if the file starts with the EVTX signature (ElfFile).")
     def is_evtx_fn(line, path):
-        from tblib import _magic
         return is_evtx(_magic.read_head(line, path, "evtx.is_evtx", 8))
 
     @m.fn("to_json", 1, doc="to_json(record) -> text\nOne record as a JSON line (the same shape "

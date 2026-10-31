@@ -7,8 +7,12 @@ wrapper (friendly errors). Nothing here depends on the file extension.
 
 from __future__ import annotations
 
+import gzip
+import io
 import os
 import struct
+import zipfile
+import zlib
 
 from tblib._api import check_type, fail, fail_os
 
@@ -275,3 +279,62 @@ def read_file(line, path, fn: str, max_size: int | None = None) -> bytes:
             return f.read()
     except OSError as err:
         fail_os(line, err, path, "read")
+
+
+class _Unpacked(io.RawIOBase):
+    """A .gz or one-file .zip, unpacked as it is read; damage becomes a friendly TB error."""
+
+    def __init__(self, inner, closers, line, path):
+        self.inner, self.closers, self.line, self.path = inner, closers, line, path
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        try:
+            data = self.inner.read(len(buffer))
+        except (OSError, EOFError, zlib.error, zipfile.BadZipFile, RuntimeError) as err:
+            fail(self.line, f"'{self.path}' is a damaged compressed file: {err}.", path=self.path)
+        buffer[:len(data)] = data
+        return len(data)
+
+    def close(self):
+        for c in self.closers:
+            c.close()
+        super().close()
+
+
+def open_stream(line, path, fn: str):
+    """A buffered binary reader over a file, read a piece at a time (supports peek()).
+    A file that starts like gzip or zip is unpacked on the fly (a zip must hold one
+    file), so callers stream .gz and .zip inputs without knowing they are packed."""
+    check_type(line, path, "text", fn, "path")
+    if path == "":
+        fail(line, f"{fn}() needs a path, but got empty text.")
+    full = os.path.expanduser(path)
+    if os.path.isdir(full):
+        fail(line, f"'{path}' is a folder, not a file.", path=path)
+    try:
+        f = open(full, "rb")
+    except OSError as err:
+        fail_os(line, err, path, "read")
+    try:
+        head = f.peek(4)[:4]
+        if head[:2] == b"\x1f\x8b":
+            inner = gzip.GzipFile(fileobj=f, mode="rb")
+        elif head == b"PK\x03\x04":
+            try:
+                zf = zipfile.ZipFile(f)
+                files = [i for i in zf.infolist() if not i.is_dir()]
+                if len(files) != 1:
+                    fail(line, f"'{path}' is a zip with {len(files)} files; {fn}() reads a zip that holds "
+                               "one file, so unzip it first.", path=path)
+                inner = zf.open(files[0])
+            except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, EOFError) as err:
+                fail(line, f"'{path}' is a zip I can't open: {err}.", path=path)
+        else:
+            return f
+    except BaseException:
+        f.close()
+        raise
+    return io.BufferedReader(_Unpacked(inner, [inner, f], line, path), 1 << 16)
