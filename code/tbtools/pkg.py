@@ -822,19 +822,11 @@ def _copy_path(source: dict, dest: str) -> dict:
 
 
 def package_entry(folder: str, name: str) -> str | None:
-    """The file `import` would load for a package folder, or None."""
-    manifest = os.path.join(folder, MANIFEST)
-    if os.path.isfile(manifest):
-        try:
-            main = read_manifest(folder)["package"].get("main")
-        except PkgError:
-            main = None
-        if main and os.path.isfile(os.path.join(folder, main)):
-            return main
-    for candidate in ("lib.tb", f"{name}.tb", f"{name.replace('-', '_')}.tb"):
-        if os.path.isfile(os.path.join(folder, candidate)):
-            return candidate
-    return None
+    """The file `import` would load for a package folder (relative to it), or None."""
+    from tbcore.interp import package_entry as entry_path  # the interpreter's own lookup
+
+    path = entry_path(folder, name)
+    return os.path.relpath(path, folder).replace(os.sep, "/") if path else None
 
 
 def _installed_meta(folder: str) -> dict:

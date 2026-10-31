@@ -1019,7 +1019,7 @@ LOGSOURCES = [
     {"product": "linux", "service": "auth", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux_secure"',
      "kql": "Syslog", "kql_where": 'Facility in ("auth", "authpriv")', "elastic": "event.dataset:system.auth"},
     {"product": "linux", "service": "sshd", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux_secure"',
-     "kql": "Syslog", "kql_where": 'Facility in ("auth", "authpriv") and ProcessName == "sshd"',
+     "kql": "Syslog", "kql_where": 'Facility in ("auth", "authpriv") and ProcessName startswith "sshd"',
      "elastic": "event.dataset:system.auth AND process.name:sshd"},
     {"product": "linux", "service": "sudo", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux_secure"',
      "kql": "Syslog", "kql_where": 'Facility in ("auth", "authpriv") and ProcessName == "sudo"',
@@ -1309,9 +1309,14 @@ SYSLOG_ACTIONS = [
 ]
 SYSLOG_PARSED = {
     "Action": "case(\n    " + ",\n    ".join(f'{test}, "{action}"' for test, action in SYSLOG_ACTIONS) + ',\n    "")',
-    "SrcIp": 'extract(@"(?:from |rhost=)([0-9A-Fa-f:.]+)", 1, SyslogMessage)',
+    # The address must end at whitespace or the end, so rhost=host.dead.example isn't an IP.
+    "SrcIp": 'extract(@"(?:from |rhost=|by )(?:(?:authenticating |invalid )?user \\S+ )?'
+             '(\\d+\\.\\d+\\.\\d+\\.\\d+|[0-9A-Fa-f]*:[0-9A-Fa-f:.]+)(?:\\s|$)", 1, SyslogMessage)',
     "SrcPort": 'toint(extract(@" port (\\d+)", 1, SyslogMessage))',
-    "UserName": 'extract(@"(?:for (?:invalid user |user )?|Invalid user |user=)([^\\s(;]+)", 1, SyslogMessage)',
+    # sudo puts the user first ("alice : TTY=... ; USER=root"), so try that before the rest.
+    "UserName": 'coalesce(\n    extract(@"^\\s*(\\S+) : (?:\\d+ incorrect password|TTY=|PWD=|user NOT in sudoers)", 1, SyslogMessage),\n'
+                '    extract(@"(?:for (?:invalid user |user )?|Invalid user |user=|(?:by|from) (?:authenticating |invalid )?user )'
+                '([^\\s(;]+)", 1, SyslogMessage))',
 }
 
 

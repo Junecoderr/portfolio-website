@@ -212,6 +212,24 @@ def test_add_local_zip_file(project, index_server):
     assert (project / "tb_packages" / "flat" / "lib.tb").is_file()
 
 
+@pytest.mark.parametrize("engine", ["vm", "tree"])
+@pytest.mark.parametrize("layout", ["underscored", "manifest_main"])
+def test_add_short_import_finds_any_entry_tb_add_accepts(project, tmp_path, capsys, engine, layout):
+    src = tmp_path / "my-lib"
+    if layout == "underscored":
+        write(src / "my_lib.tb", 'fn hi() { return "hi" }\n')
+    else:
+        write(src / "tb.toml", '[package]\nname = "my-lib"\nmain = "src/x.tb"\n')
+        write(src / "src" / "x.tb", 'fn hi() { return "hi" }\n')
+        write(src / "lib.tb", 'fn hi() { return "not main" }\n')  # main wins over lib.tb
+    assert pkg.main(["add", str(src)]) == 0
+    assert 'Use it with: import "my-lib" as my_lib' in capsys.readouterr().out
+    lines = []
+    short = 'import "my-lib" as my_lib\nsay(my_lib.hi())\n'
+    tb.run(short, interpreter=tb.engine_class(engine)(output=lines.append), path=str(project / "main.tb"))
+    assert lines == ["hi"]
+
+
 def test_add_rejects_non_package_zip(project, index_server, capsys):
     assert pkg.main(["add", "notpkg"]) == 1
     assert "doesn't look like a TB package" in capsys.readouterr().err

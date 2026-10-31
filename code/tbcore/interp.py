@@ -196,20 +196,20 @@ def find_project_root(start: str) -> str | None:
         folder = parent
 
 
-def package_entry(folder: str) -> str | None:
-    """The file that `import name` runs for the package in folder, or None."""
-    name = os.path.basename(folder.rstrip("/\\"))
-    for candidate in ("lib.tb", f"{name}.tb"):
-        path = os.path.join(folder, candidate)
-        if os.path.isfile(path):
-            return path
+def package_entry(folder: str, name: str | None = None) -> str | None:
+    """The file that `import name` runs for the package in folder, or None.
+    Shared with `tb add`, so anything it installs imports by its short name."""
+    name = name or os.path.basename(folder.rstrip("/\\"))
+    candidates = ["lib.tb", f"{name}.tb", f"{name.replace('-', '_')}.tb"]
     toml_path = os.path.join(folder, "tb.toml")
     if os.path.isfile(toml_path):
         main = toml_main(toml_path)
         if main:
-            path = os.path.join(folder, main)
-            if os.path.isfile(path):
-                return path
+            candidates.insert(0, main)
+    for candidate in candidates:
+        path = os.path.join(folder, candidate)
+        if os.path.isfile(path):
+            return path
     return None
 
 
@@ -2085,8 +2085,8 @@ class Interpreter:
         if os.path.isfile(mine):
             extra = f' To use your own file, put its name in quotes: import "{name}.tb"'
         elif find_package(name, start) is not None:
-            extra = (f" There is a tb_packages/{name} folder, but it has no lib.tb, {name}.tb "
-                     "or tb.toml with [package] main = \"...\".")
+            extra = (f" There is a tb_packages/{name} folder, but it has no lib.tb, {name}.tb, "
+                     f"{name.replace('-', '_')}.tb or tb.toml with [package] main = \"...\".")
         else:
             extra += " (To add a package, run: tb add " + name + ")"
         listing = f" Libraries: {', '.join(libraries)}." if libraries else ""
