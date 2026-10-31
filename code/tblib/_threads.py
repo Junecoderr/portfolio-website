@@ -4,6 +4,7 @@
 The tree-walking interpreter keeps a little per-call state (call depth, the
 current file), so TB callbacks from background threads take one shared lock:
 only one callback runs at a time, and they never interleave with each other.
+Inside parallel.loop() the loop's baton takes the place of that lock.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import threading
 
 import tb as _tb
+from tbcore import tasks as _tasks
 
 callback_lock = threading.RLock()
 
@@ -18,7 +20,8 @@ callback_lock = threading.RLock()
 def guarded_call(api, fn, args, line=None):
     """Call a TB function from any thread. Returns (value, error) where error
     is the TBError that stopped it (or None)."""
-    with callback_lock:
+    loop = _tasks.current_loop()
+    with (_tasks.turn(loop) if loop is not None else callback_lock):
         try:
             return api.call(fn, list(args), line), None
         except _tb.TBError as err:

@@ -314,7 +314,8 @@ def test_library_callbacks_from_other_threads_get_their_own_view():
 def test_documented():
     info = tb.describe_library("parallel")
     names = [f["name"] for f in info["functions"]]
-    assert names == ["run", "map", "each", "all", "race", "sleep", "cpu_count", "Queue", "Lock", "every", "after"]
+    assert names == ["run", "map", "each", "all", "race", "sleep", "cpu_count", "loop", "group", "timeout",
+                     "processes", "shared_queue", "Queue", "Lock", "every", "after"]
     for fn in info["functions"]:
         assert fn["signature"].startswith(fn["name"] + "(") and fn["doc"]
 

@@ -7,6 +7,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as _FutureTimeout
 
+from tbcore import tasks as _tasks
 from tblib._api import Module, check_type, fail
 
 import tb as _tb
@@ -56,6 +57,24 @@ def _run_with_timeout(work, timeout):
         raise TimeoutError from None
     finally:
         pool.shutdown(wait=False)
+
+
+async def _probe_all(ip, ports, timeout) -> list:
+    """check_ports inside parallel.loop(): every port at once on the loop."""
+    import asyncio
+
+    limit = asyncio.Semaphore(MAX_WORKERS * 4)
+
+    async def one(port):
+        async with limit:
+            try:
+                _, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), timeout)
+            except (OSError, asyncio.TimeoutError):
+                return False
+            writer.close()
+            return True
+
+    return list(await asyncio.gather(*(one(p) for p in ports)))
 
 
 def lookup(host: str, timeout: float = DNS_TIMEOUT) -> list:
@@ -243,6 +262,7 @@ def load(api):
         "resolve(host, timeout?) -> list\n"
         "The IP addresses of a host name (IPv4 first): resolve(\"example.com\"). "
         "Gives an error you can catch if the name doesn't exist. timeout is in seconds (default 5)."))
+    @_tasks.releases  # inside parallel.loop(), other tasks run while this waits
     def resolve(line, host, timeout=None):
         api.need_desktop(line, "The net library")
         host = host_arg(line, host, "resolve")
@@ -260,6 +280,7 @@ def load(api):
     @m.fn("reverse", 1, 2, doc=(
         "reverse(ip, timeout?) -> text\n"
         "The host name an IP address points back to (reverse DNS, PTR record), or nil if it has none."))
+    @_tasks.releases
     def reverse(line, ip, timeout=None):
         api.need_desktop(line, "The net library")
         addr = ip_arg(line, ip, "reverse")
@@ -298,6 +319,7 @@ def load(api):
         "tcp_check(host, port, timeout?) -> bool\n"
         "True if something accepts a TCP connection on that port (a normal connect, then it hangs up). "
         "timeout is in seconds (default 1). " + AUTHORISED))
+    @_tasks.releases
     def tcp_check(line, host, port, timeout=None):
         api.need_desktop(line, "The net library")
         host = host_arg(line, host, "tcp_check")
@@ -354,8 +376,11 @@ def load(api):
         ip = resolve_one(line, host, "check_ports")
         if not wanted:
             return {}
+        loop = _tasks.current_loop()
+        if loop is not None and not loop.on_loop_thread():  # non-blocking sockets on the loop: no threads
+            return dict(zip(wanted, loop.call(_probe_all(ip, wanted, timeout))))
         workers = min(MAX_WORKERS, len(wanted))
-        with ThreadPoolExecutor(max_workers=workers) as pool:
+        with _tasks.blocking(), ThreadPoolExecutor(max_workers=workers) as pool:
             states = list(pool.map(lambda p: is_open(ip, p, timeout), wanted))
         return dict(zip(wanted, states))
 
@@ -367,6 +392,7 @@ def load(api):
         f"Gives \"\" if the service says nothing before the timeout (in seconds, default: 2).\n"
         f"\n"
         f"{AUTHORISED}"))
+    @_tasks.releases
     def banner(line, host, port, timeout=None):
         api.need_desktop(line, "The net library")
         host = host_arg(line, host, "banner")
@@ -422,6 +448,7 @@ def load(api):
         "  or nil if nothing came back.\n"
         "\n"
         + AUTHORISED))
+    @_tasks.releases
     def udp_send(line, host, port, data, timeout=None):
         api.need_desktop(line, "The net library")
         host = host_arg(line, host, "udp_send")
@@ -540,12 +567,13 @@ def load(api):
                 listener["running"] = False
                 sock.close()
 
-        thread = threading.Thread(target=serve, name=f"tb-udp-{listener['port']}", daemon=True)
+        thread = threading.Thread(target=_tasks.inherit_loop(serve), name=f"tb-udp-{listener['port']}", daemon=True)
         thread.start()
 
         def stop_(line):
             stop.set()
-            thread.join(2.0)
+            with _tasks.blocking():
+                thread.join(2.0)
             listener["running"] = False
             return None
 
@@ -553,7 +581,8 @@ def load(api):
             if seconds is not None:
                 check_type(line, seconds, "number", "listener.wait", "seconds")
             try:
-                thread.join(seconds)
+                with _tasks.blocking():
+                    thread.join(seconds)
             except KeyboardInterrupt:
                 stop_(line)
             return not thread.is_alive()

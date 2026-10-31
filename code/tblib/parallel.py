@@ -15,7 +15,9 @@ import time
 
 import tb as _tb
 from tbcore import tasks as _tasks
-from tblib._api import MANY, Module, check_type, fail, fail_timeout, fail_value, make_object, method, native_class
+from tblib._api import (
+    MANY, Module, check_type, fail, fail_timeout, fail_type, fail_value, make_object, method, native_class,
+)
 
 DOC = ("Do several things at the same time: run functions as tasks, map a function over a list "
        "with many workers, pass work through queues, and run timers. Great for waiting on many "
@@ -155,6 +157,176 @@ def load(api):
     def cpu_count(line):
         return os.cpu_count() or 1
 
+    # -- the event loop, groups and time limits (TB 3.2) ---------------------------
+
+    @m.fn("loop", 1, MANY, doc=(
+        "loop(fn, ...args) -> value\n"
+        "Run fn(args...) on an event loop and give back its result once fn and every task and timer it "
+        "started have finished. Servers it started with start() stop then.\n"
+        "\n"
+        "Inside the loop, tasks (async fn, parallel.run, map) take turns instead of running at the same "
+        "moment: one runs until it waits (await, sleep, a queue, a network request), then the next. So "
+        "loop code needs no locks. Servers started inside a loop handle every connection on one thread, "
+        "so thousands of connections are fine.\n"
+        "\n"
+        "Example:\n"
+        "    async fn twice(x) {\n"
+        "      parallel.sleep(0.1)\n"
+        "      return x * 2\n"
+        "    }\n"
+        "    say(parallel.loop(fn() { return parallel.all([twice(1), twice(2)]) }))"))
+    def loop(line, fn, *args):
+        need(line)
+        check_type(line, fn, "function", "parallel.loop", "fn")
+        return _tasks.run_loop(interp, lambda view: view.call(fn, list(args), line), _name_of(fn), line)
+
+    Group = native_class("Group", "Tasks that belong together, from parallel.group(fn).")
+
+    class _G:
+        def __init__(self):
+            self.tasks: list = []
+            self.failed: list = []
+            self.changed = threading.Event()
+            self.open = True
+
+        def finished(self, task):
+            if task.status == "failed":
+                self.failed.append(task)
+            self.changed.set()
+
+        def cancel(self):
+            for task in self.tasks:
+                task.cancel()
+
+        def join(self):  # wait for every task, even while being cancelled ourselves
+            with _tasks.blocking():
+                for task in self.tasks:
+                    task._event.wait()
+
+    @method(Group, "run", 1, MANY, doc="run(fn, ...args) -> Task\nStart fn(args...) as part of the group and "
+                                       "give back its Task.")
+    def g_run(line, me, fn, *args):
+        g = me.fields["_g"]
+        check_type(line, fn, "function", "group.run", "fn")
+        if not g.open:
+            fail(line, "This group has finished. Start tasks inside the fn given to parallel.group().")
+        task = _tasks.spawn(interp, lambda view: view.call(fn, list(args), line), _name_of(fn))
+        g.tasks.append(task)
+        task.add_done_callback(g.finished)
+        return task.obj
+
+    @method(Group, "cancel", 0, doc="cancel()\nCancel every task of the group that is still running. Their "
+                                    "results are nil.")
+    def g_cancel(line, me):
+        me.fields["_g"].cancel()
+        return None
+
+    @method(Group, "text", 0, doc="text() -> text\nHow the group shows in say().")
+    def g_text(line, me):
+        g = me.fields["_g"]
+        return f"<group {sum(1 for t in g.tasks if not t.done())} running of {len(g.tasks)}>"
+
+    @m.fn("group", 1, doc=(
+        "group(fn) -> list\n"
+        "Call fn(group), where group.run(f, ...args) starts tasks that belong to it, then wait for all of "
+        "them and give back their results in the order they were started.\n"
+        "\n"
+        "If one task fails, the others are cancelled and that error happens here. If fn itself fails, or "
+        "the task waiting here is cancelled, the group's tasks are cancelled too, so none are left "
+        "running. group.cancel() stops the rest early (their results are nil).\n"
+        "\n"
+        "Example:\n"
+        "    let pages = parallel.group(fn(g) {\n"
+        "      for url in urls { g.run(http.get, url) }\n"
+        "    })"))
+    def group(line, fn):
+        need(line)
+        check_type(line, fn, "function", "parallel.group", "fn")
+        g = _G()
+        try:
+            interp.current().call(fn, [make_object(Group, {"_g": g})], line)
+            while True:
+                g.changed.clear()
+                if g.failed or all(t.done() for t in g.tasks):
+                    break
+                _tasks.wait_event(g.changed)
+        except BaseException:
+            g.open = False
+            g.cancel()
+            g.join()
+            raise
+        g.open = False
+        if g.failed:
+            g.cancel()
+            g.join()
+            return g.failed[0].wait(0, line)
+        return [t.value if t.status == "done" else None for t in g.tasks]
+
+    @m.fn("timeout", 2, doc=(
+        "timeout(seconds, fn) -> value\n"
+        "Call fn() and give back its result, but cancel it if it takes longer than seconds; that gives a "
+        "TimeoutError with err.cancelled true. Tasks fn started in a parallel.group are cancelled with it.\n"
+        "\n"
+        "Cancelling is cooperative: fn stops before its next step, or when it next waits."))
+    def timeout_(line, seconds, fn):
+        need(line)
+        seconds = _seconds_arg(line, seconds, "parallel.timeout", "seconds")
+        check_type(line, fn, "function", "parallel.timeout", "fn")
+        task = _tasks.spawn(interp, lambda view: view.call(fn, [], line), _name_of(fn))
+        try:
+            finished = _tasks.wait_event(task._event, seconds)
+        except BaseException:
+            task.cancel()
+            raise
+        if not finished:
+            task.cancel()
+            with _tasks.blocking():
+                task._event.wait()
+            if task.status == "cancelled":
+                fail_timeout(line, f"parallel.timeout(): fn didn't finish within {_tasks._seconds(seconds)}, "
+                                   "so it was cancelled.", cancelled=True)
+        return task.wait(0, line)
+
+    # -- processes (TB 3.2) ---------------------------------------------------------
+
+    @m.fn("processes", 2, 3, doc=(
+        "processes(fn, items, workers?) -> list\n"
+        "fn(item) for every item, in other processes (workers at a time, default: one per processor core), "
+        "giving the results in the same order as items.\n"
+        "\n"
+        "Unlike map, this makes CPU-heavy work faster: each process has a core to itself. Starting the "
+        "processes takes a moment, so use it for work that takes seconds, not milliseconds.\n"
+        "\n"
+        "fn is copied into each process with the values it uses, so changes it makes to variables aren't "
+        "seen here. Items, results and the values fn uses must be plain: nil, true/false, numbers, text, "
+        "bytes, lists, maps, other functions, libraries or shared queues; anything else is a TypeError.\n"
+        "\n"
+        "Example:\n"
+        "    fn slow_square(n) { return n * n }\n"
+        "    say(parallel.processes(slow_square, [1, 2, 3, 4], 2))"))
+    def processes(line, fn, items, workers=None):
+        need(line)
+        if not isinstance(fn, _tb.Function) or fn.owner is not None:
+            fail_type(line, "parallel.processes() needs fn to be a function written in TB (not a method or a "
+                            "built-in function).")
+        workers = (os.cpu_count() or 1) if workers is None else _workers_arg(line, workers, "parallel.processes")
+        from tblib import _procs
+        return _procs.run(interp, fn, items_of(line, items, "parallel.processes"), workers, line)
+
+    @m.fn("shared_queue", 0, 1, doc=(
+        "shared_queue(size?) -> SharedQueue\n"
+        "A queue that functions running in parallel.processes can use too: put(value, timeout?), "
+        "get(timeout?), size(), close(), and `for item in q { }`, like parallel.Queue. Only plain values "
+        "can go in. With a size, put() waits while the queue is full."))
+    def shared_queue(line, size=None):
+        need(line)
+        if size is not None:
+            size = check_type(line, size, "whole", "parallel.shared_queue", "size")
+            if size < 1:
+                fail_value(line, "parallel.shared_queue() needs a size of at least 1 (or no size).")
+        from tblib import _procs
+        return _procs.new_shared_queue(line, size)
+
     # -- Queue -------------------------------------------------------------------
 
     Queue = native_class("Queue", "A first-in, first-out line of values that tasks can share safely.")
@@ -176,7 +348,17 @@ def load(api):
                     if left <= 0:
                         fail_timeout(line, f"queue.{what}() waited {_tasks._seconds(timeout)} and gave up.")
                     step = min(step, left)
-                self.cond.wait(step)
+                if _tasks.current_loop() is None:
+                    self.cond.wait(step)
+                    continue
+                # Inside a loop: never wait for the baton while holding cond.
+                self.cond.release()
+                try:
+                    with _tasks.blocking(), self.cond:
+                        if not ready():
+                            self.cond.wait(step)
+                finally:
+                    self.cond.acquire()
 
     def q_of(me):
         return me.fields["_q"]
@@ -257,8 +439,9 @@ def load(api):
     def l_hold(line, me, fn):
         check_type(line, fn, "function", "lock.hold", "fn")
         lock = me.fields["_lock"]
-        while not lock.acquire(timeout=0.05):
-            _tasks.check_cancelled()
+        with _tasks.blocking():
+            while not lock.acquire(timeout=0.05):
+                _tasks.check_cancelled()
         try:
             return interp.current().call(fn, [], line)
         finally:

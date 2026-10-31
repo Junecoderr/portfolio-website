@@ -87,4 +87,52 @@ SPEC = {
         "gives": "a Timer: .stop() before then cancels it",
         "roles": {"ms": "milliseconds to wait", "fn": "runs once, on its own thread"},
     },
+    "loop": {
+        "run": True, "args": {"fn": "(a, b) => a + b", "args": "2, 3"},
+        "nodes": [
+            {"row": [{"param": "fn", "lines": ["main function"]}, {"param": "args", "lines": ["its inputs"]}]},
+            {"arrow": "parallel.loop"},
+            {"row": [{"box": "task A", "icon": "cpu", "lines": ["runs until it waits"]},
+                     {"box": "task B", "icon": "cpu", "lines": ["then takes its turn"]},
+                     {"box": "server", "icon": "code", "lines": ["10,000 connections,", "one thread"]}], "cols": 3},
+            {"arrow": "fn and every task it started are done"},
+            {"result": True},
+        ],
+        "roles": {"fn": "the loop's main function", "args": "inputs passed on to fn"},
+    },
+    "group": {
+        "run": True, "args": {"fn": "g => [g.run(() => 1), g.run(() => 2)]"},
+        "nodes": [
+            {"param": "fn", "lines": ["g.run(task 1)", "g.run(task 2)"]},
+            {"row": [{"box": "task 1", "icon": "cpu", "lines": ["1"]}, {"box": "task 2", "icon": "cpu", "lines": ["2"]}]},
+            {"arrow": "waits for all; one fails → the rest are cancelled"},
+            {"result": True, "label": "results, in start order"},
+        ],
+        "roles": {"fn": "gets the group; g.run(f, ...args) starts its tasks"},
+    },
+    "timeout": {
+        "t": "timeline", "run": False, "args": {"seconds": "2", "fn": "() => slow_job()"},
+        "marks": [{"label": "start", "at": 0.05}, {"label": "cancelled", "at": 0.6, "p": "fn", "under": "TimeoutError"}],
+        "spans": [{"from": 0.05, "to": 0.6, "label": "at most 2 s", "p": "seconds"}],
+        "gives": "fn's result, or a TimeoutError (err.cancelled is true)",
+        "roles": {"seconds": "the most seconds fn may take", "fn": "the work to limit"},
+    },
+    "processes": {
+        "t": "lanes", "run": False, "args": {"fn": "fib", "items": "[30, 30, 30, 30]", "workers": "4"},
+        "items": [30, 30, 30, 30], "durations": [4, 4, 4, 4], "workers": [1, 2, 4], "workers_default": 4,
+        "items_title": "items", "gives": "the results in order; each process has a core to itself",
+        "roles": {"fn": "your function, copied into each process", "items": "plain values to work through",
+                  "workers": "how many processes (one per core if left out)"},
+    },
+    "shared_queue": {
+        "run": False, "args": {"size": "100"}, "static": "<shared queue 0 waiting>",
+        "nodes": [
+            {"box": "a worker process", "icon": "cpu", "lines": ["q.put(result)"]},
+            {"arrow": "across processes"},
+            {"param": "size", "lines": ["plain values only"]},
+            {"arrow": "q.get()"},
+            {"box": "your program", "icon": "code", "lines": ["for item in q { … }"]},
+        ],
+        "roles": {"size": "how many it holds before put() waits (no limit if left out)"},
+    },
 }

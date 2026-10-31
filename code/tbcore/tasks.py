@@ -24,10 +24,31 @@ The model
   cancelled task raises "The task was cancelled." (err.cancelled is true).
 * In the browser (Pyodide: no threads) a task runs to completion at once,
   so `async fn` and `await` still work, just not in parallel.
+
+The event loop (parallel.loop, TB 3.2)
+--------------------------------------
+* `run_loop` makes the calling thread a loop thread: an asyncio event loop
+  there owns the sockets of servers started inside it (one thread for any
+  number of connections), and TB code inside the loop runs one piece at a
+  time. Tasks started inside it (`async fn`, parallel.run, map workers) are
+  coroutines: they take turns holding the loop's baton and hand it on
+  whenever they wait (await, sleep, queues, locks, socket reads, http
+  requests: every `wait_event` / `blocking()`), so loop code needs no locks.
+  Server handlers run on the loop thread while holding the baton.
+* asyncio rather than raw `selectors`: it gives the same non-blocking sockets
+  plus IOCP on Windows (no 512-socket select() cap) and thread-safe wakeups.
+  TB code is called from its protocol callbacks, never as Python coroutines.
+* Python has no stack-switching coroutines in its standard library, so a
+  coroutine that is waiting parks its own OS thread; connections, server
+  handlers and the loop itself cost no extra threads.
+* The loop ends when its main function and every task started inside it
+  have finished; servers started with start() inside it stop then.
 """
 
 from __future__ import annotations
 
+import collections
+import contextlib
 import sys
 import threading
 import time
@@ -61,12 +82,169 @@ def current_task():
 def check_cancelled() -> None:
     task = current_task()
     if task is not None and task.cancel_requested:
+        for view in task.views[:1]:  # this thread's view: its cancel hook has now fired too,
+            mine = getattr(view._local, "interp", None)  # so finally/defer blocks can run
+            if mine is not None and getattr(mine.trace, "tb_cancel", False):
+                mine.trace = None
         raise TaskCancelled()
+
+
+# ---------------------------------------------------------------------------
+# The event loop
+# ---------------------------------------------------------------------------
+
+
+class Baton:
+    """Who may run TB code inside a loop: one holder at a time, handed on in
+    first-come order (a plain Lock could starve a waiter)."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._held = False
+        self._waiters: collections.deque = collections.deque()
+
+    def acquire(self) -> None:
+        with self._lock:
+            if not self._held:
+                self._held = True
+                return
+            ready = threading.Event()
+            self._waiters.append(ready)
+        ready.wait()                  # release() handed it straight to us
+
+    def release(self) -> None:
+        with self._lock:
+            if self._waiters:
+                self._waiters.popleft().set()
+            else:
+                self._held = False
+
+
+class Loop:
+    """One parallel.loop(): the asyncio loop on its thread, the baton, and the
+    tasks running inside it."""
+
+    def __init__(self):
+        import asyncio
+
+        self.aio = asyncio.new_event_loop()
+        self.baton = Baton()
+        self.thread = threading.current_thread()
+        self.tasks: set = set()           # unfinished tasks started inside the loop
+        self.closers: list = []           # run when the loop ends (servers)
+        self.root = None
+
+    def wake(self) -> None:
+        """From any thread: let the loop see whether it is finished."""
+        try:
+            self.aio.call_soon_threadsafe(self._check)
+        except RuntimeError:              # the loop has already closed
+            pass
+
+    def _check(self) -> None:
+        if self.root is not None and self.root.done() and not self.tasks:
+            self.aio.stop()
+
+    def on_loop_thread(self) -> bool:
+        return threading.current_thread() is self.thread
+
+    def call(self, coro):
+        """Run an asyncio coroutine on the loop from a task and wait for it
+        (other tasks run meanwhile)."""
+        import asyncio
+
+        future = asyncio.run_coroutine_threadsafe(coro, self.aio)
+        done = threading.Event()
+        future.add_done_callback(lambda f: done.set())
+        try:
+            wait_event(done)
+        except BaseException:
+            future.cancel()
+            raise
+        return future.result()
+
+
+def current_loop():
+    """The Loop the calling thread runs inside, or None (thread mode)."""
+    return getattr(_local, "loop", None)
+
+
+def _hold(loop) -> None:
+    loop.baton.acquire()
+    _local.holding = True
+
+
+def _drop(loop) -> None:
+    _local.holding = False
+    loop.baton.release()
+
+
+@contextlib.contextmanager
+def blocking():
+    """Wrap anything that may block (socket I/O, waits): inside a loop, the
+    other tasks run meanwhile. Nothing happens outside a loop."""
+    loop = current_loop()
+    if loop is None or not getattr(_local, "holding", False):
+        yield
+        return
+    _drop(loop)
+    try:
+        yield
+    finally:
+        _hold(loop)
+
+
+def releases(fn):
+    """Decorator for library functions that only do I/O (no TB callbacks):
+    they run inside blocking()."""
+    import functools
+
+    @functools.wraps(fn)
+    def run(*args, **kwargs):
+        with blocking():
+            return fn(*args, **kwargs)
+    return run
+
+
+@contextlib.contextmanager
+def turn(loop):
+    """Hold loop's baton while a library runs a TB callback (server handlers
+    on the loop thread, or a listener thread started inside the loop)."""
+    if getattr(_local, "holding", False):
+        yield
+        return
+    previous = getattr(_local, "loop", None)
+    _local.loop = loop
+    _hold(loop)
+    try:
+        yield
+    finally:
+        _drop(loop)
+        _local.loop = previous
+
+
+def inherit_loop(target):
+    """target, made to run its TB callbacks inside the caller's loop (if any)
+    when started on a new thread."""
+    loop = current_loop()
+    if loop is None:
+        return target
+
+    def run(*args):
+        _local.loop = loop
+        return target(*args)
+    return run
 
 
 def wait_event(event: threading.Event, timeout=None) -> bool:
     """event.wait(timeout) that wakes up when the calling task is cancelled
-    (raising TaskCancelled) and stays responsive to Ctrl+C."""
+    (raising TaskCancelled) and stays responsive to Ctrl+C. Inside a loop,
+    other tasks run while this one waits."""
+    with blocking():
+        return _wait_event(event, timeout)
+
+
+def _wait_event(event, timeout):
     deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
     while True:
         check_cancelled()
@@ -89,6 +267,7 @@ def _cancel_hook(view):
     def hook(event, line, file, env):
         view.trace = None           # one shot: finally/defer bodies still run
         raise TaskCancelled()
+    hook.tb_cancel = True
     return hook
 
 
@@ -224,9 +403,57 @@ def spawn(interp, work, name: str = "task") -> Task:
         _run(task, view, work)
         return task
     _prepare_threads()
-    thread = threading.Thread(target=_run, args=(task, view, work), name=f"tb-task-{name}", daemon=True)
+    loop = current_loop()
+    target, args = _run, (task, view, work)
+    if loop is not None:  # a coroutine: counted by the loop, runs only while holding its baton
+        loop.tasks.add(task)
+        target, args = _run_in_loop, (loop, task, view, work)
+    thread = threading.Thread(target=target, args=args, name=f"tb-task-{name}", daemon=True)
     thread.start()
     return task
+
+
+def _run_in_loop(loop, task, view, work) -> None:
+    _local.loop = loop
+    _hold(loop)
+    try:
+        _run(task, view, work)
+    finally:
+        _drop(loop)
+        loop.tasks.discard(task)
+        loop.wake()
+
+
+def run_loop(interp, work, name: str = "loop", line=None):
+    """parallel.loop(): run work(view) as the main task of a new event loop
+    on the calling thread; return its result once it and every task started
+    inside the loop have finished. Inside a loop already, just run it."""
+    if current_loop() is not None:
+        return work(interp.current())
+    loop = Loop()
+    _local.loop = loop
+    try:
+        loop.root = spawn(interp, work, name)
+        loop.wake()
+        try:
+            loop.aio.run_forever()
+        except BaseException:  # Ctrl+C: stop every task, then leave
+            for task in list(loop.tasks):
+                task.cancel()
+            raise
+    finally:
+        _local.loop = None
+        for close in reversed(loop.closers):
+            try:
+                close()
+            except Exception:
+                pass
+        try:
+            loop.aio.run_until_complete(loop.aio.shutdown_asyncgens())
+        except Exception:
+            pass
+        loop.aio.close()
+    return loop.root.wait(None, line)
 
 
 def start_async(interp, fn, scope, line) -> Instance:
@@ -257,8 +484,12 @@ def run_pool(interp, items, call_one, workers: int, line):
     state = {"next": 0, "error": None, "error_at": n, "stop": False}
     finished = threading.Event()
     running = [workers]
+    loop = current_loop()
 
     def worker():
+        if loop is not None:  # a coroutine of the caller's loop
+            _local.loop = loop
+            _hold(loop)
         view = root.fork()
         _local.task = parent
         view._local.interp = view
@@ -290,6 +521,8 @@ def run_pool(interp, items, call_one, workers: int, line):
                 running[0] -= 1
                 if running[0] == 0:
                     finished.set()
+            if loop is not None:
+                _drop(loop)
 
     if sys.getrecursionlimit() < _PYTHON_RECURSION_LIMIT:
         sys.setrecursionlimit(_PYTHON_RECURSION_LIMIT)
