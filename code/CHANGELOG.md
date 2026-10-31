@@ -20,6 +20,32 @@ How to write an entry:
 
 ## Unreleased
 
+### Added
+
+- A faster engine: code that runs often is translated into a quicker form, more than twice as fast as TB 3.0 on the benchmark set. `TB_JIT=off` turns it off.
+- `tb profile` shows where a program spends its time, per function and per line, with `--html` for a flame graph and a list of the largest values.
+- `parallel.loop` runs `async fn` tasks, servers and network calls on one event loop, holding thousands of connections without a thread each. `parallel.group` and `parallel.timeout` cancel work cleanly.
+- `parallel.processes` spreads CPU-heavy work across processes, with `parallel.shared_queue` to pass values between them.
+- `logs.stream`, `logs.each`, `pcap.each` and `evtx.each` read files of any size with flat memory, and `.gz` and `.zip` files are read directly.
+- The `macho` library reads macOS executables; `pe` adds imphash, the Rich header, resources and code-signature details; `elf` adds symbol versions and a hardening report. file-inspector shows all of them.
+- `scan` accepts much more of the YARA language: `xor`, `base64`, `wide` and `nocase` regexes, counts and offsets, integer readers, loops and the `pe`, `elf` and `math` modules.
+- Sigma correlation rules and `| near` convert for Splunk, KQL and the new ES|QL backend, with field maps for more Sentinel tables.
+- Official MITRE ATT&CK data (version 20.0), and new intel providers (AlienVault OTX, GreyNoise, Shodan) and SIEM senders (QRadar, Chronicle).
+- Editor support: rename and find references across files, quick fixes, organise imports, `[fmt]` options in `tb.toml`, and debugging from VS Code through `tb debug --dap`.
+- Desktop apps accept files dropped on the window and show a tray icon on Windows and macOS; every control can be reached with Tab.
+- The playground and Run buttons run in a background worker: output appears as it is printed, Stop works at once, and `ask()` reads answers inline.
+
+### Changed
+
+- `evtx` reads real Windows logs the way Windows shows them: `record_id` is the event's own record ID and empty values are kept. Damaged chunks and records in slack space can be recovered with `{"recover": true}`.
+- The legacy ATT&CK tactic name `defense-evasion` covers both of its v20 successors, Stealth and Defense Impairment.
+
+### Security
+
+- Hostile files and rules are bounded: packet captures, PE, Mach-O, EVTX and compressed logs have size and time limits, and YARA refuses patterns that could run for minutes.
+- Sigma field names are checked and quoted, so a rule can't add commands to a converted query.
+- API keys and tokens are never sent on to another site when a server redirects.
+
 ## 3.1.0 - 2026-10-31
 
 Named inputs for standard-library functions, packet-capture stream reassembly with HTTP file extraction, seven more log formats for security teams, and clearer messages across the tools.

@@ -219,7 +219,9 @@ def compare(channel, path):
         if w["anonymous"]:
             mine = data.get("Data")
             mine = mine if isinstance(mine, list) and len(w["anonymous"]) > 1 else [mine]
-            check(rid, "EventData (unnamed Data)", mine, "\n".join(norm(v) for v in w["anonymous"]))
+            # Compare item by item: joining and trimming would hide (or invent) empty
+            # strings at either end of the list.
+            check(rid, "EventData (unnamed Data)", [norm(v) for v in mine], [norm(v) for v in w["anonymous"]])
     return problems, len(wanted), fields
 
 

@@ -304,7 +304,14 @@ def run(interp, fn, items, workers: int, line):
 
         for future in futures:  # done callbacks run after the result is set, so result() never waits
             future.add_done_callback(one_done)
-        _tasks.wait_event(finished)  # a worker that dies (out of memory, killed) breaks the pool: all finish
+        # A worker that dies (out of memory, killed) breaks the pool and every future
+        # finishes. Python doesn't notice that promptly everywhere (seen on Windows), so
+        # also look at the worker processes ourselves.
+        while not _tasks.wait_event(finished, 0.5):
+            procs = list((getattr(pool, "_processes", None) or {}).values())
+            if any(proc.exitcode is not None for proc in procs) and not finished.is_set():
+                fail(line, "parallel.processes(): a worker process stopped suddenly (it may have run out of "
+                           "memory or been killed), so its items have no results.")
         for future in futures:
             try:
                 rows.extend(future.result())
