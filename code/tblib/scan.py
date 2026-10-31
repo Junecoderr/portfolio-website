@@ -694,10 +694,12 @@ def rules_from(line, rules, fn) -> list:
 def load(api):
     m = Module(
         "scan",
-        "Look for patterns in files and bytes with YARA-like rules: text (with nocase, wide and fullword), "
-        "hex byte patterns with ?? wildcards and [n-m] jumps, and /regular expressions/, combined with a "
-        "condition ($a and ($b or $c), 2 of them, #a > 3, filesize < 1MB, uint16(0) == 0x5A4D). Rules can "
-        "be YARA-style text or plain TB maps. Also pulls readable strings (ASCII and UTF-16) out of binary data.",
+        "Look for patterns in files and bytes with YARA rules: text (with nocase, wide, fullword, xor and "
+        "base64), hex byte patterns with ?? wildcards and [n-m] jumps, and /regular expressions/, combined with "
+        "a condition ($a and ($b or $c), 2 of them, #a > 3, @a[1] < 100, uint16(0) == 0x5A4D, for any i in "
+        "(1..#a) : (...)). The pe, elf and math modules work too (pe.imphash(), pe.sections, math.entropy). "
+        "Rules can be YARA text or plain TB maps; YARA features TB doesn't have give a precise error. Also "
+        "pulls readable strings (ASCII and UTF-16) out of binary data.",
     )
     m.value("example", 'rule SuspiciousDownloader {\n  meta:\n    author = "soc"\n    severity = "high"\n'
                        '  strings:\n    $a = "DownloadString" nocase\n    $b = { 4D 5A ?? 00 }\n'

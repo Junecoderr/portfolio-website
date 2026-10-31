@@ -2,7 +2,7 @@
 // The bundled example packages (approved, owned by the "tb" system owner)
 // and the standard library names no package may use.
 
-export const STDLIB_NAMES = ["archive", "attack", "binary", "crypto", "csv", "datetime", "decimal", "detect", "dns", "elf", "encode", "evtx", "fs", "gui", "hash", "http", "intel", "ioc", "json", "logs", "math", "net", "os", "parallel", "pcap", "pe", "random", "re", "report", "scan", "server", "siem", "sqlite", "stix", "template", "test", "text", "time", "tls", "toml", "websocket", "xml", "yaml"];
+export const STDLIB_NAMES = ["archive", "attack", "binary", "crypto", "csv", "datetime", "decimal", "detect", "dns", "elf", "encode", "evtx", "fs", "gui", "hash", "http", "intel", "ioc", "json", "logs", "macho", "math", "net", "os", "parallel", "pcap", "pe", "random", "re", "report", "scan", "server", "siem", "sqlite", "stix", "template", "test", "text", "time", "tls", "toml", "websocket", "xml", "yaml"];
 
 export const SEED_OWNER = "tb";
 

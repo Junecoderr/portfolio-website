@@ -32,7 +32,7 @@ report.save("alerts.html", report.html("SSH brute force", alerts))
 - **Errors that explain themselves.** Every mistake names the line, says what
   went wrong in plain English and suggests a fix:
   `Oops! On line 3: I don't know what 'nmae' is. Did you mean 'name'?`
-- **Batteries included.** 43 standard libraries ship inside the runtime:
+- **Batteries included.** 44 standard libraries ship inside the runtime:
   files and data formats, SQLite, HTTP, DNS, TLS, a web server, a native GUI
   toolkit, and a security library that reads logs, PCAPs and Windows EVTX
   files, runs Sigma rules and maps findings to MITRE ATT&CK.
@@ -153,7 +153,7 @@ specification is in [`spec/SPEC.md`](spec/SPEC.md).
 |---|---|
 | Core | `math` `text` `time` `datetime` `decimal` `random` `re` `os` `binary` |
 | Files and data | `fs` `json` `csv` `yaml` `toml` `xml` `sqlite` `archive` `template` |
-| Security operations | `logs` `detect` (incl. Sigma) `ioc` `hash` `encode` `crypto` `report` `pcap` `evtx` `pe` `elf` `scan` `attack` `stix` `siem` `intel` |
+| Security operations | `logs` `detect` (incl. Sigma) `ioc` `hash` `encode` `crypto` `report` `pcap` `evtx` `pe` `elf` `macho` `scan` `attack` `stix` `siem` `intel` |
 | Networking | `net` `http` `dns` `tls` `websocket` `server` |
 | Concurrency | `parallel` |
 | Desktop GUI | `gui` |
