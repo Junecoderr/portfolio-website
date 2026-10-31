@@ -775,7 +775,12 @@ def build_record(root, record_id: int, written: int, chunk_index: int, want_xml:
     record = logs.windows_record(obj, xml_text)
     describe(record, fields.get("Channel"))
     record["source"] = "evtx"
-    record["record_id"] = record_id
+    # Exported logs (wevtutil epl, Save As) renumber the record headers from 1, but each
+    # record's own System/EventRecordID keeps the number Windows gave it; Event Viewer and
+    # wevtutil show that one, so it wins. record_number is the position in this file.
+    own = fields.get("EventRecordID")
+    record["record_id"] = own if isinstance(own, int) and not isinstance(own, bool) and own > 0 else record_id
+    record["record_number"] = record_id
     record["chunk"] = chunk_index
     record["written"] = filetime_stamp(written)
     record["level"] = fields.get("Level")
@@ -994,7 +999,7 @@ def load(api):
         "- \"time\", \"when\"\n"
         "- \"event_id\", \"action\", \"description\"\n"
         "- \"user\", \"ip\", \"success\"\n"
-        "- \"computer\", \"channel\", \"provider\", \"level_name\", \"record_id\"\n"
+        "- \"computer\", \"channel\", \"provider\", \"level_name\", \"record_id\" (Windows' EventRecordID), \"record_number\" (position in the file)\n"
         "- \"task_name\", \"opcode_name\": when known (Security task categories, standard opcodes).\n"
         "- \"event_data\": a map of the EventData fields.\n"
         "  Every EventData field is also its own key.\n"
