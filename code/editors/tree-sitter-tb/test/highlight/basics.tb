@@ -1,0 +1,67 @@
+## Documented function
+import json as j
+# <- keyword.import
+#      ^ module
+#           ^ keyword.import
+#              ^ module
+const LIMIT = 10
+# <- keyword
+#     ^ constant
+#             ^ number
+fn greet(name: text, ...rest) -> text {
+# <- keyword.function
+#  ^ function
+#        ^ variable.parameter
+#              ^ type
+#                       ^ variable.parameter
+  return f"hi {name:>5}"
+# ^ keyword.return
+#        ^ string
+#             ^ punctuation.special
+#                   ^ string.special
+}
+class Dog extends Animal {
+# <- keyword
+#     ^ type
+#         ^ keyword
+#                 ^ type
+  fn speak() { say(self.name.upper()) }
+#    ^ function.method
+#              ^ function.builtin
+#                  ^ variable.builtin
+#                       ^ variable.member
+#                            ^ function.method.call
+}
+let d = Dog("rex")
+#       ^ constructor
+#           ^ string
+let n = match d {
+#       ^ keyword.conditional
+  is Dog => 1
+# ^ keyword.operator
+#    ^ type
+#        ^ operator
+  _ => nil
+# ^ character.special
+#      ^ constant.builtin
+}
+async fn load() { await fetch(true) }
+# <- keyword.coroutine
+#                 ^ keyword.coroutine
+#                       ^ function.call
+#                             ^ boolean
+try { throw "x" } catch err { } finally { }
+# <- keyword.exception
+#     ^ keyword.exception
+#                 ^ keyword.exception
+#                               ^ keyword.exception
+for x in 0..3 { break }
+# <- keyword.repeat
+#     ^ keyword.operator
+#        ^ number
+#         ^ operator
+#               ^ keyword.repeat
+export enum Mode { on, off }
+# <- keyword.import
+#           ^ type
+#                  ^ constant

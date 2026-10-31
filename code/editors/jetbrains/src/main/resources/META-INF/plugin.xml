@@ -1,0 +1,30 @@
+<idea-plugin>
+  <id>lang.tb.jetbrains</id>
+  <name>TB Language</name>
+  <vendor url="https://code.tanisha.ceo">TB</vendor>
+  <description><![CDATA[
+    Support for the TB programming language (.tb files): syntax highlighting
+    and the TB language server (<code>tb lsp</code>) for diagnostics,
+    completion, hover, go to definition, references, rename and formatting.
+    Needs TB 3.0 or newer on PATH (or the TB_PATH environment variable).
+  ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+  <depends>org.jetbrains.plugins.textmate</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+    <server id="tbLanguageServer"
+            name="TB"
+            factoryClass="lang.tb.jetbrains.TbLanguageServerFactory">
+      <description><![CDATA[The TB language server: <code>tb lsp</code>.]]></description>
+    </server>
+    <fileNamePatternMapping patterns="*.tb"
+                            serverId="tbLanguageServer"
+                            languageId="tb"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="org.jetbrains.plugins.textmate">
+    <bundleProvider implementation="lang.tb.jetbrains.TbTextMateBundleProvider"/>
+  </extensions>
+</idea-plugin>

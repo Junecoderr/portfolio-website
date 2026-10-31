@@ -47,6 +47,7 @@
             <li><a href="#packages">tb init, add, search, publish</a></li>
             <li><a href="#lsp">tb lsp</a></li>
             <li><a href="#vscode">VS Code extension</a></li>
+            <li><a href="#editors">Neovim, Helix, JetBrains</a></li>
           </ul>
         </div>
       </aside>
@@ -246,6 +247,22 @@ $ tb yank tb-greet@1.0.1 --reason "breaks on Windows"</code></pre>
   "stopOnEntry": false
 }</code></pre>
         <p>Settings: <code>tb.path</code> (the tb program), <code>tb.languageServer.enabled</code>, <code>tb.check.onSave</code>, <code>tb.run.saveBeforeRun</code>. With TB 2.x only highlighting, snippets and Run File work; the rest needs TB 3.0.</p>
+        </section>
+        <section id="editors">
+          <h2>Neovim, Helix and JetBrains IDEs</h2>
+        <p>Other editors get the same language server, plus highlighting from a tree-sitter grammar. The files are in the <code>editors</code> folder of <code>tb-python.zip</code> on the <a href="download.html">download page</a>: <code>tree-sitter-tb</code> (the grammar and its queries), <code>neovim</code>, <code>helix</code> and <code>jetbrains</code>. Make sure <code>tb --version</code> works in a terminal first.</p>
+        <p><strong>Neovim 0.11 or newer.</strong> Add the <code>neovim</code> folder to your runtime path; it sets up the <code>tb</code> file type, starts <code>tb lsp</code> and turns on tree-sitter highlighting and folds. Then build the parser once with the tree-sitter CLI (<code>npm install -g tree-sitter-cli</code>) and a C compiler:</p>
+        <pre class="md-code"><code>-- init.lua
+vim.opt.rtp:prepend("/path/to/editors/neovim")
+
+# in a terminal
+tree-sitter build -o /path/to/editors/neovim/parser/tb.so /path/to/editors/tree-sitter-tb</code></pre>
+        <p>Open a <code>.tb</code> file: <code>:checkhealth vim.lsp</code> shows <code>tb</code> attached, <code>K</code> shows hover help, <code>Ctrl-]</code> jumps to a definition and errors appear as you type. With nvim-treesitter installed, the queries in <code>neovim/queries/tb</code> also give indentation.</p>
+        <p><strong>Helix 25.07 or newer.</strong> Copy the contents of <code>helix/languages.toml</code> into <code>~/.config/helix/languages.toml</code> (on Windows <code>%AppData%\helix\languages.toml</code>), set its grammar <code>path</code> to your <code>tree-sitter-tb</code> folder, copy <code>helix/queries/tb</code> to <code>~/.config/helix/runtime/queries/tb</code>, then:</p>
+        <pre class="md-code"><code>hx --grammar build
+hx --health tb</code></pre>
+        <p><strong>JetBrains IDEs 2024.3 or newer</strong> (IntelliJ IDEA, PyCharm, WebStorm and the rest, Community editions too). The plugin in <code>jetbrains</code> runs <code>tb lsp</code> through the free <a href="https://plugins.jetbrains.com/plugin/23257-lsp4ij">LSP4IJ</a> plugin and highlights with the VS Code extension's grammar. Build it with <code>gradle buildPlugin</code> (JDK 21), then Settings, Plugins, the gear icon, <strong>Install Plugin from Disk</strong>, and pick <code>build/distributions/tb-jetbrains-3.2.0.zip</code>. If <code>tb</code> isn't on the IDE's PATH, set the <code>TB_PATH</code> environment variable to its full path. For highlighting alone, Settings, Editor, <strong>TextMate Bundles</strong>, + and pick an unpacked copy of the VS Code extension works too.</p>
+        <p>Any other editor with LSP support: run <code>tb lsp</code> as the server for <code>.tb</code> files; it talks over standard input and output.</p>
         </section>
       </article>
       <nav class="on-this-page" aria-label="On this page">

@@ -1,0 +1,315 @@
+==================
+operator precedence
+==================
+
+a or b and not c == d
+1 + 2 * 3 ** -4
+x << 1 | y & 3 ^ z
+a not in b
+v is not text
+w is my_lib.Thing;
+-2 ** 2
+!ready == false
+~mask
+1 < x <= 10
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      (identifier)
+      (binary_expression
+        (identifier)
+        (not_expression
+          (binary_expression
+            (identifier)
+            (identifier))))))
+  (expression_statement
+    (binary_expression
+      (number)
+      (binary_expression
+        (number)
+        (binary_expression
+          (number)
+          (unary_expression
+            (number))))))
+  (expression_statement
+    (binary_expression
+      (binary_expression
+        (identifier)
+        (number))
+      (binary_expression
+        (binary_expression
+          (identifier)
+          (number))
+        (identifier))))
+  (expression_statement
+    (binary_expression
+      (identifier)
+      (identifier)))
+  (expression_statement
+    (is_expression
+      (identifier)
+      (type_name
+        (identifier))))
+  (expression_statement
+    (is_expression
+      (identifier)
+      (type_name
+        (identifier)
+        (identifier))))
+  (expression_statement
+    (unary_expression
+      (binary_expression
+        (number)
+        (number))))
+  (expression_statement
+    (binary_expression
+      (unary_expression
+        (identifier))
+      (false)))
+  (expression_statement
+    (unary_expression
+      (identifier)))
+  (expression_statement
+    (binary_expression
+      (binary_expression
+        (number)
+        (identifier))
+      (number))))
+
+==================
+ranges
+==================
+
+0..10
+0..=n
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      (number)
+      (number)))
+  (expression_statement
+    (binary_expression
+      (number)
+      (identifier))))
+
+==================
+calls, indexes and slices
+==================
+
+f(1, x = 2, ...rest,)
+items[0]
+items[1:]
+items[:-1]
+items[::2]
+obj.method().field[3](4)
+config.class.match
+
+---
+
+(source_file
+  (expression_statement
+    (call
+      (identifier)
+      (arguments
+        (number)
+        (keyword_argument
+          (identifier)
+          (number))
+        (spread
+          (identifier)))))
+  (expression_statement
+    (index
+      (identifier)
+      (number)))
+  (expression_statement
+    (slice
+      (identifier)
+      (number)))
+  (expression_statement
+    (slice
+      (identifier)
+      (unary_expression
+        (number))))
+  (expression_statement
+    (slice
+      (identifier)
+      (number)))
+  (expression_statement
+    (call
+      (index
+        (member
+          (call
+            (member
+              (identifier)
+              (identifier))
+            (arguments))
+          (identifier))
+        (number))
+      (arguments
+        (number))))
+  (expression_statement
+    (member
+      (member
+        (identifier)
+        (identifier))
+      (identifier))))
+
+==================
+a bracket on a new line starts a new statement
+==================
+
+foo
+(bar)
+foo
+[1, 2]
+foo(1)
+foo [1]
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (list
+      (number)
+      (number)))
+  (expression_statement
+    (call
+      (identifier)
+      (arguments
+        (number))))
+  (expression_statement
+    (index
+      (identifier)
+      (number))))
+
+==================
+an operator on a new line continues the expression
+==================
+
+let total = a
+  + b
+  - 1
+let ok = ready
+  and safe
+
+---
+
+(source_file
+  (let_declaration
+    (identifier)
+    (binary_expression
+      (binary_expression
+        (identifier)
+        (identifier))
+      (number)))
+  (let_declaration
+    (identifier)
+    (binary_expression
+      (identifier)
+      (identifier))))
+
+==================
+literals
+==================
+
+[1, 2.5, 1e3, 0xff, 0b1010, 0o17, 1_000]
+{"a": 1, b: 2, ...rest}
+{}
+[]
+true
+false
+nil
+self
+
+---
+
+(source_file
+  (expression_statement
+    (list
+      (number)
+      (number)
+      (number)
+      (number)
+      (number)
+      (number)
+      (number)))
+  (expression_statement
+    (map
+      (pair
+        (string)
+        (number))
+      (pair
+        (identifier)
+        (number))
+      (spread
+        (identifier))))
+  (expression_statement
+    (map))
+  (expression_statement
+    (list))
+  (expression_statement
+    (true))
+  (expression_statement
+    (false))
+  (expression_statement
+    (nil))
+  (expression_statement
+    (self)))
+
+==================
+conditional and yield expressions
+==================
+
+fn g() {
+  let v = if a then b else c
+  let got = yield v
+}
+
+---
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameters)
+    (block
+      (let_declaration
+        (identifier)
+        (conditional_expression
+          (identifier)
+          (identifier)
+          (identifier)))
+      (let_declaration
+        (identifier)
+        (yield_expression
+          (identifier))))))
+
+==================
+comments
+==================
+
+# a comment
+## a doc comment
+let a = 1  # trailing
+
+---
+
+(source_file
+  (comment)
+  (comment)
+  (let_declaration
+    (identifier)
+    (number))
+  (comment))

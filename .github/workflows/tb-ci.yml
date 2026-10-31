@@ -103,6 +103,46 @@ jobs:
           TB_ENGINE: tree
         run: uv run --locked pytest
 
+  # The tree-sitter grammar (corpus and highlight tests, every .tb file in the
+  # repo parses without errors), Neovim and Helix opening a .tb file with
+  # highlighting and `tb lsp` (tests/tools/test_editors.py; it skips these
+  # parts in the other jobs, where the tools aren't installed).
+  editors:
+    name: Editors (tree-sitter, Neovim, Helix)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      UV_PYTHON_PREFERENCE: only-system
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        working-directory: code
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.2"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install tree-sitter, Neovim and Helix
+        run: |
+          npm install -g tree-sitter-cli@0.25.3
+          curl -fsSL https://github.com/neovim/neovim/releases/download/v0.11.0/nvim-linux-x86_64.tar.gz | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+          curl -fsSL https://github.com/helix-editor/helix/releases/download/25.07.1/helix-25.07.1-x86_64-linux.tar.xz | tar -xJ -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/helix-25.07.1-x86_64-linux" >> "$GITHUB_PATH"
+
+      - name: Editor tests
+        run: uv run --locked pytest tests/tools/test_editors.py -v -rs
+
   # Benchmarks: fail when the VM gets more than 10% slower on any of
   # code/bench/*.tb. CI machines are noisy, so the check doesn't compare with
   # stored numbers: it checks out the commit this change starts from (a pull

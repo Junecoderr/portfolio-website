@@ -1,0 +1,24 @@
+# TB for Helix: add this to ~/.config/helix/languages.toml (on Windows
+# %AppData%\helix\languages.toml), copy queries/tb/ to
+# ~/.config/helix/runtime/queries/tb/, set the grammar path below to where
+# code/editors/tree-sitter-tb is on your machine, then run:
+#   hx --grammar build
+#   hx --health tb
+
+[[language]]
+name = "tb"
+scope = "source.tb"
+file-types = ["tb"]
+roots = ["tb.toml"]
+comment-token = "#"
+indent = { tab-width = 2, unit = "  " }
+language-servers = ["tb-lsp"]
+formatter = { command = "tb", args = ["fmt", "-"] }
+
+[language-server.tb-lsp]
+command = "tb"
+args = ["lsp"]
+
+[[grammar]]
+name = "tb"
+source = { path = "/path/to/code/editors/tree-sitter-tb" }

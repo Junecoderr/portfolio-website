@@ -1,0 +1,115 @@
+==================
+plain, raw and bytes text
+==================
+
+"double"
+'single'
+"esc \" \n \u{1F600}"
+r"\d+"
+b"\x00ab"
+Rb'raw bytes'
+"""triple "quoted" text
+over lines"""
+''''''
+""
+
+---
+
+(source_file
+  (expression_statement
+    (string))
+  (expression_statement
+    (string))
+  (expression_statement
+    (string))
+  (expression_statement
+    (string))
+  (expression_statement
+    (string))
+  (expression_statement
+    (string))
+  (expression_statement
+    (string))
+  (expression_statement
+    (string))
+  (expression_statement
+    (string)))
+
+==================
+f-text
+==================
+
+f"hello {name}!"
+f'{a + 1:>10} {b!r} {{braces}}'
+f"{d["key"]} {f'{inner}'}"
+F"""multi
+{line} text"""
+rf"\d{n}"
+f"{h:#x}"
+f""
+
+---
+
+(source_file
+  (expression_statement
+    (fstring
+      (fstring_start)
+      (string_content)
+      (interpolation
+        (identifier))
+      (string_content)
+      (fstring_end)))
+  (expression_statement
+    (fstring
+      (fstring_start)
+      (interpolation
+        (binary_expression
+          (identifier)
+          (number))
+        (format_spec))
+      (string_content)
+      (interpolation
+        (identifier))
+      (string_content)
+      (fstring_end)))
+  (expression_statement
+    (fstring
+      (fstring_start)
+      (interpolation
+        (index
+          (identifier)
+          (string)))
+      (string_content)
+      (interpolation
+        (fstring
+          (fstring_start)
+          (interpolation
+            (identifier))
+          (fstring_end)))
+      (fstring_end)))
+  (expression_statement
+    (fstring
+      (fstring_start)
+      (string_content)
+      (interpolation
+        (identifier))
+      (string_content)
+      (fstring_end)))
+  (expression_statement
+    (fstring
+      (fstring_start)
+      (string_content)
+      (interpolation
+        (identifier))
+      (fstring_end)))
+  (expression_statement
+    (fstring
+      (fstring_start)
+      (interpolation
+        (identifier)
+        (format_spec))
+      (fstring_end)))
+  (expression_statement
+    (fstring
+      (fstring_start)
+      (fstring_end))))

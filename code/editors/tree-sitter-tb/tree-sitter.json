@@ -1,0 +1,22 @@
+{
+  "grammars": [
+    {
+      "name": "tb",
+      "camelcase": "Tb",
+      "scope": "source.tb",
+      "path": ".",
+      "file-types": ["tb"],
+      "highlights": "queries/highlights.scm",
+      "locals": "queries/locals.scm",
+      "injection-regex": "^tb$"
+    }
+  ],
+  "metadata": {
+    "version": "3.2.0",
+    "license": "MIT",
+    "description": "TB grammar for tree-sitter",
+    "links": {
+      "repository": "https://code.tanisha.ceo"
+    }
+  }
+}

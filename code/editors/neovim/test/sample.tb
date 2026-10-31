@@ -1,0 +1,7 @@
+## Adds two numbers.
+fn add(a, b) {
+  return a + b
+}
+
+let total = add(1, 2)
+say(totl)
