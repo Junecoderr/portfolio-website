@@ -14,8 +14,8 @@ import { MAX_ARCHIVE_BYTES, NAME_RE, checkName, compareVersions, isPrerelease, p
 import { ArchiveError, validateArchive } from "./zip.js";
 import {
   ApiError, assertSameSite, blobClient, clearCookie, hmacHex, json, pairs, parseJson, pkceChallenge,
-  randomToken, readBytes, readCookie, readJson, redirect, registryRedis, sessionSecret, setCookie, sha256Hex,
-  signValue, verifyValue, safeEqual,
+  publicKeyBase64, randomToken, readBytes, readCookie, readJson, redirect, registryRedis, sessionSecret, setCookie, sha256Hex,
+  signIndex, signingKey, signValue, verifyValue, safeEqual,
 } from "./services.js";
 
 export const SESSION_TTL = 7 * 24 * 3600;
@@ -220,7 +220,7 @@ function computeMeta(name, versions, base) {
   const summary = {};
   for (const v of order) {
     const r = versions[v];
-    if (VISIBLE.has(r.status)) summary[v] = { sha256: r.sha256, status: r.status, size: r.size, created: r.created };
+    if (VISIBLE.has(r.status)) summary[v] = { sha256: r.sha256, status: r.status, size: r.size, created: r.created, dependencies: r.dependencies || {} };
   }
   return {
     name, owner: base.owner, ownerLogin: base.ownerLogin, created: base.created, updated: base.updated || base.created,
@@ -286,7 +286,12 @@ async function listedPackages(ctx) {
     const meta = metas[name] || (await loadMeta({ ...ctx, redis: null }, name));
     if (!meta || meta.status !== "approved") continue;
     const versions = {};
-    for (const [v, s] of Object.entries(meta.summary || {})) versions[v] = s.status === "yanked" ? { sha256: s.sha256, yanked: true } : { sha256: s.sha256 };
+    for (const [v, s] of Object.entries(meta.summary || {})) {
+      versions[v] = { sha256: s.sha256 };
+      // Summaries stored before TB 3.3 have no dependencies; clients then read the package's tb.toml.
+      if (s.dependencies) versions[v].dependencies = s.dependencies;
+      if (s.status === "yanked") versions[v].yanked = true;
+    }
     if (!Object.keys(versions).length) continue;
     packages[name] = {
       description: meta.description, version: meta.latest, keywords: meta.keywords, license: meta.license,
@@ -301,10 +306,21 @@ async function listedPackages(ctx) {
 
 async function getIndex(ctx) {
   const { packages, degraded } = await listedPackages(ctx);
-  return json({
+  const body = JSON.stringify({
     format: "tb-registry-1", name: "TB Package Index", registry: `${ctx.siteUrl}/api/registry`,
     generated: iso(ctx), degraded, packages,
-  }, 200, { "Cache-Control": degraded ? "no-store" : PUBLIC_CACHE });
+  });
+  const headers = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": degraded ? "no-store" : PUBLIC_CACHE };
+  const key = signingKey(ctx.env);
+  if (key) headers["X-TB-Signature"] = signIndex(key, body);
+  return new Response(body, { status: 200, headers });
+}
+
+/** The public half of REGISTRY_SIGNING_KEY, for people pinning it by hand. */
+function getSigningKey(ctx) {
+  const key = signingKey(ctx.env);
+  return json({ algorithm: "ed25519", publicKey: key ? publicKeyBase64(key) : null, header: "X-TB-Signature" }, 200,
+    { "Cache-Control": PUBLIC_CACHE });
 }
 
 export function searchPackages(packages, query) {
@@ -840,6 +856,7 @@ async function route(ctx) {
   // URLs, so the index answers on the bare path and on "index.json" too.
   if (m === "GET" && (n === 0 || (n === 1 && (a === "index" || a === "index.json")))) return getIndex(ctx);
   if (m === "GET" && n === 1 && a === "search") return getSearch(ctx);
+  if (m === "GET" && n === 1 && a === "signing-key") return getSigningKey(ctx);
   if (m === "GET" && n === 1 && a === "me") return me(ctx);
   if (a === "auth" && n === 2) {
     if (m === "GET" && b === "login") return login(ctx);

@@ -30,6 +30,12 @@ name@range` picks the newest version that matches the range (`^1.2`, `~1.2.3`,
 it from <registry>/packages/<name>/<version>/download, checks its sha256 and
 records it in tb.lock.
 
+Each version in the index lists its own [dependencies], and `tb add` resolves
+the whole tree (dependencies of dependencies) into tb.lock; see resolve_tree()
+for the algorithm. The index is signed with Ed25519 (header X-TB-Signature over
+"tb-registry-index-v1\n" + the body); see check_index_signature() for when
+the signature is required.
+
 The older static format `{ "<name>": {"description": "...", "git": "<url>" |
 "zip": "<url>", "version"?: "..."} }` (https://code.tanisha.ceo/packages/index.json)
 still works. TB_PACKAGE_INDEX overrides the index URL (the tests point it at
@@ -101,6 +107,15 @@ PUBLISH_SKIP_DIRS = {PACKAGES_DIR, "__pycache__", "node_modules"}
 PUBLISH_SKIP_FILES = {LOCKFILE, ".DS_Store", "Thumbs.db"}
 ZIP_DATE = (2026, 1, 1, 0, 0, 0)
 TOKEN_RE = re.compile(r"^tbr_[A-Za-z0-9_-]{43}$")
+
+# Index signing. The server signs SIGNATURE_CONTEXT + the index body with the
+# Ed25519 key in REGISTRY_SIGNING_KEY. Put its public key (32 bytes, base64)
+# here to make the signature required for the official index.
+OFFICIAL_INDEX_KEYS: tuple[str, ...] = ()
+OFFICIAL_INDEX_URLS = (DEFAULT_INDEX, DEFAULT_REGISTRY + "/index")
+SIGNATURE_HEADER = "X-TB-Signature"
+SIGNATURE_CONTEXT = b"tb-registry-index-v1\n"
+MAX_RESOLVE_STEPS = 20000
 
 USAGE = """\
 TB packages
@@ -576,8 +591,129 @@ def pick_version(name: str, versions: dict, range_text: str | None, prefer: str 
     return max(candidates, key=version_key)
 
 
+def _is_yanked(info) -> bool:
+    return isinstance(info, dict) and bool(info.get("yanked"))
+
+
+def resolve_tree(requirements: dict, index: dict, deps_of, locked: dict | None = None,
+                 fixed: set | frozenset = frozenset()) -> dict:
+    """Pick one version of every index package the project needs, directly or
+    through other packages. Returns {name: version}.
+
+    requirements: {name: [(who, range), ...]} from tb.toml (and from packages
+    installed from git, zip or a folder). deps_of(name, version) gives a
+    version's own {name: range}. locked: {name: version} from tb.lock.
+    fixed: names tb.toml installs from git, zip or a folder; requirements on
+    them are left to tb.toml.
+
+    The algorithm is a depth-first search with backtracking. It always takes
+    the alphabetically first package that is needed but not chosen yet, and
+    tries its versions that match every range seen so far: the tb.lock
+    version first, then newest to oldest. Yanked versions are only tried when
+    a range pins them exactly or tb.lock has them. A chosen version's own
+    dependencies add ranges; one that breaks an earlier choice is skipped. A
+    package that needs itself (a cycle) is fine: it is chosen once. Because
+    every step goes in a fixed order, the same tb.toml, tb.lock and index give
+    the same answer whatever order files or the index list things in. If no
+    combination works, the error names the package and everyone's ranges for
+    it, from the first dead end the search met."""
+    locked = locked or {}
+    state = {"steps": 0, "conflict": None}
+
+    def versions_of(name):
+        entry = index.get(name)
+        return entry.get("versions") if isinstance(entry, dict) and isinstance(entry.get("versions"), dict) else None
+
+    def dead_end(name, wanted):
+        if state["conflict"] is None:
+            state["conflict"] = (name, wanted)
+
+    def solve(chosen: dict, needs: dict):
+        pending = sorted(n for n in needs if n not in chosen)
+        if not pending:
+            return chosen
+        name = pending[0]
+        wanted = needs[name]
+        versions = versions_of(name)
+        if versions is None:
+            dead_end(name, wanted)
+            return None
+        exact = any(is_exact(r) for _who, r in wanted)
+        candidates = sorted((v for v, info in versions.items()
+                             if parse_version(v) and all(satisfies(v, r) for _who, r in wanted)
+                             and (not _is_yanked(info) or exact or v == locked.get(name))),
+                            key=version_key, reverse=True)
+        if locked.get(name) in candidates:
+            candidates.remove(locked[name])
+            candidates.insert(0, locked[name])
+        if not candidates:
+            dead_end(name, wanted)
+            return None
+        for version in candidates:
+            state["steps"] += 1
+            if state["steps"] > MAX_RESOLVE_STEPS:
+                raise PkgError("These dependencies are too tangled to resolve (I gave up after "
+                               f"{MAX_RESOLVE_STEPS} tries).", "Pin some versions exactly in tb.toml.")
+            now = dict(chosen, **{name: version})
+            more = dict(needs)
+            ok = True
+            for dep, rng in sorted(deps_of(name, version).items()):
+                if dep in fixed:
+                    continue
+                more[dep] = more.get(dep, ()) + ((f"{name} {version}", rng),)
+                if dep in now and not satisfies(now[dep], rng):
+                    dead_end(dep, more[dep])
+                    ok = False
+                    break
+            if ok:
+                found = solve(now, more)
+                if found is not None:
+                    return found
+        return None
+
+    needs = {n: tuple(w) for n, w in requirements.items() if n not in fixed}
+    for wanted in needs.values():
+        for _who, rng in wanted:
+            parse_range(rng)  # a friendly error for a bad range in tb.toml
+    found = solve({}, needs)
+    if found is not None:
+        return found
+    name, wanted = state["conflict"]
+    lines = "\n".join(f"    {who} needs {name} {rng}" for who, rng in sorted(set(wanted)))
+    versions = versions_of(name)
+    if versions is None:
+        raise PkgError(f"I couldn't find a package called '{name}' in the index at {index_url()}:\n{lines}")
+    available = sorted((v for v, i in versions.items() if not _is_yanked(i)), key=version_key)
+    hint = f"Available: {', '.join(available[-8:])}. " if available else "Every version of it has been yanked. "
+    raise PkgError(f"No version of '{name}' works for everything that needs it:\n{lines}",
+                   hint + "Change a range in tb.toml, or try other versions of the packages that need it.")
+
+
+def _dependency_ranges(name: str, version: str, deps: dict, root_deps: dict) -> dict:
+    """A package's [dependencies] as {name: range}. Git, zip and folder
+    sources inside a package aren't installed for you unless tb.toml lists them."""
+    out = {}
+    if not isinstance(deps, dict):
+        return out
+    for dep, value in deps.items():
+        if isinstance(value, dict) and set(value) == {"version"}:
+            value = value["version"]
+        if isinstance(value, str):
+            out[dep] = "*" if value in ("", "latest") else value
+        elif dep not in root_deps:
+            raise PkgError(f"{name} {version} needs '{dep}' from a git, zip or folder source; "
+                           "tb only installs index packages as dependencies of dependencies.",
+                           f"Add it to your tb.toml yourself (tb add <url> --as {dep}).")
+    return out
+
+
 def _fetch(url: str, what: str, limit: int = MAX_ZIP_BYTES) -> bytes:
-    """Download `url` (http/https/file) with a size limit and friendly errors."""
+    return _fetch_raw(url, what, limit)[0]
+
+
+def _fetch_raw(url: str, what: str, limit: int = MAX_ZIP_BYTES) -> tuple[bytes, dict]:
+    """Download `url` (http/https/file) with a size limit and friendly errors.
+    Returns (body, headers with lower-case names)."""
     scheme = urllib.parse.urlparse(url).scheme
     if scheme not in ("http", "https", "file"):
         raise PkgError(f"I can only download {what} over http(s), not '{url}'.")
@@ -585,6 +721,7 @@ def _fetch(url: str, what: str, limit: int = MAX_ZIP_BYTES) -> bytes:
     try:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
             data = response.read(limit + 1)
+            headers = {k.lower(): v for k, v in response.headers.items()} if response.headers else {}
     except urllib.error.HTTPError as err:
         if err.code == 404:
             raise PkgError(f"I couldn't find {what} at {url} (404).") from None
@@ -597,12 +734,67 @@ def _fetch(url: str, what: str, limit: int = MAX_ZIP_BYTES) -> bytes:
         ) from None
     if len(data) > limit:
         raise PkgError(f"{what} at {url} is bigger than {limit // (1024 * 1024)} MB; I won't download it.")
-    return data
+    return data, headers
+
+
+def pinned_keys(url: str) -> list[bytes]:
+    """The Ed25519 public keys the index at `url` must be signed with:
+    TB_REGISTRY_PUBLIC_KEY (base64, comma-separated) for any index, else
+    OFFICIAL_INDEX_KEYS for the official one. Empty: no signature needed."""
+    import base64
+    import binascii
+
+    env = os.environ.get("TB_REGISTRY_PUBLIC_KEY", "").strip()
+    texts = env.split(",") if env else (OFFICIAL_INDEX_KEYS if url.rstrip("/") in OFFICIAL_INDEX_URLS else ())
+    keys = []
+    for text in texts:
+        try:
+            key = base64.b64decode(text.strip(), validate=True)
+        except (binascii.Error, ValueError):
+            key = b""
+        if len(key) != 32:
+            raise PkgError(f"'{text.strip()[:60]}' isn't an Ed25519 public key (32 bytes in base64).",
+                           "Check TB_REGISTRY_PUBLIC_KEY.")
+        keys.append(key)
+    return keys
+
+
+def check_index_signature(url: str, body: bytes, header: str | None) -> bool:
+    """Check the index's X-TB-Signature header ("ed25519 <base64>").
+
+    With a pinned key (pinned_keys) the signature is required: a missing or
+    wrong one is refused. Without one (the official index until its key ships
+    with TB, or a self-hosted index), an unsigned index is accepted; the
+    official one gets a warning. Returns True when a signature was verified."""
+    import base64
+    import binascii
+
+    from tbtools.ed25519 import verify
+
+    keys = pinned_keys(url)
+    if not keys:
+        if not header and url.rstrip("/") in OFFICIAL_INDEX_URLS:
+            print("  note: the package index isn't signed yet; tb.lock checksums still protect what you install.",
+                  file=sys.stderr)
+        return False
+    if not header:
+        raise PkgError(f"The package index at {url} isn't signed, so I won't use it.",
+                       "Someone may be tampering with your connection. Try again later, or from another network.")
+    kind, _, text = header.strip().partition(" ")
+    try:
+        signature = base64.b64decode(text.strip(), validate=True)
+    except (binascii.Error, ValueError):
+        signature = b""
+    if kind.lower() != "ed25519" or not any(verify(k, SIGNATURE_CONTEXT + body, signature) for k in keys):
+        raise PkgError(f"The package index at {url} has a signature that doesn't match TB's key, so I won't use it.",
+                       "Someone may be tampering with your connection. Try again later, or from another network.")
+    return True
 
 
 def load_index() -> dict:
     url = index_url()
-    data = _fetch(url, "the package index", limit=10 * 1024 * 1024)
+    data, headers = _fetch_raw(url, "the package index", limit=10 * 1024 * 1024)
+    check_index_signature(url, data, headers.get(SIGNATURE_HEADER.lower()))
     try:
         index = json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
@@ -667,14 +859,7 @@ def resolve_spec(spec: str, index: dict | None = None, prefer: str | None = None
         raise PkgError(f"The index entry for '{base}' is malformed.")
     source = {"name": base, "description": entry.get("description", ""), "version": entry.get("version")}
     if isinstance(entry.get("versions"), dict) and entry["versions"]:
-        version = pick_version(base, entry["versions"], tag, prefer)
-        info = entry["versions"][version] if isinstance(entry["versions"][version], dict) else {}
-        registry = registry_base()
-        source.update(
-            kind="registry", version=version, sha256=info.get("sha256"), range=tag, registry=registry,
-            url=f"{registry}/packages/{urllib.parse.quote(base)}/{urllib.parse.quote(version)}/download",
-            yanked=bool(info.get("yanked")),
-        )
+        source.update(registry_source(base, entry, pick_version(base, entry["versions"], tag, prefer)), range=tag)
         return source
     if entry.get("git"):
         source.update(kind="git", url=entry["git"], tag=tag or entry.get("tag"))
@@ -685,6 +870,17 @@ def resolve_spec(spec: str, index: dict | None = None, prefer: str | None = None
     else:
         raise PkgError(f"The index entry for '{base}' has neither a 'git' nor a 'zip' source.")
     return source
+
+
+def registry_source(name: str, entry: dict, version: str) -> dict:
+    """The source for one version of an index package."""
+    info = entry["versions"][version] if isinstance(entry["versions"][version], dict) else {}
+    registry = registry_base()
+    return {
+        "name": name, "description": entry.get("description", ""), "kind": "registry", "version": version,
+        "sha256": info.get("sha256"), "registry": registry, "yanked": bool(info.get("yanked")),
+        "url": f"{registry}/packages/{urllib.parse.quote(name)}/{urllib.parse.quote(version)}/download",
+    }
 
 
 def _rmtree(path: str, ignore_errors: bool = False) -> None:
@@ -808,8 +1004,7 @@ def _clone(source: dict, dest: str) -> dict:
     return info
 
 
-def _unzip(source: dict, dest: str) -> dict:
-    data = _fetch(source["url"], f"the package '{source['name']}'")
+def _check_digest(source: dict, data: bytes) -> str:
     digest = hashlib.sha256(data).hexdigest()
     expected = source.get("sha256")
     if expected and digest != expected:
@@ -817,6 +1012,28 @@ def _unzip(source: dict, dest: str) -> dict:
             f"The download of {source['name']} {source.get('version', '')} doesn't match the index's checksum; refusing to install it.",
             f"Expected sha256 {expected}, got {digest}. Try again later, and tell the index admins if it keeps happening.",
         )
+    return digest
+
+
+def _zip_manifest(data: bytes) -> dict:
+    """The [dependencies] of the tb.toml at the top of a package zip ({} if none)."""
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+        names = [n for n in archive.namelist() if not n.endswith("/")]
+        heads = {n.split("/", 1)[0] for n in names}
+        prefix = heads.pop() + "/" if len(heads) == 1 and all("/" in n for n in names) else ""
+        if prefix + MANIFEST not in names:
+            return {}
+        text = archive.read(prefix + MANIFEST).decode("utf-8")
+    except (zipfile.BadZipFile, UnicodeDecodeError, KeyError, OSError):
+        return {}
+    deps = parse_toml(text).get("dependencies", {})
+    return deps if isinstance(deps, dict) else {}
+
+
+def _unzip(source: dict, dest: str) -> dict:
+    data = source.get("data") or _fetch(source["url"], f"the package '{source['name']}'")
+    digest = _check_digest(source, data)
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
         members = [m for m in archive.infolist()]
@@ -980,6 +1197,7 @@ def cmd_add(args: list[str]) -> int:
     if alias and len(specs) != 1:
         raise PkgError("--as works with one package at a time.")
     index = None
+    added = set()
     for spec in specs:
         base, _ = _split_tag(spec)
         if index is None and not _looks_like_url(base) and not os.path.exists(base) and not base.endswith((".zip", ".git")):
@@ -989,15 +1207,20 @@ def cmd_add(args: list[str]) -> int:
         source = resolve_spec(spec, index)
         source["from_index"] = bool(index) and source["name"] in (index or {})
         if alias:
+            if source["kind"] == "registry":
+                raise PkgError("--as works with git, zip and folder sources; index packages keep their own name.")
             if not NAME_RE.match(alias):
                 raise PkgError(f"'{alias}' isn't a valid package name.")
             source["name"] = alias
         print(f"Adding {source['name']}...")
-        entry = install(root, source)
         manifest["dependencies"][source["name"]] = _manifest_source(source)
-        lock[source["name"]] = entry
-        write_manifest(root, manifest)
-        write_lock(root, lock)
+        if source["kind"] == "registry":
+            added.add(source["name"])  # installed with its dependencies below
+        else:
+            lock[source["name"]] = install(root, source)
+            write_lock(root, lock)
+    _sync(root, manifest, lock, unlock=added, index=index)
+    write_manifest(root, manifest)
     last = source["name"]
     # import "<name>" finds tb_packages/<name>/ from anywhere in the project
     print(f"Done. Use it with: import \"{last}\" as {last.replace('-', '_')}")
@@ -1010,19 +1233,135 @@ def _install_all(root: str, manifest: dict, lock: dict) -> int:
         print(f"No dependencies in {MANIFEST} yet. Add one with: tb add <name>")
         return 0
     print(f"Installing {len(deps)} package{'s' if len(deps) != 1 else ''} from {MANIFEST}...")
-    for name, value in deps.items():
-        locked = lock.get(name, {})
-        prefer = locked.get("version") if locked.get("source") == "registry" else None
-        source = _source_from_manifest(name, value, prefer)
-        if source["kind"] == "git" and not source.get("tag") and locked.get("commit") and locked.get("url") == source["url"]:
-            # Reproduce the lock: fetch the recorded commit.
-            source = dict(source, tag=None, commit=locked["commit"])
-            lock[name] = _install_locked_git(root, source)
-            continue
-        lock[name] = install(root, source)
-    write_lock(root, lock)
+    _sync(root, manifest, lock, reinstall=True)
     print("Done.")
     return 0
+
+
+def _is_index_style(value) -> bool:
+    return isinstance(value, str) or (isinstance(value, dict) and "version" in value
+                                      and not any(k in value for k in ("git", "zip", "path")))
+
+
+def _sync(root: str, manifest: dict, lock: dict, *, reinstall: bool = False, unlock=frozenset(),
+          verbose: bool = False, index: dict | None = None) -> dict:
+    """Install everything tb.toml needs, dependencies of dependencies included,
+    and write tb.lock; returns the new lock.
+
+    reinstall: download everything again, exactly as tb.lock pins it (each
+    zip's sha256 is checked against tb.lock). unlock: names whose tb.lock
+    version (or git commit) is dropped, so they move to the newest allowed.
+    Packages nothing needs any more are removed from tb_packages/."""
+    deps = manifest["dependencies"]
+    state = {"index": index}
+
+    def get_index() -> dict:
+        if state["index"] is None:
+            state["index"] = load_index()
+        return state["index"]
+
+    new_lock: dict = {}
+    requirements: dict = {}
+    fixed = []
+    for name in sorted(deps):
+        value = deps[name]
+        if _is_index_style(value):
+            entry = get_index().get(name)
+            if isinstance(entry, dict) and isinstance(entry.get("versions"), dict) and entry["versions"]:
+                wanted = value if isinstance(value, str) else str(value["version"])
+                requirements[name] = [(MANIFEST, "*" if wanted in ("", "latest") else wanted)]
+                continue
+        fixed.append(name)
+
+    # Git, zip and folder sources (and entries of an old static index): fetched as they are.
+    for name in fixed:
+        locked = lock.get(name, {})
+        folder = os.path.join(root, PACKAGES_DIR, name)
+        if locked and os.path.isdir(folder) and not reinstall and name not in unlock:
+            entry = dict(locked)
+        else:
+            if verbose:
+                print(f"Updating {name}...")
+            source = _source_from_manifest(name, deps[name], None, state["index"])
+            if (reinstall and name not in unlock and source["kind"] == "git" and not source.get("tag")
+                    and locked.get("commit") and locked.get("url") == source["url"]):
+                entry = _install_locked_git(root, dict(source, tag=None, commit=locked["commit"]))
+            else:
+                entry = install(root, source)
+            if verbose and locked and all(locked.get(k) == entry.get(k) for k in ("commit", "sha256", "version")):
+                print(f"    {name} was already up to date.")
+        meta = read_manifest(folder) if os.path.isfile(os.path.join(folder, MANIFEST)) else {}
+        ranges = _dependency_ranges(name, str(entry.get("version", "")), meta.get("dependencies", {}), deps)
+        for dep, rng in sorted(ranges.items()):
+            requirements.setdefault(dep, []).append((name, rng))
+        entry.pop("dependencies", None)
+        if ranges:
+            entry["dependencies"] = dict(sorted(ranges.items()))
+        new_lock[name] = entry
+
+    if requirements:
+        index = get_index()
+        locked_versions = {n: e.get("version") for n, e in lock.items()
+                           if e.get("source") == "registry" and n not in unlock}
+        archives: dict = {}
+        known: dict = {}
+
+        def source_of(name: str, version: str) -> dict:
+            source = registry_source(name, index[name], version)
+            old = lock.get(name, {})
+            if old.get("source") == "registry" and old.get("version") == version and old.get("sha256"):
+                if source["sha256"] and source["sha256"] != old["sha256"]:
+                    raise PkgError(f"The index's checksum for {name} {version} isn't the one in {LOCKFILE}; refusing to install it.",
+                                   "Published versions never change, so the index or your connection is damaged. Tell the index admins.")
+                source["sha256"] = old["sha256"]
+            source["data"] = archives.get((name, version))
+            return source
+
+        def deps_of(name: str, version: str) -> dict:
+            if (name, version) not in known:
+                info = index[name]["versions"][version]
+                if isinstance(info, dict) and isinstance(info.get("dependencies"), dict):
+                    raw = info["dependencies"]
+                else:  # an index from before TB 3.3 doesn't list them: read the package's tb.toml
+                    source = source_of(name, version)
+                    data = _fetch(source["url"], f"the package '{name}'")
+                    _check_digest(source, data)
+                    archives[(name, version)] = data
+                    raw = _zip_manifest(data)
+                known[(name, version)] = _dependency_ranges(name, version, raw, deps)
+            return known[(name, version)]
+
+        picked = resolve_tree(requirements, index, deps_of, locked_versions, set(fixed))
+        for name in sorted(picked):
+            version = picked[name]
+            old = lock.get(name, {})
+            folder = os.path.join(root, PACKAGES_DIR, name)
+            if verbose and name in unlock:
+                print(f"Updating {name}...")
+            if (not reinstall and old.get("source") == "registry" and old.get("version") == version
+                    and os.path.isdir(folder)):
+                entry = dict(old)
+                if verbose and name in unlock:
+                    print(f"    {name} was already up to date.")
+            else:
+                if locked_versions.get(name) and locked_versions[name] != version:
+                    print(f"  note: {name} {locked_versions[name]} from {LOCKFILE} doesn't fit any more; using {version}.")
+                entry = install(root, source_of(name, version))
+            ranges = deps_of(name, version)
+            entry.pop("dependencies", None)
+            if ranges:
+                entry["dependencies"] = dict(sorted(ranges.items()))
+            new_lock[name] = entry
+
+    for name in sorted(set(lock) - set(new_lock)):
+        folder = os.path.join(root, PACKAGES_DIR, name)
+        if os.path.isdir(folder):
+            _rmtree(folder)
+        print(f"  - {name} (nothing needs it any more)")
+    write_lock(root, new_lock)
+    lock.clear()
+    lock.update(new_lock)
+    return new_lock
 
 
 def _install_locked_git(root: str, source: dict) -> dict:
@@ -1075,6 +1414,19 @@ def cmd_remove(args: list[str]) -> int:
         manifest["dependencies"].pop(name, None)
         lock.pop(name, None)
         print(f"  - {name} removed")
+    # Also drop what only the removed packages needed (tb.lock records who needs what).
+    needed, todo = set(), list(manifest["dependencies"])
+    while todo:
+        name = todo.pop()
+        if name not in needed:
+            needed.add(name)
+            todo.extend(lock.get(name, {}).get("dependencies", {}) or {})
+    for name in sorted(set(lock) - needed):
+        folder = os.path.join(root, PACKAGES_DIR, name)
+        if os.path.isdir(folder):
+            _rmtree(folder)
+        del lock[name]
+        print(f"  - {name} (nothing needs it any more)")
     write_manifest(root, manifest)
     write_lock(root, lock)
     return 0
@@ -1093,15 +1445,9 @@ def cmd_update(args: list[str]) -> int:
             raise PkgError(f"I don't know the option '{name}' for tb update.")
         if name not in manifest["dependencies"]:
             raise PkgError(f"'{name}' isn't in {MANIFEST}.", "Add it first with: tb add " + name)
-        source = _source_from_manifest(name, manifest["dependencies"][name])
-        before = lock.get(name, {})
-        print(f"Updating {name}...")
-        after = install(root, source)
-        lock[name] = after
-        same = all(before.get(k) == after.get(k) for k in ("commit", "sha256", "version"))
-        if same and before:
-            print(f"    {name} was already up to date.")
-    write_lock(root, lock)
+    # `tb update` frees everything (dependencies of dependencies too); `tb update x` only x.
+    unlock = set(names) if args else set(names) | set(lock)
+    _sync(root, manifest, lock, unlock=unlock, verbose=True)
     return 0
 
 

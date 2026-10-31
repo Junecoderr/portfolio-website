@@ -4,7 +4,7 @@
 // a fake GitHub. Nothing here talks to the network.
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, verify as cryptoVerify } from "node:crypto";
 import { test } from "node:test";
 import { deflateRawSync } from "node:zlib";
 
@@ -515,7 +515,7 @@ test("yanked versions stay downloadable but leave the ranges; admins' yanks stic
   assert.equal(y.status, 200);
   let index = await (await w.call("GET", "index")).json();
   assert.equal(index.packages.greet.version, "1.0.0");
-  assert.deepEqual(index.packages.greet.versions["1.1.0"], { sha256: index.packages.greet.versions["1.1.0"].sha256, yanked: true });
+  assert.deepEqual(index.packages.greet.versions["1.1.0"], { sha256: index.packages.greet.versions["1.1.0"].sha256, dependencies: { "tb-colors": "^1.0" }, yanked: true });
   assert.equal((await w.call("GET", "packages/greet/1.1.0/download")).status, 200);
   const view = await (await w.call("GET", "packages/greet")).json();
   assert.equal(view.versions[0].yankReason, "broken");
@@ -626,4 +626,36 @@ test("the seed matches the bundled packages", () => {
     assert.equal(createHash("sha256").update(bytes).digest("hex"), p.sha256);
     assert.equal(bytes.length, p.size);
   }
+});
+
+test("the index lists each version's dependencies and is signed with REGISTRY_SIGNING_KEY", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519"); // a throwaway key, only for this test
+  const { w, alice, bobToken } = await setup();
+  assert.equal((await upload(w, bobToken, "greet", "1.0.0", pkgZip("greet", "1.0.0"))).status, 201);
+  assert.equal((await w.call("POST", "admin/packages/greet/1.0.0/approve", { cookie: alice })).status, 200);
+  // No key yet: unsigned, and the key route says so.
+  const plain = await w.call("GET", "index");
+  assert.equal(plain.headers.get("x-tb-signature"), null);
+  const index = await plain.json();
+  assert.deepEqual(index.packages.greet.versions["1.0.0"].dependencies, { "tb-colors": "^1.0" });
+  assert.deepEqual(index.packages["tb-colors"].versions["1.0.0"].dependencies, {});
+  assert.equal((await (await w.call("GET", "signing-key")).json()).publicKey, null);
+  // With the key (one line of base64 PKCS#8, as the owner sets it).
+  w.env.REGISTRY_SIGNING_KEY = privateKey.export({ format: "der", type: "pkcs8" }).toString("base64");
+  const res = await w.call("GET", "index.json");
+  const body = Buffer.from(await res.arrayBuffer());
+  const [kind, sig] = res.headers.get("x-tb-signature").split(" ");
+  assert.equal(kind, "ed25519");
+  const message = Buffer.concat([Buffer.from("tb-registry-index-v1\n"), body]);
+  assert.ok(cryptoVerify(null, message, publicKey, Buffer.from(sig, "base64")));
+  assert.ok(!cryptoVerify(null, Buffer.concat([message, Buffer.from(" ")]), publicKey, Buffer.from(sig, "base64")));
+  const raw = publicKey.export({ format: "der", type: "spki" }).subarray(12).toString("base64");
+  assert.equal((await (await w.call("GET", "signing-key")).json()).publicKey, raw);
+  // PEM works too; a broken key leaves the index unsigned instead of failing.
+  w.env.REGISTRY_SIGNING_KEY = privateKey.export({ format: "pem", type: "pkcs8" });
+  assert.match((await w.call("GET", "index")).headers.get("x-tb-signature"), /^ed25519 /);
+  w.env.REGISTRY_SIGNING_KEY = "not a key";
+  const broken = await w.call("GET", "index");
+  assert.equal(broken.status, 200);
+  assert.equal(broken.headers.get("x-tb-signature"), null);
 });

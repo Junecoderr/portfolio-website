@@ -286,7 +286,8 @@ reachable.
 
 | Route | Who | What |
 |---|---|---|
-| `GET index` | anyone | approved packages for `tb`: `{format: "tb-registry-1", packages: {name: {description, version, keywords, owner, downloads, versions: {v: {sha256, yanked?}}, zip}}}` (CDN-cached 60 s) |
+| `GET index` | anyone | approved packages for `tb`: `{format: "tb-registry-1", packages: {name: {description, version, keywords, owner, downloads, versions: {v: {sha256, dependencies, yanked?}}, zip}}}` (CDN-cached 60 s), signed when `REGISTRY_SIGNING_KEY` is set |
+| `GET signing-key` | anyone | `{algorithm: "ed25519", publicKey}` (the public half of `REGISTRY_SIGNING_KEY`, or null) |
 | `GET search?q=` | anyone | ranked matches on name, keywords, description |
 | `GET packages/<name>` / `packages/<name>/<version>` | anyone (owner/admin also see pending ones) | metadata, versions, README |
 | `GET packages/<name>/<version>/download` | anyone | the zip (counted per version); yanked versions stay downloadable |
@@ -313,6 +314,30 @@ name (edit distance 1, or equal without dashes) and names starting with `tb-`
 are flagged for the reviewer. The three bundled packages (`packages/<name>/`)
 are approved packages owned by the system owner `tb`; admins may publish new
 versions of them.
+
+**Dependency trees.** `tb add` resolves dependencies of dependencies
+(`resolve_tree()` in `tbtools/pkg.py`): a depth-first search with backtracking
+that always takes the alphabetically first package still needed and tries its
+matching versions, tb.lock's version first, then newest to oldest (yanked ones
+only when pinned exactly or locked). Every step is in a fixed order, so the
+same tb.toml, tb.lock and index always give a byte-identical tb.lock. A
+conflict names the package and every range on it with who asked. Each tb.lock
+entry records its own `dependencies`; `tb remove` drops what only the removed
+package needed. The index lists each version's `dependencies`; an index from
+before 3.3 doesn't, and `tb` then reads the package's own tb.toml from its
+(checksum-verified) zip. Packages may only depend on index packages; git, zip
+and folder sources must be listed in the project's own tb.toml.
+
+**Signed index.** With `REGISTRY_SIGNING_KEY` set, `GET index` carries
+`X-TB-Signature: ed25519 <base64>` over `"tb-registry-index-v1\n"` + the exact
+body. The index holds every version's sha256, so the signature covers the
+downloads too. `tb` (pure-Python verification in `tbtools/ed25519.py`, tested
+with the RFC 8032 vectors) requires it once a public key is pinned:
+`OFFICIAL_INDEX_KEYS` in `tbtools/pkg.py` for the official index, or
+`TB_REGISTRY_PUBLIC_KEY` (base64, comma-separated) for any index. With no key
+pinned it accepts an unsigned index (the official one with a note), so clients
+keep working while the server has no key yet. tb.lock's checksums are checked
+on every install either way.
 
 **Publishing checks** (server side, and by `tb publish` before it uploads):
 names `^[a-z][a-z0-9-]{1,38}[a-z0-9]$` without `--`, not a standard library
@@ -375,6 +400,16 @@ Variables, Production):
    once and read `user.id` from `/api/registry/me`.
 5. Optional: `REGISTRY_SITE_URL` (default: the request's origin) if the site
    moves; the OAuth callback must match it.
+6. `REGISTRY_SIGNING_KEY`: the index's Ed25519 private key, one line of base64
+   PKCS#8 (PEM also works). Make a key pair on your own machine with
+   `node -e "const k=require('crypto').generateKeyPairSync('ed25519');console.log('REGISTRY_SIGNING_KEY='+k.privateKey.export({format:'der',type:'pkcs8'}).toString('base64'));console.log('public key: '+k.publicKey.export({format:'der',type:'spki'}).subarray(12).toString('base64'))"`,
+   set the first line's value in Vercel (Production, sensitive), redeploy and
+   check that `/api/registry/signing-key` shows the public key. Then put the
+   public key in `OFFICIAL_INDEX_KEYS` in `tbtools/pkg.py` for the next
+   release; from that release on, `tb` refuses an unsigned or wrongly signed
+   official index. To rotate, add the new public key next to the old one,
+   release, then switch the variable. Keep the private key only in Vercel and
+   an offline backup.
 
 Until a variable is set the API says what's missing (`503` with the variable's
 name, or `/packages/publish?error=signin-unavailable`) and the public index

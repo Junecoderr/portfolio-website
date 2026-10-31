@@ -2,7 +2,7 @@
 // HMAC signing, Upstash Redis over REST and Vercel Blob over REST. Everything
 // is plain fetch + node:crypto; no npm packages.
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, createPrivateKey, createPublicKey, randomBytes, sign as cryptoSign, timingSafeEqual } from "node:crypto";
 
 import { redisConfig } from "../stats.js";
 
@@ -116,6 +116,36 @@ export function safeEqual(a, b) {
 export function sessionSecret(env) {
   const s = env.REGISTRY_SESSION_SECRET;
   return typeof s === "string" && s.length >= 32 ? s : null;
+}
+
+// Index signing: Ed25519 over INDEX_SIGNATURE_CONTEXT + the exact JSON body,
+// sent as "X-TB-Signature: ed25519 <base64>". tbtools/pkg.py checks it with
+// the public key it pins. REGISTRY_SIGNING_KEY is the private key as one line
+// of base64 PKCS#8 DER (or PEM). Unset: the index goes out unsigned.
+export const INDEX_SIGNATURE_CONTEXT = "tb-registry-index-v1\n";
+
+export function signingKey(env) {
+  const text = String(env.REGISTRY_SIGNING_KEY || "").trim();
+  if (!text) return null;
+  try {
+    const key = text.startsWith("-----BEGIN")
+      ? createPrivateKey(text)
+      : createPrivateKey({ key: Buffer.from(text, "base64"), format: "der", type: "pkcs8" });
+    if (key.asymmetricKeyType !== "ed25519") throw new Error("not an Ed25519 key");
+    return key;
+  } catch (err) {
+    console.error("REGISTRY_SIGNING_KEY isn't a usable Ed25519 private key; the index goes out unsigned.", err.message);
+    return null;
+  }
+}
+
+/** The raw 32-byte public key, base64: what clients pin. */
+export function publicKeyBase64(key) {
+  return createPublicKey(key).export({ format: "der", type: "spki" }).subarray(12).toString("base64");
+}
+
+export function signIndex(key, body) {
+  return "ed25519 " + cryptoSign(null, Buffer.from(INDEX_SIGNATURE_CONTEXT + body, "utf8"), key).toString("base64");
 }
 
 export function signValue(secret, payload) {

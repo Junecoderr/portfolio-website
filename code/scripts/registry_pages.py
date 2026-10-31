@@ -107,6 +107,7 @@ tb search tables              # find packages
 tb info tb-tables             # versions, owner, checksums
 tb update                     # newer versions, within the ranges in tb.toml
 tb remove tb-tables</code></pre>
+        <p><code>tb add</code> also installs what each package needs, picking one version of every package that fits all the ranges asking for it, and records the whole tree in <code>tb.lock</code>.</p>
         <p>Commit <code>tb.toml</code> and <code>tb.lock</code>: anyone who runs <code>tb add</code> with no arguments gets the same versions, checked against the same checksums. You can still install straight from a zip or a git URL: <code>tb add https://example.com/my-package.zip</code>.</p>
         <p>Only install packages you trust: a package's code runs with the same rights as your program. Reviews catch obvious problems, not every bug. If something looks wrong, use <strong>Report</strong> on the package's page.</p>
       </section>

@@ -364,6 +364,13 @@
         var label = [el("code", { text: v.version })];
         if (v.status === "yanked") label.push(" ", el("span", { className: "registry-badge registry-badge-warn", title: v.yankReason || "", text: "yanked" }));
         else if (v.status && v.status !== "approved") label.push(" ", el("span", { className: "registry-badge", text: v.status }));
+        // Every version's checksum (what tb.lock records) and its own dependencies.
+        if (v.sha256) label.push(el("br"), el("code", { className: "registry-hash", title: "sha256", text: v.sha256 }));
+        var needs = v.dependencies ? Object.keys(v.dependencies).sort() : [];
+        if (needs.length) label.push(el("br"), "needs " + needs.map(function (d) {
+          var r = v.dependencies[d];
+          return d + " " + (typeof r === "string" ? r : (r.version || r.git || r.zip || ""));
+        }).join(", "));
         rows.appendChild(el("tr", null, [
           el("th", { scope: "row" }, label),
           el("td", { text: v.created ? day(v.created) : "" }),
