@@ -274,3 +274,10 @@ website are covered in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 ## License
 
 TB is released under the MIT License. See [`LICENSE`](../LICENSE).
+
+The `attack` library bundles data derived from MITRE ATT&CK®
+(`tblib/data/attack.json`). © The MITRE Corporation. This work is reproduced
+and distributed with the permission of The MITRE Corporation under the
+[ATT&CK terms of use](https://attack.mitre.org/resources/legal-and-branding/terms-of-use/);
+the data file carries MITRE's copyright designation and license in full.
+MITRE ATT&CK and ATT&CK are registered trademarks of The MITRE Corporation.

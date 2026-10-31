@@ -41,6 +41,24 @@ SPEC = {
         "static": '{"source": "urlhaus", "indicator": "http://198.51.100.14/inv/INV-20817.zip", "verdict": "malicious", "score": 100, "details": {"listed": true, "status": "online", "threat": "malware_download"}}',
         "roles": {"url": "the web address to check", "key": "your abuse.ch Auth-Key"},
     },
+    "otx": {
+        "args": {"indicator": '"203.0.113.42"'}, "extra": ["indicator"], "host_title": "AlienVault OTX",
+        "host_label": "otx.alienvault.com", "request": "GET /indicators/IPv4/<ip>/general", "response": "pulses, tags",
+        "static": '{"source": "otx", "indicator": "203.0.113.42", "verdict": "malicious", "score": 70, "details": {"pulses": 7, "tags": ["ssh", "bruteforce"], "country": "Netherlands"}}',
+        "roles": {"indicator": "an IP, domain, URL or file hash (key from OTX_API_KEY)"},
+    },
+    "greynoise": {
+        "args": {"ip": '"203.0.113.42"'}, "extra": ["ip"], "host_title": "GreyNoise", "host_label": "api.greynoise.io",
+        "request": "GET /v3/community/<ip>", "response": "noise, classification",
+        "static": '{"source": "greynoise", "indicator": "203.0.113.42", "verdict": "malicious", "score": 90, "details": {"noise": true, "riot": false, "classification": "malicious"}}',
+        "roles": {"ip": "the IP address (GREYNOISE_API_KEY is optional)"},
+    },
+    "shodan": {
+        "args": {"ip": '"198.51.100.14"'}, "extra": ["ip"], "host_title": "Shodan", "host_label": "api.shodan.io",
+        "request": "GET /shodan/host/<ip>", "response": "ports, vulns",
+        "static": '{"source": "shodan", "indicator": "198.51.100.14", "verdict": "suspicious", "score": 20, "details": {"ports": [22, 80, 443], "org": "Example Hosting BV", "vulns": ["CVE-2023-38408", "CVE-2024-6387"]}}',
+        "roles": {"ip": "the IP address (key from SHODAN_API_KEY)"},
+    },
     "has_key": {
         "t": "flow", "run": True, "extra": [],
         "args": {"service": '"virustotal"'},

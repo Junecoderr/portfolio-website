@@ -1,0 +1,216 @@
+# A test subset of Sigma rules written for TB, modelled on the kinds of rules in the
+# public SigmaHQ repository (same logsources, field names, modifiers and condition
+# shapes). They are not copies of SigmaHQ rules.
+title: Encoded PowerShell command line
+id: 6d1b6a4e-0001-4a00-9000-000000000001
+status: test
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection_img:
+    Image|endswith:
+      - '\powershell.exe'
+      - '\pwsh.exe'
+  selection_cli:
+    CommandLine|contains:
+      - ' -enc '
+      - ' -EncodedCommand '
+  condition: all of selection_*
+level: high
+tags:
+  - attack.execution
+  - attack.t1059.001
+---
+title: Certutil used to download a file
+id: 6d1b6a4e-0001-4a00-9000-000000000002
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection:
+    Image|endswith: '\certutil.exe'
+    CommandLine|contains|all:
+      - 'urlcache'
+      - 'http'
+  condition: selection
+level: high
+tags:
+  - attack.t1105
+---
+title: Office application spawns a shell
+id: 6d1b6a4e-0001-4a00-9000-000000000003
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection:
+    ParentImage|endswith:
+      - '\winword.exe'
+      - '\excel.exe'
+      - '\powerpnt.exe'
+    Image|endswith:
+      - '\cmd.exe'
+      - '\powershell.exe'
+      - '\wscript.exe'
+  condition: selection
+level: high
+tags:
+  - attack.t1204.002
+---
+title: Shadow copies deleted
+id: 6d1b6a4e-0001-4a00-9000-000000000004
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection_vssadmin:
+    Image|endswith: '\vssadmin.exe'
+    CommandLine|contains|all:
+      - 'delete'
+      - 'shadows'
+  selection_wmic:
+    Image|endswith: '\wmic.exe'
+    CommandLine|contains|all:
+      - 'shadowcopy'
+      - 'delete'
+  condition: 1 of selection_*
+level: critical
+tags:
+  - attack.impact
+  - attack.t1490
+---
+title: Rundll32 without a DLL argument
+id: 6d1b6a4e-0001-4a00-9000-000000000005
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection:
+    Image|endswith: '\rundll32.exe'
+  filter_dll:
+    CommandLine|contains: '.dll'
+  filter_empty:
+    CommandLine: null
+  condition: selection and not 1 of filter_*
+level: medium
+tags:
+  - attack.t1218.011
+---
+title: Suspicious process renamed from original file name
+id: 6d1b6a4e-0001-4a00-9000-000000000006
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection:
+    OriginalFileName:
+      - 'PsExec.exe'
+      - 'procdump'
+  filter:
+    Image|endswith:
+      - '\PsExec.exe'
+      - '\PsExec64.exe'
+      - '\procdump.exe'
+  condition: selection and not filter
+level: medium
+---
+title: Mimikatz keywords in command line
+id: 6d1b6a4e-0001-4a00-9000-000000000007
+logsource:
+  product: windows
+  category: process_creation
+detection:
+  selection:
+    CommandLine|contains:
+      - 'sekurlsa::'
+      - 'lsadump::'
+      - 'kerberos::golden'
+  condition: selection
+level: critical
+tags:
+  - attack.t1003.001
+---
+title: Failed logon from many accounts
+id: 6d1b6a4e-0001-4a00-9000-000000000008
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4625
+    LogonType:
+      - 3
+      - 10
+  condition: selection | count(TargetUserName) by IpAddress > 10
+timeframe: 10m
+level: high
+tags:
+  - attack.t1110.003
+---
+title: Security log cleared
+id: 6d1b6a4e-0001-4a00-9000-000000000009
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 1102
+  condition: selection
+level: high
+tags:
+  - attack.t1070.001
+---
+title: Member added to a privileged group
+id: 6d1b6a4e-0001-4a00-9000-000000000010
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID:
+      - 4728
+      - 4732
+      - 4756
+    TargetUserName|re: '^(Domain|Enterprise) Admins$'
+  condition: selection
+level: high
+tags:
+  - attack.t1098
+---
+title: PowerShell downloads and runs code
+id: 6d1b6a4e-0001-4a00-9000-000000000011
+logsource:
+  product: windows
+  service: powershell
+detection:
+  selection:
+    EventID: 4104
+    ScriptBlockText|contains:
+      - 'DownloadString('
+      - 'Invoke-WebRequest'
+  invoke:
+    ScriptBlockText|contains:
+      - 'IEX'
+      - 'Invoke-Expression'
+  condition: selection and invoke
+level: high
+---
+title: Sysmon connection to a rare port from a script host
+id: 6d1b6a4e-0001-4a00-9000-000000000012
+logsource:
+  product: windows
+  service: sysmon
+detection:
+  selection:
+    EventID: 3
+    Image|endswith:
+      - '\wscript.exe'
+      - '\cscript.exe'
+      - '\mshta.exe'
+  filter:
+    DestinationPort:
+      - 80
+      - 443
+  condition: selection and not filter
+level: medium

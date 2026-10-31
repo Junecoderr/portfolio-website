@@ -114,6 +114,24 @@ installs silently, verifies and uninstalls (CI runs it).
 Fallback zip for running with your own Python:
 `uv run python packaging/make_fallback_zip.py` → `dist/tb-python.zip`.
 
+## ATT&CK data
+
+`tblib/data/attack.json` is generated from MITRE's official Enterprise STIX
+bundle (the `mitre-attack/attack-stix-data` repository):
+
+```sh
+uv run python scripts/update_attack.py                 # latest release
+uv run python scripts/update_attack.py --version 18.0  # a given release
+uv run python scripts/update_attack.py enterprise-attack.json   # a local copy
+```
+
+It keeps tactics, techniques, sub-techniques (first sentence of each
+description), mitigations and groups, records the ATT&CK version and the
+bundle's modified date (`attack.info()` reports both), and stays well under
+3 MB. Commit the regenerated file. MITRE's terms of use require every copy to
+carry its copyright designation and license: the script writes them into the
+file's `copyright` and `notice` fields, and `README.md` repeats the notice.
+
 ## Releasing
 
 Keep `tb.__version__`, `pyproject.toml` (then `uv lock`), `packaging/tb.spec`,

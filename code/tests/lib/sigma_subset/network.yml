@@ -1,0 +1,85 @@
+# Firewall, DNS and Zeek rules for the conversion test subset (written for TB; see windows.yml).
+title: Outbound SMB to the internet
+logsource:
+  category: firewall
+detection:
+  selection:
+    dst_port: 445
+    action: allow
+  filter_private:
+    dst_ip|cidr:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+  condition: selection and not filter_private
+level: high
+---
+title: Firewall denies from one source to many ports
+logsource:
+  category: firewall
+detection:
+  selection:
+    action: deny
+  condition: selection | count(dst_port) by src_ip > 20
+timeframe: 1m
+level: medium
+tags:
+  - attack.t1046
+---
+title: CEF event from a known bad user agent
+logsource:
+  category: proxy
+detection:
+  selection:
+    requestClientApplication|contains: 'python-requests'
+    suser|exists: false
+  condition: selection
+level: low
+---
+title: DNS query for a dynamic DNS domain
+logsource:
+  category: dns
+detection:
+  selection:
+    query|endswith:
+      - '.duckdns.org'
+      - '.no-ip.com'
+      - '.ddns.net'
+  condition: selection
+level: medium
+---
+title: Zeek connection to a Tor port
+logsource:
+  product: zeek
+  service: conn
+detection:
+  selection:
+    id.resp_p:
+      - 9001
+      - 9030
+  condition: selection
+level: medium
+---
+title: Zeek DNS TXT query of a long name
+logsource:
+  product: zeek
+  service: dns
+detection:
+  selection:
+    qtype_name: TXT
+    query|re: '^[A-Za-z0-9]{40,}\.'
+  condition: selection
+level: medium
+tags:
+  - attack.t1071.004
+---
+title: Zeek HTTP request with a curl user agent to an IP
+logsource:
+  product: zeek
+  service: http
+detection:
+  selection:
+    user_agent|startswith: 'curl/'
+    uri|contains: '/bin'
+  condition: selection
+level: low

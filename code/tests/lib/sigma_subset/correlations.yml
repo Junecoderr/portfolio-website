@@ -1,0 +1,112 @@
+# Correlation and "| near" rules for the conversion test subset (written for TB; see windows.yml).
+title: SSH failed login
+name: ssh_failed
+logsource:
+  product: linux
+  service: sshd
+detection:
+  selection:
+    action: failed_login
+  condition: selection
+level: low
+---
+title: SSH accepted login
+name: ssh_accepted
+logsource:
+  product: linux
+  service: sshd
+detection:
+  selection:
+    action: login
+  condition: selection
+level: low
+---
+title: Windows failed logon
+name: win_failed
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4625
+  condition: selection
+level: low
+---
+title: Many SSH failures from one address
+correlation:
+  type: event_count
+  rules:
+    - ssh_failed
+  group-by:
+    - ip
+  timespan: 5m
+  condition:
+    gte: 20
+level: high
+---
+title: Password spraying over SSH
+correlation:
+  type: value_count
+  rules:
+    - ssh_failed
+  group-by:
+    - ip
+  timespan: 10m
+  condition:
+    field: user
+    gt: 5
+level: high
+tags:
+  - attack.t1110.003
+---
+title: Failures then success from one address
+correlation:
+  type: temporal
+  rules:
+    - ssh_failed
+    - ssh_accepted
+  group-by:
+    - ip
+  timespan: 2m
+level: high
+---
+title: Failures on Linux and Windows from one address
+correlation:
+  type: temporal
+  rules:
+    - ssh_failed
+    - win_failed
+  group-by:
+    - source
+  timespan: 15m
+  aliases:
+    source:
+      ssh_failed: ip
+      win_failed: IpAddress
+level: high
+---
+title: Failures then success in order
+correlation:
+  type: temporal_ordered
+  rules:
+    - ssh_failed
+    - ssh_accepted
+  group-by:
+    - ip
+  timespan: 2m
+level: high
+---
+title: SSH success soon after a failure
+logsource:
+  product: linux
+  service: sshd
+detection:
+  ok:
+    action: login
+  bad:
+    action: failed_login
+  monitoring:
+    user: nagios
+  condition: ok | near bad and not monitoring
+timeframe: 1m
+level: medium

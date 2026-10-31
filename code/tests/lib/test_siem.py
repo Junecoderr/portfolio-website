@@ -30,7 +30,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         self.server.seen.append({"path": self.path, "headers": dict(self.headers), "body": body})
-        auth = self.headers.get("Authorization", "")
+        auth = " ".join(self.headers.get(h, "") for h in ("Authorization", "SEC", "X-goog-api-key"))
         if "wrong" in auth:
             status, reply = 403, {"text": "Invalid token"}
         elif self.path.startswith("/_bulk"):
@@ -170,3 +170,68 @@ def test_unreachable_server_is_friendly():
 def test_option_errors():
     assert "doesn't know the option" in str(tb_error('import siem\nsiem.cef({"a": 1}, {"colour": 1})'))
     assert "empty list" in str(tb_error('import siem\nsiem.splunk("http://x.example", "t", {"dry_run": true}).send([])'))
+
+
+# -- QRadar and Chronicle (secrets only from the environment) -------------------------------
+
+@pytest.fixture
+def no_secrets(monkeypatch):
+    for env in ("QRADAR_SEC_TOKEN", "CHRONICLE_API_KEY", "CHRONICLE_SECRET"):
+        monkeypatch.delenv(env, raising=False)
+    return monkeypatch
+
+
+def test_qradar_send_posts_leef_lines(server, no_secrets):
+    out = run(f'let q = siem.qradar("{url(server)}/receiver")\nsay(q.send([{ALERT}, {{"user": "x"}}]).sent)')
+    assert out == ["2"]
+    seen = server.seen[0]
+    assert seen["path"] == "/receiver"
+    lines = seen["body"].decode().splitlines()
+    assert len(lines) == 2 and lines[0].startswith("LEEF:2.0|TB|detect|") and "src=203.0.113.42" in lines[0]
+
+
+def test_qradar_reference_set_uses_env_token(server, no_secrets):
+    no_secrets.setenv("QRADAR_SEC_TOKEN", "qradar-secret-1")
+    out = run(f'let q = siem.qradar("http://ignored.example:12469", {{"console": "{url(server)}"}})\n'
+              'say(q.reference_set("TB Bad IPs", ["203.0.113.42", "198.51.100.7"]))')
+    assert out == ['{"sent": 2, "status": 200, "ok": true, "response": {"text": "Success", "code": 0}}']
+    seen = server.seen[0]
+    h = {k.lower(): v for k, v in seen["headers"].items()}
+    assert seen["path"] == "/api/reference_data/sets/bulk_load/TB%20Bad%20IPs"
+    assert h["sec"] == "qradar-secret-1" and h["version"] == "20.0"
+    assert json.loads(seen["body"]) == ["203.0.113.42", "198.51.100.7"]
+
+
+def test_qradar_errors_and_dry_run(server, no_secrets):
+    err = tb_error('import siem\nsiem.qradar("https://q.example").reference_set("s", ["1.2.3.4"])')
+    assert "QRADAR_SEC_TOKEN" in str(err) and err.fields["reason"] == "no_key"
+    no_secrets.setenv("QRADAR_SEC_TOKEN", "wrong-secret")
+    err = str(tb_error(f'import siem\nsiem.qradar("{url(server)}", {{"console": "{url(server)}"}}).reference_set("s", ["1"])'))
+    assert "QRadar rejected the credentials (HTTP 403)" in err and "wrong-secret" not in err
+    out = run('let r = siem.qradar("https://q.example:12469", {"dry_run": true}).reference_set("s", ["1"])\nsay(r.url, r.headers.SEC)')
+    assert out == ["https://q.example/api/reference_data/sets/bulk_load/s ***"]
+    assert "empty list" in str(tb_error('import siem\nsiem.qradar("https://q.example", {"dry_run": true}).reference_set("s", [])'))
+
+
+def test_chronicle_webhook_feed(server, no_secrets):
+    no_secrets.setenv("CHRONICLE_API_KEY", "gkey-1")
+    no_secrets.setenv("CHRONICLE_SECRET", "gsecret-2")
+    feed = f"{url(server)}/v1alpha/projects/p/locations/us/instances/i/feeds/f:importPushLogs"
+    out = run(f'let c = siem.chronicle("{feed}")\nsay(c.send([{ALERT}, {{"user": "x"}}]).sent)')
+    assert out == ["2"]
+    seen = server.seen[0]
+    h = {k.lower(): v for k, v in seen["headers"].items()}
+    assert seen["path"].endswith("/feeds/f:importPushLogs") and "gkey-1" not in seen["path"]
+    assert h["x-goog-api-key"] == "gkey-1" and h["x-webhook-access-key"] == "gsecret-2"
+    docs = [json.loads(l) for l in seen["body"].decode().splitlines()]
+    assert docs[0]["name"] == "Brute force" and docs[1] == {"user": "x"}
+
+
+def test_chronicle_needs_env_keys_but_dry_run_does_not(no_secrets):
+    err = tb_error('import siem\nsiem.chronicle("https://c.example/f:importPushLogs").send([{"a": 1}])')
+    assert "CHRONICLE_API_KEY and CHRONICLE_SECRET" in str(err)
+    no_secrets.setenv("CHRONICLE_API_KEY", "gkey-1")
+    no_secrets.setenv("CHRONICLE_SECRET", "gsecret-2")
+    out = run('let r = siem.chronicle("https://c.example/f:importPushLogs", {"dry_run": true}).send([{"a": 1}])\n'
+              'say(r.headers)')
+    assert "gkey-1" not in out[0] and "gsecret-2" not in out[0] and out[0].count("***") == 2
