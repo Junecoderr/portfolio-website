@@ -338,3 +338,88 @@ def test_unsupported_features_fail_precisely(text, message):
 def test_errors_reach_tb_as_friendly_errors():
     msg = str(tb_error(f'import scan\nscan.rules({q(UNSUPPORTED[1][0])})'))
     assert "scan.rules() couldn't read that rule" in msg and "hash" in msg and "Traceback" not in msg
+
+
+# -- hostile rules and data: each must finish quickly --------------------------------
+
+def scan_one(rule_text, data):
+    return scan.scan_bytes(scan.parse_rules(rule_text), data)
+
+
+@pytest.mark.timeout(60)
+def test_unbounded_regex_matches_stop_at_yaras_scan_limit():
+    import time
+    start = time.perf_counter()
+    found = scan_one(r"rule B64 { strings: $a = /[A-Za-z0-9+\/]{100,}/ condition: $a }", b"A" * 2_000_000)
+    assert time.perf_counter() - start < 5  # was 17-28 s: every overlapping match ran to the end of the data
+    assert found[0]["count"] == 1000 and found[0]["strings"][0]["length"] == 4096  # YR_RE_SCAN_LIMIT
+    assert matches("$a = /ab*c/", "$a", "x" + "ab" + "b" * 10 + "c") and matches("$a = /a.*z/s", "$a", "a\nz")
+
+
+def test_chained_hex_jumps_try_every_hit_in_the_window():
+    d = bytearray(600)
+    d[0], d[101], d[302], d[500] = 0xAA, 0xBB, 0xBB, 0xCC  # only the second BB reaches CC
+    assert hits("rule R { strings: $a = { AA [100-301] BB [100-301] CC } condition: $a }", bytes(d)) == ["R"]
+    assert hits("rule R { strings: $a = { AA [100-301] BB [100-301] DD } condition: $a }", bytes(d)) == []
+    m = scan_one("rule R { strings: $a = { AA [100-301] BB [100-301] CC } condition: $a }", bytes(d))
+    assert (m[0]["strings"][0]["offset"], m[0]["strings"][0]["length"]) == (0, 501)
+    big = b"\x01\x02" + b"\x00" * 10_000 + b"\x03\x04"  # a huge fixed jump becomes a chain, not .{99999999999}
+    assert hits("rule R { strings: $a = { 01 02 [10000] 03 04 } condition: $a }", big) == ["R"]
+    assert hits("rule R { strings: $a = { 61 [99999999999] 62 } condition: $a }", b"abc") == []
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.parametrize("regex", [r"(a+)+b", r"(a*)*b", r"(\w+\s*)+$", r"(a|b+)+c", r"(.*a){3,}x", r"((a+)+)c"])
+def test_exponential_regexes_are_refused(regex):
+    with pytest.raises(scan.RuleSyntax, match="repeats a group that can itself repeat without limit"):
+        scan.parse_rules(f"rule R {{ strings: $a = /{regex}/ condition: $a }}")
+
+
+@pytest.mark.parametrize("regex,data", [(r"(\w+\.)+com", "www.example.com"), (r"(%[0-9a-f]{2})+", "%41%42"),
+                                        (r"((ab+)c)+", "abbcabc"), (r"(\s*,\s*\w+)+", "x , y,z"),
+                                        (r"([a-z]+-)+[0-9]", "ab-cd-7")])
+def test_safe_nested_repeats_are_allowed(regex, data):
+    assert matches(f"$a = /{regex}/", "$a", data)
+
+
+def test_too_large_patterns_are_friendly_errors():
+    for strings, message in [("$a = /a{0,99999999999}/", "too large"), ("$a = /a{40000}/", "too large"),
+                             ("$a = { 61 ( 62 [99999999999] | 63 ) 64 }", "too large"),
+                             ("$a = { 61 [" + "9" * 5000 + "] 62 }", "too large")]:
+        with pytest.raises(scan.RuleSyntax, match=message):
+            scan.parse_rules(f"rule R {{ strings: {strings} condition: $a }}")
+    with pytest.raises(scan.RuleSyntax, match="too big; YARA numbers are 64-bit"):
+        scan.parse_rules("rule R { condition: filesize < " + "1" * 5000 + " }")
+    msg = str(tb_error('import scan\nscan.bytes("abc", "rule R { strings: $a = /a{0,99999999999}/ condition: $a }")'))
+    assert "too large" in msg and "Something went wrong" not in msg
+
+
+def test_xor_and_chain_scans_keep_no_data_on_compiled_rules():
+    import tracemalloc
+    rules = scan.parse_rules("\n".join(f'rule X{i} {{ strings: $a = "secret{i}" xor condition: $a }}' for i in range(5))
+                             + "\nrule C { strings: $a = { 01 02 [300-900] 03 } condition: $a }")
+    tracemalloc.start()
+    data = bytes(8 << 20)
+    scan.scan_bytes(rules, data)
+    del data
+    held, _peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert held < 2 << 20, held  # was 5 x 8 MB of xor diffs (and the data) kept in scan._COMPILED
+    for strings, _cond in scan._COMPILED.values():
+        for _entry, patterns in strings:
+            for p in patterns:  # XorSearch / ChainSearch objects hold only their patterns
+                for v in getattr(p, "__dict__", {}).values():
+                    assert not (isinstance(v, (bytes, tuple, list)) and len(v) > 1000)
+
+
+@pytest.mark.parametrize("condition", [
+    "9223372036854775807 \\ 3 == 3074457345618258602",       # exact, not via float (2^63 - 1)
+    "-7 \\ 2 == -3 and -7 % 2 == -1 and 7 % -2 == 1",        # C truncation toward zero
+    "9007199254740993 % 10 == 3",                            # 2^53 + 1 survives
+    "9223372036854775807 + 1 == -9223372036854775807 - 1",   # int64 wraparound
+    "4611686018427387904 * 4 == 0",
+    "1 << 63 == -9223372036854775807 - 1 and 1 << 64 == 0 and -8 >> 64 == 0 and -8 >> 1 == -4",
+    "not defined ((-9223372036854775807 - 1) \\ -1) and not defined (5 % 0)",
+])
+def test_integer_arithmetic_follows_yaras_int64(condition):
+    assert hits(f"rule R {{ condition: {condition} }}", b"x") == ["R"]

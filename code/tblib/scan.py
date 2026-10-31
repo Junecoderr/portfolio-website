@@ -7,9 +7,12 @@ import re
 
 from tblib import _magic
 from tblib._api import MANY, Module, check_type, fail, fail_os
-from tblib._yara import (MODULES, ChainSearch, Cond, Ctx, RuleSyntax, XorSearch, base64_variants, find_all, truth,
-                         yara_regex)
+from tblib._yara import (MODULES, RE_SCAN_LIMIT, ChainSearch, Cond, Ctx, RuleSyntax, XorSearch, base64_variants,
+                         check_backtracking, find_all, truth, yara_regex)
 
+# shortcut: YARA allows 1,000,000 matches per string; each match here costs a Python-level search
+# call and a stored tuple, so dense data with many strings would be slow. Raise with a counting-only
+# pass (no offsets kept past 1,000) if #a > 1000 conditions turn up in real rules.
 MAX_MATCHES_PER_STRING = 1000
 MAX_FILE = 256 * 1024 * 1024
 WORD = rb"[A-Za-z0-9]"  # YARA's fullword: delimited by non-alphanumeric characters
@@ -431,22 +434,26 @@ def hex_to_regex(body: str, name: str) -> list:
         tok = m.group(1)
         if tok.startswith("["):
             lo, dash, hi = m.group(2), m.group(3), m.group(4)
+            if not dash and not lo:
+                raise RuleSyntax(f"string {name}: a jump needs a number like [4] or [2-8]")
+            if len(lo) > 12 or len(hi) > 12:
+                raise RuleSyntax(f"string {name}: the jump {tok} is far too large")
+            lo_n = int(lo) if lo else 0
             if not dash:
-                if not lo:
-                    raise RuleSyntax(f"string {name}: a jump needs a number like [4] or [2-8]")
-                out.append(".{%d}" % int(lo))
-            else:
-                lo_n = int(lo) if lo else 0
-                if hi and int(hi) < lo_n:
-                    raise RuleSyntax(f"string {name}: the jump [{lo}-{hi}] is backwards")
-                hi_n = int(hi) if hi else None  # [n-] and [-] have no upper limit in YARA
-                if depth == 0 and (hi_n is None or hi_n - lo_n > LONG_JUMP):
-                    if not out:
-                        raise RuleSyntax(f"string {name}: a hex string can't start with a jump")
-                    pieces.append(("".join(out).encode("latin-1"), lo_n, hi_n))
-                    out = []
-                    continue
-                out.append(".{%d,%s}?" % (lo_n, "" if hi_n is None else hi_n))
+                hi = lo
+            if hi and int(hi) < lo_n:
+                raise RuleSyntax(f"string {name}: the jump [{lo}-{hi}] is backwards")
+            hi_n = int(hi) if hi else None  # [n-] and [-] have no upper limit in YARA
+            if depth == 0 and (hi_n is None or hi_n - lo_n > LONG_JUMP or lo_n > RE_SCAN_LIMIT):
+                if not out:
+                    raise RuleSyntax(f"string {name}: a hex string can't start with a jump")
+                pieces.append(("".join(out).encode("latin-1"), lo_n, hi_n))
+                out = []
+                continue
+            if not dash:
+                out.append(".{%d}" % lo_n)
+            else:  # inside ( | ) groups an open-ended jump still stops at RE_SCAN_LIMIT
+                out.append(".{%d,%d}?" % (lo_n, max(lo_n, RE_SCAN_LIMIT) if hi_n is None else hi_n))
         elif tok == "(":
             depth += 1
             out.append("(?:")
@@ -558,9 +565,13 @@ def compile_string(entry: dict) -> list:
                     edge = WIDE_WORD if wide else WORD
                     pat = b"(?<!" + edge + b")(?:" + pat + b")(?!" + edge + b")"
                 # YARA's . matches any byte but \n, unless the regex ends in /s
-                patterns.append(re.compile(pat, flags | (re.DOTALL if entry.get("dotall") else 0)))
+                rflags = flags | (re.DOTALL if entry.get("dotall") else 0)
+                check_backtracking(pat, rflags, name)
+                patterns.append(re.compile(pat, rflags))
     except re.error as err:
         raise RuleSyntax(f"string {name} has a broken pattern: {err}")
+    except (OverflowError, RecursionError) as err:  # e.g. {0,99999999999} inside a hex ( | ) group
+        raise RuleSyntax(f"string {name} has a pattern too large to compile ({err})")
     return patterns
 
 
@@ -588,11 +599,14 @@ def match_rule(rule: dict, data: bytes, results=None, modules=None, known=()):
     """Run one rule over bytes. Returns a match map or None. results: earlier rules' outcomes
     (for conditions that name them); modules: pe/elf/math built once per buffer."""
     strings, cond = compile_rule(rule, known)
+    # per-buffer search scratch (xor diff, chained hex pieces): lives with this scan's modules map,
+    # never on the cached compiled rule, so nothing of the data outlives the scan
+    memo = modules.setdefault("_search", {}) if modules is not None else {}
     counts = {}
     for entry, patterns in strings:
         hits = {}
         for pat in patterns:
-            for offset, length in find_all(pat, data, MAX_MATCHES_PER_STRING):
+            for offset, length in find_all(pat, data, MAX_MATCHES_PER_STRING, memo):
                 hits[offset] = max(length, hits.get(offset, 0))
         counts[entry["name"]] = sorted(hits.items())[:MAX_MATCHES_PER_STRING]
     if not truth(cond.fn(Ctx(counts, data, results, modules))):
@@ -699,7 +713,9 @@ def load(api):
         "a condition ($a and ($b or $c), 2 of them, #a > 3, @a[1] < 100, uint16(0) == 0x5A4D, for any i in "
         "(1..#a) : (...)). The pe, elf and math modules work too (pe.imphash(), pe.sections, math.entropy). "
         "Rules can be YARA text or plain TB maps; YARA features TB doesn't have give a precise error. Also "
-        "pulls readable strings (ASCII and UTF-16) out of binary data.",
+        "pulls readable strings (ASCII and UTF-16) out of binary data. Limits: each string keeps its first "
+        "1,000 matches, so #a counts at most 1,000 (YARA goes to 1,000,000); a regex match stops after "
+        "4,096 bytes, as in YARA; regexes like (a+)+ that could backtrack for hours are refused.",
     )
     m.value("example", 'rule SuspiciousDownloader {\n  meta:\n    author = "soc"\n    severity = "high"\n'
                        '  strings:\n    $a = "DownloadString" nocase\n    $b = { 4D 5A ?? 00 }\n'

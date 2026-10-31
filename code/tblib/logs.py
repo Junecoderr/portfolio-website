@@ -1785,7 +1785,7 @@ def load(api):
         "each(path, fn, format?, options?) -> number\n"
         "Call fn(record) for every record in a log file without keeping them all in memory (for huge logs). "
         "The file is streamed from disk a line at a time, and .gz and one-file .zip logs are unpacked as they "
-        "are read. Gives back how many records there were. If fn gives back false, reading stops early. "
+        "are read. Gives back how many records there were. If fn gives back false, reading stops early.\n\n"
         "Lines over 4 MB are cut (the record gets \"truncated\": true), so memory stays flat."))
     def each(line, path, fn, fmt="auto", options=None):
         path = path_arg(line, path, "each")
