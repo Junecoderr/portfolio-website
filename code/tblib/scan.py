@@ -7,7 +7,8 @@ import re
 
 from tblib import _magic
 from tblib._api import MANY, Module, check_type, fail, fail_os
-from tblib._yara import MODULES, Cond, Ctx, RuleSyntax, base64_variants, find_all, truth, yara_regex
+from tblib._yara import (MODULES, ChainSearch, Cond, Ctx, RuleSyntax, XorSearch, base64_variants, find_all, truth,
+                         yara_regex)
 
 MAX_MATCHES_PER_STRING = 1000
 MAX_FILE = 256 * 1024 * 1024
@@ -409,9 +410,16 @@ def normalize_rule(rule, known=()) -> dict:
 _HEX_TOKEN = re.compile(r"\s*(\[\s*(\d*)\s*(-?)\s*(\d*)\s*\]|\(|\)|\||\?\?|[0-9A-Fa-f?]{2}|~[0-9A-Fa-f]{2})")
 
 
-def hex_to_regex(body: str, name: str) -> bytes:
+LONG_JUMP = 200  # jumps wider than this (or unbounded) split a hex string into chained pieces
+
+
+def hex_to_regex(body: str, name: str) -> list:
+    """A hex string -> [(regex bytes, min gap, max gap or None)]: one piece, or several when
+    long jumps at the top level separate them (the gaps say how far apart they may be)."""
     pos = 0
     out = []
+    pieces = []
+    depth = 0
     body = re.sub(r"//[^\n]*|/\*.*?\*/", " ", body, flags=re.S).strip()
     if not body:
         raise RuleSyntax(f"string {name}: the hex string is empty")
@@ -431,11 +439,19 @@ def hex_to_regex(body: str, name: str) -> bytes:
                 lo_n = int(lo) if lo else 0
                 if hi and int(hi) < lo_n:
                     raise RuleSyntax(f"string {name}: the jump [{lo}-{hi}] is backwards")
-                # [n-] and [-] have no upper limit in YARA
-                out.append(".{%d,%s}?" % (lo_n, int(hi) if hi else ""))
+                hi_n = int(hi) if hi else None  # [n-] and [-] have no upper limit in YARA
+                if depth == 0 and (hi_n is None or hi_n - lo_n > LONG_JUMP):
+                    if not out:
+                        raise RuleSyntax(f"string {name}: a hex string can't start with a jump")
+                    pieces.append(("".join(out).encode("latin-1"), lo_n, hi_n))
+                    out = []
+                    continue
+                out.append(".{%d,%s}?" % (lo_n, "" if hi_n is None else hi_n))
         elif tok == "(":
+            depth += 1
             out.append("(?:")
         elif tok == ")":
+            depth -= 1
             out.append(")")
         elif tok == "|":
             out.append("|")
@@ -452,7 +468,12 @@ def hex_to_regex(body: str, name: str) -> bytes:
             out.append("[" + "".join("\\x%02x" % v for v in values) + "]")
         else:
             out.append("\\x" + tok.lower())
-    return "".join(out).encode("latin-1")
+    if not out:
+        raise RuleSyntax(f"string {name}: a hex string can't end with a jump")
+    # each piece carries the gap before the next one
+    gaps = [(0, 0)] + [(lo, hi) for _, lo, hi in pieces]
+    regexes = [p for p, _, _ in pieces] + ["".join(out).encode("latin-1")]
+    return [(r, lo, hi) for r, (lo, hi) in zip(regexes, gaps)]
 
 
 def _check_modifiers(entry: dict):
@@ -507,19 +528,24 @@ def compile_string(entry: dict) -> list:
                     groups.append(([raw], False))
                 if entry.get("wide"):
                     groups.append(([_widen(raw)], True))
-            if entry.get("xor"):
-                lo, hi = entry["xor"]
-                groups = [([bytes(b ^ k for b in v) for v in variants for k in range(lo, hi + 1)], wide)
-                          for variants, wide in groups]
+            xor = entry.get("xor")
             for variants, wide in groups:
+                base = variants[0]
+                if xor:
+                    variants = [bytes(b ^ k for b in v) for v in variants for k in range(xor[0], xor[1] + 1)]
                 unique = list(dict.fromkeys(variants))
                 pat = b"|".join(re.escape(v) for v in unique)
                 if entry.get("fullword"):
                     edge = WIDE_WORD if wide else WORD
                     pat = b"(?<!" + edge + b")(?:" + pat + b")(?!" + edge + b")"
-                patterns.append(re.compile(pat, flags | re.DOTALL))
+                compiled = re.compile(pat, flags | re.DOTALL)
+                patterns.append(XorSearch(compiled, base) if xor else compiled)
         elif kind == "hex":
-            patterns.append(re.compile(hex_to_regex(value, name), re.DOTALL))
+            pieces = hex_to_regex(value, name)
+            if len(pieces) == 1:
+                patterns.append(re.compile(pieces[0][0], re.DOTALL))
+            else:
+                patterns.append(ChainSearch(pieces))
         else:
             forms = []
             if entry.get("ascii") or not entry.get("wide"):

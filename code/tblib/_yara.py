@@ -5,8 +5,11 @@ tblib.elf and tblib._magic). Semantics follow https://yara.readthedocs.io (4.x).
 from __future__ import annotations
 
 import base64
+import bisect
+import collections
 import datetime as dt
 import math
+import operator
 import re
 import struct
 
@@ -41,9 +44,6 @@ def truth(v) -> bool:
 # =============================================================================
 # Strings: regex dialect, wide, base64
 # =============================================================================
-
-_RX_ESCAPE_ATOM = set("dwsDWS")
-
 
 def yara_regex(pattern: str, wide: bool, name: str) -> str:
     """A YARA regex as a Python one: `$` is end-of-data only, and with wide=True every
@@ -135,6 +135,75 @@ def find_all(pattern, data: bytes, limit: int) -> list:
         hits.append((m.start(), m.end() - m.start()))
         pos = m.start() + 1
     return hits
+
+
+class _Hit:
+    __slots__ = ("s", "e")
+
+    def __init__(self, s, e):
+        self.s, self.e = s, e
+
+    def start(self):
+        return self.s
+
+    def end(self):
+        return self.e
+
+
+class XorSearch:
+    """Finds an xor string fast: XOR-ing neighbouring bytes cancels the key, so one plain find()
+    over data[i] ^ data[i+1] locates every candidate; the full pattern then checks it."""
+
+    def __init__(self, pattern, base: bytes):
+        self.pattern = pattern
+        self.delta = bytes(a ^ b for a, b in zip(base[1:], base[:-1]))
+        self.cache = None  # (data, diff): one tuple, so threads scanning other data can't mix them up
+
+    def search(self, data: bytes, pos: int = 0):
+        if not self.delta:
+            return self.pattern.search(data, pos)
+        cache = self.cache
+        if cache is None or cache[0] is not data:
+            value = int.from_bytes(data, "big")
+            self.cache = cache = (data, (value ^ (value >> 8)).to_bytes(len(data), "big"))
+        diff = cache[1]
+        while True:
+            i = diff.find(self.delta, pos + 1)  # diff[i] = data[i - 1] ^ data[i]
+            if i < 0:
+                return None
+            m = self.pattern.match(data, i - 1)
+            if m:
+                return m
+            pos = i
+
+
+class ChainSearch:
+    """A hex string cut at its long or unbounded jumps ([n-], [-], [0-5000]): each piece is found
+    on its own and the pieces are linked by distance, as YARA does, instead of one regex that
+    would rescan to the end of the data from every candidate."""
+
+    def __init__(self, parts):
+        self.parts = [(re.compile(p, re.DOTALL), lo, hi) for p, lo, hi in parts]
+        self.cache = None
+
+    def search(self, data: bytes, pos: int = 0):
+        cache = self.cache
+        if cache is None or cache[0] is not data:
+            found = [find_all(p, data, 1_000_000) for p, _, _ in self.parts]
+            self.cache = cache = (data, found, [[s for s, _ in h] for h in found])
+        _, all_hits, all_starts = cache
+        first = all_hits[0]
+        for k in range(bisect.bisect_left(all_starts[0], pos), len(first)):
+            start, length = first[k]
+            end = start + length
+            for (_, lo, hi), hits, starts in zip(self.parts[1:], all_hits[1:], all_starts[1:]):
+                j = bisect.bisect_left(starts, end + lo)
+                if j == len(starts) or (hi is not None and starts[j] > end + hi):
+                    break
+                end = starts[j] + hits[j][1]
+            else:
+                return _Hit(start, end)
+        return None
 
 
 # =============================================================================
@@ -274,13 +343,13 @@ class Cond:
             self.fail("the condition is empty")
         self.fn = self.parse_or()
         if self.i < len(self.tokens):
-            self.fail(f"unexpected '{self.tokens[self.i][1]}' in the condition")
+            self.fail(f"unexpected '{self.tokens[self.i][1]}' in the condition", self.tokens[self.i][2])
 
     # -- helpers ----------------------------------------------------------------
 
     def fail(self, message, pos=None):
         if pos is None:
-            pos = self.tokens[self.i][2] if self.i < len(self.tokens) else len(self.text)
+            pos = self.tokens[max(self.i - 1, 0)][2] if self.tokens else 0  # the token just read
         where = ""
         if self.base_line is not None:
             where = f" (line {self.base_line + self.text.count(chr(10), 0, pos)})"
@@ -310,7 +379,8 @@ class Cond:
     def need(self, kind, value):
         if not self.accept(kind, value):
             found = self.tokens[self.i][1] if self.i < len(self.tokens) else "the end"
-            self.fail(f"expected '{value}' in the condition but found '{found}'")
+            where = self.tokens[self.i][2] if self.i < len(self.tokens) else len(self.text.rstrip())
+            self.fail(f"expected '{value}' in the condition but found '{found}'", where)
 
     # -- boolean levels ---------------------------------------------------------------
 
@@ -354,7 +424,7 @@ class Cond:
             if word == "matches":
                 if self.peek("regex") is None:
                     self.fail("'matches' needs a /regex/ on its right")
-                right = self.regex_value(self.take()[1])
+                right = (lambda r: lambda ctx: r)(self.regex_value(self.take()[1]))
             else:
                 right = self.parse_bits(0)
             return (lambda a, b, f: lambda ctx: f(a(ctx), b(ctx)))(left, right, _string_op(word))
@@ -1052,15 +1122,15 @@ def build_math(data: bytes) -> dict:
             return None, ()
         return data[offset:offset + size], args[2:]
 
+    def histogram(chunk):
+        return collections.Counter(chunk)  # counted in C
+
     def entropy(*args):
         chunk, _ = block(args)
         if not chunk:
             return None
-        counts = [0] * 256
-        for b in chunk:
-            counts[b] += 1
         n = len(chunk)
-        return -sum(c / n * math.log2(c / n) for c in counts if c)
+        return -sum(c / n * math.log2(c / n) for c in histogram(chunk).values())
 
     def mean(*args):
         chunk, _ = block(args)
@@ -1070,21 +1140,16 @@ def build_math(data: bytes) -> dict:
         chunk, rest = block(args)
         if not chunk or not rest:
             return None
-        return sum(abs(b - rest[0]) for b in chunk) / len(chunk)
+        return sum(c * abs(b - rest[0]) for b, c in histogram(chunk).items()) / len(chunk)
 
     def serial_correlation(*args):
         chunk, _ = block(args)
         if not chunk:
             return None
-        t1 = t2 = t3 = 0.0
-        last = 0
-        for b in chunk:
-            t1 += last * b
-            t2 += b
-            t3 += b * b
-            last = b
-        t1 += last * chunk[0]
-        t2 *= t2
+        # ent's serial correlation (what YARA's math module computes), with the products summed in C
+        t1 = float(sum(map(operator.mul, chunk, chunk[1:])) + chunk[-1] * chunk[0])
+        t2 = float(sum(chunk)) ** 2
+        t3 = float(sum(c * b * b for b, c in histogram(chunk).items()))
         n = len(chunk)
         scc = n * t3 - t2
         return -100000.0 if scc == 0 else (n * t1 - t2) / scc
@@ -1115,10 +1180,8 @@ def build_math(data: bytes) -> dict:
         chunk, _ = block(rest) if rest else (data, ())
         if not chunk:
             return None
-        counts = [0] * 256
-        for b in chunk:
-            counts[b] += 1
-        return counts.index(max(counts))
+        counts = histogram(chunk)
+        return max(sorted(counts), key=lambda b: counts[b])  # the lowest byte wins a tie
     return {"entropy": entropy, "mean": mean, "deviation": deviation, "serial_correlation": serial_correlation,
             "monte_carlo_pi": monte_carlo_pi, "in_range": lambda t, lo, hi: lo <= t <= hi,
             "max": max, "min": min, "abs": abs, "to_number": lambda b: 1 if b else 0, "count": count,
