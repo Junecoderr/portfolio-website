@@ -142,14 +142,23 @@ def page_html(rels: list[Release], version: str) -> str:
           <div><dt><span class="rel-badge rel-unpublished">Not published</span></dt><dd>The version was built but never offered as a download.</dd></div>
         </dl>
         <p class="rel-note">The <a href="download.html">Download page</a> always has the latest version.</p>
-        <p class="rel-actions"><a class="button button-primary" href="download.html">Download TB {html.escape(latest.version)}</a><a class="button" href="releases.xml">Subscribe to the feed</a></p>
+        <p class="rel-actions"><a class="button button-primary" href="download.html">Download TB {html.escape(latest.version)}</a><a class="button" href="#subscribe">Get release updates</a></p>
       </header>
       <ol class="rel-list">
 {items}
       </ol>
+      <section class="rel-subscribe" id="subscribe" aria-labelledby="subscribe-title">
+        <h2 id="subscribe-title">Get release updates</h2>
+        <p>TB publishes a feed of its releases. Add the address below to a feed reader app (for example Feedly, Inoreader, NetNewsWire or Thunderbird) and it tells you when a new version is out. Browsers don't read feeds themselves, so opening the address directly only shows its code.</p>
+        <div class="rel-feed-url">
+          <input type="text" readonly value="{SITE_URL}/releases.xml" aria-label="Feed address" data-feed-url>
+          <button class="button button-primary" type="button" data-copy-feed hidden>Copy address</button>
+        </div>
+        <p class="rel-note" data-copy-status role="status"></p>
+      </section>
     </div>"""
     text = shell.page("Releases · TB", f"TB release notes: every version, newest first. Latest: TB {latest.version}.",
-                      main, version=version, styles=("releases.css",))
+                      main, version=version, styles=("releases.css",), scripts=("releases.js",))
     feed = '\n  <link rel="alternate" type="application/atom+xml" title="TB releases" href="releases.xml">'
     return text.replace("</title>", "</title>" + feed, 1)
 

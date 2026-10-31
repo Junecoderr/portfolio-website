@@ -53,6 +53,16 @@
   background: var(--note-bg); border-radius: 0 var(--r) var(--r) 0;
 }
 
+.rel-subscribe { margin: 1rem 0 0; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--bg-soft); scroll-margin-top: calc(var(--header-h, 4rem) + 1rem); }
+.rel-subscribe h2 { margin: 0 0 0.5rem; font-size: var(--step-2, 1.5rem); }
+.rel-subscribe > p:first-of-type { margin: 0; max-width: 62ch; color: var(--ink-soft); }
+.rel-feed-url { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1rem 0 0; }
+.rel-feed-url input {
+  flex: 1 1 18rem; min-width: 0; min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line-strong);
+  border-radius: var(--r); background: var(--bg); color: var(--ink); font-family: var(--font-code); font-size: 0.9rem;
+}
+.rel-subscribe .rel-note:empty { display: none; }
+
 @media (max-width: 44rem) {
   .rel-legend > div { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; }
   .rel { grid-template-columns: minmax(0, 1fr); padding-left: 1.25rem; }

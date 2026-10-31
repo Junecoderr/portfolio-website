@@ -478,6 +478,9 @@ def test_changelog_matches_the_version_and_renders(tmp_path):
         assert f'id="v{r.version}"' in page
     assert "<script>" not in page and "github.com" not in page.lower()
     assert 'class="rel-legend"' in page and "rel-unpublished" in page
+    # The button leads to how-to-subscribe help, not the raw XML (browsers show feeds as code).
+    assert 'href="#subscribe"' in page and 'id="subscribe"' in page and 'href="releases.xml"' not in page.split("<body>")[1]
+    assert "assets/js/releases.js" in page
     assert page.count("rel-latest") == 1  # only the newest release is "Latest"
     feed = xml.dom.minidom.parse(str(tmp_path / "releases.xml"))
     assert len(feed.getElementsByTagName("entry")) == len(rels)
