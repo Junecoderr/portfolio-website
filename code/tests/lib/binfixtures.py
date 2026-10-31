@@ -339,19 +339,24 @@ def der_name(pairs) -> bytes:
     return der_seq(*[der_set(der_seq(der_oid(NAME_OIDS[k]), der(0x0C, v.encode()))) for k, v in pairs])
 
 
-def build_cert(subject, issuer, serial, not_before="240101000000Z", not_after="270101000000Z") -> bytes:
+def build_cert(subject, issuer, serial, not_before="240101000000Z", not_after="270101000000Z", ski=None) -> bytes:
+    """ski: bytes for a subjectKeyIdentifier extension."""
     sha256_rsa = der_seq(der_oid("1.2.840.113549.1.1.11"), der(0x05, b""))
+    ext = der(0xA3, der_seq(der_seq(der_oid("2.5.29.14"), der(0x04, der(0x04, ski))))) if ski else b""
     tbs = der_seq(der(0xA0, der_int(2)), der_int(serial), sha256_rsa, der_name(issuer),
                   der_seq(der(0x17, not_before.encode()), der(0x17, not_after.encode())), der_name(subject),
-                  der_seq(der_seq(der_oid("1.2.840.113549.1.1.1"), der(0x05, b"")), der(0x03, b"\x00" + b"\x01" * 16)))
+                  der_seq(der_seq(der_oid("1.2.840.113549.1.1.1"), der(0x05, b"")), der(0x03, b"\x00" + b"\x01" * 16)),
+                  ext)
     return der_seq(tbs, sha256_rsa, der(0x03, b"\x00" + b"\x02" * 32))
 
 
 def build_pkcs7(certs, signer, digest="2.16.840.1.101.3.4.2.1") -> bytes:
-    """Authenticode-shaped SignedData. certs: DER certificates; signer: (issuer pairs, serial)."""
+    """Authenticode-shaped SignedData. certs: DER certificates; signer: (issuer pairs, serial), or
+    the signer certificate's subjectKeyIdentifier bytes (SignerInfo version 3)."""
     alg = der_seq(der_oid(digest), der(0x05, b""))
     content = der_seq(der_oid("1.3.6.1.4.1.311.2.1.4"), der(0xA0, der_seq(b"")))
-    signer_info = der_seq(der_int(1), der_seq(der_name(signer[0]), der_int(signer[1])), alg,
+    sid = der(0x80, signer) if isinstance(signer, bytes) else der_seq(der_name(signer[0]), der_int(signer[1]))
+    signer_info = der_seq(der_int(3 if isinstance(signer, bytes) else 1), sid, alg,
                           der_seq(der_oid("1.2.840.113549.1.1.1"), der(0x05, b"")), der(0x04, b"\x03" * 32))
     signed = der_seq(der_int(1), der_set(alg), content, der(0xA0, b"".join(certs)), der_set(signer_info))
     return der_seq(der_oid("1.2.840.113549.1.7.2"), der(0xA0, signed))
@@ -364,10 +369,12 @@ def build_pkcs7(certs, signer, digest="2.16.840.1.101.3.4.2.1") -> bytes:
 
 def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",), imports=("puts", "socket"),
               exports=(), interp="/lib64/ld-linux-x86-64.so.2", wx_segment=False, symtab=True, entry_section=".text",
-              little=True, no_section_headers=False, versions=None, relro=None):
+              little=True, no_section_headers=False, versions=None, relro=None, defines=None):
     """A small, well-formed ELF image with .text/.rodata/.data, .interp, .dynstr/.dynsym/.dynamic
     (so DT_NEEDED and imports are real), .symtab (unless stripped) and .shstrtab.
     versions: {"puts": ("libc.so.6", "GLIBC_2.2.5")} adds .gnu.version/.gnu.version_r.
+    defines: ("libx.so", "LIBX_1.0") adds .gnu.version_d: the file itself (VER_FLG_BASE, index 1),
+    then versions it defines; exports carry the last one.
     relro: "partial" adds a GNU_RELRO segment; "full" also asks for BIND_NOW."""
     e = "<" if little else ">"
     is64 = bits == 64
@@ -413,7 +420,25 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
     if relro == "full":
         dyn_entries += [(30, 0x8), (0x6FFFFFFB, 0x1)]
     version_sections = []
-    if versions:
+    version_def_count = version_need_count = 0
+
+    def elf_hash(text):
+        h = 0
+        for ch in text.encode():
+            h = ((h << 4) + ch) & 0xFFFFFFFF
+            g = h & 0xF0000000
+            if g:
+                h ^= g >> 24
+            h &= ~g & 0xFFFFFFFF
+        return h
+    if versions or defines:
+        versions = versions or {}
+        verdef = bytearray()
+        for di, text in enumerate(defines or ()):  # index 1 is the file itself (VER_FLG_BASE)
+            verdef += struct.pack(e + "HHHHIII", 1, 1 if di == 0 else 0, di + 1, 1, elf_hash(text), 20,
+                                  28 if di + 1 < len(defines) else 0)
+            verdef += struct.pack(e + "II", dyn_name(text), 0)
+        version_def_count = len(defines or ())
         libs: dict = {}
         for name in imports:
             if name in versions:
@@ -423,7 +448,7 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
                     libs[lib].append(ver)
         index = {}
         verneed = bytearray()
-        next_index = 2
+        next_index = max(2, version_def_count + 1)
         lib_items = list(libs.items())
         for li, (lib, vers) in enumerate(lib_items):
             file_off = dyn_name(lib)
@@ -431,20 +456,18 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
             verneed += struct.pack(e + "HHIII", 1, len(vers), file_off, 16, size if li + 1 < len(lib_items) else 0)
             for vi, ver in enumerate(vers):
                 index[(lib, ver)] = next_index
-                h = 0
-                for ch in ver.encode():
-                    h = ((h << 4) + ch) & 0xFFFFFFFF
-                    g = h & 0xF0000000
-                    if g:
-                        h ^= g >> 24
-                    h &= ~g & 0xFFFFFFFF
-                verneed += struct.pack(e + "IHHII", h, 0, next_index, dyn_name(ver), 16 if vi + 1 < len(vers) else 0)
+                verneed += struct.pack(e + "IHHII", elf_hash(ver), 0, next_index, dyn_name(ver),
+                                       16 if vi + 1 < len(vers) else 0)
                 next_index += 1
         versym = struct.pack(e + "H", 0)
         for name in imports:
             versym += struct.pack(e + "H", index[versions[name]] if name in versions else 1)
-        versym += struct.pack(e + "H", 1) * len(exports)
-        version_sections = [(".gnu.version", versym, 0x6FFFFFFF, 0x2), (".gnu.version_r", bytes(verneed), 0x6FFFFFFE, 0x2)]
+        versym += struct.pack(e + "H", version_def_count if version_def_count > 1 else 1) * len(exports)
+        version_sections = [(".gnu.version", versym, 0x6FFFFFFF, 0x2)]
+        if lib_items:
+            version_sections.append((".gnu.version_r", bytes(verneed), 0x6FFFFFFE, 0x2))
+        if verdef:
+            version_sections.append((".gnu.version_d", bytes(verdef), 0x6FFFFFFD, 0x2))
         version_need_count = len(lib_items)
     # placeholders for strtab/symtab addresses filled after layout
     ordered.append((".dynstr", bytes(dynstr), 3, 0x2))
@@ -531,11 +554,11 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
                 link = 1 + laid.index(by_name[".dynstr"])
             if s["name"] == ".symtab":
                 link = 1 + laid.index(by_name[".strtab"])
-            if s["name"] in (".dynamic", ".gnu.version_r"):
+            if s["name"] in (".dynamic", ".gnu.version_r", ".gnu.version_d"):
                 link = 1 + laid.index(by_name[".dynstr"])
             if s["name"] == ".gnu.version":
                 link = 1 + laid.index(by_name[".dynsym"])
-            info = version_need_count if s["name"] == ".gnu.version_r" else 0
+            info = {".gnu.version_r": version_need_count, ".gnu.version_d": version_def_count}.get(s["name"], 0)
             entsize = sym_size if s["name"] in (".dynsym", ".symtab") else (16 if is64 else 8) if s["name"] == ".dynamic" else 0
             if is64:
                 image += struct.pack(e + "IIQQQQIIQQ", shname[s["name"]], s["type"], s["flags"], s["addr"], s["offset"],

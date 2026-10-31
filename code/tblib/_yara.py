@@ -967,7 +967,7 @@ def build_pe(data: bytes) -> dict:
     try:
         entries = p.import_entries()
         exports = p.exports()["functions"]
-        resources = p.resources()
+        resources = p.resources(entropy=False)  # YARA has no resource entropy; skip the work
         signature = p.signature()
         rich = p.rich_header()
     except (struct.error, IndexError, ValueError):
