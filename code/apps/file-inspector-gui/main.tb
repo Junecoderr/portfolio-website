@@ -1,5 +1,5 @@
 # TB File Inspector: open (or drop) a file and see what it really is,
-# without running it: type from its bytes, hashes, entropy, PE/ELF sections
+# without running it: type from its bytes, hashes, entropy, PE/ELF/Mach-O sections
 # and imports, suspicious indicators, YARA-style rule matches and the
 # interesting strings inside. Shares its engine with apps/file-inspector.
 # Run: tb apps/file-inspector-gui/main.tb [file] [--light]
@@ -206,11 +206,12 @@ fn show() {
       if d.pdb != nil {
         rows.push(["PDB path", d.pdb])
       }
-    } else {
+    } else if r.type == "elf" {
       rows.push(["Kind", d.type])
       rows.push(["Interpreter", str(d.interpreter)])
       rows.push(["Needs", d.needed.join(", ")])
     }
+    rows = rows + inspect.extra_facts(r)
   }
   facts.set_rows(rows)
 

@@ -1,12 +1,13 @@
 # inspect.tb: look inside one file without running it.
 # Shared by the file-inspector command line app and its GUI variant.
-# Uses scan (file type, entropy, strings, YARA-style rules), pe and elf
+# Uses scan (file type, entropy, strings, YARA rules), pe, elf and macho
 # (headers, sections, imports, suspicious indicators) and hash.
 
 import fs
 import hash
 import pe
 import elf
+import macho
 import scan
 
 let LEVELS = {"high": 0, "medium": 1, "low": 2, "info": 3}
@@ -44,6 +45,9 @@ fn inspect(path, rules) {
     } else if kind.type == "elf" {
       result.details = elf.parse(path)
       result.summary = elf.summary(path)
+    } else if kind.type == "macho" or kind.type == "macho-fat" {
+      result.details = macho.parse(path)
+      result.summary = macho.summary(path)
     }
   } catch err {
     result.problem = err.message
@@ -111,6 +115,87 @@ fn findings(result) {
   return rows.sort_by(fn(r) {
     return LEVELS.get(r.level, 9)
   })
+}
+
+fn yes_no(flag) {
+  if flag {
+    return "yes"
+  }
+  return "no"
+}
+
+# Who signed it, from a PE signature or a Mach-O code signature map.
+fn signer_text(sig) {
+  if sig == nil {
+    return "not signed"
+  }
+  if sig.get("adhoc", false) and not sig.has_cms {
+    return f"ad hoc (no certificate), identifier {sig.identifier}"
+  }
+  let who = sig.signer
+  if who == nil {
+    who = "an unreadable certificate"
+  }
+  let extra = ""
+  if sig.get("team_id") != nil {
+    extra = f", team {sig.team_id}"
+  }
+  return f"{who}{extra} (read, not verified)"
+}
+
+# The format-specific facts beyond the basics, as [label, value] rows:
+# imphash, Rich header, signer and resources for PE; the hardening report and
+# symbol versions for ELF; architectures, signature and hardening for Mach-O.
+fn extra_facts(result) {
+  let d = result.details
+  let rows = []
+  if d == nil {
+    return rows
+  }
+  if result.type == "pe" {
+    if d.imphash != nil {
+      rows.push(["Imphash", d.imphash])
+    }
+    if d.rich_header != nil {
+      let ok = "checksum ok"
+      if not d.rich_header.checksum_valid {
+        ok = "checksum BAD (edited?)"
+      }
+      rows.push(["Rich header", f"{len(d.rich_header.entries)} build tools, {ok}"])
+    }
+    rows.push(["Signed by", signer_text(d.signature)])
+    if not d.resources.is_empty() {
+      let kinds = []
+      for r in d.resources {
+        if not kinds.contains(r.type) {
+          kinds.push(r.type)
+        }
+      }
+      rows.push(["Resources", f"{len(d.resources)} ({kinds.join(", ")})"])
+    }
+  } else if result.type == "elf" {
+    let h = d.hardening
+    rows.push([
+      "Hardening",
+      f"RELRO {h.relro}, NX {yes_no(h.nx)}, PIE {yes_no(h.pie)}, canary {yes_no(h.canary)}, fortify {yes_no(h.fortify)}",
+    ])
+    for lib in d.version_needs.keys() {
+      rows.push(["Versions", f"{lib}: " + d.version_needs[lib].join(", ")])
+    }
+  } else {
+    let h = d.hardening
+    rows.push(["Kind", f"{d.type} for {d.architectures.join(" + ")}"])
+    if d.min_os != nil {
+      rows.push(["Needs OS", f"{d.platform} {d.min_os}"])
+    }
+    rows.push(["Libraries", d.needed.join(", ")])
+    rows.push(["Signed by", signer_text(d.code_signature)])
+    rows.push([
+      "Hardening",
+      f"PIE {yes_no(h.pie)}, NX stack {yes_no(h.nx_stack)}, canary {yes_no(h.canary)}, hardened runtime {yes_no(h.hardened_runtime)}, encrypted {yes_no(h.encrypted)}",
+    ])
+  }
+  return rows
 }
 
 # File sizes people can read: 812 B, 14.2 KB, 3.1 MB.

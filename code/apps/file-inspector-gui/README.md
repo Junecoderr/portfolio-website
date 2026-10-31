@@ -5,8 +5,10 @@ file (or drop one on the window, or pick a sample) and see what it really is,
 without running it. A verdict badge and level counts sit at the top; the tabs
 show:
 
-* **Overview**: type, size, entropy, hashes, and PE/ELF facts (architecture,
-  entry point, compile time, subsystem, signature, libraries it needs)
+* **Overview**: type, size, entropy, hashes, and PE/ELF/Mach-O facts
+  (architecture, entry point, compile time, subsystem, libraries it needs,
+  imphash, Rich header, who signed it, resources, the hardening report and
+  symbol versions)
 * **Findings**: suspicious indicators and YARA-style rule matches, most
   serious first; click one for the details
 * **Sections**: name, size, entropy and permissions (rwx)

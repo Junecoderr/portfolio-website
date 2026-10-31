@@ -192,7 +192,8 @@ class MachO:
             sections.append({"name": sname.rstrip(b"\x00").decode("latin-1"),
                              "segment": sseg.rstrip(b"\x00").decode("latin-1"), "address": addr, "size": size,
                              "offset": offset, "entropy": _magic.entropy(chunk) if chunk else 0.0,
-                             "executable": bool(sflags & 0x80000400)})
+                             "readable": bool(initprot & 1), "writable": bool(initprot & 2),
+                             "executable": bool(initprot & 4 and sflags & 0x80000400)})
         if fileoff + filesize > len(d):
             self.truncated = True
         return {"name": name.rstrip(b"\x00").decode("latin-1"), "address": vmaddr, "vm_size": vmsize,
