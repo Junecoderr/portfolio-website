@@ -681,7 +681,7 @@ def kql_columns(query):
     made = set(re.findall(r"\| extend (\w+) =", text)) | {"count_"}
     words = set(re.findall(r"\b[A-Za-z_]\w*\b", text)) - made
     keywords = {"Syslog", "where", "extend", "summarize", "by", "in", "and", "or", "not", "case", "extract", "toint",
-                "matches", "regex", "contains", "startswith", "count", "bin", "s", "ipv4_is_in_range"}
+                "matches", "regex", "contains", "startswith", "count", "bin", "s", "ipv4_is_in_range", "coalesce"}
     return {w for w in words - keywords if not w.isdigit()}
 
 
@@ -695,7 +695,7 @@ def test_sigma_to_query_kql_ssh_brute_force_fits_the_syslog_schema():
     # Group-by and filter fields go through the field map; only real Syslog columns are read.
     assert kql_columns(kql) <= SYSLOG_COLUMNS, kql_columns(kql) - SYSLOG_COLUMNS
     assert "by ip" not in kql and "action =~" not in kql
-    assert '| extend SrcIp = extract(@"(?:from |rhost=)([0-9A-Fa-f:.]+)", 1, SyslogMessage)' in kql
+    assert '| extend SrcIp = extract(@"(?:from |rhost=|by )' in kql
     assert 'SyslogMessage matches regex @"Failed \\S+ for ", "failed_login"' in kql
     assert kql.endswith('| where Action =~ "failed_login"\n| summarize count_ = count() by SrcIp, '
                         'bin(TimeGenerated, 300s)\n| where count_ > 10')
@@ -703,13 +703,52 @@ def test_sigma_to_query_kql_ssh_brute_force_fits_the_syslog_schema():
                       '| where count > 10')
 
 
+def kql_extract(expression, message):
+    """Run a SYSLOG_PARSED extract() / coalesce(extract(), ...) on one SyslogMessage with Python's re."""
+    import re
+    for pattern in re.findall(r'extract\(@"((?:[^"]|"")*)", 1, SyslogMessage\)', expression):
+        m = re.search(pattern.replace('""', '"'), message)  # @"..." is a KQL verbatim string
+        if m and m.group(1):
+            return m.group(1)  # coalesce: the first non-empty one
+    return None
+
+
+@pytest.mark.parametrize("message", [
+    "Failed password for invalid user admin from 203.0.113.5 port 52814 ssh2",
+    "Failed password for root from 2001:db8::7 port 22 ssh2",
+    "Accepted publickey for alice from 198.51.100.2 port 40022 ssh2",
+    "Invalid user oracle from 203.0.113.9 port 4242",
+    "pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=203.0.113.5  user=root",
+    "pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=host.dead.example",
+    "pam_unix(sudo:session): session opened for user root(uid=0) by alice(uid=1000)",
+    "  alice : TTY=pts/0 ; PWD=/ ; USER=root ; COMMAND=/bin/ls",
+    "  bob : 3 incorrect password attempts ; TTY=pts/1 ; PWD=/home/bob ; USER=root ; COMMAND=/bin/sh",
+    "Connection closed by authenticating user bob 203.0.113.5 port 22 [preauth]",
+    "Connection closed by invalid user x 203.0.113.5 port 22",
+    "Connection closed by 203.0.113.5 port 22 [preauth]",
+    "Disconnected from user bob 203.0.113.5 port 22",
+    "Received disconnect from 203.0.113.5 port 22:11: Bye Bye [preauth]",
+])
+def test_kql_syslog_extracts_match_logs(message):
+    from tblib.detect import SYSLOG_PARSED
+    from tblib.logs import LineParser
+    record = LineParser("auth").parse("Oct 31 10:00:00 web1 sshd[812]: " + message)
+    assert kql_extract(SYSLOG_PARSED["UserName"], message) == (record.get("user") or None)
+    ip = record.get("ip") or None
+    if ip and not any(c.isdigit() for c in ip):
+        ip = None  # logs keeps rhost=host.dead.example as given; SrcIp is only ever an address
+    assert kql_extract(SYSLOG_PARSED["SrcIp"], message) == ip
+    port = kql_extract(SYSLOG_PARSED["SrcPort"], message)
+    assert (int(port) if port else None) == record.get("port")
+
+
 def test_sigma_to_query_kql_syslog_only_parses_what_it_uses():
     text = ("title: t\nlogsource:\n  product: linux\n  service: sshd\ndetection:\n  sel:\n    user: root\n"
             "    message|contains: Accepted\n  condition: sel\n")
     lines = run(f"say(detect.sigma_to_query(detect.sigma({_json.dumps(text)}), \"kql\"))")
     kql = "\n".join(lines)
-    assert kql.splitlines()[1] == '| where Facility in ("auth", "authpriv") and ProcessName == "sshd"'
-    assert "| extend UserName = extract(" in kql and "Action" not in kql and "SrcIp" not in kql
+    assert kql.splitlines()[1] == '| where Facility in ("auth", "authpriv") and ProcessName startswith "sshd"'
+    assert "| extend UserName = coalesce(" in kql and "Action" not in kql and "SrcIp" not in kql
     assert kql.endswith('| where UserName =~ "root" and SyslogMessage contains "Accepted"')
     assert kql_columns(kql) <= SYSLOG_COLUMNS
     # A table given by hand drops the logsource's Facility filter.

@@ -311,9 +311,23 @@ class Debugger:
         in_function = bool(frames) and frames[-1]["fn"] != "<main>"
         # at the top level the "current function" is the module itself
         local_vars: dict = {}
-        for scope in (chain[:-1] if in_function else chain):
-            for k, v in scope.vars.items():
-                local_vars.setdefault(k, v)
+        if in_function and getattr(self.env, "frame", None) is not None:
+            # VM: one FrameEnv per call; leave out what a closure captured from outside
+            code = self.env.frame.code
+            outer = {name for name, _ in code.free_names} - {entry[0] for entry in code.varinfo}
+            local_vars = {k: v for k, v in chain[0].vars.items() if k not in outer}
+        elif in_function:
+            # tree: block scopes up to the call's own scope, not the enclosing function's
+            call_scope = self.interp.call_stack[-1].env
+            for scope in chain[:-1]:
+                for k, v in scope.vars.items():
+                    local_vars.setdefault(k, v)
+                if scope is call_scope:
+                    break
+        else:
+            for scope in chain:
+                for k, v in scope.vars.items():
+                    local_vars.setdefault(k, v)
         return local_vars, dict(chain[-1].vars)
 
     def cmd_locals(self, running: bool) -> None:

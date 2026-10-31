@@ -91,6 +91,30 @@ def test_debugger_locals_and_globals(tmp_path, engine):
     assert "globals" in run_tb(["debug", "--help"], tmp_path).stdout
 
 
+CLOSURE = """fn outer(a) {
+  let hidden = 7
+  let shared = a * 2
+  fn inner(x) {
+    let y = x + shared
+    return y
+  }
+  return inner(1)
+}
+say(outer(5))
+"""
+
+
+@pytest.mark.parametrize("engine", ["vm", "tree"])
+def test_debugger_locals_in_a_closure_leave_out_the_outer_function(tmp_path, engine):
+    (tmp_path / "prog.tb").write_text(CLOSURE, encoding="utf-8")
+    out = run_tb(["debug", "prog.tb"], tmp_path, "break 6\nrun\nlocals\nprint 0\nquit\n",
+                 env={"TB_ENGINE": engine}).stdout
+    in_inner = out.split("-> prog.tb:6")[1].split("(tb) 0\n")[0]
+    assert "  x = 1" in in_inner and "  y = 11" in in_inner
+    for name in ("a", "hidden", "shared", "inner"):
+        assert f"  {name} = " not in in_inner
+
+
 def test_debugger_step_into_and_out(tmp_path):
     (tmp_path / "prog.tb").write_text(PROGRAM, encoding="utf-8")
     script = "step\nstep\nstep\nstep\nstep\nout\nprint total\nquit\n"
