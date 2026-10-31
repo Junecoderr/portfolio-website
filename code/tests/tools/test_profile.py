@@ -111,3 +111,27 @@ def test_flame_tree_adds_up_the_stacks():
     main = tree["children"]["<main>"]
     assert tree["value"] == main["value"] == 4.0
     assert main["children"]["a"]["value"] == 2.0 and main["children"]["b"]["value"] == 1.0
+
+
+DEEP = """fn f(n) {
+  if n == 0 {
+    let s = 0
+    for i in range(200000) { s += i }
+    return s
+  }
+  return f(n - 1)
+}
+say(f(2000))
+"""
+
+
+def test_deep_recursion_gets_a_flame_graph_and_exact_lines(tmp_path):
+    (tmp_path / "deep.tb").write_text(DEEP, encoding="utf-8")
+    for engine in ("vm", "tree"):
+        result = run_tb(["profile", "--html", "flame.html", "deep.tb"], tmp_path, {"TB_ENGINE": engine})
+        assert result.returncode == 0, result.stderr
+        assert "Traceback" not in result.stderr
+        lines = result.stdout.split("Busiest lines", 1)[1].split("Largest values")[0]
+        assert "deep.tb:4  for i in range(200000) { s += i }" in lines, (engine, lines)
+        page = (tmp_path / "flame.html").read_text(encoding="utf-8")
+        assert page.count('class="bar"') > 2000

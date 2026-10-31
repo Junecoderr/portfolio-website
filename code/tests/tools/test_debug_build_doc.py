@@ -124,6 +124,18 @@ def test_debugger_step_into_and_out(tmp_path):
     assert "(tb) 1\n" in out   # out: back in the loop, after total += square(1)
 
 
+@pytest.mark.parametrize("engine", ["vm", "tree"])
+def test_debugger_next_and_out_leave_an_imported_module(tmp_path, engine):
+    (tmp_path / "helper.tb").write_text("let a = 1\nlet b = 2\n", encoding="utf-8")
+    (tmp_path / "main.tb").write_text('import "helper.tb" as h\nsay("after import")\nsay("line3")\n',
+                                      encoding="utf-8")
+    for move in ("next", "out"):
+        script = f"break helper.tb:2\nrun\n{move}\nquit\n"
+        out = run_tb(["debug", "main.tb"], tmp_path, script, env={"TB_ENGINE": engine}).stdout
+        assert "-> helper.tb:2   let b = 2" in out
+        assert '-> main.tb:2   say("after import")' in out, (move, out)
+
+
 def test_debugger_reports_errors_and_quits_on_eof(tmp_path):
     (tmp_path / "bad.tb").write_text('let x = 1\nsay(x + nope)\n', encoding="utf-8")
     result = run_tb(["debug", "bad.tb"], tmp_path, "run\n")

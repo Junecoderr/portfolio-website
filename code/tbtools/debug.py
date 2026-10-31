@@ -51,6 +51,7 @@ class Debugger:
         self.depth = 0             # our own count of active calls
         self.target_depth = 0
         self.step_file = None      # where 'next' started: an import's code at the same depth is stepped over
+        self.target_nesting = 0    # imports in progress when 'next'/'out' started (module bodies run at depth 0)
         self.interp = None
         self.sources: dict[str, list[str]] = {}
         self.current: tuple[str | None, int] | None = None
@@ -147,15 +148,29 @@ class Debugger:
         elif self.mode == "step":
             stop = True
         elif self.mode == "next":
-            stop = self.depth < self.target_depth or (
-                self.depth == self.target_depth and (file or self.path) == self.step_file)
+            nesting = self.nesting()
+            stop = nesting < self.target_nesting or nesting == self.target_nesting and (
+                self.depth < self.target_depth or (
+                    self.depth == self.target_depth and (file or self.path) == self.step_file))
         elif self.mode == "out":
-            stop = self.depth < self.target_depth
+            nesting = self.nesting()
+            stop = nesting < self.target_nesting or (
+                nesting == self.target_nesting and self.depth < self.target_depth)
         if not stop:
             return
         self.current = (file, line)
         self.env = env
         self.stopped_at(file, line)
+
+    def nesting(self) -> int:
+        """How many imports are running (each module body runs inside the import that loads it)."""
+        return len(getattr(self.interp, "loading", ()))
+
+    def mark_step(self, file) -> None:
+        """Remember where a 'next' or 'out' starts."""
+        self.target_depth = self.depth
+        self.target_nesting = self.nesting()
+        self.step_file = file or self.path
 
     def stopped_at(self, file, line) -> None:
         """The program is paused before `line`: talk to the user until they resume it."""
@@ -205,15 +220,14 @@ class Debugger:
                     self.mode = "step"
                     return "run"
                 self.mode = "next"
-                self.target_depth = self.depth
-                self.step_file = self.current[0] or self.path
+                self.mark_step(self.current[0])
                 return "next"
             elif word in ("o", "out", "finish"):
                 if not running:
                     self.say("The program isn't running yet. Type 'run' or 'step'.")
                     continue
                 self.mode = "out"
-                self.target_depth = self.depth
+                self.mark_step(self.current[0])
                 return "out"
             elif word in ("c", "continue", "cont"):
                 if not running:

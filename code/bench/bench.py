@@ -20,7 +20,11 @@ slower. Timing on shared CI machines is noisy, so:
   reports it (not wall time, which includes waiting for the CPU);
 * each side keeps its best run (noise only ever adds time);
 * a benchmark that looks too slow is measured again with three times the
-  runs, and only fails if it is still too slow.
+  runs, and only fails if it is still too slow;
+* each side runs its own copy of a benchmark, so a benchmark that changed or
+  uses a new feature still compares; one the old side doesn't have is
+  skipped. When the two sides print different things, that is listed
+  separately (it is not a slowdown, and doesn't fail the check).
 """
 
 from __future__ import annotations
@@ -96,22 +100,20 @@ def table(opts) -> int:
 
 # -- the regression check ---------------------------------------------------------------
 
-def measure_pair(name, old_root, new_root, rounds, env) -> tuple[float, float]:
-    """Best CPU time of one benchmark on the old and the new checkout, taking turns."""
-    program = os.path.join(new_root, "bench", name + ".tb")
-    old_best = new_best = float("inf")
-    outs = set()
+def measure_pair(name, old_root, new_root, rounds, env) -> tuple[float, float, tuple | None]:
+    """Best CPU time of one benchmark on the old and the new checkout, taking turns,
+    each running its own copy of the program; plus (old output, new output) when
+    they differ (else None)."""
+    best_of = [float("inf"), float("inf")]
+    outs: list[set] = [set(), set()]
     for _ in range(rounds):
         for side, root in enumerate((old_root, new_root)):
+            program = os.path.join(root, "bench", name + ".tb")
             t, out = cpu_timed([sys.executable, os.path.join(root, "tb.py"), program], env, root)
-            outs.add(out)
-            if side == 0:
-                old_best = min(old_best, t)
-            else:
-                new_best = min(new_best, t)
-    if len(outs) != 1:
-        raise SystemExit(f"{name}: the old and the new version print different things: {sorted(outs)!r}")
-    return old_best, new_best
+            outs[side].add(out)
+            best_of[side] = min(best_of[side], t)
+    old_out, new_out = (" | ".join(sorted(o)) for o in outs)
+    return best_of[0], best_of[1], (None if old_out == new_out else (old_out, new_out))
 
 
 def verdict(old: float, new: float, max_slowdown: float) -> bool:
@@ -126,24 +128,37 @@ def regression_check(opts) -> int:
         raise SystemExit(f"{old_root} is not a TB checkout (no tb.py there).")
     env = dict(os.environ)
     env["TB_ENGINE"] = "vm"
-    failed = []
+    failed, skipped, changed = [], [], []
     print(f"old: {old_root}\nnew: {new_root}\n(best of {opts.repeat} runs each, CPU time"
           f"{'' if resource else ' (wall time on this system)'}; fails above +{opts.max_slowdown:g}%)\n")
     print(f"{'benchmark':<12} {'old (s)':>8} {'new (s)':>8} {'change':>8}")
     for name in opts.names:
         if not os.path.isfile(os.path.join(new_root, "bench", name + ".tb")):
             raise SystemExit(f"There is no benchmark called {name}.")
-        old, new = measure_pair(name, old_root, new_root, opts.repeat, env)
+        if not os.path.isfile(os.path.join(old_root, "bench", name + ".tb")):
+            skipped.append(name)
+            print(f"{name:<12} {'-':>8} {'-':>8} {'':>8}  (new: the old version has no such benchmark)", flush=True)
+            continue
+        old, new, differ = measure_pair(name, old_root, new_root, opts.repeat, env)
         note = ""
         if not verdict(old, new, opts.max_slowdown):  # measure again before blaming the change
-            old2, new2 = measure_pair(name, old_root, new_root, opts.repeat * 3, env)
+            old2, new2, _ = measure_pair(name, old_root, new_root, opts.repeat * 3, env)
             old, new = min(old, old2), min(new, new2)
             note = "  (measured twice)"
+        if differ:
+            changed.append((name, differ))
+            note += "  (output changed)"
         change = 100 * (new / old - 1)
         ok = verdict(old, new, opts.max_slowdown)
         if not ok:
             failed.append(name)
         print(f"{name:<12} {old:>8.2f} {new:>8.2f} {change:>+7.1f}%{'' if ok else '  TOO SLOW'}{note}", flush=True)
+    if skipped:
+        print(f"\nNew benchmarks (not compared): {', '.join(skipped)}.")
+    if changed:
+        print("\nOutput changed (not a slowdown; check it is meant):")
+        for name, (old_out, new_out) in changed:
+            print(f"  {name}: old printed {old_out!r}, new prints {new_out!r}")
     if failed:
         print(f"\n{', '.join(failed)}: more than {opts.max_slowdown:g}% slower than before.")
         return 1

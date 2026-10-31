@@ -133,6 +133,7 @@ class Loop:
         self.tasks: set = set()           # unfinished tasks started inside the loop
         self.closers: list = []           # run when the loop ends (servers)
         self.root = None
+        self.parked = 0                   # > 0 while the loop thread itself waits (a handler in wait())
 
     def wake(self) -> None:
         """From any thread: let the loop see whether it is finished."""
@@ -148,25 +149,48 @@ class Loop:
     def on_loop_thread(self) -> bool:
         return threading.current_thread() is self.thread
 
-    def call(self, coro):
+    def call(self, coro, fallback=None):
         """Run an asyncio coroutine on the loop from a task and wait for it
-        (other tasks run meanwhile)."""
+        (other tasks run meanwhile). While the loop thread is itself parked
+        (a request handler waiting for this very task), the coroutine could
+        never run: then fallback() does the work instead (if given)."""
         import asyncio
 
+        if fallback is not None and self.parked:
+            coro.close()
+            return fallback()
         future = asyncio.run_coroutine_threadsafe(coro, self.aio)
         done = threading.Event()
         future.add_done_callback(lambda f: done.set())
+        stuck = False
         try:
-            wait_event(done)
+            with blocking():
+                while not _wait_event(done, _SLICE):
+                    if fallback is not None and self.parked:
+                        stuck = True
+                        break
         except BaseException:
             future.cancel()
             raise
+        if stuck:
+            future.cancel()
+            return fallback()
         return future.result()
 
 
 def current_loop():
     """The Loop the calling thread runs inside, or None (thread mode)."""
     return getattr(_local, "loop", None)
+
+
+def context():
+    """This thread's task, loop and baton state, for a helper thread that runs
+    TB code on its behalf while it waits (tree-engine generator bodies)."""
+    return (getattr(_local, "task", None), getattr(_local, "loop", None), getattr(_local, "holding", False))
+
+
+def adopt(ctx) -> None:
+    _local.task, _local.loop, _local.holding = ctx
 
 
 def _hold(loop) -> None:
@@ -187,11 +211,16 @@ def blocking():
     if loop is None or not getattr(_local, "holding", False):
         yield
         return
+    mine = loop.on_loop_thread()
+    if mine:
+        loop.parked += 1
     _drop(loop)
     try:
         yield
     finally:
         _hold(loop)
+        if mine:
+            loop.parked -= 1
 
 
 def releases(fn):

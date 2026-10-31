@@ -1,6 +1,7 @@
 """TB 3.2: parallel.loop (the event loop), groups and time limits, and
 parallel.processes (worker processes) with shared queues."""
 
+import re
 import subprocess
 import sys
 import threading
@@ -25,15 +26,21 @@ def stop_servers():
 def test_async_fns_take_turns_on_the_loop():
     src = '''import parallel
 import time
+parallel.loop(fn() {})  # the first loop imports asyncio (50+ ms, far more on a slow machine): not timed
+let seen = []
+let start = time.timestamp()
+fn ms() { return round((time.timestamp() - start) * 1000) }
 async fn twice(x) {
+  seen.push(f"{x} sleeps at {ms()} ms")
   parallel.sleep(0.3)
+  seen.push(f"{x} wakes at {ms()} ms")
   return x * 2
 }
-let start = time.timestamp()
 say(parallel.loop(fn() { return parallel.all([twice(1), twice(2), twice(3)]) }))
-# One after another would take 0.9 s; together they take about 0.3 s. A wide margin
-# keeps busy CI machines from failing this.
-say(time.timestamp() - start < 0.75)
+# One after another would take 0.9 s; together they take about 0.3 s.
+let took = time.timestamp() - start
+say(took < 0.75)
+say(f"took {round(took * 1000)} ms: {seen}")
 let n = {"v": 0}
 parallel.loop(fn() {
   parallel.map(fn(i) {
@@ -43,7 +50,14 @@ parallel.loop(fn() {
 })
 say(n.v)
 say(parallel.loop(fn(a, b) { return parallel.loop(fn() { return a + b }) }, 2, 3))'''
-    assert run_tb(src) == ["[2, 4, 6]", "true", "200", "5"]
+    out = run_tb(src)
+    # other threads busy in Python (left by earlier tests) slow every hand-off: name them on failure
+    timeline = out.pop(2) + f"; other threads: {[t.name for t in threading.enumerate()]}"
+    # every task is asleep before the first one wakes: they really wait together
+    marks = [(int(m.group(2)), m.group(1)) for m in re.finditer(r"(sleeps|wakes) at (\d+) ms", timeline)]
+    assert len(marks) == 6, timeline
+    assert max(t for t, kind in marks if kind == "sleeps") < min(t for t, kind in marks if kind == "wakes"), timeline
+    assert out == ["[2, 4, 6]", "true", "200", "5"], timeline
 
 
 def test_loop_waits_for_every_task_and_passes_errors_on():
@@ -180,6 +194,188 @@ say(parallel.loop(fn() {{ return net.check_ports("127.0.0.1", [{port}]) }}))''')
     finally:
         listener.close()
     assert out == [f"{{{port}: true}}"]
+
+
+def test_handler_waiting_on_a_task_that_needs_the_loop():
+    """A request handler runs on the loop thread; a task it waits for must not
+    need that thread (check_ports falls back to threads, a server starts once
+    the handler is done)."""
+    src = '''import parallel
+import server
+import http
+import net
+parallel.loop(fn() {
+  let app = server.create({"log": false})
+  let other = {"url": nil, "app": nil}
+  app.get("/scan", fn(req) {
+    let t = parallel.run(fn() { return net.check_ports("127.0.0.1", [1, 2]) })
+    return str(t.wait(5))
+  })
+  app.get("/start", fn(req) {
+    let t = parallel.run(fn() {
+      let a2 = server.create({"log": false})
+      a2.get("/", fn(r) { return "second" })
+      other.app = a2
+      return a2.start(0)
+    })
+    other.url = t.wait(5)
+    return "started"
+  })
+  let url = app.start(0)
+  say(http.get(url + "/scan", {"timeout": 8}).text)
+  say(http.get(url + "/start", {"timeout": 8}).text)
+  say(http.get(other.url + "/", {"timeout": 8}).text)
+  other.app.stop()
+  app.stop()
+})
+say("loop ended")'''
+    assert run_tb(src) == ["{1: false, 2: false}", "started", "second", "loop ended"]
+
+
+@pytest.mark.parametrize("engine", ["vm", "tree"])
+def test_generator_waiting_inside_a_loop_hands_the_baton_on(engine):
+    """The tree engine runs a generator body on a helper thread: a wait in it
+    must still let the loop's other tasks run (and both engines agree)."""
+    from tbcore.interp import Interpreter as Tree
+    from tbcore.vm import VMInterpreter as VM
+
+    src = '''import parallel
+fn producer(q) { parallel.sleep(0.1); q.put(42) }
+fn gen(q) {
+  yield q.get(3)
+  parallel.sleep(0.05)
+  yield "after"
+}
+say(parallel.loop(fn() {
+  let q = parallel.Queue()
+  parallel.run(producer, q)
+  let out = []
+  for v in gen(q) { push(out, v) }
+  return out
+}))'''
+    lines = []
+    tb.run(src, interpreter=(VM if engine == "vm" else Tree)(output=lines.append))
+    assert lines == ['[42, "after"]']
+
+
+def _ws_client(port, path):
+    import base64
+    import os
+    import socket
+
+    sock = socket.create_connection(("127.0.0.1", port), timeout=30)
+    key = base64.b64encode(os.urandom(16)).decode()
+    sock.sendall(f"GET {path} HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                 f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n".encode())
+    head = b""
+    while b"\r\n\r\n" not in head:
+        head += sock.recv(1)
+    assert b" 101 " in head.split(b"\r\n")[0], head
+    return sock
+
+
+def _ws_frame(payload: bytes) -> bytes:
+    n = len(payload)
+    size = bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + n.to_bytes(2, "big")
+    return b"\x81" + size + b"\0\0\0\0" + payload  # a zero mask leaves the payload as it is
+
+
+def _ws_read(sock) -> bytes:
+    def exactly(n):
+        data = b""
+        while len(data) < n:
+            chunk = sock.recv(n - len(data))
+            assert chunk, "connection closed"
+            data += chunk
+        return data
+
+    b1, b2 = exactly(2)
+    n = b2 & 0x7F
+    if n == 126:
+        n = int.from_bytes(exactly(2), "big")
+    elif n == 127:
+        n = int.from_bytes(exactly(8), "big")
+    return exactly(n)
+
+
+def test_websockets_in_a_loop_have_backpressure(monkeypatch):
+    """A client flooding a slow handler, and a handler flooding a slow client:
+    memory stays bounded in both directions."""
+    import socket
+
+    peak = {"read": 0, "write": 0}
+    feed, write = serverlib._TransportSock.feed, serverlib._TransportSock._write
+
+    def counting_feed(self, data):
+        feed(self, data)
+        peak["read"] = max(peak["read"], len(self.buf))
+
+    def counting_write(self, data):
+        write(self, data)
+        peak["write"] = max(peak["write"], self.transport.get_write_buffer_size() + self.pending)
+
+    monkeypatch.setattr(serverlib._TransportSock, "feed", counting_feed)
+    monkeypatch.setattr(serverlib._TransportSock, "_write", counting_write)
+    probe = socket.socket()
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+    count, size = 1500, 8192   # 12 MB each way
+    src = f'''import parallel
+import server
+parallel.loop(fn() {{
+  let app = server.create({{"log": false}})
+  app.ws("/flood", fn(ws, req) {{
+    parallel.sleep(1)
+    let n = {{"v": 0}}
+    ws.each(fn(msg) {{
+      n.v += 1
+      if n.v == {count} {{ return false }}
+    }})
+    ws.send(str(n.v))
+  }})
+  app.ws("/drown", fn(ws, req) {{
+    let big = "x" * {size}
+    for i in range({count}) {{ ws.send(big) }}
+    ws.send("end")
+  }})
+  app.get("/stop", fn(req) {{
+    app.stop()
+    return "bye"
+  }})
+  app.listen({port})
+}})'''
+    runner = threading.Thread(target=run_tb, args=(src,), daemon=True)
+    runner.start()
+    for _ in range(100):
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=1).close()
+            break
+        except OSError:
+            time.sleep(0.05)
+    message = _ws_frame(b"y" * size)
+    flood = _ws_client(port, "/flood")
+    sender = threading.Thread(target=lambda: flood.sendall(message * count), daemon=True)
+    sender.start()
+    assert _ws_read(flood) == str(count).encode()
+    sender.join(10)
+    flood.close()
+    drown = _ws_client(port, "/drown")
+    time.sleep(1)   # the handler sends while this client reads nothing
+    got = 0
+    while _ws_read(drown) != b"end":
+        got += 1
+    drown.close()
+    assert got == count
+    stop = socket.create_connection(("127.0.0.1", port), timeout=10)
+    stop.sendall(b"GET /stop HTTP/1.1\r\nHost: x\r\n\r\n")
+    stop.recv(100)
+    stop.close()
+    runner.join(10)
+    assert not runner.is_alive()
+    print(f"\n[ws backpressure] peak unread {peak['read']:,} bytes, peak unsent {peak['write']:,} bytes "
+          f"(each side sent {count * size:,})")
+    assert peak["read"] < 1024 * 1024 and peak["write"] < 1024 * 1024, peak
 
 
 def test_new_functions_check_inputs(monkeypatch):
@@ -369,6 +565,57 @@ def test_processes_explain_values_that_cannot_cross():
     assert "at least 1 worker" in err.message
     err = tb_error('import parallel\nparallel.processes(say, [1])')
     assert "needs fn to be a function written in TB" in err.message
+
+
+def test_processes_send_only_names_the_function_really_uses_from_outside():
+    src = '''import parallel
+let lock = parallel.Lock()
+let item = parallel.Lock()
+let k = parallel.Lock()
+let base = 100
+fn work(x) {
+  let lock = x * 2
+  let total = 0
+  for item in [1, 2] { total += item }
+  let add = fn(k) { return k + base }
+  try { throw "no" } catch k { total += 0 }
+  return add(lock + total)
+}
+say(parallel.processes(work, [1, 2, 3], 2))'''
+    assert run_tb(src) == ["[105, 107, 109]"]
+    # a name bound only after its use (or only inside a block) is still the outside one
+    err = tb_error('import parallel\nlet lock = parallel.Lock()\nfn f(x) {\n  if x { let lock = 1 }\n  return lock\n}\n'
+                   'parallel.processes(f, [1])')
+    assert "can't send a Lock object (the name 'lock' in 'f')" in err.message
+
+
+def test_processes_report_a_worker_that_dies():
+    import multiprocessing
+
+    before = {p.pid for p in multiprocessing.active_children()}
+    outcome = {}
+
+    def go():
+        try:
+            run_tb('import parallel\nparallel.processes(fn(x) { parallel.sleep(60) }, [1, 2], 2)')
+        except tb.TBError as err:
+            outcome["error"] = err
+
+    runner = threading.Thread(target=go, daemon=True)
+    runner.start()
+    deadline = time.monotonic() + 20
+    workers = []
+    while not workers and time.monotonic() < deadline:
+        time.sleep(0.1)
+        workers = [p for p in multiprocessing.active_children() if p.pid not in before]
+    assert workers, "no worker process started"
+    time.sleep(1)  # let the workers start their items
+    workers[0].terminate()  # like the system killing it (out of memory)
+    runner.join(20)
+    assert not runner.is_alive(), "parallel.processes() kept waiting for a dead worker"
+    assert "a worker process stopped suddenly" in outcome["error"].message
+    time.sleep(0.5)
+    assert not [p for p in multiprocessing.active_children() if p.pid not in before]
 
 
 def test_shared_queue_crosses_processes():

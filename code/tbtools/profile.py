@@ -60,6 +60,7 @@ class Profiler:
         self._ident = threading.get_ident()
         self._started = 0.0
         self._codes = None
+        self._tree_file = None
 
     # -- sampling ---------------------------------------------------------------
 
@@ -67,6 +68,9 @@ class Profiler:
         from tbcore import vm
 
         self._codes = (vm.VMInterpreter._run.__code__,)
+        # the tree engine runs TB code in tbcore/interp.py: the walk stops at its first frame there
+        from tbcore import interp as tree
+        self._tree_file = None if isinstance(self.interp, vm.VMInterpreter) else tree.__file__
         self._old_switch = sys.getswitchinterval()
         sys.setswitchinterval(min(self._old_switch, self.interval / 2))  # let the sampler in on time
         self._started = time.perf_counter()
@@ -95,7 +99,7 @@ class Profiler:
         stack = list(getattr(self.interp, "call_stack", ()) or ())
         if pyframe is None or not stack:
             return
-        exact, native = self._read_python_stack(pyframe)
+        exact, native = self._read_python_stack(pyframe, stack[-1])
         labels = []
         for fr in stack:
             labels.append(self._label(fr))
@@ -111,29 +115,32 @@ class Profiler:
             self.lines[spot] = self.lines.get(spot, 0.0) + weight
         self.samples += 1
 
-    def _read_python_stack(self, pyframe):
-        """The exact pc of each TB frame a Python frame is running right now, and the
-        library function running on top of TB code (if any)."""
+    def _read_python_stack(self, pyframe, top):
+        """The exact pc of the innermost TB frame (top) if a Python frame is running it
+        right now, and the library function running on top of TB code (if any). Only the
+        Python frames down to the innermost TB one are read, so a sample costs the same
+        however deep the program's recursion goes."""
         exact: dict[int, int] = {}
         native = None
-        seen_tb = False
         f = pyframe
         while f is not None:
             co = f.f_code
             if co in self._codes:
                 loc = f.f_locals
                 fr, pc = loc.get("frame"), loc.get("pc")
-                if fr is not None and type(pc) is int and id(fr) not in exact:
+                if fr is top and type(pc) is int:
                     exact[id(fr)] = pc
-                seen_tb = True
+                break
             elif co.co_filename.startswith("<tb fast code"):
                 fr = f.f_locals.get("frame")
-                if fr is not None and id(fr) not in exact:
+                if fr is top:
                     pcs = getattr(getattr(fr.code, "fast", None), "pcs", None)
                     if pcs and 0 < f.f_lineno <= len(pcs):
                         exact[id(fr)] = pcs[f.f_lineno - 1] + 1
-                seen_tb = True
-            elif not seen_tb:
+                break
+            elif co.co_filename == self._tree_file:
+                break
+            else:
                 name = _library_of(co.co_filename)
                 if name is not None:
                     fn = co.co_name.lstrip("_")
@@ -400,10 +407,12 @@ def report_html(prof: Profiler, interp, base_dir: str) -> str:
     bars = []
     depth_max = [0]
 
-    def place(node, left, depth):
+    todo = [(root, 0.0, 0)]   # an explicit stack: deep recursion in the program must not crash the report
+    while todo:
+        node, left, depth = todo.pop()
         width = 100.0 * node["value"] / total
         if width < 0.05:
-            return
+            continue
         depth_max[0] = max(depth_max[0], depth)
         name = node["name"]
         library = name.endswith("(library)")
@@ -414,11 +423,11 @@ def report_html(prof: Profiler, interp, base_dir: str) -> str:
             f'--h:{hue}" title="{esc(tip)}"><span>{esc(name)}</span></div>'
         )
         x = left
+        placed = []
         for child in sorted(node["children"].values(), key=lambda c: -c["value"]):
-            place(child, x, depth + 1)
+            placed.append((child, x, depth + 1))
             x += 100.0 * child["value"] / total
-
-    place(root, 0.0, 0)
+        todo.extend(reversed(placed))
     height = (depth_max[0] + 1) * 22
     fn_rows = []
     for label, own, tot in prof.functions()[:50]:

@@ -91,10 +91,13 @@ class DapServer(Debugger):
             name, _, value = line.decode("ascii", "replace").partition(":")
             if name.strip().lower() == "content-length":
                 length = int(value.strip())
+                if length < 0:
+                    raise ValueError("a negative Content-Length")
         body = self.reader.read(length)
         if body is None or len(body) < length:
             return None
-        return json.loads(body.decode("utf-8"))
+        message = json.loads(body.decode("utf-8"))
+        return {} if message is None else message   # None means the input has ended
 
     def send(self, message: dict) -> None:
         with self.write_lock:
@@ -166,8 +169,7 @@ class DapServer(Debugger):
                 command = request.get("command")
                 if command in RESUME:
                     self.mode = RESUME[command]
-                    self.target_depth = self.depth
-                    self.step_file = file or self.path
+                    self.mark_step(file)
                     self.paused = False
                     self.respond(request, {"allThreadsContinued": True})
                     return
@@ -369,9 +371,12 @@ class DapServer(Debugger):
                     continue
                 if request is None:
                     break
-                if request.get("type") != "request":
+                if not isinstance(request, dict) or request.get("type") != "request":
                     continue
                 command = request.get("command", "")
+                if not isinstance(command, str) or not isinstance(request.get("arguments") or {}, dict):
+                    self.respond(request, error="A request needs a command name and its arguments as an object.")
+                    continue
                 if command in CONTROL:
                     try:
                         body = getattr(self, "on_" + command)(request.get("arguments") or {})

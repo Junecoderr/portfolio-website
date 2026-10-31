@@ -17,7 +17,8 @@ the dispatch gone:
 * The VM's superinstructions are undone (each keeps its original instruction
   in place), because the translation already specialises the plain sequence.
 * Method calls on instances use an inline cache per call site (class ->
-  method), filled on the first lookup.
+  method), filled on the first lookup and never invalidated: it relies on
+  class methods never changing after creation (see runtime.TBClass).
 
 Everything else is the VM's: rarer instructions call the same `_SLOW`
 handlers, slow paths call the same interpreter methods with the same line

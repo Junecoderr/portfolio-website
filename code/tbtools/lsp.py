@@ -1351,7 +1351,7 @@ class Server:
             raise ValueError(f"'{new_name}' can't be a TB name.")
         target = self._target(uri, params["position"])
         if target is not None:
-            found = self._references(*target)
+            found = self._references(*target, rename=True)
             return {"changes": {u: [{"range": r, "newText": new_name} for r in ranges]
                                 for u, ranges in found.items()}}
         analysis, word, spans = self._rename_targets(uri, params)
@@ -1409,7 +1409,8 @@ class Server:
         receiver = self._receiver(text, start)
         if receiver is not None:
             info = analysis.imports.get(receiver)
-            if info and info["kind"] in ("file", "library"):
+            shown = analysis.visible(receiver, tok - 2) if tok >= 2 else None  # a local may shadow the import
+            if info and info["kind"] in ("file", "library") and shown is not None and shown.kind == "import":
                 path = self._import_file(analysis, info)
                 return (path, word) if path else None
             return None
@@ -1428,8 +1429,10 @@ class Server:
                 return (path, word) if path else None
         return None
 
-    def _references(self, path: str, name: str) -> dict[str, list[dict]]:
-        """uri -> ranges of every use of the top-level `name` of `path`, across the workspace."""
+    def _references(self, path: str, name: str, rename: bool = False) -> dict[str, list[dict]]:
+        """uri -> ranges of every use of the top-level `name` of `path`, across the workspace.
+        An open file whose current text doesn't parse is left out (its ranges would be for older
+        text); for a rename that is an error instead, so no edit lands in the wrong place."""
         def key(p):
             return os.path.normcase(os.path.abspath(p))
 
@@ -1438,9 +1441,14 @@ class Server:
 
         target = key(path)
         result: dict[str, list[dict]] = {}
+        stale: list[str] = []
         for file in self.workspace_files() + [path]:
             an = self.file_analysis(file)
             uri = path_to_uri(file)
+            if uri in self.docs and (an is None or an.text != self.docs[uri]):
+                if file not in stale:
+                    stale.append(file)
+                continue
             if an is None or uri in result:
                 continue
             spans = set()
@@ -1455,10 +1463,12 @@ class Server:
                 if not file_of or key(file_of) != target:
                     continue
                 imported = an.visible(alias, len(an.tokens) - 1)
-                if info["kind"] in ("file", "library"):   # alias.name
+                if info["kind"] in ("file", "library"):   # alias.name, where alias still means the import
                     for k, hit in enumerate(names):
                         if hit and k > 1 and after_dot(an, k) and an.tokens[k - 2].value == alias:
-                            spans.add(an.tok_offsets(k))
+                            shown = an.visible(alias, k - 2)
+                            if shown is not None and shown.kind == "import":
+                                spans.add(an.tok_offsets(k))
                 elif info["name"] == name:                # from "file" import name [as alias]
                     a, b = getattr(imported.node, "_span", (0, 0)) if imported else (0, 0)
                     spans.update(an.tok_offsets(k) for k in range(a, b) if names[k] and not after_dot(an, k))
@@ -1468,6 +1478,13 @@ class Server:
             spans.discard(None)
             if spans:
                 result[uri] = [an.index.range(a, b) for a, b in sorted(spans)]
+        if stale:
+            names = ", ".join(os.path.basename(f) for f in stale)
+            if rename:
+                raise ValueError(f"Fix the errors in {names} first: it doesn't parse right now, so "
+                                 f"'{name}' can't be renamed there safely.")
+            self.notify("window/showMessage", {"type": 2, "message": f"References in {names} are left out "
+                                                                     "until its errors are fixed."})
         return result
 
     def on_textDocument_references(self, params):

@@ -104,6 +104,36 @@ def _lookup(fn, name):
     return True, env.vars[name]
 
 
+def _free_names(fn) -> set:
+    """The names fn's body (and the functions inside it) look up outside fn:
+    names bound inside (let, for, catch, nested parameters, ...) are left
+    out. Found by compiling the body with the VM's compiler, which resolves
+    every use to a local or a global exactly as running it would."""
+    from tbcore import compiler as C
+
+    found: set = set()
+    pending: list = []
+
+    class Finder(C.FuncCompiler):
+        def resolve(self, name):
+            where, info = C.FuncCompiler.resolve(self, name)
+            if where == "global" or (where == "fast" and info.maybe):  # maybe: bound on some paths only
+                found.add(name)
+            return where, info
+
+        def make_template(self, *args, **kwargs):
+            tmpl = C.FuncCompiler.make_template(self, *args, **kwargs)
+            pending.append(tmpl)
+            return tmpl
+
+    tmpl = C.FnTemplate(fn.name, fn.params, fn.body, 0, fn.file, is_generator=fn.is_generator,
+                        is_async=fn.is_async)
+    pending.append(tmpl)
+    while pending:
+        Finder(pending.pop(), traced=False).compile_function()
+    return found
+
+
 class Packer:
     def __init__(self):
         self.table: list = []
@@ -130,11 +160,14 @@ class Packer:
             return self.index[key]
         at = self.index[key] = len(self.table)
         self.table.append(None)
-        names: set = set()
-        _names(fn.body, names)
-        for param in fn.params:
-            _names(param.default, names)
-        names -= {p.target for p in fn.params if isinstance(p.target, str)}
+        try:
+            names = _free_names(fn)
+        except Exception:  # pragma: no cover - fall back to every name mentioned
+            names = set()
+            _names(fn.body, names)
+            for param in fn.params:
+                _names(param.default, names)
+            names -= {p.target for p in fn.params if isinstance(p.target, str)}
         owner = "fn" if fn.name == "anonymous" else f"'{fn.name}'"
         free = {}
         for name in sorted(names):
@@ -214,6 +247,10 @@ def _child_call(job):
         return ("err", at, f"Something went wrong in a worker process: {err}", None, "Error")
 
 
+def _child_chunk(jobs):
+    return [_child_call(job) for job in jobs]
+
+
 # ---------------------------------------------------------------------------
 # parallel.processes (parent side)
 # ---------------------------------------------------------------------------
@@ -237,27 +274,47 @@ def run(interp, fn, items, workers: int, line):
     if not items:
         return []
     import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+    from concurrent.futures.process import BrokenProcessPool
 
     workers = max(1, min(workers, len(items)))
     args = (getattr(interp, "engine", "tree"), interp.base_dir, interp.script_path, list(interp.argv),
             packer.table, root)
     try:
-        pool = multiprocessing.get_context("spawn").Pool(workers, _child_init, args)
+        pool = ProcessPoolExecutor(workers, multiprocessing.get_context("spawn"), _child_init, args)
     except (OSError, ImportError, ValueError) as err:
         fail(line, f"parallel.processes() couldn't start worker processes: {err}")
+    jobs = list(enumerate(items))
+    size = max(1, len(jobs) // (workers * 4))
+    rows = []
     try:
         finished = threading.Event()
-        async_result = pool.map_async(_child_call, list(enumerate(items)),
-                                      chunksize=max(1, len(items) // (workers * 4)),
-                                      callback=lambda _: finished.set(), error_callback=lambda _: finished.set())
-        _tasks.wait_event(finished)
         try:
-            # The pool calls back just before it marks the result ready, so wait for that too.
-            rows = async_result.get(timeout=30)
-        except Exception as err:  # e.g. a value pickle refused
-            fail(line, f"parallel.processes(): a worker process failed: {err}")
+            futures = [pool.submit(_child_chunk, jobs[i:i + size]) for i in range(0, len(jobs), size)]
+        except (OSError, BrokenProcessPool) as err:
+            fail(line, f"parallel.processes() couldn't start worker processes: {err}")
+        left = [len(futures)]
+        lock = threading.Lock()
+
+        def one_done(_):
+            with lock:
+                left[0] -= 1
+                if left[0] == 0:
+                    finished.set()
+
+        for future in futures:  # done callbacks run after the result is set, so result() never waits
+            future.add_done_callback(one_done)
+        _tasks.wait_event(finished)  # a worker that dies (out of memory, killed) breaks the pool: all finish
+        for future in futures:
+            try:
+                rows.extend(future.result())
+            except BrokenProcessPool:
+                fail(line, "parallel.processes(): a worker process stopped suddenly (it may have run out of "
+                           "memory or been killed), so its items have no results.")
+            except Exception as err:  # e.g. a value pickle refused
+                fail(line, f"parallel.processes(): a worker process failed: {err}")
     finally:
-        pool.terminate()
+        _stop_pool(pool)
     results = [None] * len(items)
     for row in rows:
         if row[0] == "err":
@@ -266,6 +323,17 @@ def run(interp, fn, items, workers: int, line):
                               cls=_tb.ERROR_CLASSES.get(cls) or _tb.ERROR_CLASSES["Error"])
         results[row[1]] = row[2]
     return results
+
+
+def _stop_pool(pool) -> None:
+    """Stop the workers now, finished or not (cancel, Ctrl+C, an error)."""
+    processes = list((getattr(pool, "_processes", None) or {}).values())
+    pool.shutdown(wait=False, cancel_futures=True)
+    for process in processes:
+        try:
+            process.terminate()
+        except (OSError, AttributeError):  # pragma: no cover - already gone
+            pass
 
 
 # ---------------------------------------------------------------------------
