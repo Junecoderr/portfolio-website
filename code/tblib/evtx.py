@@ -15,7 +15,8 @@ EVTX fidelity (what is and isn't handled, honestly):
   with "broken": true unless options {"strict": true}.
 * Not handled: the event *message* text. Windows renders it from the
   provider's message DLL, which isn't in the file, so records get the
-  description from the logs EventID table (or "Event N"); task, opcode and
+  description from EVENTS, keyed by channel + event ID (Security, System,
+  Sysmon, PowerShell), or "Event N"; task, opcode and
   keyword names are only known for the common audit keywords. No carving of
   deleted records from chunk slack space, and no repair of half-written
   chunks beyond skipping what doesn't parse.
@@ -38,6 +39,66 @@ from tblib import logs
 from tblib._api import Module, check_type, fail, fail_os
 
 MAX_RECORDS = 500_000
+
+SYSMON = "microsoft-windows-sysmon/operational"
+POWERSHELL = "microsoft-windows-powershell/operational"
+SYSTEM_IDS = {104, 7045}  # the logs table's System-channel events; the rest are Security
+# (lowercased channel, event id) -> (action, description). Event titles follow the
+# Sysinternals Sysmon reference and Microsoft's PowerShell logging docs.
+EVENTS = {(("system" if i in SYSTEM_IDS else "security"), i): (action, text)
+          for i, (action, text, _success) in logs.EVENTS.items()}
+EVENTS.update({(SYSMON, i): v for i, v in {
+    1: ("process_created", "Process creation: a process was started"),
+    2: ("file_time_changed", "A process changed a file creation time"),
+    3: ("network_connection", "Network connection: a process made a TCP/UDP connection"),
+    4: ("sysmon_state_changed", "The Sysmon service state changed"),
+    5: ("process_exited", "Process terminated"),
+    6: ("driver_loaded", "A driver was loaded"),
+    7: ("image_loaded", "Image loaded: a process loaded a DLL or other module"),
+    8: ("remote_thread_created", "CreateRemoteThread: a process started a thread in another process"),
+    9: ("raw_disk_read", "RawAccessRead: a process read a drive directly"),
+    10: ("process_accessed", "ProcessAccess: a process opened another process"),
+    11: ("file_created", "FileCreate: a file was created or overwritten"),
+    12: ("registry_key_changed", "Registry object (key or value) created or deleted"),
+    13: ("registry_value_set", "Registry value set"),
+    14: ("registry_renamed", "Registry key or value renamed"),
+    15: ("file_stream_created", "FileCreateStreamHash: an alternate data stream was created"),
+    16: ("sysmon_config_changed", "The Sysmon configuration changed"),
+    17: ("pipe_created", "Named pipe created"),
+    18: ("pipe_connected", "Named pipe connected"),
+    19: ("wmi_filter", "WMI event filter registered"),
+    20: ("wmi_consumer", "WMI event consumer registered"),
+    21: ("wmi_binding", "WMI consumer bound to a filter"),
+    22: ("dns_query", "DNSEvent: a process ran a DNS query"),
+    23: ("file_deleted", "FileDelete: a file was deleted and archived"),
+    24: ("clipboard_changed", "New content in the clipboard"),
+    25: ("process_tampering", "ProcessTampering: a process image was changed (hollowing or herpaderping)"),
+    26: ("file_deleted", "FileDeleteDetected: a file was deleted"),
+    27: ("file_blocked", "FileBlockExecutable: Sysmon blocked an executable file from being created"),
+    28: ("file_blocked", "FileBlockShredding: Sysmon blocked file shredding"),
+    29: ("executable_detected", "FileExecutableDetected: a new executable file was created"),
+    255: ("sysmon_error", "Sysmon error"),
+}.items()})
+EVENTS.update({(POWERSHELL, i): v for i, v in {
+    4103: ("powershell_pipeline", "Module logging: PowerShell ran a pipeline (command and parameters)"),
+    4104: ("powershell_script_block", "Script block logging: PowerShell compiled a script block (its text)"),
+    4105: ("powershell_script_started", "A PowerShell script block started"),
+    4106: ("powershell_script_finished", "A PowerShell script block finished"),
+}.items()})
+
+
+def describe(record, channel):
+    """Set action/description from EVENTS for this channel + event ID."""
+    channel = str(channel or "").lower()
+    known = EVENTS.get((channel, record.get("event_id")))
+    old = record.get("description")
+    if known:
+        record["action"], record["description"] = known
+    elif channel and record.get("event_id") in logs.EVENTS:
+        # logs.EVENTS has no channel: the same number means something else outside Security/System.
+        record["action"] = record["description"] = None
+    if old and record.get("message") == old:
+        record["message"] = None  # build_record fills it from the new description
 CHUNK_SIZE = 65536
 FILETIME_EPOCH = 116444736000000000
 
@@ -613,6 +674,7 @@ def build_record(root, record_id: int, written: int, chunk_index: int, want_xml:
     obj["KeywordsDisplayNames"] = keyword_names(fields.get("Keywords"))
     obj["Message"] = None
     record = logs.windows_record(obj, xml_text)
+    describe(record, fields.get("Channel"))
     record["source"] = "evtx"
     record["record_id"] = record_id
     record["chunk"] = chunk_index

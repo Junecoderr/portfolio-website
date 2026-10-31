@@ -27,5 +27,6 @@ The sample `apps/data/sample.evtx` is synthetic (written by
 How faithful is it? The notes at the top of `tblib/evtx.py` list what the
 parser handles. The main gap: event message text is not rendered (Windows
 builds it from the provider's message DLL, which isn't in the file), so
-records carry the description from the `logs` EventID table instead. The
+records carry a description looked up by channel and event ID instead (Security,
+System, Sysmon and PowerShell/Operational). The
 parser is tested against synthetic files, not yet a corpus of real ones.
