@@ -99,3 +99,20 @@ def test_friendly_errors(tmp_path):
     cut.write_bytes(pcap_file(small_frames())[:-10])
     # A capture cut off mid-packet keeps what there is of the last one.
     assert run_tb(f'import pcap\nlet ps = pcap.read("{tb_path(cut)}")\nsay(len(ps), ps[5].captured < ps[5].length, ps[0].captured == ps[0].length)') == ["6 true true"]
+
+
+def test_read_caps_fail_and_point_at_each(tmp_path, monkeypatch):
+    # The caps hold whatever open_stream allows: too many packets or too many bytes is an error, not a
+    # silent cut (read and summary), while each() and an explicit limit still work.
+    from tblib import pcap
+    path = tmp_path / "x.pcap"
+    path.write_bytes(pcap_file(small_frames()))
+    p = tb_path(path)
+    monkeypatch.setattr(pcap, "MAX_PACKETS", 3)
+    for call in (f'pcap.read("{p}")', f'pcap.summary("{p}")'):
+        assert "more than 3 packets; use pcap.each()" in str(tb_error(f"import pcap\n{call}"))
+    assert run_tb(f'import pcap\nsay(len(pcap.read("{p}", 3)), pcap.each("{p}", fn(x) {{ }}))') == ["3 6"]
+    monkeypatch.setattr(pcap, "MAX_PACKETS", 1000)
+    monkeypatch.setattr(pcap, "MAX_READ_BYTES", 100)
+    msg = str(tb_error(f'import pcap\npcap.read("{p}")'))
+    assert "too much to load" in msg and "pcap.each()" in msg

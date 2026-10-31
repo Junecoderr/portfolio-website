@@ -1,6 +1,8 @@
 """pe library: Windows PE headers, sections, imports/exports and indicators."""
 
 import os
+import struct
+import time
 
 import pytest
 
@@ -150,3 +152,125 @@ def test_rich_header_resources_and_signature(tmp_path):
         assert name in run_tb(f'import pe\nsay(pe.parse("{p}").indicators.map(fn(x) {{ return x.name }}))')[0]
     assert run_tb(f'import pe\nlet i = pe.parse("{save(tmp_path, build_pe(), "plain.exe")}")\n'
                   'say(i.rich_header, i.resources, i.signature)') == ["nil [] nil"]
+
+
+# -- hostile inputs: each must finish quickly ---------------------------------
+
+def hostile_header(total: int, res_rva: int) -> bytearray:
+    """A PE32 with no sections whose headers cover the whole file (so every RVA is a file offset)
+    and a resource directory at res_rva."""
+    d = bytearray(total)
+    d[0:2] = b"MZ"
+    struct.pack_into("<I", d, 0x3C, 0x40)
+    d[0x40:0x44] = b"PE\0\0"
+    struct.pack_into("<HHIIIHH", d, 0x44, 0x14C, 0, 0, 0, 0, 224, 0x102)
+    struct.pack_into("<H", d, 0x58, 0x10B)
+    struct.pack_into("<IIHHHHHHIIIIHH", d, 0x78, 0x1000, 0x200, 4, 0, 0, 0, 4, 0, 0, 0xFFFFFFF0, 0xFFFFFFF0, 0, 2, 0x140)
+    struct.pack_into("<II", d, 0xB0, 0, 16)  # loader flags, 16 data directories
+    struct.pack_into("<II", d, 0xB8 + 16, res_rva, 0x1000)
+    return d
+
+
+def resource_dir(d, off, count):
+    struct.pack_into("<IIHHHH", d, off, 0, 0, 0, 0, 0, count)
+
+
+@pytest.mark.timeout(60)
+def test_resource_tree_fan_out_is_bounded():
+    # 48 type dirs x 1024 name dirs, each name dir holding 1024 entries: 50M entries before the budget.
+    from tblib import pe
+    base, types = 0x1000, 48
+    name_dirs = base + 16 + 8 * types
+    leaves = name_dirs + types * (16 + 8 * 1024)
+    d = hostile_header(leaves + 8 * types * 1024 + 16 + 8 * 1024, base)
+    resource_dir(d, base, types)
+    k = 0
+    for i in range(types):
+        nd = name_dirs + i * (16 + 8 * 1024)
+        struct.pack_into("<II", d, base + 16 + 8 * i, i, 0x80000000 | (nd - base))
+        resource_dir(d, nd, 1024)
+        for j in range(1024):
+            struct.pack_into("<II", d, nd + 16 + 8 * j, j, 0x80000000 | (leaves - base + 8 * k))
+            k += 1
+    for p in range(leaves, len(d) - 8, 8):  # every language dir claims 1024 entries
+        struct.pack_into("<II", d, p, 0, 0x04000400)
+    start = time.perf_counter()
+    assert pe.PE(bytes(d)).resources() == []
+    assert time.perf_counter() - start < 5
+
+
+@pytest.mark.timeout(60)
+def test_resource_leaves_sharing_one_huge_blob_measure_entropy_once():
+    from tblib import pe
+    base = 0x1000
+    d = hostile_header(4 << 20, base)
+    d[0xA000:] = os.urandom(len(d) - 0xA000)
+    resource_dir(d, base, 4)
+    for i in range(4):
+        l1, l2 = 0x100 + i * 0x20, 0x200 + i * 0x2010
+        struct.pack_into("<II", d, base + 16 + 8 * i, i + 1, 0x80000000 | l1)
+        resource_dir(d, base + l1, 1)
+        struct.pack_into("<II", d, base + l1 + 16, 1, 0x80000000 | l2)
+        resource_dir(d, base + l2, 1024)
+        for j in range(1024):
+            struct.pack_into("<II", d, base + l2 + 16 + 8 * j, j, 0x8400)
+    struct.pack_into("<III", d, base + 0x8400, 0xA000, 0xFFFFFFF0, 0)  # one leaf "4 GB" long
+    start = time.perf_counter()
+    found = pe.PE(bytes(d)).resources()
+    assert time.perf_counter() - start < 5
+    assert len(found) == 4096 and {r["size"] for r in found} == {0xFFFFFFF0}
+    assert {r["entropy"] for r in found} == {pe.PE(bytes(d)).resources()[0]["entropy"]} and found[0]["entropy"] > 7.9
+    assert all(r["entropy"] is None for r in pe.PE(bytes(d)).resources(entropy=False))
+
+
+@pytest.mark.timeout(60)
+def test_rich_header_far_from_the_start_is_ignored():
+    from tblib import pe
+    n = 8 << 20  # a DOS stub of 8 MB with a valid-looking Rich header at its end
+    d = bytearray(n + 0x200)
+    d[0:2] = b"MZ"
+    struct.pack_into("<I", d, 0x3C, n)
+    key = 0x12345678
+    struct.pack_into("<I", d, n - 0x40, 0x536E6144 ^ key)
+    d[n - 8:n - 4] = b"Rich"
+    struct.pack_into("<I", d, n - 4, key)
+    p = pe.PE.__new__(pe.PE)
+    p.data, p.e_lfanew = bytes(d), n
+    start = time.perf_counter()
+    assert p.rich_header() is None
+    assert time.perf_counter() - start < 1
+
+
+def indefinite(element: bytes) -> bytes:
+    """The same DER element re-encoded with BER's indefinite length."""
+    n = element[1]
+    head = 2 + (n & 0x7F if n & 0x80 else 0)
+    return bytes([element[0], 0x80]) + element[head:] + b"\x00\x00"
+
+
+def test_signature_signer_by_key_id_ber_lengths_and_bad_dates(tmp_path):
+    from binfixtures import build_cert, build_pkcs7
+    from tblib import pe
+    ca = build_cert([("CN", "Demo CA")], [("CN", "Demo CA")], 1)
+    signer = build_cert([("CN", "Key Signer")], [("CN", "Demo CA")], 0x99, ski=b"\xab\xcd\xef")
+    by_key = build_pkcs7([ca, signer], b"\xab\xcd\xef")
+    info = pe.pkcs7_info(by_key)
+    assert (info["problem"], info["signer"]) == (None, "CN=Key Signer")
+    assert [c["is_signer"] for c in info["certificates"]] == [False, True]
+    assert "_ski" not in info["certificates"][1]
+    # The same SignedData with indefinite lengths on the outer SEQUENCE and the [0] wrapper (BER).
+    outer = pe.der_items(by_key)[0]
+    oid, wrapper = pe.der_items(by_key, outer[1], outer[2])
+    inner = by_key[wrapper[1]:wrapper[2]]
+    ber = indefinite(bytes([0x30, 0]) + by_key[oid[1] - 2:oid[2]] + indefinite(bytes([0xA0, 0]) + inner))
+    info = pe.pkcs7_info(ber + b"\x00" * 6)  # WIN_CERTIFICATE pads to 8 bytes
+    assert (info["problem"], info["signer"]) == (None, "CN=Key Signer")
+    assert pe.pkcs7_info(b"\x30\x80\x02\x01\x01")["problem"]  # never closed: damaged, not a crash
+    # One unreadable UTCTime loses that field only.
+    odd = build_cert([("CN", "Odd Dates")], [("CN", "Demo CA")], 7, "XX0101000000Z", "270101000000Z")
+    info = pe.pkcs7_info(build_pkcs7([odd], ([("CN", "Demo CA")], 7)))
+    assert info["problem"] is None and info["signer"] == "CN=Odd Dates"
+    assert (info["certificates"][0]["not_before"], info["certificates"][0]["not_after"]) == \
+        (None, "2027-01-01 00:00:00 UTC")
+    path = save(tmp_path, build_pe(signature=by_key))
+    assert "damaged_signature" not in run_tb(f'import pe\nsay(pe.parse("{path}").indicators.map(fn(x) {{ return x.name }}))')[0]

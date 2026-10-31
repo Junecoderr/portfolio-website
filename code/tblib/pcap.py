@@ -17,6 +17,7 @@ from tblib import _magic
 from tblib._api import Module, check_type, fail, fail_os
 
 MAX_PACKETS = 1_000_000
+MAX_READ_BYTES = 512 * 1024 * 1024  # frame bytes pcap.read/parse/summary load into one list
 MAX_BLOCK = 16 * 1024 * 1024  # no real frame or pcapng block comes near this; bigger sizes are damage
 
 LINK_TYPES = {0: "null", 1: "ethernet", 12: "raw", 101: "raw", 113: "linux_sll", 228: "ipv4", 229: "ipv6",
@@ -691,8 +692,20 @@ def iter_packets(line, src, path=None, limit=MAX_PACKETS):
 
 
 def packets_from(line, src, fn, path=None, limit=None):
+    """Packets as a list for read/parse/summary. Past MAX_PACKETS packets or MAX_READ_BYTES of frames
+    (zero-filled packets compress ~1000:1, so a small .gz can hold gigabytes) it fails and points
+    at pcap.each, unless the caller asked for fewer packets."""
     cap = MAX_PACKETS if limit is None else min(limit, MAX_PACKETS)
-    return list(iter_packets(line, src, path, cap))
+    out, total = [], 0
+    for p in iter_packets(line, src, path, None if limit is None else cap):
+        if len(out) >= cap:
+            fail(line, f"That capture has more than {MAX_PACKETS:,} packets; use pcap.each() or a limit.", path=path)
+        total += p["captured"]
+        if total > MAX_READ_BYTES:
+            fail(line, f"That capture holds more than {MAX_READ_BYTES // 2**20} MB of packets, too much to load "
+                       "at once; use pcap.each() to go through it one packet at a time.", path=path)
+        out.append(p)
+    return out
 
 
 def capture_format(data: bytes) -> str:
@@ -1380,6 +1393,7 @@ def load(api):
     @m.fn("read", 1, 2, doc=(
         "read(path, limit?) -> list\n"
         "Every packet in a pcap or pcapng file, as a list of maps. Fails if the file isn't a capture.\n"
+        "Fails too past MAX_PACKETS packets or 512 MB of packet data: use pcap.each() for those.\n"
         "\n"
         "Arguments:\n"
         "- limit: read only the first limit packets.\n"

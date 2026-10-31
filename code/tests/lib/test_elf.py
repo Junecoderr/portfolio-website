@@ -108,3 +108,14 @@ def test_symbol_versions_and_hardening(tmp_path):
                  'say(a.relro, a.pie, a.canary, b.relro, b.nx)\n'
                  f'say(elf.parse("{none}").version_needs, elf.parse("{none}").symbol_versions)')
     assert out == ["partial false false none true", "{} {}"]
+
+
+def test_version_definitions_base_entry_is_not_a_symbol_version(tmp_path):
+    # VER_FLG_BASE (index 1) names the file; symbols with versym 1 are unversioned, not "libx.so"
+    path = save(tmp_path, build_elf(e_type=3, interp=None, imports=("puts", "socket"), exports=("plugin_init",),
+                                    versions={"puts": ("libc.so.6", "GLIBC_2.2.5")},
+                                    defines=("libx.so", "LIBX_1.0")), "libx.so")
+    out = run_tb(f'import elf\nlet i = elf.parse("{path}")\nsay(i.version_definitions)\nsay(i.symbol_versions)\n'
+                 'say(i.version_needs)')
+    assert out == ['["LIBX_1.0"]', '{"puts": "GLIBC_2.2.5", "plugin_init": "LIBX_1.0"}',
+                   '{"libc.so.6": ["GLIBC_2.2.5"]}']

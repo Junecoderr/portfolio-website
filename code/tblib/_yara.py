@@ -45,6 +45,10 @@ def truth(v) -> bool:
 # Strings: regex dialect, wide, base64
 # =============================================================================
 
+RE_SCAN_LIMIT = 4096   # YARA's YR_RE_SCAN_LIMIT: no regex match runs further than this
+RE_MAX_RANGE = 32767   # YARA's RE_MAX_RANGE: the largest n in {n} or {n,m}
+
+
 def yara_regex(pattern: str, wide: bool, name: str) -> str:
     """A YARA regex as a Python one: `$` is end-of-data only, and with wide=True every
     character also matches the 0x00 byte after it (UTF-16LE text)."""
@@ -84,13 +88,22 @@ def yara_regex(pattern: str, wide: bool, name: str) -> str:
         elif ch == "$":
             out.append(r"\Z")
             i += 1
-        elif ch in "()|*+?^":
+        elif ch in "*+":  # unbounded repeats stop at RE_SCAN_LIMIT, as YARA's matcher does
+            out.append("{%d,%d}" % (0 if ch == "*" else 1, RE_SCAN_LIMIT))
+            i += 1
+        elif ch in "()|?^":
             out.append(ch)
             i += 1
         elif ch == "{":
-            m = re.compile(r"\{\d*,?\d*\}").match(pattern, i)
+            m = re.compile(r"\{(\d*)(,?)(\d*)\}").match(pattern, i)
             if m and m.group(0) != "{}" and m.group(0) != "{,}":
-                out.append(m.group(0))
+                lo, comma, hi = m.groups()
+                if any(len(v) > 5 or int(v) > RE_MAX_RANGE for v in (lo, hi) if v):
+                    raise RuleSyntax(f"string {name}: the repeat {m.group(0)} is too large (YARA allows up to "
+                                     f"{{{RE_MAX_RANGE}}})")
+                if comma and not hi:
+                    hi = str(max(int(lo or 0), RE_SCAN_LIMIT))
+                out.append("{%s%s%s}" % (lo, comma, hi))
                 i = m.end()
             else:
                 atom(r"\{")
@@ -103,6 +116,129 @@ def yara_regex(pattern: str, wide: bool, name: str) -> str:
                 atom(re.escape(chr(b)) if b < 0x80 else f"\\x{b:02x}")
             i += 1
     return "".join(out)
+
+
+try:
+    from re import _parser as _sre  # Python 3.11+
+except ImportError:  # pragma: no cover
+    import sre_parse as _sre
+
+_ALL = frozenset(range(256))
+_DIGITS = frozenset(b"0123456789")
+_WORDS = frozenset(b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+_SPACES = frozenset(b" \t\n\r\f\v")
+_CATEGORIES = {"CATEGORY_DIGIT": _DIGITS, "CATEGORY_NOT_DIGIT": _ALL - _DIGITS, "CATEGORY_WORD": _WORDS,
+               "CATEGORY_NOT_WORD": _ALL - _WORDS, "CATEGORY_SPACE": _SPACES, "CATEGORY_NOT_SPACE": _ALL - _SPACES}
+
+
+def _char_set(op: str, av, nocase: bool):
+    """The bytes one single-character regex node can match, or None if it isn't one."""
+    if op == "LITERAL":
+        out = {av}
+    elif op == "NOT_LITERAL":
+        out = set(_ALL - {av})
+    elif op == "ANY":
+        out = set(_ALL)
+    elif op == "IN":
+        out, negate = set(), False
+        for item_op, item in av:
+            item_op = str(item_op)
+            if item_op == "NEGATE":
+                negate = True
+            elif item_op == "LITERAL":
+                out.add(item)
+            elif item_op == "RANGE":
+                out.update(range(item[0], min(item[1], 255) + 1))
+            elif item_op == "CATEGORY":
+                out |= _CATEGORIES.get(str(item), _ALL)
+            else:
+                out = set(_ALL)
+        if negate:
+            out = set(_ALL - out)
+    else:
+        return None
+    if nocase:
+        out |= {c ^ 0x20 for c in out if chr(c).isascii() and chr(c).isalpha()}
+    return out
+
+
+def _atom_chars(nodes, nocase) -> set:
+    """Every byte any single-character node inside nodes can match."""
+    out = set()
+    for op, av in nodes:
+        op = str(op)
+        chars = _char_set(op, av, nocase)
+        if chars is not None:
+            out |= chars
+        else:
+            for sub in _children(op, av):
+                out |= _atom_chars(sub, nocase)
+    return out
+
+
+def _children(op: str, av) -> list:
+    if op in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+        return [av[2]]
+    if op == "SUBPATTERN":
+        return [av[-1]]
+    if op == "BRANCH":
+        return list(av[1])
+    if op in ("ASSERT", "ASSERT_NOT", "ATOMIC_GROUP"):
+        return [av[-1]]
+    return []
+
+
+def _wide_open(nodes, nocase) -> set:
+    """Bytes matched by repeats (at least RE_SCAN_LIMIT times, i.e. once unbounded) inside nodes."""
+    out = set()
+    for op, av in nodes:
+        op = str(op)
+        if op in ("MAX_REPEAT", "MIN_REPEAT") and av[1] >= RE_SCAN_LIMIT:
+            out |= _atom_chars(av[2], nocase)
+        for sub in _children(op, av):
+            out |= _wide_open(sub, nocase)
+    return out
+
+
+def _anchored(nodes, chars, nocase) -> bool:
+    """True if every way through nodes must match a character outside chars: then each repetition of
+    the enclosing group ends at a definite place and the regex can't backtrack exponentially."""
+    for op, av in nodes:
+        op = str(op)
+        own = _char_set(op, av, nocase)
+        if own is not None and not own & chars:
+            return True
+        if op == "SUBPATTERN" and _anchored(av[-1], chars, nocase):
+            return True
+        if op == "BRANCH" and all(_anchored(b, chars, nocase) for b in av[1]):
+            return True
+    return False
+
+
+def check_backtracking(pattern: bytes, flags: int, name: str):
+    """Refuse regexes like (a+)+b, which Python's backtracking matcher (unlike YARA's) can take
+    hours on: a repeated group whose inside repeats without limit, unless each repetition must
+    end on a character the inner repeat can't match, as in (\\w+\\.)+."""
+    try:
+        tree = _sre.parse(pattern, flags)
+    except Exception:  # re.compile reports real syntax errors
+        return
+    nocase = bool(flags & re.IGNORECASE)
+
+    def walk(nodes):
+        for op, av in nodes:
+            op = str(op)
+            if op in ("MAX_REPEAT", "MIN_REPEAT") and av[1] > 1:
+                inner = _wide_open(av[2], nocase)
+                if inner and not _anchored(av[2], inner, nocase):
+                    raise RuleSyntax(
+                        f"string {name}: the regex repeats a group that can itself repeat without limit, "
+                        "like (a+)+ or (\\w+\\s*)*. Python's matcher can take hours on such a pattern, so "
+                        "it is refused: make each repetition end on a character the inner part can't "
+                        "match, like (\\w+\\.)+, or drop the outer repeat.")
+            for sub in _children(op, av):
+                walk(sub)
+    walk(list(tree))
 
 
 STANDARD_B64 = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -124,12 +260,21 @@ def base64_variants(raw: bytes, alphabet: bytes | None = None) -> list:
     return out
 
 
-def find_all(pattern, data: bytes, limit: int) -> list:
+def find_all(pattern, data: bytes, limit: int, memo: dict | None = None) -> list:
     """Every (offset, length) where pattern matches, overlapping ones included (YARA reports a
-    match at each offset: "aa" in "aaaa" is 3 matches)."""
+    match at each offset: "aa" in "aaaa" is 3 matches). memo: per-buffer scratch space that
+    XorSearch and ChainSearch share during one scan (never kept on the compiled patterns).
+    Regexes are compiled with bounded repeats (RE_SCAN_LIMIT), so each search stays short."""
+    if isinstance(pattern, re.Pattern):
+        search = pattern.search
+    else:
+        memo = {} if memo is None else memo
+
+        def search(d, p):
+            return pattern.search(d, p, memo)
     hits, pos = [], 0
     while len(hits) < limit:
-        m = pattern.search(data, pos)
+        m = search(data, pos)
         if not m:
             break
         hits.append((m.start(), m.end() - m.start()))
@@ -157,16 +302,15 @@ class XorSearch:
     def __init__(self, pattern, base: bytes):
         self.pattern = pattern
         self.delta = bytes(a ^ b for a, b in zip(base[1:], base[:-1]))
-        self.cache = None  # (data, diff): one tuple, so threads scanning other data can't mix them up
 
-    def search(self, data: bytes, pos: int = 0):
+    def search(self, data: bytes, pos: int = 0, memo: dict | None = None):
         if not self.delta:
             return self.pattern.search(data, pos)
-        cache = self.cache
-        if cache is None or cache[0] is not data:
+        memo = {} if memo is None else memo
+        diff = memo.get("xor-diff")  # one per buffer, shared by every xor string in the scan
+        if diff is None:
             value = int.from_bytes(data, "big")
-            self.cache = cache = (data, (value ^ (value >> 8)).to_bytes(len(data), "big"))
-        diff = cache[1]
+            diff = memo["xor-diff"] = (value ^ (value >> 8)).to_bytes(len(data), "big")
         while True:
             i = diff.find(self.delta, pos + 1)  # diff[i] = data[i - 1] ^ data[i]
             if i < 0:
@@ -184,26 +328,33 @@ class ChainSearch:
 
     def __init__(self, parts):
         self.parts = [(re.compile(p, re.DOTALL), lo, hi) for p, lo, hi in parts]
-        self.cache = None
 
-    def search(self, data: bytes, pos: int = 0):
-        cache = self.cache
-        if cache is None or cache[0] is not data:
-            found = [find_all(p, data, 1_000_000) for p, _, _ in self.parts]
-            self.cache = cache = (data, found, [[s for s, _ in h] for h in found])
-        _, all_hits, all_starts = cache
-        first = all_hits[0]
-        for k in range(bisect.bisect_left(all_starts[0], pos), len(first)):
-            start, length = first[k]
-            end = start + length
-            for (_, lo, hi), hits, starts in zip(self.parts[1:], all_hits[1:], all_starts[1:]):
-                j = bisect.bisect_left(starts, end + lo)
-                if j == len(starts) or (hi is not None and starts[j] > end + hi):
-                    break
-                end = starts[j] + hits[j][1]
-            else:
-                return _Hit(start, end)
-        return None
+    def complete(self, data: bytes):
+        """[(start, end)] of every first-piece hit that some chain of later pieces completes, found
+        from the last piece back: a hit is viable if any viable hit of the next piece starts within
+        its jump window (so AA@0, BB@101, BB@302, CC@500 matches through the second BB). Each
+        hit is looked at once, with a bisect into the next piece's viable starts."""
+        found = [find_all(p, data, 1_000_000) for p, _, _ in self.parts]
+        starts, ends = [s for s, _ in found[-1]], [s + n for s, n in found[-1]]
+        for k in range(len(self.parts) - 2, -1, -1):
+            _, lo, hi = self.parts[k + 1]
+            new_starts, new_ends = [], []
+            for s, n in found[k]:
+                j = bisect.bisect_left(starts, s + n + lo)
+                if j < len(starts) and (hi is None or starts[j] <= s + n + hi):
+                    new_starts.append(s)
+                    new_ends.append(ends[j])
+            starts, ends = new_starts, new_ends
+        return starts, ends
+
+    def search(self, data: bytes, pos: int = 0, memo: dict | None = None):
+        memo = {} if memo is None else memo
+        key = ("chain", self)  # the memo lives for one buffer's scan, then goes with its results
+        if key not in memo:
+            memo[key] = self.complete(data)
+        starts, ends = memo[key]
+        k = bisect.bisect_left(starts, pos)
+        return _Hit(starts[k], ends[k]) if k < len(starts) else None
 
 
 # =============================================================================
@@ -249,6 +400,14 @@ def _num(v):
     return int(v) if isinstance(v, bool) else v
 
 
+INT64_MIN = -(1 << 63)
+
+
+def int64(v: int) -> int:
+    """Wrap to a signed 64-bit integer, as YARA's int64_t arithmetic does."""
+    return ((v - INT64_MIN) & 0xFFFFFFFFFFFFFFFF) + INT64_MIN
+
+
 def _arith(op):
     def run(a, b):
         a, b = _num(a), _num(b)
@@ -256,16 +415,24 @@ def _arith(op):
             return UNDEF
         if op in ("\\", "%") and b == 0:
             return UNDEF
-        if op == "\\":
-            return int(a / b) if isinstance(a, int) and isinstance(b, int) else a / b
-        if op == "%":
-            return int(math.fmod(a, b)) if isinstance(a, int) and isinstance(b, int) else math.fmod(a, b)
-        if op in ("<<", ">>") and b < 0:
-            return UNDEF
-        if op == "<<":
-            return 0 if b >= 64 else (a << b) & 0xFFFFFFFFFFFFFFFF
-        return {"+": lambda: a + b, "-": lambda: a - b, "*": lambda: a * b, ">>": lambda: a >> b,
-                "&": lambda: a & b, "|": lambda: a | b, "^": lambda: a ^ b}[op]()
+        if isinstance(a, float) or isinstance(b, float):
+            floats = {"\\": lambda: a / b, "%": lambda: math.fmod(a, b), "+": lambda: a + b,
+                      "-": lambda: a - b, "*": lambda: a * b}
+            return floats[op]() if op in floats else UNDEF  # bitwise operators need integers
+        # integers: exact, C-style truncating \ and %, wrapped to int64 (INT64_MIN \ -1 is undefined)
+        if op in ("\\", "%"):
+            if a == INT64_MIN and b == -1:
+                return UNDEF
+            q = abs(a) // abs(b) * (1 if (a < 0) == (b < 0) else -1)
+            return int64(q if op == "\\" else a - b * q)
+        if op in ("<<", ">>"):
+            if b < 0:
+                return UNDEF
+            if b >= 64:
+                return 0
+            return int64(a << b) if op == "<<" else a >> b
+        return int64({"+": lambda: a + b, "-": lambda: a - b, "*": lambda: a * b,
+                      "&": lambda: a & b, "|": lambda: a | b, "^": lambda: a ^ b}[op]())
     return run
 
 
@@ -318,9 +485,13 @@ class Cond:
                 self.fail(f"I don't understand '{text[pos:pos + 10]}' in the condition", pos)
             if m.group("num") is not None:
                 n = m.group("num")
+                if len(n) > 40:  # also keeps int() below Python's 4300-digit limit
+                    self.fail(f"the number {n[:20]}... is too big; YARA numbers are 64-bit", pos)
                 value = float(n) if "." in n else int(n[2:], 8) if n.startswith("0o") else \
                     int(n, 16) if n.startswith("0x") else int(n, 10)
                 value *= {"KB": 1024, "MB": 1024 ** 2, None: 1}[m.group("unit")]
+                if isinstance(value, int) and value > 0x7FFFFFFFFFFFFFFF:
+                    self.fail(f"the number {n} is too big; YARA numbers are 64-bit", pos)
                 self.tokens.append(("num", value, pos))
             elif m.group("text") is not None:
                 try:
@@ -967,7 +1138,7 @@ def build_pe(data: bytes) -> dict:
     try:
         entries = p.import_entries()
         exports = p.exports()["functions"]
-        resources = p.resources()
+        resources = p.resources(entropy=False)  # YARA has no resource entropy; skip the work
         signature = p.signature()
         rich = p.rich_header()
     except (struct.error, IndexError, ValueError):

@@ -266,8 +266,8 @@ class ELF:
                 _ver, flags, ndx, cnt, _hash, aux, nxt = struct.unpack_from(e + "HHHHIII", d, off)
                 if cnt and off + aux + 8 <= len(d):
                     text = cstr(d, strs + struct.unpack_from(e + "I", d, off + aux)[0], 256)
-                    out["names"][ndx & 0x7FFF] = text
-                    if not flags & 1:  # VER_FLG_BASE names the file itself
+                    if not flags & 1:  # VER_FLG_BASE names the file itself; index 1 means "unversioned"
+                        out["names"][ndx & 0x7FFF] = text
                         out["defines"].append(text)
                 if not nxt:
                     break

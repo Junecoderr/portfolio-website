@@ -391,3 +391,33 @@ say(logs.top(rs, "ip"))'''
 ])
 def test_logs_errors(src, message):
     assert message in str(tb_error(f"import logs\n{src}"))
+
+
+@pytest.mark.timeout(60)
+def test_huge_line_is_cut_not_held(tmp_path):
+    import gzip
+    path = tmp_path / "big.log.gz"
+    with gzip.open(path, "wb") as g:  # a 20 MB line between two normal ones (~20 KB packed)
+        g.write(b"Mar 10 09:15:02 web1 app: first\n" + b"x" * (20 << 20) + b"\nMar 10 09:15:03 web1 app: last\n")
+    p = str(path).replace("\\", "/")
+    out = run_tb(f'import logs\nsay(logs.each("{p}", fn(r) {{ return true }}, "syslog"))\n'
+                 f'let r = logs.read("{p}", "syslog")\nsay(len(r), r[1].truncated, len(r[1].raw) <= 4194304, r[2].message)')
+    assert out == ["3", "3 true true last"]
+
+
+def test_json_document_size_cap(tmp_path, monkeypatch):
+    from tblib import logs
+    monkeypatch.setattr(logs, "MAX_JSON_DOCUMENT", 1000)
+    path = tmp_path / "big.json"
+    path.write_text('[{"a": "' + "A" * 2000 + '"}]')
+    msg = str(tb_error(f'import logs\nlogs.read("{str(path).replace(chr(92), "/")}", "json")'))
+    assert "too big to read whole" in msg and "logs.each()" in msg
+
+
+def test_negative_limit_is_rejected_everywhere(tmp_path):
+    path = tmp_path / "a.log"
+    path.write_text("Mar 10 09:15:02 web1 app: hi\n")
+    p = str(path).replace("\\", "/")
+    for call in (f'logs.read("{p}", "auto", {{"limit": -1}})', f'logs.each("{p}", fn(r) {{ }}, "auto", {{"limit": -1}})',
+                 f'logs.stream("{p}", "auto", {{"limit": -1}})', 'logs.parse("x", "auto", {"limit": -1})'):
+        assert "a limit of 0 or more" in str(tb_error(f"import logs\n{call}")), call

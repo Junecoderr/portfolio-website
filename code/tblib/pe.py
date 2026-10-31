@@ -10,6 +10,9 @@ from tblib import _magic
 from tblib._api import Module, check_type, fail
 
 MAX_FILE = 512 * 1024 * 1024
+MAX_RESOURCE_ENTRIES = 16384                  # directory entries one resource walk may visit
+MAX_RESOURCE_ENTROPY_BYTES = 16 * 1024 * 1024  # resource bytes whose entropy one parse measures
+MAX_RICH_OFFSET = 4096                        # MSVC puts the Rich header in the first few hundred bytes
 
 MACHINES = {
     0x14C: ("x86", "Intel 386 (32-bit)"), 0x8664: ("x64", "x86-64 (64-bit)"), 0x1C0: ("arm", "ARM"),
@@ -208,27 +211,31 @@ def der_name(data: bytes, start: int, end: int) -> str:
 
 
 def der_time(tag: int, raw: bytes):
+    """A UTCTime or GeneralizedTime as text, or None if it is damaged (only that field is lost)."""
     text = raw.decode("ascii", "replace").rstrip("Z")
-    if tag == 0x17:  # UTCTime: YYMMDDHHMMSS
-        year = int(text[:2])
-        text = f"{2000 + year if year < 50 else 1900 + year}{text[2:]}"
     try:
+        if tag == 0x17:  # UTCTime: YYMMDDHHMMSS
+            year = int(text[:2])
+            text = f"{2000 + year if year < 50 else 1900 + year}{text[2:]}"
         return dt.datetime.strptime(text[:14], "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S UTC")
     except ValueError:
         return None
 
 
 def x509_info(data: bytes, start: int, end: int) -> dict:
-    """Subject, issuer, serial and validity of the certificate whose content is data[start:end]."""
+    """Subject, issuer, serial and validity of the certificate whose content is data[start:end].
+    A damaged validity date loses only that field."""
     tbs = der_items(data, *der_items(data, start, end)[0][1:])
     if tbs and tbs[0][0] == 0xA0:
         tbs = tbs[1:]
     serial = data[tbs[0][1]:tbs[0][2]]
-    validity = der_items(data, tbs[3][1], tbs[3][2])
+    try:
+        times = [der_time(t, data[s:e]) for t, s, e in der_items(data, tbs[3][1], tbs[3][2])[:2]]
+    except (ValueError, IndexError):
+        times = []
+    times += [None] * (2 - len(times))
     return {"subject": der_name(data, tbs[4][1], tbs[4][2]), "issuer": der_name(data, tbs[2][1], tbs[2][2]),
-            "serial": hex_serial(serial),
-            "not_before": der_time(validity[0][0], data[validity[0][1]:validity[0][2]]),
-            "not_after": der_time(validity[1][0], data[validity[1][1]:validity[1][2]])}
+            "serial": hex_serial(serial), "not_before": times[0], "not_after": times[1]}
 
 
 def hex_serial(raw: bytes) -> str:
@@ -492,7 +499,8 @@ class PE:
     def rich_header(self):
         """The Rich header MSVC's linker hides after the DOS stub: which tools built the file."""
         d = self.data
-        rich = d.find(b"Rich", 0x40, self.e_lfanew)
+        # The checksum loops over every byte before it, so a stub of attacker-chosen size would be slow.
+        rich = d.find(b"Rich", 0x40, min(self.e_lfanew, MAX_RICH_OFFSET))
         if rich < 0 or rich + 8 > len(d):
             return None
         (key,) = struct.unpack_from("<I", d, rich + 4)
@@ -517,8 +525,11 @@ class PE:
         return {"offset": start, "key": f"0x{key:08x}", "checksum_valid": checksum & 0xFFFFFFFF == key,
                 "entries": entries, "hash": hashlib.md5(clear).hexdigest()}
 
-    def resources(self) -> list:
-        """Every resource: [{type, name, language, size, offset, entropy}], walking the 3-level tree."""
+    def resources(self, entropy: bool = True) -> list:
+        """Every resource: [{type, name, language, size, offset, entropy}], walking the 3-level tree.
+        A hostile tree can fan out (1024 x 1024 x 1024 entries) or point thousands of leaves at one huge
+        blob, so the walk visits at most MAX_RESOURCE_ENTRIES entries and entropy is measured once per
+        blob, over at most MAX_RESOURCE_ENTROPY_BYTES in all (later blobs get entropy nil)."""
         rva, size = self.directories.get("resource", (0, 0))
         base = self.rva_to_offset(rva) if rva else None
         out: list = []
@@ -526,6 +537,8 @@ class PE:
             return out
         d = self.data
         seen = set()
+        budget = {"entries": MAX_RESOURCE_ENTRIES, "bytes": MAX_RESOURCE_ENTROPY_BYTES}
+        entropies: dict = {}
 
         def label(raw):
             if raw & 0x80000000:
@@ -533,18 +546,29 @@ class PE:
                 if o + 2 > len(d):
                     return "?"
                 (n,) = struct.unpack_from("<H", d, o)
-                return d[o + 2:o + 2 + 2 * n].decode("utf-16-le", "replace")
+                return d[o + 2:o + 2 + 2 * min(n, 256)].decode("utf-16-le", "replace")
             return raw
 
+        def blob_entropy(off, length):
+            if not entropy:
+                return None
+            if (off, length) not in entropies:
+                if length > budget["bytes"]:
+                    return None
+                budget["bytes"] -= length
+                entropies[(off, length)] = _magic.entropy(d[off:off + length])
+            return entropies[(off, length)]
+
         def walk(off, path):
-            if off in seen or off + 16 > len(d) or len(out) >= 4096 or len(path) > 2:
+            if off in seen or off + 16 > len(d) or len(path) > 2:
                 return
             seen.add(off)
             named, ids = struct.unpack_from("<HH", d, off + 12)
             for i in range(min(named + ids, 1024)):
                 e = off + 16 + 8 * i
-                if e + 8 > len(d):
+                if e + 8 > len(d) or budget["entries"] <= 0:
                     return
+                budget["entries"] -= 1
                 ident, target = struct.unpack_from("<II", d, e)
                 here = path + [label(ident)]
                 if target & 0x80000000:
@@ -552,12 +576,12 @@ class PE:
                 elif base + target + 16 <= len(d) and len(here) == 3:
                     data_rva, data_size, codepage = struct.unpack_from("<III", d, base + target)
                     data_off = self.rva_to_offset(data_rva)
-                    body = d[data_off:data_off + data_size] if data_off is not None else b""
+                    present = max(0, min(data_size, len(d) - data_off)) if data_off is not None else 0
                     kind = here[0]
                     out.append({"type": RESOURCE_TYPES.get(kind, str(kind)) if isinstance(kind, int) else kind,
                                 "name": str(here[1]), "language": here[2] if isinstance(here[2], int) else 0,
                                 "size": data_size, "offset": data_off, "codepage": codepage,
-                                "entropy": _magic.entropy(body)})
+                                "entropy": blob_entropy(data_off, present) if data_off is not None else 0.0})
         walk(base, [])
         return out
 
@@ -747,7 +771,7 @@ def indicators_for(info: dict) -> list:
         add("medium", "rich_header_tampered",
             "The Rich header's checksum doesn't match: it was edited or copied from another file.")
     for r in info.get("resources", []):
-        if r["entropy"] >= 7.2 and r["size"] >= 1024:
+        if (r["entropy"] or 0) >= 7.2 and r["size"] >= 1024:
             add("medium", "high_entropy_resource", f"Resource {r['type']}/{r['name']} has entropy {r['entropy']} "
                 f"({r['size']:,} bytes): an encrypted or packed payload?")
     if "dynamic_base" not in info["dll_characteristics"] and not info["is_dotnet"]:
@@ -810,6 +834,7 @@ def load(api):
         "- \"rich_header\": nil, or {offset, key, checksum_valid, hash, entries}. Each entry\n"
         "  is {product_id, build, count}: a Microsoft tool that built the file.\n"
         "- \"resources\": a list of {type, name, language, size, offset, codepage, entropy}.\n"
+        "  At most 16384 tree entries are read; entropy is nil past the first 16 MB of resource data.\n"
         "- \"signature\": nil if unsigned, else {type, digest_algorithm, signer, certificates,\n"
         "  verified, problem}. Each certificate has subject, issuer, serial, not_before,\n"
         "  not_after and is_signer. Nothing is checked: verified is always false.\n"

@@ -396,10 +396,12 @@ def to_ber(data: bytes) -> bytes:
 
 def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",), imports=("puts", "socket"),
               exports=(), interp="/lib64/ld-linux-x86-64.so.2", wx_segment=False, symtab=True, entry_section=".text",
-              little=True, no_section_headers=False, versions=None, relro=None):
+              little=True, no_section_headers=False, versions=None, relro=None, defines=None):
     """A small, well-formed ELF image with .text/.rodata/.data, .interp, .dynstr/.dynsym/.dynamic
     (so DT_NEEDED and imports are real), .symtab (unless stripped) and .shstrtab.
     versions: {"puts": ("libc.so.6", "GLIBC_2.2.5")} adds .gnu.version/.gnu.version_r.
+    defines: ("libx.so", "LIBX_1.0") adds .gnu.version_d: the file itself (VER_FLG_BASE, index 1),
+    then versions it defines; exports carry the last one.
     relro: "partial" adds a GNU_RELRO segment; "full" also asks for BIND_NOW."""
     e = "<" if little else ">"
     is64 = bits == 64
@@ -445,7 +447,25 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
     if relro == "full":
         dyn_entries += [(30, 0x8), (0x6FFFFFFB, 0x1)]
     version_sections = []
-    if versions:
+    version_def_count = version_need_count = 0
+
+    def elf_hash(text):
+        h = 0
+        for ch in text.encode():
+            h = ((h << 4) + ch) & 0xFFFFFFFF
+            g = h & 0xF0000000
+            if g:
+                h ^= g >> 24
+            h &= ~g & 0xFFFFFFFF
+        return h
+    if versions or defines:
+        versions = versions or {}
+        verdef = bytearray()
+        for di, text in enumerate(defines or ()):  # index 1 is the file itself (VER_FLG_BASE)
+            verdef += struct.pack(e + "HHHHIII", 1, 1 if di == 0 else 0, di + 1, 1, elf_hash(text), 20,
+                                  28 if di + 1 < len(defines) else 0)
+            verdef += struct.pack(e + "II", dyn_name(text), 0)
+        version_def_count = len(defines or ())
         libs: dict = {}
         for name in imports:
             if name in versions:
@@ -455,7 +475,7 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
                     libs[lib].append(ver)
         index = {}
         verneed = bytearray()
-        next_index = 2
+        next_index = max(2, version_def_count + 1)
         lib_items = list(libs.items())
         for li, (lib, vers) in enumerate(lib_items):
             file_off = dyn_name(lib)
@@ -463,20 +483,18 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
             verneed += struct.pack(e + "HHIII", 1, len(vers), file_off, 16, size if li + 1 < len(lib_items) else 0)
             for vi, ver in enumerate(vers):
                 index[(lib, ver)] = next_index
-                h = 0
-                for ch in ver.encode():
-                    h = ((h << 4) + ch) & 0xFFFFFFFF
-                    g = h & 0xF0000000
-                    if g:
-                        h ^= g >> 24
-                    h &= ~g & 0xFFFFFFFF
-                verneed += struct.pack(e + "IHHII", h, 0, next_index, dyn_name(ver), 16 if vi + 1 < len(vers) else 0)
+                verneed += struct.pack(e + "IHHII", elf_hash(ver), 0, next_index, dyn_name(ver),
+                                       16 if vi + 1 < len(vers) else 0)
                 next_index += 1
         versym = struct.pack(e + "H", 0)
         for name in imports:
             versym += struct.pack(e + "H", index[versions[name]] if name in versions else 1)
-        versym += struct.pack(e + "H", 1) * len(exports)
-        version_sections = [(".gnu.version", versym, 0x6FFFFFFF, 0x2), (".gnu.version_r", bytes(verneed), 0x6FFFFFFE, 0x2)]
+        versym += struct.pack(e + "H", version_def_count if version_def_count > 1 else 1) * len(exports)
+        version_sections = [(".gnu.version", versym, 0x6FFFFFFF, 0x2)]
+        if lib_items:
+            version_sections.append((".gnu.version_r", bytes(verneed), 0x6FFFFFFE, 0x2))
+        if verdef:
+            version_sections.append((".gnu.version_d", bytes(verdef), 0x6FFFFFFD, 0x2))
         version_need_count = len(lib_items)
     # placeholders for strtab/symtab addresses filled after layout
     ordered.append((".dynstr", bytes(dynstr), 3, 0x2))
@@ -563,11 +581,11 @@ def build_elf(bits=64, e_type=2, machine=62, sections=None, needed=("libc.so.6",
                 link = 1 + laid.index(by_name[".dynstr"])
             if s["name"] == ".symtab":
                 link = 1 + laid.index(by_name[".strtab"])
-            if s["name"] in (".dynamic", ".gnu.version_r"):
+            if s["name"] in (".dynamic", ".gnu.version_r", ".gnu.version_d"):
                 link = 1 + laid.index(by_name[".dynstr"])
             if s["name"] == ".gnu.version":
                 link = 1 + laid.index(by_name[".dynsym"])
-            info = version_need_count if s["name"] == ".gnu.version_r" else 0
+            info = {".gnu.version_r": version_need_count, ".gnu.version_d": version_def_count}.get(s["name"], 0)
             entsize = sym_size if s["name"] in (".dynsym", ".symtab") else (16 if is64 else 8) if s["name"] == ".dynamic" else 0
             if is64:
                 image += struct.pack(e + "IIQQQQIIQQ", shname[s["name"]], s["type"], s["flags"], s["addr"], s["offset"],
