@@ -1237,3 +1237,180 @@ say(before, got)
 def test_real_scale_and_system_theme(real_tk):
     out = run_tb('import gui\nlet s = gui.scale()\nsay(s > 0)\nsay(gui.system_theme() in ["light", "dark"])')
     assert out == ["true", "true"]
+
+
+# -- native file drop and tray icons (tblib/_gui_native.py) --------------------
+
+
+class _NoTkdnd:
+    """Just enough of a Tk toplevel for enable_drop: tkdnd is not installed."""
+    class tk:
+        @staticmethod
+        def call(*args):
+            raise RuntimeError("can't find package tkdnd")
+
+
+def test_native_hooks_fall_back_quietly(monkeypatch):
+    from tblib import _gui_native as native
+    monkeypatch.setattr(native.sys, "platform", "linux")
+    assert native.enable_drop(_NoTkdnd(), lambda paths: None) is None
+    assert native.make_tray(_NoTkdnd(), "TB", [("Quit", lambda: None)], lambda: None) is None
+
+
+@needs_tk
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
+def test_real_windows_drop_and_tray(real_tk, tmp_path):
+    """Sends the window a real HDROP, as Explorer does, and adds a tray icon."""
+    import ctypes
+    import struct
+    from ctypes import wintypes as wt
+    a = tmp_path / "dropped file.txt"
+    a.write_text("x")
+    w = real_tk.window("Drop test", 300, 200, "light", True)
+    got, result = [], {}
+    w.on_drop(got.append)
+    assert w.drop_kind == "windows"
+    tray = w.tray("TB tray", [("Show", lambda: None), None, ("Quit", w.close)])
+    assert tray.native == "windows"
+
+    def go():
+        hook = w.top._tb_drop_state["hook"]
+        result["hooked"] = hook is not None
+        u, k = ctypes.WinDLL("user32"), ctypes.WinDLL("kernel32")
+        get = getattr(u, "GetWindowLongPtrW", None) or u.GetWindowLongW
+        get.restype, get.argtypes = ctypes.c_ssize_t, [wt.HWND, ctypes.c_int]
+        result["accepts"] = bool(get(hook.hwnd, -20) & 0x10)    # GWL_EXSTYLE has WS_EX_ACCEPTFILES
+        k.GlobalAlloc.restype, k.GlobalAlloc.argtypes = ctypes.c_void_p, [wt.UINT, ctypes.c_size_t]
+        k.GlobalLock.restype, k.GlobalLock.argtypes = ctypes.c_void_p, [ctypes.c_void_p]
+        k.GlobalUnlock.argtypes = [ctypes.c_void_p]
+        names = (str(a) + "\0\0").encode("utf-16-le")
+        h = k.GlobalAlloc(0x0042, 20 + len(names))             # GHND; DragFinish frees it
+        p = k.GlobalLock(h)
+        ctypes.memmove(p, struct.pack("<IiiII", 20, 0, 0, 0, 1), 20)   # DROPFILES, fWide = 1
+        ctypes.memmove(p + 20, names, len(names))
+        k.GlobalUnlock(h)
+        u.PostMessageW.restype = wt.BOOL
+        u.PostMessageW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
+        # Posted, so Tk's own message loop dispatches it, as with a real drop.
+        result["posted"] = bool(u.PostMessageW(hook.hwnd, 0x0233, h, 0))   # WM_DROPFILES
+        tray.minimize()      # NIM_ADD may fail on a desktop without a taskbar; that is not an error
+        result["hidden"] = not w.is_shown()
+        u.PostMessageW(tray.icon.hwnd, 0x8051, 0, 0x0203)       # a double click on the icon restores
+        w.top.after(500, finish)
+
+    def finish():
+        result["restored"] = w.is_shown() and not tray.shown
+        w.close()
+
+    w.top.after(300, go)
+    w.run()
+    assert result == {"hooked": True, "accepts": True, "posted": True, "hidden": True, "restored": True}
+    assert got == [[str(a)]]
+    assert tray.icon.hwnd is None    # close() removed the icon and its message window
+
+
+@needs_tk
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
+def test_real_macos_drop_and_status_item(real_tk, tmp_path):
+    """Calls the drag methods through the Objective-C runtime with a pasteboard
+    holding a file URL, and drives the menu bar item's native menu."""
+    import ctypes
+    from tblib import _gui_native as native
+    a = tmp_path / "dropped file.txt"
+    a.write_text("x")
+    w = real_tk.window("Drop test", 300, 200, "light", True)
+    got, chosen, result = [], [], {}
+    w.on_drop(got.append)
+    assert w.drop_kind == "macos"
+    tray = w.tray("TB tray", [("Show", lambda: chosen.append("show")), None,
+                              ("Quit", lambda: chosen.append("quit"))])
+    assert tray.native == "macos" and not tray.shown
+    m = native._mac()
+    pb = m.send(m.cls("NSPasteboard"), "pasteboardWithUniqueName")
+    m.send(pb, "clearContents")
+    url = m.send(m.cls("NSURL"), "fileURLWithPath:", m.string(str(a)), argtypes=(ctypes.c_void_p,))
+    m.send(pb, "writeObjects:", m.send(m.cls("NSArray"), "arrayWithObject:", url, argtypes=(ctypes.c_void_p,)),
+           restype=ctypes.c_bool, argtypes=(ctypes.c_void_p,))
+    cls = m.cls("TBTestDragInfo")
+    if not cls:   # a stand-in for the NSDraggingInfo AppKit passes
+        cls = m.objc.objc_allocateClassPair(m.cls("NSObject"), b"TBTestDragInfo", 0)
+        imp = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)(lambda s, c: m.test_pb)
+        m.imps.append(imp)
+        m.objc.class_addMethod(cls, m.sel("draggingPasteboard"), ctypes.cast(imp, ctypes.c_void_p), b"@@:")
+        m.objc.objc_registerClassPair(cls)
+    m.test_pb = pb
+    sender = m.send(m.send(cls, "alloc"), "init")
+
+    def go():
+        win = w.top._tb_drop_state["window"]
+        types = m.send(win, "registeredDraggedTypes")
+        result["types"] = m.text(m.send(types, "objectAtIndex:", 0, argtypes=(ctypes.c_ulong,)))
+        result["entered"] = m.send(win, "draggingEntered:", sender, restype=ctypes.c_ulong,
+                                   argtypes=(ctypes.c_void_p,))
+        tray.minimize()
+        item = tray.icon.item
+        result["visible"] = m.send(item, "isVisible", restype=ctypes.c_bool)
+        result["title"] = m.text(m.send(m.send(item, "button"), "title"))
+        menu = m.send(item, "menu")
+        # Like AppKit, call the drop and the menu items from Cocoa's run loop
+        # (inside Tk's event loop), not from inside a Python callback.
+        later = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_double)
+        m.send(win, "performSelector:withObject:afterDelay:", m.sel("performDragOperation:"), sender, 0.0,
+               restype=None, argtypes=later)
+        for index in (2, 0):
+            entry = m.send(menu, "itemAtIndex:", index, argtypes=(ctypes.c_long,))
+            m.send(m.send(entry, "target"), "performSelector:withObject:afterDelay:", m.sel("tbChoose:"), entry,
+                   0.05 * index, restype=None, argtypes=later)
+        w.top.after(500, finish)
+
+    def finish():
+        result["hidden"] = not w.is_shown()
+        tray.restore()
+        w.close()
+
+    w.top.after(300, go)
+    w.run()
+    assert result == {"types": "public.file-url", "entered": 1, "visible": True, "title": "TB tray", "hidden": True}
+    assert got == [[str(a)]] and chosen == ["show", "quit"]
+    assert tray.icon.item is None    # close() removed the menu bar item
+
+
+@needs_tk
+def test_real_tab_order_reaches_every_control(real_tk):
+    """Tab visits the controls in the order they were added, links included,
+    and skips display-only widgets; Enter on a focused link clicks it."""
+    w = real_tk.window("Keyboard", 600, 400, "light", True)
+    clicks = []
+    added = {}
+    for kind, spec in [("label", {"text": "Name"}), ("input", {}), ("button", {"text": "Go"}),
+                       ("progress", {}), ("checkbox", {"text": "On"}),
+                       ("link", {"text": "Help", "on_click": lambda: clicks.append("link")})]:
+        added[str(w.body.add(kind, spec).widget)] = kind
+    order = []
+
+    def go():
+        if not w.body_frame.winfo_viewable():   # Tab skips widgets that are not on screen yet
+            w.top.after(100, go)
+            return
+        widget = w.body_frame
+        for _ in range(len(added) + 2):
+            widget = widget.tk_focusNext()
+            if widget is None or added.get(str(widget)) in order:
+                break
+            order.append(added.get(str(widget), str(widget)))
+        link = next(name for name, kind in added.items() if kind == "link")
+        press(w.top.nametowidget(link), 10)
+
+    def press(link, tries):
+        # Key events go to the focused widget, and the OS may hand focus over late.
+        if clicks or not tries:
+            w.close()
+            return
+        link.focus_force()
+        link.event_generate("<Return>")
+        w.top.after(100, lambda: press(link, tries - 1))
+
+    w.top.after(300, go)
+    w.run()
+    assert order == ["input", "button", "checkbox", "link"]
+    assert clicks == ["link"]

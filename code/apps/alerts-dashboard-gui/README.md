@@ -25,8 +25,9 @@ tb apps/alerts-dashboard-gui/main.tb /var/log/auth.log web.log # your own logs
 tb apps/alerts-dashboard-gui/main.tb --light --analyst Tanisha
 ```
 
-Keyboard: Ctrl+O open, Ctrl+E export (Cmd on a Mac). On a Mac you can also
-drop log files on the app's Dock icon, or paste file paths into the window.
+Keyboard: Ctrl+O open, Ctrl+E export (Cmd on a Mac). You can also drop log
+files on the window (Windows and macOS; Linux needs the tkdnd Tk extension),
+on the app's Dock icon on a Mac, or paste file paths into the window.
 
 Shows: `tabs`, `card`, `badge`, `tree`, `splitter`, bar/pie/line `chart`s
 with `.update()`, `win.run_in_background` with `on_done`/`on_error`,

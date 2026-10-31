@@ -1052,6 +1052,7 @@ def _apply_style(root, p, P, fonts):
     style.configure(f"{P}.TPanedwindow", background=p["bg"])
     style.configure("Sash", sashthickness=6, gripcount=0, sashpad=0)
     style.configure(f"{P}.Link.TLabel", background=p["bg"], foreground=p["accent_text"], font=fonts["link"])
+    style.map(f"{P}.Link.TLabel", background=[("focus", p["select"])])   # visible keyboard focus
 
 
 _TK_SHARED = {"root": None, "fonts": None, "styled": set()}
@@ -1373,8 +1374,11 @@ class _TkWindow:
         self.close_cb = cb
 
     def on_drop(self, cb):
-        """Files dropped on the app (macOS: on its Dock icon) or pasted into the window."""
+        """Files dropped on the window (natively on Windows and macOS, with tkdnd
+        elsewhere), on the app's Dock icon on a Mac, or pasted into the window."""
+        from tblib import _gui_native
         self.drop_cb = cb
+        self.drop_kind = _gui_native.enable_drop(self.top, cb)
         self.top.bind("<<Paste>>", self._paste_paths, add=True)
         if sys.platform == "darwin":
             def open_documents(*paths):
@@ -1398,11 +1402,13 @@ class _TkWindow:
             self.drop_cb(paths)
 
     def tray(self, title, items):
-        """The tray fallback: a tiny always-on-top chip in the corner of the screen.
-        Clicking it opens the menu; double-clicking brings the window back."""
+        """A real tray icon on Windows, a menu bar item on macOS. Elsewhere (or if
+        that fails) a tiny always-on-top chip in the corner of the screen."""
+        from tblib import _gui_native
         if self.tray_widget is not None:
             self.tray_widget.destroy()
-        self.tray_widget = _TkTray(self, title, items)
+        native = _gui_native.make_tray(self.top, title, items, lambda: self.tray_widget.restore())
+        self.tray_widget = _NativeTray(self, native) if native else _TkTray(self, title, items)
         return self.tray_widget
 
     def hide(self):
@@ -1478,8 +1484,43 @@ class _TkWindow:
             self._poller = self.top.after(40, self._poll)
 
 
+class _NativeTray:
+    """The window side of a native tray icon (tblib/_gui_native.py)."""
+
+    def __init__(self, win, icon):
+        self.win, self.icon = win, icon
+        self.native = icon.native
+        if sys.platform == "darwin":
+            try:  # clicking the Dock icon also brings the window back
+                win.top.createcommand("::tk::mac::ReopenApplication", self.restore)
+            except Exception:
+                pass
+
+    @property
+    def shown(self):
+        return self.icon.shown
+
+    def show(self):
+        self.icon.show()
+
+    def hide(self):
+        self.icon.hide()
+
+    def minimize(self):
+        self.win.hide()
+        self.show()
+
+    def restore(self):
+        self.hide()
+        self.win.show()
+
+    def destroy(self):
+        self.icon.destroy()
+
+
 class _TkTray:
     """A small always-on-top window standing in for a system tray icon."""
+    native = None
 
     def __init__(self, win, title, items):
         tk, _ = _tk()
@@ -2781,8 +2822,9 @@ class _TkLink(_TkHandle):
         self.backend = c.win.backend
         self.url = spec.get("url", "")
         self.widget = self.outer = ttk.Label(c.frame, text=spec.get("text", ""), style=f"{P}.Link.TLabel", cursor="hand2",
-                                             anchor="w")
-        self.widget.bind("<Button-1>", lambda e: self.click())
+                                             anchor="w", takefocus=True)
+        for seq in ("<Button-1>", "<Return>", "<space>"):   # Tab reaches it; Enter or Space opens it
+            self.widget.bind(seq, lambda e: self.click())
         self.cb = spec.get("on_click")
 
     def click(self):
@@ -2966,9 +3008,16 @@ Window methods:
 - theme(): the window's theme.
 - on_close(fn): fn can give back false to keep the window open.
 - on_key(fn): fn(key) gets every key, as text like "a" or "Ctrl+S".
-- on_drop(fn): fn(paths) gets files dropped on the app's Dock icon on a Mac, or file paths pasted into the window with Ctrl/Cmd+V. Also called on_paste_paths.
-- tray(menu, options?): a small always-on-top chip standing in for a system tray icon. menu is like {"Show": fn, "Quit": fn}. options can have "title".
-  - .minimize() hides the window and shows the chip.
+- on_drop(fn): fn(paths) gets files dropped on the window. Also called on_paste_paths.
+  - Windows and macOS: drops work out of the box.
+  - Linux: drops work when the tkdnd Tk extension is installed.
+  - Everywhere: file paths pasted with Ctrl/Cmd+V, and (Mac) files dropped on the Dock icon.
+  - Without tkdnd, give people an "Open…" button with gui.open_file() too.
+- tray(menu, options?): an icon with a menu. menu is like {"Show": fn, "Quit": fn}. options can have "title".
+  - Windows: a notification-area icon. Click for the menu; double-click to restore.
+  - macOS: the title in the menu bar, with the menu.
+  - Linux: a small always-on-top chip in the screen corner instead.
+  - .minimize() hides the window and shows the icon.
   - .restore() brings it back.
   - .show() .hide() .visible()
 - hide(), show()
@@ -2976,7 +3025,15 @@ Window methods:
 
 Callbacks:
 - Your functions can take fewer inputs than offered: fn() { } is fine for on_change too.
-- If a function you gave the window hits an error, the window shows it in a friendly message and keeps going."""
+- If a function you gave the window hits an error, the window shows it in a friendly message and keeps going.
+
+Keyboard and screen readers:
+- Tab and Shift+Tab move between widgets in the order you added them.
+- Buttons, inputs, lists, tables, trees, sliders, pickers and links take the keyboard. Enter or Space presses.
+- In a textarea, Tab types a tab; Ctrl+Tab moves on.
+- Labels, badges, progress bars, charts and canvases are skipped. Use key() for canvas apps.
+- Screen readers read window titles, menus and dialogs. Tk does not expose the widgets inside a window to them.
+- So put key facts in the title, status() or an alert() too."""
 
 WINDOW_OPTIONS = {"width": "whole", "height": "whole", "theme": "text", "resizable": "bool", "accent": "text"}
 
