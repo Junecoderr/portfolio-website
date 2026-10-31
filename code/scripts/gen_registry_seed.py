@@ -34,7 +34,8 @@ PACKAGE_SKIP = {".DS_Store", "tb.lock"}
 
 def package_files(folder: Path) -> list[Path]:
     files = []
-    for path in sorted(folder.rglob("*")):
+    # Sort by the text of the path: Windows compares Paths ignoring case, which would reorder the zip.
+    for path in sorted(folder.rglob("*"), key=lambda p: p.relative_to(folder).as_posix()):
         parts = path.relative_to(folder).parts
         if (not path.is_file() or path.name in PACKAGE_SKIP or "__pycache__" in parts
                 or "tb_packages" in parts or any(p.startswith(".") for p in parts)):
