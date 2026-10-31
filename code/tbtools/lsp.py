@@ -13,7 +13,12 @@ Features:
   * signature help - inside `f(...)`, with the active input highlighted
   * go to definition - in the same file and across `import "file.tb"` /
     `from "file.tb" import name`
-  * document symbols (outline), formatting (`tb fmt`), rename within a file
+  * document symbols (outline), formatting (`tb fmt`, with the [fmt] options
+    of the project's tb.toml)
+  * find references and rename - top-level names follow imports across the
+    workspace's files and its tb_packages/ (anything else: within the file)
+  * code actions - "Did you mean ..." fixes, add a missing `import`, and
+    organise imports (source.organizeImports)
 
 Documents are synced in full. Everything is computed from the text the editor
 sends, so unsaved changes count.
@@ -559,6 +564,7 @@ class Server:
         self.shutdown = False
         self.running = True
         self.file_cache: dict[str, tuple[float, Analysis | None]] = {}
+        self.roots: list[str] = []
 
     # -- transport -------------------------------------------------------------------
 
@@ -630,6 +636,14 @@ class Server:
     # -- lifecycle ----------------------------------------------------------------------
 
     def on_initialize(self, params):
+        for folder in params.get("workspaceFolders") or []:
+            path = uri_to_path(folder.get("uri", ""))
+            if path:
+                self.roots.append(path)
+        if not self.roots:
+            path = uri_to_path(params.get("rootUri") or "") or params.get("rootPath")
+            if path:
+                self.roots.append(path)
         try:
             import tb
 
@@ -647,6 +661,8 @@ class Server:
                 "documentSymbolProvider": True,
                 "documentFormattingProvider": True,
                 "renameProvider": {"prepareProvider": True},
+                "referencesProvider": True,
+                "codeActionProvider": {"codeActionKinds": ["quickfix", "source.organizeImports"]},
             },
             "serverInfo": {"name": "tb lsp", "version": version},
         }
@@ -1270,8 +1286,13 @@ class Server:
         text = self.docs.get(uri)
         if text is None:
             return None
+        from tbtools.pkg import PkgError, fmt_options
+
         try:
-            formatted = format_source(text)
+            formatted = format_source(text, fmt_options(uri_to_path(uri)))
+        except PkgError as err:
+            self.notify("window/showMessage", {"type": 1, "message": str(err)})
+            return None
         except (TBError, FormatError):
             return None
         if formatted == text:
@@ -1328,11 +1349,243 @@ class Server:
         new_name = params.get("newName", "")
         if not NAME_RE.fullmatch(new_name) or new_name in KEYWORDS:
             raise ValueError(f"'{new_name}' can't be a TB name.")
+        target = self._target(uri, params["position"])
+        if target is not None:
+            found = self._references(*target)
+            return {"changes": {u: [{"range": r, "newText": new_name} for r in ranges]
+                                for u, ranges in found.items()}}
         analysis, word, spans = self._rename_targets(uri, params)
         if not spans:
             return None
         edits = [{"range": analysis.index.range(a, b), "newText": new_name} for a, b in spans]
         return {"changes": {uri: edits}}
+
+    # -- references and rename across files -------------------------------------------------------
+
+    def workspace_files(self) -> list[str]:
+        """Every .tb file under the workspace folders (tb_packages/ included), plus open files."""
+        from tbtools.fmt import SKIP_DIRS
+
+        skip = SKIP_DIRS - {"tb_packages"}
+        found: list[str] = []
+        for root in self.roots:
+            for folder, dirs, files in os.walk(root):
+                dirs[:] = sorted(d for d in dirs if d not in skip and not d.startswith("."))
+                found.extend(os.path.join(folder, f) for f in sorted(files) if f.endswith(".tb"))
+                if len(found) > 5000:   # shortcut: huge folders are cut off; index them if it matters
+                    break
+        for uri in self.docs:
+            path = uri_to_path(uri)
+            if path:
+                found.append(path)
+        seen, result = set(), []
+        for path in found:
+            key = os.path.normcase(os.path.abspath(path))
+            if key not in seen:
+                seen.add(key)
+                result.append(path)
+        return result
+
+    def _import_file(self, analysis: Analysis, info: dict) -> str | None:
+        """The .tb file an import reads: a file, or a package from tb_packages/."""
+        if info["kind"] in ("file", "file-name"):
+            return self.import_path(analysis, info)
+        if info["target"] in self.knowledge.library_names():
+            return None
+        return self.import_path(analysis, {"target": info["target"] + ".tb", "package": info["target"]})
+
+    def _target(self, uri: str, position: dict) -> tuple[str, str] | None:
+        """(file, name) of the top-level definition the name at position means, when
+        it can be followed across files; None for local names and members."""
+        analysis = self.analysis(uri)
+        text = self.docs.get(uri, "")
+        if analysis is None or analysis.text != text or not analysis.path:
+            return None
+        start, end = self._word_at(text, analysis.index.offset(position))
+        word = text[start:end]
+        tok = analysis.token_at(start)
+        if not word or tok < 0 or analysis.tokens[tok].kind != "IDENT" or analysis.tokens[tok].value != word:
+            return None
+        receiver = self._receiver(text, start)
+        if receiver is not None:
+            info = analysis.imports.get(receiver)
+            if info and info["kind"] in ("file", "library"):
+                path = self._import_file(analysis, info)
+                return (path, word) if path else None
+            return None
+        sym = analysis.visible(word, tok)
+        if sym is not None and sym.kind == "import":
+            info = analysis.imports.get(word, {})
+            if info.get("kind") in ("file-name", "library-name") and info["name"] == word:
+                path = self._import_file(analysis, info)
+                return (path, info["name"]) if path else None
+            return None
+        if sym is not None:
+            return (analysis.path, word) if sym in analysis.top else None
+        for info in analysis.imports.values():   # the original name in `from "x.tb" import word as w`
+            if info["kind"] in ("file-name", "library-name") and info["name"] == word:
+                path = self._import_file(analysis, info)
+                return (path, word) if path else None
+        return None
+
+    def _references(self, path: str, name: str) -> dict[str, list[dict]]:
+        """uri -> ranges of every use of the top-level `name` of `path`, across the workspace."""
+        def key(p):
+            return os.path.normcase(os.path.abspath(p))
+
+        def after_dot(an, k):
+            return k > 0 and an.tokens[k - 1].kind == "OP" and an.tokens[k - 1].value == "."
+
+        target = key(path)
+        result: dict[str, list[dict]] = {}
+        for file in self.workspace_files() + [path]:
+            an = self.file_analysis(file)
+            uri = path_to_uri(file)
+            if an is None or uri in result:
+                continue
+            spans = set()
+            names = [t.kind == "IDENT" and t.value == name for t in an.tokens]
+            if key(file) == target:
+                top = next((s for s in an.top if s.name == name), None)
+                if top is not None:
+                    spans.update(an.tok_offsets(k) for k, hit in enumerate(names)
+                                 if hit and not after_dot(an, k) and an.visible(name, k) is top)
+            for alias, info in an.imports.items():
+                file_of = self._import_file(an, info) if an.path else None
+                if not file_of or key(file_of) != target:
+                    continue
+                imported = an.visible(alias, len(an.tokens) - 1)
+                if info["kind"] in ("file", "library"):   # alias.name
+                    for k, hit in enumerate(names):
+                        if hit and k > 1 and after_dot(an, k) and an.tokens[k - 2].value == alias:
+                            spans.add(an.tok_offsets(k))
+                elif info["name"] == name:                # from "file" import name [as alias]
+                    a, b = getattr(imported.node, "_span", (0, 0)) if imported else (0, 0)
+                    spans.update(an.tok_offsets(k) for k in range(a, b) if names[k] and not after_dot(an, k))
+                    if alias == name:
+                        spans.update(an.tok_offsets(k) for k, hit in enumerate(names)
+                                     if hit and not after_dot(an, k) and an.visible(name, k) is imported)
+            spans.discard(None)
+            if spans:
+                result[uri] = [an.index.range(a, b) for a, b in sorted(spans)]
+        return result
+
+    def on_textDocument_references(self, params):
+        uri = params["textDocument"]["uri"]
+        target = self._target(uri, params["position"])
+        if target is not None:
+            found = self._references(*target)
+            if not (params.get("context") or {}).get("includeDeclaration", True):
+                an = self.file_analysis(target[0])
+                top = next((s for s in an.top if s.name == target[1]), None) if an else None
+                span = an.tok_offsets(top.tok) if top else None
+                if span:
+                    decl = an.index.range(*span)
+                    found = {u: [r for r in rs if not (u == path_to_uri(target[0]) and r == decl)]
+                             for u, rs in found.items()}
+            return [{"uri": u, "range": r} for u, rs in found.items() for r in rs]
+        analysis, _word, spans = self._rename_targets(uri, params)
+        if not spans:
+            return []
+        return [{"uri": uri, "range": analysis.index.range(a, b)} for a, b in spans]
+
+    # -- code actions -------------------------------------------------------------------------------
+
+    def on_textDocument_codeAction(self, params):
+        uri = params["textDocument"]["uri"]
+        text = self.docs.get(uri)
+        if text is None:
+            return []
+        index = TextIndex(text)
+        context = params.get("context") or {}
+        only = context.get("only")
+        actions = []
+
+        def wanted(kind):
+            return not only or any(kind == o or kind.startswith(o + ".") for o in only)
+
+        for diag in context.get("diagnostics", []):
+            message = diag.get("message", "")
+            typo = re.search(r"'([^']+)'[^']*Did you mean '([^']+)'\?", message)
+            missing = re.search(r"Did you forget '(import [A-Za-z_]\w*)'", message)
+            if typo and wanted("quickfix"):
+                wrong, right = typo.groups()
+                rng = self._find_in_range(index, diag["range"], wrong)
+                if rng is not None:
+                    actions.append({"title": f"Change '{wrong}' to '{right}'", "kind": "quickfix",
+                                    "diagnostics": [diag], "isPreferred": True,
+                                    "edit": {"changes": {uri: [{"range": rng, "newText": right}]}}})
+            if missing and wanted("quickfix"):
+                at = {"line": self._import_insert_line(text), "character": 0}
+                actions.append({"title": f"Add '{missing.group(1)}'", "kind": "quickfix",
+                                "diagnostics": [diag], "isPreferred": True,
+                                "edit": {"changes": {uri: [{"range": {"start": at, "end": at},
+                                                            "newText": missing.group(1) + "\n"}]}}})
+        if wanted("source.organizeImports"):
+            edit = self._organize_imports(text, index)
+            if edit is not None:
+                actions.append({"title": "Organise imports", "kind": "source.organizeImports",
+                                "edit": {"changes": {uri: [edit]}}})
+        return actions
+
+    def _find_in_range(self, index: TextIndex, rng: dict, word: str) -> dict | None:
+        """The range of `word` at the diagnostic, or the first whole-word use on its line."""
+        a, b = index.offset(rng["start"]), index.offset(rng["end"])
+        if index.text[a:b] == word:
+            return rng
+        line = rng["start"]["line"]
+        start = index.starts[min(line, len(index.starts) - 1)]
+        end = index.text.find("\n", start)
+        end = len(index.text) if end < 0 else end
+        m = re.search(rf"(?<![\w.]){re.escape(word)}(?!\w)", index.text[start:end])
+        return index.range(start + m.start(), start + m.end()) if m else None
+
+    @staticmethod
+    def _is_import_line(line: str) -> bool:
+        return re.match(r"(import|from)\s", line) is not None
+
+    def _import_insert_line(self, text: str) -> int:
+        """Line (0-based) for a new import: after the imports at the top, else the first line."""
+        last = None
+        for k, line in enumerate(text.split("\n")):
+            stripped = line.strip()
+            if self._is_import_line(stripped):
+                last = k
+            elif stripped and not stripped.startswith("#"):
+                break
+        return 0 if last is None else last + 1
+
+    def _organize_imports(self, text: str, index: TextIndex) -> dict | None:
+        """Sort and de-duplicate the block of imports at the top: libraries, then files.
+        Only a block of one-line import statements (and blank lines) is touched."""
+        lines = text.split("\n")
+        first = last = None
+        for k, line in enumerate(lines):
+            stripped = line.strip()
+            if self._is_import_line(line):
+                first = k if first is None else first
+                last = k
+            elif not stripped or (first is None and stripped.startswith("#")):
+                continue
+            else:
+                break
+        if first is None:
+            return None
+        block = [line.rstrip() for line in lines[first:last + 1] if line.strip()]
+        try:
+            from tbcore.parser import parse
+
+            if len(parse("\n".join(block) + "\n").body) != len(block):
+                return None   # an import that spans lines: leave the block as written
+        except Exception:
+            return None
+        ordered = sorted(dict.fromkeys(block), key=lambda line: ('"' in line.split("#")[0], line.lower()))
+        new = "\n".join(ordered)
+        start = index.starts[first]
+        end = index.starts[last] + len(lines[last])
+        if new == text[start:end]:
+            return None
+        return {"range": index.range(start, end), "newText": new}
 
 
 def main(args: list[str] | None = None) -> int:

@@ -148,3 +148,29 @@ def test_crlf_files_keep_their_line_endings(tmp_path):
     assert subprocess.run(tb + [str(tmp_path)], capture_output=True).returncode == 0
     assert messy.read_bytes() == b"let x = 1\r\nsay(x)\r\n"
     assert tidy.read_bytes() == b"let x = 1\r\nsay(x)\r\n"
+
+
+def test_tb_toml_fmt_options(tmp_path):
+    """[fmt] line_width and indent in the project's tb.toml (a CRLF tb.toml is fine)."""
+    from tbtools.pkg import PkgError, fmt_options
+
+    source = "fn f(a) {\nif a { return [1111111, 2222222, 3333333, 4444444, 5555555] }\n}\n"
+    assert fmt.format_source(source, {"line_width": 40, "indent": 4}) == (
+        "fn f(a) {\n    if a {\n        return [\n            1111111,\n            2222222,\n"
+        "            3333333,\n            4444444,\n            5555555,\n        ]\n    }\n}\n")
+    (tmp_path / "src").mkdir()
+    prog = tmp_path / "src" / "prog.tb"
+    prog.write_text(source, encoding="utf-8")
+    assert fmt_options(str(prog)) == {}
+    (tmp_path / "tb.toml").write_bytes(b'[package]\r\nname = "demo"\r\n\r\n[fmt]\r\nline_width = 40\r\nindent = 4\r\n')
+    assert fmt_options(str(prog)) == {"line_width": 40, "indent": 4}
+    tb = [sys.executable, str(ROOT / "tb.py"), "fmt"]
+    assert subprocess.run(tb + [str(prog)], capture_output=True, cwd=tmp_path).returncode == 0
+    assert prog.read_text(encoding="utf-8").startswith("fn f(a) {\n    if a {\n        return [\n")
+    for bad, words in (("width = 80", "don't know: 'width'"), ("indent = 0", "from 1 to 8"),
+                       ("line_width = true", "from 40 to 200")):
+        (tmp_path / "tb.toml").write_text(f"[fmt]\n{bad}\n", encoding="utf-8")
+        with pytest.raises(PkgError, match=words):
+            fmt_options(str(tmp_path))
+    result = subprocess.run(tb + [str(prog)], capture_output=True, text=True, cwd=tmp_path)
+    assert result.returncode == 1 and "Oops!" in result.stderr and "Traceback" not in result.stderr

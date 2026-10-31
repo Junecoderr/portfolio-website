@@ -7,7 +7,10 @@
 //   - TB: Run File (a terminal running `tb file.tb`);
 //   - TB: Format (`tb fmt file.tb`);
 //   - TB: Check (`tb check file.tb`, shown in the Problems panel);
-//   - TB: Run Tests (`tb test` in a terminal).
+//   - TB: Run Tests (`tb test` in a terminal);
+//   - the debugger: the "tb" debug type runs `tb debug --dap` (Debug Adapter
+//     Protocol over stdin/stdout), so breakpoints, stepping, variables and
+//     the debug console work; F5 with no launch.json debugs the open file.
 // If `tb lsp` isn't available (older TB, or tb not on PATH) the extension
 // says so once and keeps working without it.
 
@@ -363,10 +366,46 @@ async function restartServer(context) {
   }
 }
 
+// --- debugger ----------------------------------------------------------------------------
+
+/** Starts `tb debug --dap` for every "tb" debug session. */
+const debugAdapterFactory = {
+  createDebugAdapterDescriptor(session) {
+    const cwd = session.configuration.cwd || (session.workspaceFolder && session.workspaceFolder.uri.fsPath);
+    return new vscode.DebugAdapterExecutable(tbPath(), ["debug", "--dap"], cwd ? { cwd } : {});
+  },
+};
+
+/** F5 without a launch.json: debug the open .tb file. */
+const debugConfigurationProvider = {
+  resolveDebugConfiguration(folder, config) {
+    if (!config.type && !config.request && !config.name) {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document.languageId !== LANGUAGE) {
+        return config;
+      }
+      return {
+        type: LANGUAGE,
+        request: "launch",
+        name: "Debug TB file",
+        program: editor.document.uri.fsPath,
+        cwd: path.dirname(editor.document.uri.fsPath),
+      };
+    }
+    if (!config.program) {
+      vscode.window.showInformationMessage('Set "program" in launch.json to the .tb file to debug.');
+      return undefined;
+    }
+    return config;
+  },
+};
+
 // --- activation ------------------------------------------------------------------------
 
 function activate(context) {
   context.subscriptions.push(
+    vscode.debug.registerDebugAdapterDescriptorFactory(LANGUAGE, debugAdapterFactory),
+    vscode.debug.registerDebugConfigurationProvider(LANGUAGE, debugConfigurationProvider),
     vscode.commands.registerCommand("tb.runFile", runFile),
     vscode.commands.registerCommand("tb.format", formatFile),
     vscode.commands.registerCommand("tb.check", () => checkFile()),
@@ -399,4 +438,4 @@ function deactivate() {
   return stopServer();
 }
 
-module.exports = { activate, deactivate, parseCheckOutput };
+module.exports = { activate, deactivate, parseCheckOutput, debugAdapterFactory, debugConfigurationProvider };

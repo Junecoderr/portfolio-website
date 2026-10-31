@@ -50,6 +50,7 @@ class Debugger:
         self.mode = "continue"     # continue | step | next | out
         self.depth = 0             # our own count of active calls
         self.target_depth = 0
+        self.step_file = None      # where 'next' started: an import's code at the same depth is stepped over
         self.interp = None
         self.sources: dict[str, list[str]] = {}
         self.current: tuple[str | None, int] | None = None
@@ -146,13 +147,18 @@ class Debugger:
         elif self.mode == "step":
             stop = True
         elif self.mode == "next":
-            stop = self.depth <= self.target_depth
+            stop = self.depth < self.target_depth or (
+                self.depth == self.target_depth and (file or self.path) == self.step_file)
         elif self.mode == "out":
             stop = self.depth < self.target_depth
         if not stop:
             return
         self.current = (file, line)
         self.env = env
+        self.stopped_at(file, line)
+
+    def stopped_at(self, file, line) -> None:
+        """The program is paused before `line`: talk to the user until they resume it."""
         self.show_line(file, line)
         self.command_loop(running=True)
 
@@ -200,6 +206,7 @@ class Debugger:
                     return "run"
                 self.mode = "next"
                 self.target_depth = self.depth
+                self.step_file = self.current[0] or self.path
                 return "next"
             elif word in ("o", "out", "finish"):
                 if not running:
@@ -383,7 +390,7 @@ class Debugger:
         except OSError as err:
             self.say(f"Oops! I couldn't open '{self.path}': {err.strerror or err}.")
             return 1
-        self.interp = tb.Interpreter()
+        self.interp = self.make_interpreter()
         self.interp.trace = self.hook
         self.depth = 0
         self.current = None
@@ -411,6 +418,11 @@ class Debugger:
             self.interp.trace = None
         return code
 
+    def make_interpreter(self):
+        import tb
+
+        return tb.Interpreter()
+
     def start(self) -> int:
         self.say(f"Debugging {self.shown(self.path)}. Type 'help' for the commands, 'run' to start.")
         code = 0
@@ -428,8 +440,13 @@ class Debugger:
 
 def main(args: list[str] | None = None) -> int:
     args = list(args or [])
+    if args[:1] == ["--dap"]:
+        from tbtools.dap import main as dap_main
+
+        return dap_main(args[1:])
     if not args or args[0] in ("-h", "--help"):
         print("tb debug FILE.tb [args...] - step through a program line by line")
+        print("tb debug --dap            - the Debug Adapter Protocol server editors start (stdin/stdout)")
         print("Commands" + HELP.rstrip())
         return 0 if args else 2
     path = args[0]

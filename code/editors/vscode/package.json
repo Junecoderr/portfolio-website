@@ -1,7 +1,7 @@
 {
   "name": "tb-vscode",
   "displayName": "TB Language",
-  "description": "Syntax highlighting, snippets, formatting, checks and the language server for TB (.tb files).",
+  "description": "Syntax highlighting, snippets, formatting, checks, the language server and a debugger for TB (.tb files).",
   "version": "3.1.0",
   "publisher": "tb-lang",
   "license": "MIT",
@@ -14,7 +14,8 @@
     "Programming Languages",
     "Snippets",
     "Formatters",
-    "Linters"
+    "Linters",
+    "Debuggers"
   ],
   "keywords": [
     "tb",
@@ -26,12 +27,13 @@
   "activationEvents": [
     "onLanguage:tb",
     "workspaceContains:**/*.tb",
-    "workspaceContains:tb.toml"
+    "workspaceContains:tb.toml",
+    "onDebugResolve:tb"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "The language server, Run File, Format and Check run the `tb` program from tb.path. In an untrusted workspace a workspace-level tb.path is ignored."
+      "description": "The language server, the debugger, Run File, Format and Check run the `tb` program from tb.path. In an untrusted workspace a workspace-level tb.path is ignored."
     }
   },
   "contributes": {
@@ -70,6 +72,78 @@
       {
         "language": "tb",
         "path": "./snippets/tb.json"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "tb"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "tb",
+        "label": "TB",
+        "languages": [
+          "tb"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The .tb file to debug.",
+                "default": "${file}"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Command-line arguments for the program (os.args).",
+                "default": []
+              },
+              "cwd": {
+                "type": "string",
+                "description": "The folder the program runs in.",
+                "default": "${fileDirname}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Pause on the program's first line.",
+                "default": false
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "tb",
+            "request": "launch",
+            "name": "Debug TB file",
+            "program": "${file}",
+            "cwd": "${fileDirname}",
+            "args": [],
+            "stopOnEntry": false
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "TB: Debug a file",
+            "description": "Debug a .tb file with tb debug --dap.",
+            "body": {
+              "type": "tb",
+              "request": "launch",
+              "name": "Debug TB file",
+              "program": "^\"\\${file}\"",
+              "cwd": "^\"\\${fileDirname}\"",
+              "args": [],
+              "stopOnEntry": false
+            }
+          }
+        ]
       }
     ],
     "commands": [

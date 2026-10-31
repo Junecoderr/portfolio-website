@@ -150,7 +150,7 @@ Usage:
   tb test --coverage     ... and show how many lines of each file the tests ran
   tb fmt [FILES]         tidy up the layout of TB files (--check to only report)
   tb check [FILES]       look for mistakes without running the program
-  tb debug FILE.tb       step through a program line by line
+  tb debug FILE.tb       step through a program line by line (--dap: for editors)
   tb init / add / remove / packages / update   manage packages (tb_packages/)
   tb build APP.tb        bundle an app with the TB runtime into a folder
   tb lsp                 start the language server (used by editors)

@@ -224,6 +224,70 @@ def test_commands_exist_in_client(package):
     assert "warnServerOnce" in source  # degrades gracefully, one message
 
 
+def test_debugger_contribution(package):
+    contributes = package["contributes"]
+    assert {"language": "tb"} in contributes["breakpoints"]   # breakpoints can be set in .tb files
+    debugger = next(d for d in contributes["debuggers"] if d["type"] == "tb")
+    assert debugger["languages"] == ["tb"]
+    launch = debugger["configurationAttributes"]["launch"]
+    assert launch["required"] == ["program"]
+    assert {"program", "args", "cwd", "stopOnEntry"} <= set(launch["properties"])
+    first = debugger["initialConfigurations"][0]
+    assert first["type"] == "tb" and first["request"] == "launch" and first["program"] == "${file}"
+    assert debugger["configurationSnippets"][0]["body"]["type"] == "tb"
+    assert "onDebugResolve:tb" in package["activationEvents"]
+    source = (EXT / "client" / "extension.js").read_text(encoding="utf-8")
+    assert "registerDebugAdapterDescriptorFactory" in source and '["debug", "--dap"]' in source
+
+
+FAKE_VSCODE = r"""
+const Module = require("module");
+const made = [];
+const vscode = {
+  DebugAdapterExecutable: function (command, args, options) { Object.assign(this, { command, args, options }); },
+  workspace: {
+    getConfiguration: () => ({ get: (key, fallback) => (key === "path" ? "/opt/tb/tb" : fallback) }),
+    isTrusted: true,
+  },
+  window: { activeTextEditor: { document: { languageId: "tb", uri: { fsPath: "/work/app/main.tb" } } },
+            showInformationMessage: (m) => made.push(m) },
+};
+const load = Module._load;
+Module._load = function (request, ...rest) {
+  if (request === "vscode") return vscode;
+  if (request === "vscode-languageclient/node") return {};
+  return load.call(this, request, ...rest);
+};
+const ext = require(process.argv[2]);
+const adapter = ext.debugAdapterFactory.createDebugAdapterDescriptor(
+  { configuration: { cwd: "/work/app" }, workspaceFolder: undefined });
+const blank = ext.debugConfigurationProvider.resolveDebugConfiguration(undefined, {});
+const missing = ext.debugConfigurationProvider.resolveDebugConfiguration(
+  undefined, { type: "tb", request: "launch", name: "x" });
+console.log(JSON.stringify({ adapter, blank, missing: missing === undefined, made }));
+"""
+
+
+def test_debug_adapter_factory_runs_tb_debug_dap(tmp_path):
+    """The DebugAdapterDescriptorFactory, run under Node with a stand-in `vscode` module."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node isn't installed")
+    script = tmp_path / "fake.js"
+    script.write_text(FAKE_VSCODE, encoding="utf-8")
+    result = subprocess.run([node, str(script), str(EXT / "client" / "extension.js")],
+                            capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    found = json.loads(result.stdout)
+    assert found["adapter"] == {"command": "/opt/tb/tb", "args": ["debug", "--dap"],
+                                "options": {"cwd": "/work/app"}}
+    assert found["blank"]["type"] == "tb" and found["blank"]["program"] == "/work/app/main.tb"
+    assert found["missing"] is True and "program" in found["made"][0]
+
+
 def test_settings_have_defaults(package):
     props = package["contributes"]["configuration"]["properties"]
     assert props["tb.path"]["default"] == "tb"

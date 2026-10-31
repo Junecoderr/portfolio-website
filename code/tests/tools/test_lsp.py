@@ -286,3 +286,106 @@ def test_library_docs_hover_as_markdown_lists():
     assert "```tb\nlet r = detect.rule({" in md
     own = "Adds one.\n\n* first\n* second"
     assert doc_markdown(own) == own
+
+
+def _open(client, path, text):
+    uri = path_to_uri(str(path))
+    client.notify("textDocument/didOpen", {"textDocument": {"uri": uri, "languageId": "tb", "version": 1,
+                                                            "text": text}})
+    client.diagnostics_for(uri)
+    return uri
+
+
+def _lines(changes_or_refs):
+    if isinstance(changes_or_refs, dict):
+        return {u: sorted(e["range"]["start"]["line"] for e in edits) for u, edits in changes_or_refs.items()}
+    found: dict = {}
+    for loc in changes_or_refs:
+        found.setdefault(loc["uri"], []).append(loc["range"]["start"]["line"])
+    return {u: sorted(v) for u, v in found.items()}
+
+
+OTHER = 'from "helpers.tb" import greet\nfn greet_all() {\n  let shout = 1\n  return greet("all")\n}\n'
+PKG = '## Paints text.\nfn paint(t) {\n  return t\n}\nsay(paint("own"))\n'
+USES_PKG = 'import tb_colors\nfrom "tb-colors" import paint as p\nsay(tb_colors.paint("a"), p("b"))\n'
+
+
+def test_references_and_rename_across_files_and_packages(session):
+    client, _init, uri, tmp = session
+    (tmp / "other.tb").write_text(OTHER, encoding="utf-8")
+    (tmp / "tb_packages" / "tb-colors").mkdir(parents=True)
+    (tmp / "tb_packages" / "tb-colors" / "lib.tb").write_text(PKG, encoding="utf-8")
+    (tmp / "app.tb").write_text(USES_PKG, encoding="utf-8")
+    helpers, other, app = (path_to_uri(str(tmp / n)) for n in ("helpers.tb", "other.tb", "app.tb"))
+    lib = path_to_uri(str(tmp / "tb_packages" / "tb-colors" / "lib.tb"))
+    where = pos(MAIN, "greet(\"Tanisha\")", 1)
+    # from the use in main.tb (helpers.greet): the definition and the uses in other files
+    refs = client.request("textDocument/references", {"textDocument": {"uri": uri}, "position": where,
+                                                      "context": {"includeDeclaration": True}})
+    assert _lines(refs) == {helpers: [1], uri: [16], other: [0, 3]}
+    refs = client.request("textDocument/references", {"textDocument": {"uri": uri}, "position": where,
+                                                      "context": {"includeDeclaration": False}})
+    assert helpers not in _lines(refs)
+    # rename from a `from ... import` use: the definition, the import and the use; the local
+    # `let shout` in other.tb is a different name and stays
+    rename = client.request("textDocument/rename", {"textDocument": {"uri": uri},
+                                                    "position": pos(MAIN, "shout(\"hi\")", 1), "newName": "yell"})
+    assert _lines(rename["changes"]) == {helpers: [5], uri: [2, 16]}
+    # a package in tb_packages/: `import tb_colors` and `from "tb-colors" import paint as p`
+    assert _open(client, tmp / "app.tb", USES_PKG) == app
+    rename = client.request("textDocument/rename", {"textDocument": {"uri": app},
+                                                    "position": pos(USES_PKG, "paint(\"a\")", 1),
+                                                    "newName": "colour"})
+    assert _lines(rename["changes"]) == {lib: [1, 4], app: [1, 2]}
+    assert {e["range"]["start"]["character"] for e in rename["changes"][app]} == {24, 14}
+    # renaming the alias `p` only renames the alias, in this file
+    rename = client.request("textDocument/rename", {"textDocument": {"uri": app},
+                                                    "position": pos(USES_PKG, "p(\"b\")"), "newName": "q"})
+    assert _lines(rename["changes"]) == {app: [1, 2]}
+    # a local name still renames within its file only
+    rename = client.request("textDocument/rename", {"textDocument": {"uri": uri},
+                                                    "position": pos(MAIN, "items = "), "newName": "things"})
+    assert list(rename["changes"]) == [uri]
+
+
+def test_code_actions_fix_typos_add_imports_and_organise(session):
+    client, _init, uri, _tmp = session
+    text = ('import "helpers.tb" as helpers\nimport text\n\nimport fs\nimport fs\n'
+            'let total = 1\nsay(totl)\nsay(json.parse("1"))\n')
+    client.diagnostics_for(uri)   # the ones for the opened file
+    client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 2},
+                                             "contentChanges": [{"text": text}]})
+    diags = client.diagnostics_for(uri)
+    everything = {"start": {"line": 0, "character": 0}, "end": {"line": 8, "character": 0}}
+    actions = client.request("textDocument/codeAction", {"textDocument": {"uri": uri}, "range": everything,
+                                                         "context": {"diagnostics": diags}})
+    by_title = {a["title"]: a for a in actions}
+    fix = by_title["Change 'totl' to 'total'"]["edit"]["changes"][uri][0]
+    assert fix["newText"] == "total" and fix["range"]["start"] == {"line": 6, "character": 4}
+    add = by_title["Add 'import json'"]["edit"]["changes"][uri][0]
+    assert add["newText"] == "import json\n" and add["range"]["start"] == {"line": 5, "character": 0}
+    organise = by_title["Organise imports"]
+    assert organise["kind"] == "source.organizeImports"
+    edit = organise["edit"]["changes"][uri][0]
+    assert edit["newText"] == 'import fs\nimport text\nimport "helpers.tb" as helpers'
+    assert edit["range"] == {"start": {"line": 0, "character": 0}, "end": {"line": 4, "character": 9}}
+    only = client.request("textDocument/codeAction", {"textDocument": {"uri": uri}, "range": everything,
+                                                      "context": {"diagnostics": diags,
+                                                                  "only": ["source.organizeImports"]}})
+    assert [a["title"] for a in only] == ["Organise imports"]
+
+
+def test_formatting_uses_tb_toml_fmt_options(session):
+    client, _init, uri, tmp = session
+    (tmp / "tb.toml").write_text('[package]\nname = "demo"\nversion = "0.1.0"\n\n[fmt]\nindent = 4\n',
+                                 encoding="utf-8")
+    messy = "fn f(a,b){return a+b}\n"
+    client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 2},
+                                             "contentChanges": [{"text": messy}]})
+    edits = client.request("textDocument/formatting", {"textDocument": {"uri": uri},
+                                                       "options": {"tabSize": 2, "insertSpaces": True}})
+    assert edits[0]["newText"] == "fn f(a, b) {\n    return a + b\n}\n"
+    (tmp / "tb.toml").write_text('[fmt]\nindent = "wide"\n', encoding="utf-8")
+    assert client.request("textDocument/formatting", {"textDocument": {"uri": uri}, "options": {}}) is None
+    note = next(n for n in client.notifications if n.get("method") == "window/showMessage")
+    assert "indent" in note["params"]["message"]

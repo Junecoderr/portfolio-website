@@ -20,7 +20,15 @@ run / format / check commands and the TB language server.
 - **Language server** (`tb lsp`, TB 3.0 and newer): errors as you type,
   completion for keywords, built-ins, libraries and your own names, hover
   documentation, signature help, go to definition, document symbols,
-  formatting and rename.
+  formatting (following `[fmt]` in `tb.toml`), find references and rename
+  across files and packages, quick fixes for "Did you mean ..." and missing
+  imports, and Organize Imports.
+- **Debugger** (`tb debug --dap`, TB 3.2 and newer): set breakpoints in the margin and press
+  F5. Step over, into and out of functions, see variables and the call
+  stack, watch expressions and evaluate them in the Debug Console. With no
+  `launch.json` F5 debugs the open file; Run > Add Configuration offers
+  **TB: Debug a file** (`"type": "tb"`, `program`, `args`, `cwd`,
+  `stopOnEntry`).
 
 ## Setup
 

@@ -373,7 +373,7 @@ def _fits(next_cmd, rest, width) -> bool:
     return False
 
 
-def render(doc, width: int = WIDTH) -> str:
+def render(doc, width: int = WIDTH, indent: int = INDENT) -> str:
     out: list[str] = []
     col = 0
     at_start = True
@@ -401,7 +401,7 @@ def render(doc, width: int = WIDTH) -> str:
             for x in reversed(d):
                 stack.append((ind, mode, x))
         elif isinstance(d, Indent):
-            stack.append((ind + INDENT, mode, d.doc))
+            stack.append((ind + indent, mode, d.doc))
         elif isinstance(d, Group):
             if d.broken:
                 stack.append((ind, BREAK, d.doc))
@@ -516,6 +516,7 @@ class Printer:
         self.tokens = tokens
         self.raw_by_id = raw_by_id
         self.col_by_id = col_by_id
+        self.width, self.indent = WIDTH, INDENT
         self.claimed: set = set()
         # lines that sit inside multi-line text (never re-indented)
         self.string_lines: set[int] = set()
@@ -1426,7 +1427,7 @@ class Printer:
         if tail:
             items.extend(self.comment_items(tail))
         doc = self.sequence(items)
-        text = render(doc)
+        text = render(doc, self.width, self.indent)
         return text + "\n" if text else ""
 
 
@@ -1451,14 +1452,18 @@ def _parse_for_format(source: str):
     return program, parser.tokens, raw_by_id, col_by_id
 
 
-def format_source(source: str) -> str:
+def format_source(source: str, options: dict | None = None) -> str:
     """The canonical layout of a TB program. Raises TBError when the program
-    doesn't parse, FormatError if the result could not be made safely."""
+    doesn't parse, FormatError if the result could not be made safely.
+    options: {"line_width": int, "indent": int}, as read from tb.toml [fmt]
+    by tbtools.pkg.fmt_options."""
     source = source.replace("\r\n", "\n")
     if source.startswith("﻿"):
         source = source[1:]
     program, tokens, raw_by_id, col_by_id = _parse_for_format(source)
     printer = Printer(source, tokens, raw_by_id, col_by_id)
+    printer.width = (options or {}).get("line_width", WIDTH)
+    printer.indent = (options or {}).get("indent", INDENT)
     try:
         text = printer.program(program)
     except _NeedVerbatim:
@@ -1541,7 +1546,8 @@ tb fmt - tidy the layout of TB programs
   tb fmt --check [...]        only list the files that would change (exit 1 if any)
   tb fmt -                    read a program on stdin, write it tidied to stdout
 
-With no paths, formats every .tb file under the current folder."""
+With no paths, formats every .tb file under the current folder. A [fmt] table
+in the project's tb.toml sets the style: line_width = 100, indent = 2."""
 
 
 def main(args: list[str] | None = None) -> int:
@@ -1555,10 +1561,15 @@ def main(args: list[str] | None = None) -> int:
     if unknown:
         print(f"Oops! tb fmt doesn't know the option '{unknown[0]}'. See: tb fmt --help", file=sys.stderr)
         return 2
+    from tbtools.pkg import PkgError, fmt_options
+
     if args == ["-"]:
         source = sys.stdin.read()
         try:
-            text = format_source(source)
+            text = format_source(source, fmt_options(os.getcwd()))
+        except PkgError as err:
+            print(err, file=sys.stderr)
+            return 1
         except TBError as err:
             print(err, file=sys.stderr)
             return 1
@@ -1574,7 +1585,19 @@ def main(args: list[str] | None = None) -> int:
         print("No .tb files found.")
         return 0
     changed, failed = [], 0
+    options_by_dir: dict[str, dict | PkgError] = {}
     for path in files:
+        folder = os.path.dirname(os.path.abspath(path))
+        if folder not in options_by_dir:
+            try:
+                options_by_dir[folder] = fmt_options(folder)
+            except PkgError as err:
+                options_by_dir[folder] = err
+        options = options_by_dir[folder]
+        if isinstance(options, PkgError):
+            print(f"{path}: {options}", file=sys.stderr)
+            failed += 1
+            continue
         try:
             with open(path, encoding="utf-8", newline="") as f:
                 source = f.read()
@@ -1588,7 +1611,7 @@ def main(args: list[str] | None = None) -> int:
         if crlf:
             source = source.replace("\r\n", "\n")
         try:
-            text = format_source(source)
+            text = format_source(source, options)
         except TBError as err:
             print(f"{path}: {err}", file=sys.stderr)
             failed += 1
