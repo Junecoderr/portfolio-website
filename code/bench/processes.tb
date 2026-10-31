@@ -1,5 +1,7 @@
-# CPU-bound work on 1 process vs 4 (parallel.processes, TB 3.2).
-# Run from code/:  uv run --python /opt/homebrew/bin/python3.12 python tb.py bench/processes.tb [n] [jobs]
+# CPU-bound work: one plain loop vs parallel.processes with 1, 2, 4 and 8 workers.
+# Run from code/:  uv run --python /opt/homebrew/bin/python3.12 python tb.py bench/processes.tb [n] [jobs] [runs]
+# Each worker count runs `runs` times; the pool stays warm between calls, so the
+# first call (which starts the workers) is shown on its own.
 import os
 import parallel
 import time
@@ -11,16 +13,30 @@ fn fib(n) {
 
 let n = if len(os.args) > 0 then num(os.args[0]) else 24
 let jobs = if len(os.args) > 1 then num(os.args[1]) else 8
+let runs = if len(os.args) > 2 then num(os.args[2]) else 1
 let items = [n] * jobs
 
+fn median(xs) {
+  let s = sorted(xs)
+  return s[len(s) // 2]
+}
+
+say(f"{jobs} x fib({n}) on {parallel.cpu_count()} cores, {runs} run(s) each")
 let start = time.timestamp()
-let one = parallel.processes(fib, items, 1)
-let t1 = time.timestamp() - start
-start = time.timestamp()
-let four = parallel.processes(fib, items, 4)
-let t4 = time.timestamp() - start
-assert one == four
-say(f"{jobs} x fib({n}) on {parallel.cpu_count()} cores")
-say(f"1 worker:  {t1:.2f} s")
-say(f"4 workers: {t4:.2f} s")
-say(f"speed-up:  {t1 / t4:.2f}x")
+let want = items.map(fib)
+let plain = time.timestamp() - start
+say(f"no workers: {plain:.2f} s")
+let one = nil
+for workers in [1, 2, 4, 8] {
+  let times = []
+  for r in range(runs) {
+    start = time.timestamp()
+    let got = parallel.processes(fib, items, workers)
+    times.push(time.timestamp() - start)
+    assert got == want
+  }
+  let best = min(times)
+  if workers == 1 { one = best }
+  say(f"{workers} worker(s): first {times[0]:.2f} s, best {best:.2f} s, median {median(times):.2f} s, "
+      + f"speed-up {plain / best:.2f}x (vs 1 worker {one / best:.2f}x)")
+}
