@@ -1309,6 +1309,100 @@ def test_real_windows_drop_and_tray(real_tk, tmp_path):
     assert tray.icon.hwnd is None    # close() removed the icon and its message window
 
 
+def test_windows_drop_hook_is_once_per_window(monkeypatch):
+    """Without Windows: a fake user32 shows on_drop twice keeps one hook, swaps the callback, and that
+    unhooking only restores the old procedure while ours is still the window's."""
+    import ctypes
+    from tblib import _gui_native as native
+
+    class FakeWin:
+        WNDPROC = ctypes.CFUNCTYPE(ctypes.c_ssize_t, ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p)
+
+        def __init__(self):
+            self.procs = {7: 1234}
+
+        def set_long(self, hwnd, index, value):
+            old, self.procs[hwnd] = self.procs[hwnd], value.value if hasattr(value, "value") else value
+            return old
+
+        def get_long(self, hwnd, index):
+            return self.procs[hwnd]
+
+        def accept(self, hwnd, on):
+            pass
+
+    fake = FakeWin()
+    monkeypatch.setattr(native, "_win", lambda: fake)
+    monkeypatch.setattr(native, "_frame_hwnd", lambda top: 7)
+    monkeypatch.setattr(native, "_KEPT_HOOKS", [])
+
+    class Top:
+        def __init__(self):
+            self.binds = []
+
+        def bind(self, seq, fn, add=None):
+            self.binds.append((seq, fn))
+
+        def winfo_ismapped(self):
+            return True
+
+    top = Top()
+    got = []
+    assert native._win_drop(top, lambda p: got.append(("one", p)))
+    hook = top._tb_drop_state["hook"]
+    assert native._win_drop(top, lambda p: got.append(("two", p)))
+    assert top._tb_drop_state["hook"] is hook and len(top.binds) == 2       # no second hook, no new binds
+    top._tb_drop_state["deliver"](["a"])
+    assert got == [("two", ["a"])]
+    remove = [fn for seq, fn in top.binds if seq == "<Destroy>"][0]
+    remove()
+    assert fake.procs[7] == 1234 and native._KEPT_HOOKS == []              # ours was on top: restored
+    # Something subclassed the window after us: leave the chain alone and keep our thunk alive.
+    hook2 = native._WinHook(7)
+    fake.procs[7] = 999
+    hook2.unhook()
+    assert fake.procs[7] == 999 and native._KEPT_HOOKS == [hook2] and hook2.handlers == {}
+
+
+@needs_tk
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
+def test_real_windows_on_drop_twice_then_destroy(real_tk, tmp_path):
+    """A second on_drop swaps the callback on the one hook (two stacked hooks used to crash on destroy:
+    the second restored the first's freed thunk). Destroying the window unhooks cleanly."""
+    import ctypes
+    from tblib import _gui_native as native
+    a = tmp_path / "x.txt"
+    a.write_text("x")
+    w = real_tk.window("Drop twice", 300, 200, "light", True)
+    first, second, result = [], [], {}
+    w.on_drop(first.append)
+    w.on_drop(second.append)
+
+    def go():
+        state = w.top._tb_drop_state
+        hook = state["hook"]
+        win = native._win()
+        ours = ctypes.cast(hook.proc, ctypes.c_void_p).value
+        result["ours"] = win.get_long(hook.hwnd, native.GWLP_WNDPROC) == ours
+        result["old_is_not_ours"] = hook.old != ours
+        state["deliver"]([str(a)])
+        w.top.after(200, finish)
+
+    def finish():
+        w.close()
+
+    w.top.after(300, go)
+    w.run()
+    assert result == {"ours": True, "old_is_not_ours": True}
+    assert first == [] and second == [[str(a)]]
+    assert w.top._tb_drop_state["hook"] is None
+    # Another window still works after the first was destroyed (the process didn't crash).
+    w2 = real_tk.window("After", 200, 100, "light", True)
+    w2.on_drop(lambda paths: None)
+    w2.top.after(200, w2.close)
+    w2.run()
+
+
 @needs_tk
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
 def test_real_macos_drop_and_status_item(real_tk, tmp_path):

@@ -3,10 +3,11 @@
 //
 //   TB.load()  -> Promise that resolves once Pyodide and tb.py are ready
 //   TB.run(source, { onOutput(line), onAsk(prompt, recent) -> string | Promise })
-//              -> Promise<{ ok, error, stopped }>
+//              -> Promise<{ ok, error, stopped }> with .id, this run's handle
 //              Output arrives while the program runs. recent = lines printed
-//              since the last question.
-//   TB.stop()  stops the running program at once
+//              since the last question. Runs wait their turn in a queue.
+//   TB.stop(id) stops that run at once, or takes it out of the queue if it
+//              hasn't started; TB.stop() stops whichever run is running
 //   TB.askInline(outputEl, prompt, recent) -> an onAsk that types the answer
 //              into the output box, or (when the browser can't) a prompt box
 //
@@ -33,8 +34,10 @@
   var job = null;   // the running program: { id, opts, source, resolve, recent }
   var nextId = 1;
   var queue = Promise.resolve();
+  var waiting = {};  // id -> settle, for runs queued behind another
 
   function fail(text) { return { ok: false, error: text, stopped: false }; }
+  function stoppedResult() { return { ok: false, error: "You stopped the program.", stopped: true }; }
 
   function startWorker() {
     if (loading) return loading;
@@ -94,6 +97,8 @@
       if (job !== current || !flags) return;
       var bytes = new TextEncoder().encode(text == null ? "" : String(text));
       var n = Math.min(bytes.length, answerBytes.length);
+      // Cut a long answer between characters, not inside one (UTF-8 continuation bytes are 10xxxxxx).
+      while (n < bytes.length && n > 0 && (bytes[n] & 0xC0) === 0x80) n--;
       answerBytes.set(bytes.subarray(0, n));
       Atomics.store(flags, 2, n);
       Atomics.store(flags, 1, 1);
@@ -107,7 +112,7 @@
     job = null;
     clearTimeout(j.stopTimer);
     if (m.needsInput) return j.resolve(runOnPage(j));
-    if (m.stopped) return j.resolve({ ok: false, error: "You stopped the program.", stopped: true });
+    if (m.stopped) return j.resolve(stoppedResult());
     j.resolve(m.error == null ? { ok: true, error: null, stopped: false } : fail(String(m.error)));
   }
 
@@ -117,10 +122,15 @@
 
   function run(source, opts) {
     opts = opts || {};
-    var p = queue.then(function () {
+    var id = nextId++, settle;
+    var p = new Promise(function (resolve) { settle = resolve; });
+    waiting[id] = settle;
+    queue = queue.then(function () {
+      if (!waiting[id]) return;  // stopped before its turn
+      delete waiting[id];
       return new Promise(function (resolve) {
         // The job exists while TB is still loading, so Stop works then too.
-        var j = job = { id: nextId++, opts: opts, source: String(source), resolve: resolve, recent: [], sent: false };
+        var j = job = { id: id, opts: opts, source: String(source), resolve: resolve, recent: [], sent: false };
         startWorker().then(function () {
           if (job !== j) return;
           j.sent = true;
@@ -129,14 +139,19 @@
         }, function (e) {
           if (job === j) finish({ error: "TB could not start in this browser: " + (e && e.message ? e.message : e) });
         });
-      });
-    });
-    queue = p.catch(function () {});
+      }).then(settle);
+    }).catch(function () {});
+    p.id = id;
     return p;
   }
 
-  function stop() {
-    if (!job) return;
+  function stop(id) {
+    if (id != null && waiting[id]) {  // queued, not started: just drop it
+      var settleIt = waiting[id];
+      delete waiting[id];
+      return settleIt(stoppedResult());
+    }
+    if (!job || (id != null && job.id !== id)) return;  // that run already ended
     var j = job;
     if (!j.sent) return finish({ stopped: true });  // still loading: never start it
     if (flags) {

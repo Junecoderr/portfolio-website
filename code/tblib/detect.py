@@ -1155,6 +1155,9 @@ def sigma_rule(data, source, placeholders=None):
     return rule
 
 
+CORRELATION_FIELD = re.compile(r"^[A-Za-z_@][A-Za-z0-9_.@-]*$")
+
+
 def correlation_rule(data, rules_by_name, source):
     where = f"The Sigma correlation rule {source}"
     title = _tb.to_text(data.get("title") or data.get("name") or "Untitled correlation")
@@ -1205,6 +1208,18 @@ def correlation_rule(data, rules_by_name, source):
                 raise RuleError(f"{where}: a value_count correlation needs condition: {{field: name, gte: N}}")
             condition["field"] = field
     aliases = corr.get("aliases") if isinstance(corr.get("aliases"), dict) else {}
+    # These names are written into Splunk / KQL / ES|QL queries, so only plain field names may pass.
+    names = [("group-by", g) for g in group_by] + ([("condition: field", condition["field"])]
+                                                     if condition and "field" in condition else [])
+    for key, per_rule in aliases.items():
+        names.append(("aliases", key))
+        if not isinstance(per_rule, dict):
+            raise RuleError(f"{where}: aliases: {_tb.to_text(key)} should map each rule's name to its field")
+        names += [("aliases", v) for v in per_rule.values()]
+    for what, name in names:
+        if not isinstance(name, str) or not CORRELATION_FIELD.match(name):
+            raise RuleError(f"{where}: {what}: {_tb.to_text(name, True)} isn't a field name "
+                            "(use letters, digits and _ . - @)")
     level = data.get("level") or max((s["level"] for s in subs), key=lambda lv: LEVEL_RANK[lv])
     if str(level).lower() not in LEVEL_RANK:
         raise RuleError(f"{where}: level should be one of {', '.join(LEVELS)}, not {_tb.to_text(level, True)}")
@@ -1408,6 +1423,10 @@ class Backend:
     def field(self, name):
         return self.fields.get(name, name)
 
+    def column_ref(self, name):
+        """The field as a column reference in this backend's query (KQL quotes unusual names)."""
+        return self.field(name)
+
     # -- building --------------------------------------------------------------------
 
     def build(self, compiled: CompiledRule) -> str:
@@ -1450,7 +1469,7 @@ class Backend:
                     return _tb.to_text(alias.get(sub.rule.get("sigma_name") or "", alias.get(sub.name, field)))
                 return field
             b = type(self)(sub.rule, self.options)
-            cols = {f: b.field(real(f)) for f in fields}
+            cols = {f: b.column_ref(real(f)) for f in fields}
             parts.append({"tag": sub.name, "backend": b, "body": b.body(sub), "cols": cols})
         ops = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "eq": "==", "neq": "!="}
         spec = {"kind": kind, "group": group, "within": corr.get("timespan"), "field": cond.get("field"),
@@ -1630,6 +1649,15 @@ class Splunk(Backend):
     def esc(self, text):
         return text.replace("\\", "\\\\").replace('"', '\\"')
 
+    def quoted(self, field):
+        """A field name for stats, by and the left of eval: "c-ip" (a bare c-ip reads as c minus ip)."""
+        return field if PLAIN_WORD.match(field) else f'"{self.esc(field)}"'
+
+    @staticmethod
+    def ref(field):
+        """A field read inside an eval / where expression: 'id.orig_h' (a bare . concatenates)."""
+        return field if PLAIN_WORD.match(field) else "'" + field.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
     def one(self, vt, test, top):
         field = self.field(vt.field)
         kind = test[0]
@@ -1662,7 +1690,7 @@ class Splunk(Backend):
         if kind == "fieldref":
             if not top:
                 raise RuleError("the splunk backend can only use |fieldref at the top of the condition")
-            self.post.append(f"| where {field}={self.field(test[1])}")
+            self.post.append(f"| where {self.ref(field)}={self.ref(self.field(test[1]))}")
             return ""
         self.unsupported(kind)
 
@@ -1711,13 +1739,14 @@ class Splunk(Backend):
         searches = []
         for p in parts:
             text = p["backend"].finish(p["body"])
-            text += "".join(f" | eval {f}={p['cols'][f]}" for f in fields if out[f] == f and p["cols"][f] != f)
+            text += "".join(f" | eval {self.quoted(f)}={self.ref(p['cols'][f])}"
+                            for f in fields if out[f] == f and p["cols"][f] != f)
             if tagged:
                 text += f' | eval sigma_rule="{self.esc(p["tag"])}"'
             searches.append(text)
         # multisearch runs the searches side by side, each with its own source type and | regex stages.
         query = searches[0] if len(searches) == 1 else "| multisearch " + " ".join(f"[search {q}]" for q in searches)
-        groups = [out[f] for f in spec["group"]]
+        groups = [self.quoted(out[f]) for f in spec["group"]]
         if spec["within"]:
             # shortcut: fixed time buckets, not a sliding window; an episode across a bucket edge can be missed.
             query += f" | bin _time span={int(spec['within'])}s"
@@ -1728,10 +1757,11 @@ class Splunk(Backend):
                     [f'NOT rules="{self.esc(t)}"' for t in spec["excluded"]]
             return f"{query} | stats values(sigma_rule) as rules{by} | search {' '.join(tests)}"
         expr, name = {"event_count": ("count", "event_count"), "temporal": ("dc(sigma_rule)", "rule_count"),
-                      "value_count": (f"dc({out.get(spec.get('field'))})", "value_count")}[spec["kind"]]
+                      "value_count": (f"dc({self.quoted(out.get(spec.get('field')) or '')})", "value_count")}[spec["kind"]]
         return f"{query} | stats {expr} as {name}{by} | where {name} {spec['op']} {_tb.to_text(spec['value'])}"
 
 
+PLAIN_WORD = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 LUCENE_SPECIAL = set('+-=&|><!(){}[]^"~:\\/')
 
 
@@ -1800,7 +1830,7 @@ class Elastic(Backend):
 
 ESQL_NAME = re.compile(r"^[A-Za-z_@][\w.@]*$")
 LUCENE_TERM = re.compile(r"^([\w.@]+):(\S+)$")
-NEAR_ANCHOR = "near_anchor"
+NEAR_ANCHOR = "near anchor"  # a space: no selection can have this name
 
 
 def esql_string(text):
@@ -1810,6 +1840,55 @@ def esql_string(text):
 def esql_pattern(text):
     """A LIKE / RLIKE pattern as a triple-quoted string, where backslashes are kept as written."""
     return f'"""{text}"""' if '"""' not in text and not text.endswith('"') else esql_string(text)
+
+
+LUCENE_OPERATORS = set('@&<>~#"')  # Lucene regex operators that are plain characters in a Sigma |re
+
+
+def esql_regex(pattern):
+    """A Sigma |re (searched inside the value) as a Lucene RLIKE pattern (which must match the whole value):
+    the core in a group, so a | can't escape the .* around it. Returns None for syntax Lucene lacks."""
+    out, depth, in_class, top_or, i = [], 0, False, False, 0
+    while i < len(pattern):
+        c = pattern[i]
+        if c == "\\":
+            nxt = pattern[i + 1:i + 2]
+            if not nxt or nxt.isalnum():  # \d \w \s \b \1 \n ... mean nothing (or a letter) to Lucene
+                return None
+            out.append(c + nxt)
+            i += 2
+            continue
+        if in_class:
+            if c == "]" and not (out[-1] == "[" or out[-1] == "[^"):
+                in_class = False
+            elif c in LUCENE_OPERATORS or c == "[":
+                c = "\\" + c
+        elif c == "[":
+            in_class = True
+            if pattern[i + 1:i + 2] == "^":
+                c, i = "[^", i + 1
+        elif c == "(":
+            if pattern[i + 1:i + 2] == "?":  # (?:...), lookarounds, inline flags, named groups
+                return None
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        elif c == "|" and depth == 0:
+            top_or = True
+        elif c in "*+?}" and pattern[i + 1:i + 2] == "+":  # possessive quantifier
+            return None
+        elif c in LUCENE_OPERATORS:
+            c = "\\" + c
+        elif c in "^$" and not ((c == "^" and i == 0) or (c == "$" and i == len(pattern) - 1)):
+            return None
+        out.append(c)
+        i += 1
+    start = not top_or and out[:1] == ["^"]
+    end = not top_or and out[-1:] == ["$"] and len(out) > (1 if start else 0)
+    if top_or and (out[:1] == ["^"] or out[-1:] == ["$"]):
+        return None  # ^a|b: the anchor covers one branch only
+    core = "".join(out[1 if start else 0:len(out) - 1 if end else len(out)])
+    return f"{'' if start else '.*'}({core}){'' if end else '.*'}"
 
 
 def esql_span(seconds):
@@ -1872,9 +1951,11 @@ class Esql(Backend):
         if kind == "re":
             if test[1].flags & re.IGNORECASE or test[1].pattern.startswith("(?i)"):
                 self.unsupported("a case-insensitive |re (ES|QL's RLIKE has no (?i)); use the kql backend")
-            pattern = test[1].pattern  # RLIKE matches the whole value; Sigma's |re searches inside it
-            pattern = pattern[1:] if pattern.startswith("^") else ".*" + pattern
-            pattern = pattern[:-1] if pattern.endswith("$") and not pattern.endswith("\\$") else pattern + ".*"
+            pattern = esql_regex(test[1].pattern)
+            if pattern is None:
+                self.unsupported(f"the |re {test[1].pattern!r}: ES|QL's RLIKE has no \\d, \\w, \\s, \\b, (?...), "
+                                 "possessive quantifiers or anchors inside the pattern; spell them out "
+                                 "([0-9], [A-Za-z0-9_]) or use the kql backend")
             return f"{field} RLIKE {esql_pattern(pattern)}"
         if kind == "fieldref":
             other = self.column(test[1])
@@ -1934,6 +2015,7 @@ class Esql(Backend):
         lines = [self.head()]
         if all(conds):
             lines.append(f"| WHERE {self.join_or(conds)}")
+        conds = [c or "true" for c in conds]  # a part with no condition matches every event (no empty CASE(()))
         flags, seen = [], set()
         if spec["kind"] in ("temporal", "near"):
             for p in parts:
@@ -1978,7 +2060,7 @@ class Kql(Backend):
         return text.replace("\\", "\\\\").replace('"', '\\"')
 
     def one(self, vt, test, top):
-        field = self.field(vt.field)
+        field = self.column_ref(vt.field)
         kind = test[0]
         if kind in ("text", "glob"):
             cased = vt.cased or (kind == "text" and test[2])
@@ -2010,7 +2092,7 @@ class Kql(Backend):
         if kind == "re":
             return f'{field} matches regex "{self.esc(test[1].pattern)}"'
         if kind == "fieldref":
-            other = self.field(test[1])
+            other = self.column_ref(test[1])
             op = {"contains": "contains", "startswith": "startswith", "endswith": "endswith"}.get(vt.mode, "=~")
             if vt.cased:
                 op = {"=~": "==", "contains": "contains_cs", "startswith": "startswith_cs", "endswith": "endswith_cs"}[op]
@@ -2031,6 +2113,15 @@ class Kql(Backend):
             self.parsed.append(column)
         return column
 
+    @staticmethod
+    def ident(name):
+        """A column name: ['c-ip'] or ['id.orig_h'] unless it's a plain word (a bare - subtracts, . looks inside)."""
+        return name if PLAIN_WORD.match(name) else "['" + name.replace("\\", "\\\\").replace("'", "\\'") + "']"
+
+    def column_ref(self, name):
+        column = self.field(name)
+        return column if column != name else self.ident(name)  # a mapped column (AdditionalEventData.MFAUsed) is KQL
+
     def finish(self, body):
         lines = [self.table or "Event"]
         where = self.entry.get("kql_where") if self.entry and not self.options.get("table") else None
@@ -2039,12 +2130,12 @@ class Kql(Backend):
         tail = []
         agg = self.rule.get("aggregation")
         if agg:
-            field = self.field(agg["field"]) if agg["field"] else None
+            field = self.column_ref(agg["field"]) if agg["field"] else None
             if agg["fn"] == "count":
                 expr, name = (f"dcount({field})", "distinct_count") if field else ("count()", "count_")
             else:
                 expr, name = f"{agg['fn']}({field})", f"{agg['fn']}_"
-            by = [self.field(b) for b in (agg["by"] or [])]
+            by = [self.column_ref(b) for b in (agg["by"] or [])]
             within = self.rule.get("within")
             if within:
                 by.append(f"bin(TimeGenerated, {int(within)}s)")
@@ -2062,12 +2153,15 @@ class Kql(Backend):
         texts = []
         for p in parts:
             lines = [p["backend"].finish(p["body"])]
-            lines += [f"| extend {f} = {p['cols'][f]}" for f in fields if out[f] == f and p["cols"][f] != f]
+            lines += [f"| extend {self.ident(f)} = {p['cols'][f]}"
+                      for f in fields if out[f] == f and p["cols"][f] != self.ident(f)]
             if tagged:
                 lines.append(f'| extend sigma_rule = "{self.esc(p["tag"])}"')
             texts.append("\n".join(lines))
         query = texts[0] if len(texts) == 1 else "union\n" + ",\n".join(f"({t})" for t in texts)
-        by = [out[f] for f in spec["group"]]
+        # out[f] is a part's own column reference, or the Sigma name f when the parts were renamed to it.
+        col = {f: self.ident(f) if out[f] == f else out[f] for f in fields}
+        by = [col[f] for f in spec["group"]]
         if spec["within"]:
             # shortcut: fixed time bins, not a sliding window; an episode across a bin edge can be missed.
             by.append(f"bin(TimeGenerated, {int(spec['within'])}s)")
@@ -2077,7 +2171,7 @@ class Kql(Backend):
                     [f'not(set_has_element(rules, "{self.esc(t)}"))' for t in spec["excluded"]]
             return f"{query}\n| summarize rules = make_set(sigma_rule){by_text}\n| where {' and '.join(tests)}"
         expr, name = {"event_count": ("count()", "event_count"), "temporal": ("dcount(sigma_rule)", "rule_count"),
-                      "value_count": (f"dcount({out.get(spec.get('field'))})", "value_count")}[spec["kind"]]
+                      "value_count": (f"dcount({col.get(spec.get('field'))})", "value_count")}[spec["kind"]]
         return (f"{query}\n| summarize {name} = {expr}{by_text}\n"
                 f"| where {name} {spec['op']} {_tb.to_text(spec['value'])}")
 

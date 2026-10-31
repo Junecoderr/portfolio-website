@@ -446,7 +446,18 @@ def test_playground_runs_in_a_worker():
     assert 'id="pg-stop"' in page and 'id="pg-run"' in page
     for name in ("playground.js", "runner.js"):
         text = (js / name).read_text(encoding="utf-8")
-        assert "TB.askInline(" in text and ".stop()" in text, name
+        # Stop stops this page's own run (its id), never another queued or running one.
+        assert "TB.askInline(" in text and "TB.stop(runId)" in text and "runId = p.id" in text, name
+
+
+def test_browser_client_stop_is_per_run():
+    """tests/browser/tb-pyodide.test.mjs: tb-pyodide.js with a fake Worker (Stop per run, ask() cut on a character)."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed")
+    proc = subprocess.run([node, "--test", "--test-timeout=20000", str(ROOT / "tests" / "browser" / "tb-pyodide.test.mjs")], cwd=ROOT,
+                          capture_output=True, text=True, timeout=60)
+    assert proc.returncode == 0, proc.stdout[-4000:] + proc.stderr[-2000:]
 
 
 def test_serve_site_sends_vercel_headers():

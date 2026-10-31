@@ -400,7 +400,7 @@ def taxii_get(line, url, headers, timeout, fn):
     hdrs.update(headers)
     req = urllib.request.Request(url, headers=hdrs, method="GET")
     try:
-        resp = open_url(req, timeout)
+        resp = open_url(req, timeout, same_site=True)  # the headers hold the TAXII credentials
         status = resp.status if getattr(resp, "status", None) else resp.getcode()
     except urllib.error.HTTPError as err:
         resp, status = err, err.code

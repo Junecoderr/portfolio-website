@@ -20,6 +20,10 @@ ANSWERS = {
     "/otx/file/44d88612fea8a8f36de82e1278abb02f/general": (200, {"pulse_info": {"count": 2, "pulses": [
         {"name": "EICAR", "tags": ["test"]}, {"name": "AV test", "tags": ["test", "eicar"]}]}}),
     "/otx/url/http%3A%2F%2Fbad.example%2Fx/general": (404, {"detail": "not found"}),
+    # damaged counts: fall back to the pulses that came back
+    "/otx/IPv4/203.0.113.77/general": (200, {"pulse_info": {"count": "lots", "pulses": [{"name": "a"}, {"name": "b"}]}}),
+    "/otx/IPv4/203.0.113.78/general": (200, {"pulse_info": {"count": [1], "pulses": [{"name": "a"}]}}),
+    "/otx/IPv4/203.0.113.79/general": (200, {"pulse_info": {"count": "6", "pulses": []}}),
     "/gn/203.0.113.42": (200, {"ip": "203.0.113.42", "noise": True, "riot": False, "classification": "malicious",
                                "name": "unknown", "link": "https://viz.greynoise.io/ip/203.0.113.42",
                                "last_seen": "2026-10-30", "message": "Success"}),
@@ -90,6 +94,13 @@ def test_otx_kinds_and_verdicts(server, monkeypatch):
                    "unknown suspicious", "unknown"]
     assert [s["path"] for s in server.seen][:2] == ["/otx/IPv4/203.0.113.42/general", "/otx/domain/example.com/general"]
     assert all(s["headers"]["x-otx-api-key"] == OTX_KEY for s in server.seen)
+
+
+def test_otx_damaged_count(server, monkeypatch):
+    monkeypatch.setenv("OTX_API_KEY", OTX_KEY)
+    out = run('for ip in ["203.0.113.77", "203.0.113.78", "203.0.113.79"] {\n'
+              '  let r = intel.otx(ip)\n  say(r.verdict, r.details.pulses)\n}')
+    assert out == ["suspicious 2", "suspicious 1", "malicious 6"]
 
 
 def test_greynoise_classifications(server):

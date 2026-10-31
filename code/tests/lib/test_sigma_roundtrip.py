@@ -238,3 +238,92 @@ def test_through_tb_and_friendly_refusals():
     text = "title: t\ndetection:\n  sel:\n    cmd|re|i: 'evil'\n  condition: sel\n"
     err = str(tb_error(f"import detect\ndetect.sigma_to_query(detect.sigma({json.dumps(text)}), \"esql\")"))
     assert "case-insensitive |re" in err
+
+
+# -- correlation field names: checked when read, quoted per backend when written ------------------
+
+CORR_PARTS = ("title: Zeek conn\nname: zconn\nlogsource:\n  product: zeek\n  service: conn\ndetection:\n  sel:\n"
+              "    id.resp_p: 4444\n  condition: sel\n---\ntitle: Proxy hit\nname: proxyhit\nlogsource:\n"
+              "  category: proxy\ndetection:\n  sel:\n    c-uri|contains: '/evil'\n  condition: sel\n---\n")
+
+
+@pytest.mark.parametrize("corr,what", [
+    ("type: event_count\n  rules: [zconn]\n  group-by: ['ip | delete | search x']\n  timespan: 5m\n"
+     "  condition: {gte: 20}", "group-by: \"ip | delete | search x\" isn't a field name"),
+    ("type: value_count\n  rules: [zconn]\n  timespan: 5m\n  condition: {field: 'a) by x', gte: 2}",
+     "condition: field: \"a) by x\" isn't a field name"),
+    ("type: event_count\n  rules: [zconn, proxyhit]\n  aliases:\n    src:\n      zconn: \"x'] | take 1 //\"\n"
+     "      proxyhit: c-ip\n  group-by: [src]\n  timespan: 5m\n  condition: {gte: 2}", "aliases: \"x'] | take 1 //\""),
+    ("type: event_count\n  rules: [zconn]\n  aliases:\n    'a b': {zconn: x}\n  group-by: [x]\n  timespan: 5m\n"
+     "  condition: {gte: 2}", "aliases: \"a b\" isn't a field name"),
+])
+def test_correlation_field_names_cant_inject(corr, what):
+    with pytest.raises(RuleError) as err:
+        sigma_rules(CORR_PARTS + "title: c\ncorrelation:\n  " + corr + "\n", "x")
+    assert what in str(err.value)
+
+
+def test_correlation_dotted_and_dashed_fields_are_quoted():
+    corr = ("title: Both\ncorrelation:\n  type: value_count\n  rules: [zconn, proxyhit]\n  aliases:\n    srcip:\n"
+            "      zconn: id.orig_h\n      proxyhit: c-ip\n  group-by: [srcip]\n  timespan: 1h\n"
+            "  condition: {field: c-useragent, gte: 3}\n")
+    rule = sigma_rules(CORR_PARTS + corr, "x")[0]
+    assert sigma_to_query(rule, "splunk") == (
+        '| multisearch [search sourcetype="bro:conn:json" id.resp_p=4444 | eval srcip=\'id.orig_h\'] '
+        '[search sourcetype="squid" c-uri="*/evil*" | eval srcip=\'c-ip\'] | bin _time span=3600s '
+        '| stats dc("c-useragent") as value_count by _time, srcip | where value_count >= 3')
+    assert sigma_to_query(rule, "kql") == (
+        "union\n(_Im_NetworkSession\n| where DstPortNumber == 4444\n| extend srcip = SrcIpAddr),\n"
+        '(CommonSecurityLog\n| where RequestURL contains "/evil"\n| extend srcip = SourceIP\n'
+        "| extend ['c-useragent'] = RequestClientApplication)\n"
+        "| summarize value_count = dcount(['c-useragent']) by srcip, bin(TimeGenerated, 3600s)\n"
+        "| where value_count >= 3")
+    assert sigma_to_query(rule, "esql") == (
+        'FROM logs-*\n| WHERE (event.dataset == "zeek.connection" AND TO_STRING(destination.port) == "4444") OR '
+        '(event.category == "web" AND TO_LOWER(`c-uri`) LIKE """*/evil*""")\n'
+        '| EVAL srcip = CASE((event.dataset == "zeek.connection" AND TO_STRING(destination.port) == "4444"), '
+        'source.ip, (event.category == "web" AND TO_LOWER(`c-uri`) LIKE """*/evil*"""), `c-ip`)\n'
+        "| STATS value_count = COUNT_DISTINCT(`c-useragent`) BY srcip, bucket = BUCKET(@timestamp, 1 hour)\n"
+        "| WHERE value_count >= 3")
+    # a dotted / dashed column that every part shares is quoted where it's grouped on
+    corr = ("title: Same\ncorrelation:\n  type: event_count\n  rules: [zconn]\n  group-by: [id.orig_h, c-ip]\n"
+            "  timespan: 5m\n  condition: {gte: 2}\n")
+    rule = sigma_rules(CORR_PARTS + corr, "x")[0]
+    assert sigma_to_query(rule, "splunk").endswith('| stats count as event_count by _time, "id.orig_h", "c-ip" '
+                                                   "| where event_count >= 2")
+    assert "| summarize event_count = count() by SrcIpAddr, ['c-ip'], bin(TimeGenerated, 300s)" in \
+        sigma_to_query(rule, "kql")
+    assert "BY source.ip, `c-ip`, bucket" in sigma_to_query(rule, "esql")
+
+
+# -- ES|QL |re: the core stays grouped; syntax Lucene lacks is refused -----------------------------
+
+@pytest.mark.parametrize("pattern,expected", [
+    ("mimikatz|procdump", ".*(mimikatz|procdump).*"),
+    ("^/bin/(ba)?sh$", "(/bin/(ba)?sh)"),
+    ("^evil", "(evil).*"),
+    ("a\\.exe$", ".*(a\\.exe)"),
+    ("a\\$", ".*(a\\$).*"),
+    ("user@host", ".*(user\\@host).*"),
+    ("[^a-z]x{2,3}", ".*([^a-z]x{2,3}).*"),
+    ("[]a]<", ".*([]a]\\<).*"),
+    ("^a|b", None), ("a|b$", None), ("\\d+", None), ("\\bword", None), ("(?:a)b", None), ("(?=a)", None),
+    ("a++", None), ("a^b", None), ("\\x41", None),
+])
+def test_esql_regex(pattern, expected):
+    from tblib.detect import esql_regex
+    assert esql_regex(pattern) == expected
+
+
+def test_esql_regex_refusal_near_anchor_and_empty_part():
+    rule = sigma_rules("title: t\ndetection:\n  sel:\n    cmd|re: '\\d+'\n  condition: sel\n", "x")[0]
+    with pytest.raises(RuleError, match="RLIKE has no"):
+        sigma_to_query(rule, "esql")
+    rule = sigma_rules("title: t\ndetection:\n  a:\n    x: 1\n  near_anchor:\n    y: 2\n"
+                       "  condition: a | near near_anchor\ntimeframe: 1m\n", "x")[0]
+    assert sigma_to_query(rule, "splunk").endswith('| search rules="near anchor" rules="near_anchor"')
+    assert sigma_to_query(rule, "esql").endswith("| WHERE near_anchor > 0 AND near_anchor_ > 0")
+    rule = sigma_rules("title: t\ndetection:\n  a: {}\n  b:\n    y: 2\n  condition: a | near b\ntimeframe: 1m\n",
+                       "x")[0]
+    q = sigma_to_query(rule, "esql")
+    assert "CASE(true, 1, 0)" in q and "CASE(()" not in q and "CASE(," not in q
