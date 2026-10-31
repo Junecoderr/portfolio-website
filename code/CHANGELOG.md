@@ -18,6 +18,25 @@ How to write an entry:
 
 ## Unreleased
 
+### Added
+
+- Standard-library functions take named inputs, like functions you write: `parallel.map(scan, hosts, workers = 8)`, `round(x, digits = 2)`. A misspelled name gets a "Did you mean" hint, and `tb check` and the language server know the names too.
+- `pcap.streams` reassembles TCP connections (out-of-order, repeated and missing segments), `pcap.defragment` rebuilds fragmented IPv4 and IPv6 packets, and `pcap.http_exchanges` and `pcap.http_objects` pair HTTP requests with responses and pull out transferred files with their SHA-256 and MD5. The pcap-triage app lists files sent over HTTP.
+- `logs.read` recognises Zeek (TSV and JSON), Suricata EVE, AWS CloudTrail, Okta System Log, Microsoft 365 audit logs (JSON and CSV), CEF and LEEF, and gives Sysmon events common field names such as `process`, `command_line` and `hashes`.
+- Descriptions for Sysmon events and PowerShell script and module logging (4103, 4104) when reading EVTX files.
+- A `globals` command in `tb debug`.
+- JSON parse errors carry `data_line` and `data_column`, so a program can say where a config file is broken.
+
+### Changed
+
+- `locals` in `tb debug` shows only the current function's inputs and variables.
+- `tb add` prints the short import line, such as `import "tb-tables" as tb_tables`.
+- `let a, b = 0, 1` explains how to write it: `let a, b = [0, 1]`.
+
+### Fixed
+
+- Sigma rules converted to KQL use real columns of Microsoft Sentinel's `Syslog` table, reading the user, address and action out of `SyslogMessage`, and filter on the auth facility.
+
 ## 3.0.0 - 2026-10-26
 
 The biggest TB release so far: classes, pattern matching, generators and tasks
