@@ -159,3 +159,29 @@ def test_browser_and_docs(monkeypatch):
     assert "The dns library needs the TB app" in str(tb_error('import dns\ndns.lookup("example.test")'))
     info = tb.describe_library("dns")
     assert info["doc"] and all(fn["doc"] for fn in info["functions"])
+
+
+def test_fake_server_retries_when_its_udp_port_is_taken_for_tcp(monkeypatch):
+    """CI flake: the free UDP port was already bound over TCP (Errno 98). The fake now picks another."""
+    import errno
+    import socket
+
+    import dns_fake
+    real, refused = socket.socket, []
+
+    class Busy(real):
+        def bind(self, addr):
+            if self.type == socket.SOCK_STREAM and not refused:
+                refused.append(addr[1])
+                raise OSError(errno.EADDRINUSE, "Address already in use")
+            return super().bind(addr)
+
+    monkeypatch.setattr(dns_fake.socket, "socket", Busy)
+    s = FakeDns(ZONE)
+    monkeypatch.undo()  # the patch is on the socket module itself; the dns client must not see it
+    try:
+        assert refused and s.port
+        out = run_tb(f'import dns\nsay(dns.lookup("example.test", "A", "{s.address}")[0].value)')
+        assert out == ["192.0.2.10"]
+    finally:
+        s.close()
