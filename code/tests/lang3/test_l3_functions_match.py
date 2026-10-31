@@ -35,6 +35,13 @@ def test_destructuring_errors():
     assert "name" in str(tb_error('let {name} = {"other": 1}'))
 
 
+def test_let_with_several_values_suggests_a_list():
+    assert "put the values in a list: let a, b = [0, 1]" in str(tb_error("let a, b = 0, 1"))
+    err = str(tb_error('const x, [y, z] = 1, f(2), "hi"'))
+    assert 'const x, [y, z] = [1, <value>, "hi"]' in err and "On line 1" in err
+    assert run_tb("let a, b = [0, 1]\nsay(a, b)") == ["0 1"]
+
+
 def test_multiple_return_and_assignment():
     src = "fn two() { return 1, 2 }\nlet a, b = two()\nsay(a, b, two())\na, b = b, a\nsay(a, b)"
     assert run_tb(src) == ["1 2 [1, 2]", "2 1"]

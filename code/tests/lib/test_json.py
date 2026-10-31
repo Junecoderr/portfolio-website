@@ -40,6 +40,26 @@ def test_parse_error_map_has_json_position():
     assert run_tb('import json\ntry { json.parse("[1,\\n2,,]") } catch e { say(e.json_line, e.json_column, e.line) }') == ["2 3 2"]
 
 
+def test_read_error_has_data_line(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    # CRLF line endings count lines the same way
+    (tmp_path / "config.json").write_bytes(b'{\r\n  "a": 1,\r\n  "b": oops\r\n}\r\n')
+    src = 'import json\ntry { json.read("config.json") } catch e: ParseError { say(e.data_line, e.data_column) }'
+    assert run_tb(src) == ["3 8"]
+    assert run_tb('import json\ntry { json.parse("[1,\\n2,,]") } catch e { say(e.data_line, e.data_column) }') == ["2 3"]
+
+
+def test_docs_list_the_error_fields():
+    from tbcore import docfmt
+    import tb
+    module = tb.Interpreter().load_library("json")
+    for name in ("parse", "read"):
+        blocks = docfmt.parse(module.docs[name].split("\n", 1)[1])
+        assert {"kind": "heading", "text": "Errors"} in blocks
+        terms = [item["term"] for b in blocks if b["kind"] == "list" for item in b["items"]]
+        assert terms == ["data_line", "data_column"]
+
+
 def test_stringify_errors():
     assert "JSON can't hold a function" in str(tb_error("import json\njson.stringify({\"f\": say})"))
     assert "nested too deeply" in str(tb_error("import json\nlet a = []\npush(a, a)\njson.stringify(a)"))
