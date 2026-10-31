@@ -265,7 +265,7 @@ def test_has_key_and_key_help(fake, monkeypatch):
     help_text = "\n".join(run_tb("import intel\nsay(intel.key_help())"))
     assert "VT_API_KEY" in help_text and "ABUSEIPDB_API_KEY" in help_text and "URLHAUS_API_KEY" in help_text
     assert VT_KEY not in help_text
-    assert "doesn't know 'shodan'" in str(tb_error('import intel\nintel.has_key("shodan")'))
+    assert "doesn't know 'nope'" in str(tb_error('import intel\nintel.has_key("nope")'))
 
 
 @pytest.mark.parametrize("src,message", [

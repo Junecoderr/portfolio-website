@@ -1,4 +1,4 @@
-"""siem: format events as CEF, LEEF and syslog, and forward them to Splunk, Elasticsearch or Sentinel."""
+"""siem: format events as CEF, LEEF and syslog, and forward them to Splunk, Elasticsearch, Sentinel, QRadar or Chronicle."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import datetime as _dt
 import hashlib
 import hmac as _hmac
 import json as _json
+import os
 import socket
 import ssl
 import time as _time
@@ -260,7 +261,8 @@ def to_syslog(message, options=None) -> str:
 def redact_headers(headers: dict) -> dict:
     out = {}
     for k, v in headers.items():
-        if k.lower() in ("authorization", "x-api-key", "apikey", "api-key", "log-type", "x-ms-date"):
+        if k.lower() in ("authorization", "x-api-key", "apikey", "api-key", "log-type", "x-ms-date", "sec",
+                         "x-goog-api-key", "x-webhook-access-key"):
             out[k] = v if k.lower() in ("log-type", "x-ms-date") else "***"
         else:
             out[k] = v
@@ -307,8 +309,9 @@ def load(api):
     m = Module(
         "siem",
         "Get alerts into a SIEM: format any map (or an alert from detect.run()) as CEF, LEEF or a syslog line, send "
-        "syslog over UDP/TCP, and forward events to Splunk (HTTP Event Collector), Elasticsearch (bulk API) or "
-        "Microsoft Sentinel (Log Analytics data collector API). Every sender has a dry-run mode that gives back "
+        "syslog over UDP/TCP, and forward events to Splunk (HTTP Event Collector), Elasticsearch (bulk API), "
+        "Microsoft Sentinel (Log Analytics data collector API), IBM QRadar (HTTP Receiver and reference sets) or "
+        "Google SecOps / Chronicle (webhook feeds). Every sender has a dry-run mode that gives back "
         "the exact payload instead of sending it. Tokens and keys are never printed.",
     )
 
@@ -684,6 +687,136 @@ def load(api):
             return {"sent": len(records), "status": answer["status"], "ok": True}
 
         method(obj, "sentinel", "send", 2, 2, send, "send(log_type, records) -> map\nPost records to a custom log table.")
+        return obj
+
+    def env_secret(line, names, fn, label, dry_run):
+        """Secrets for QRadar and Chronicle come only from the environment (never arguments, never printed)."""
+        values = [(os.environ.get(n) or "").strip() for n in names]
+        missing = [n for n, v in zip(names, values) if not v]
+        if missing and not dry_run:
+            fail(line, f"{fn}() needs the {label} from the environment variable{'s' if len(missing) > 1 else ''} "
+                       f"{' and '.join(missing)}. Set it and run again.", reason="no_key")
+        return values
+
+    def check_answer(line2, answer, label, fn, count):
+        if answer["status"] in (401, 403):
+            fail(line2, f"{label} rejected the credentials (HTTP {answer['status']}).", reason="bad_key",
+                 status=answer["status"])
+        if not answer["ok"]:
+            info = answer["json"] if isinstance(answer["json"], dict) else {}
+            why = info.get("message") or info.get("description") or answer["text"][:200]
+            if isinstance(info.get("error"), dict):
+                why = info["error"].get("message") or why
+            fail(line2, f"{label} answered HTTP {answer['status']}: {why or 'no details'}.", reason="status",
+                 status=answer["status"])
+        return {"sent": count, "status": answer["status"], "ok": True, "response": answer["json"]}
+
+    # -- IBM QRadar ---------------------------------------------------------------------------------
+
+    @m.fn("qradar", 1, 2, doc=(
+        "qradar(url, options?) -> sender\n"
+        "An IBM QRadar client.\n"
+        "\n"
+        "Methods:\n"
+        "- send(events): posts events as LEEF lines to url, a log source using QRadar's HTTP Receiver "
+        "protocol.\n"
+        "- reference_set(name, values): adds values (IPs, hashes...) to a reference set with the REST API "
+        "(POST /api/reference_data/sets/bulk_load/name).\n"
+        "\n"
+        "reference_set() authenticates with an authorized service token read only from the environment "
+        "variable QRADAR_SEC_TOKEN; it is never printed.\n"
+        "\n"
+        "Options:\n"
+        "- console: the console address for the REST API (default: url without its port).\n"
+        "- version: the REST API version header (default: \"20.0\").\n"
+        "- dry_run: true to get the payload back instead of sending.\n"
+        "- timeout: seconds to wait.\n"
+        "\n"
+        "Example:\n"
+        "    let q = siem.qradar(\"https://qradar.example:12469\", {\"dry_run\": true})\n"
+        "    let out = q.reference_set(\"TB Bad IPs\", [\"203.0.113.42\"])\n"
+        "    say(out.url)"))
+    def qradar(line, url, options=None):
+        fn = "siem.qradar"
+        from tblib.http import check_url
+        url = check_url(line, url, fn)
+        opts = sender_options(line, options, fn, ("console", "version"))
+        parts = urllib.parse.urlsplit(url)
+        console = opts.get("console")
+        console = check_url(line, console, fn) if console is not None else f"{parts.scheme}://{parts.hostname}"
+        console = console.rstrip("/")
+        version = _tb.to_text(opts.get("version", "20.0"))
+        obj = {"kind": "qradar", "url": url, "console": console, "dry_run": opts["dry_run"]}
+
+        def send(line2, events):
+            events = events_arg(line2, events, "qradar.send")
+            body = ("\n".join(to_leef(e, {}) for e in events) + "\n").encode("utf-8")
+            answer = deliver(line2, url, body, {"Content-Type": "text/plain; charset=utf-8"}, opts, "QRadar",
+                             "qradar.send", len(events))
+            return answer if answer.get("dry_run") else check_answer(line2, answer, "QRadar", "qradar.send", len(events))
+
+        def reference_set(line2, name, values):
+            fn2 = "qradar.reference_set"
+            check_type(line2, name, "text", fn2, "name")
+            check_type(line2, values, "list", fn2, "values")
+            if not name.strip():
+                fail(line2, f"{fn2}() needs the reference set's name.")
+            if not values:
+                fail(line2, f"{fn2}() got an empty list; nothing to add.")
+            [token] = env_secret(line2, ["QRADAR_SEC_TOKEN"], fn2, "QRadar service token", opts["dry_run"])
+            endpoint = f"{console}/api/reference_data/sets/bulk_load/{urllib.parse.quote(name.strip(), safe='')}"
+            body = _json.dumps([_tb.to_text(v) for v in values], ensure_ascii=False).encode("utf-8")
+            headers = {"SEC": token, "Version": version, "Content-Type": "application/json"}
+            answer = deliver(line2, endpoint, body, headers, opts, "QRadar", fn2, len(values))
+            return answer if answer.get("dry_run") else check_answer(line2, answer, "QRadar", fn2, len(values))
+
+        method(obj, "qradar", "send", 1, 1, send, "send(events) -> map\nPost events as LEEF lines to the HTTP Receiver.")
+        method(obj, "qradar", "reference_set", 2, 2, reference_set,
+               "reference_set(name, values) -> map\nAdd values to a QRadar reference set.")
+        return obj
+
+    # -- Google SecOps (Chronicle) ------------------------------------------------------------------
+
+    @m.fn("chronicle", 1, 2, doc=(
+        "chronicle(url, options?) -> sender\n"
+        "A Google Security Operations (Chronicle) client for an HTTPS webhook feed.\n"
+        "\n"
+        "url is the feed's endpoint, ending in :importPushLogs.\n"
+        "\n"
+        "The API key and the feed's secret key come only from the environment variables CHRONICLE_API_KEY "
+        "and CHRONICLE_SECRET. They travel in headers, never in the URL, and are never printed.\n"
+        "\n"
+        "Methods:\n"
+        "- send(events): posts the events as newline-delimited JSON.\n"
+        "  Alerts from detect.run() are flattened with siem.event().\n"
+        "\n"
+        "Options:\n"
+        "- dry_run: true to get the payload back instead of sending.\n"
+        "- timeout: seconds to wait.\n"
+        "\n"
+        "Example:\n"
+        "    let feed = \"https://us-chronicle.googleapis.com/v1alpha/projects/p\"\n"
+        "    feed += \"/locations/us/instances/i/feeds/f:importPushLogs\"\n"
+        "    let c = siem.chronicle(feed, {\"dry_run\": true})\n"
+        "    say(c.send([{\"user\": \"Tanisha\", \"action\": \"login\"}]).body)"))
+    def chronicle(line, url, options=None):
+        fn = "siem.chronicle"
+        from tblib.http import check_url
+        url = check_url(line, url, fn)
+        opts = sender_options(line, options, fn)
+        obj = {"kind": "chronicle", "url": url, "dry_run": opts["dry_run"]}
+
+        def send(line2, events):
+            events = events_arg(line2, events, "chronicle.send")
+            key, secret = env_secret(line2, ["CHRONICLE_API_KEY", "CHRONICLE_SECRET"], "chronicle.send",
+                                     "Chronicle feed keys", opts["dry_run"])
+            docs = [flat_event(e) if "rule" in e and "level" in e else e for e in events]
+            body = "\n".join(_json.dumps(plain(line2, d), ensure_ascii=False) for d in docs).encode("utf-8")
+            headers = {"Content-Type": "application/json", "X-goog-api-key": key, "X-Webhook-Access-Key": secret}
+            answer = deliver(line2, url, body, headers, opts, "Chronicle", "chronicle.send", len(events))
+            return answer if answer.get("dry_run") else check_answer(line2, answer, "Chronicle", "chronicle.send", len(events))
+
+        method(obj, "chronicle", "send", 1, 1, send, "send(events) -> map\nPost events to the webhook feed.")
         return obj
 
     m.value("severities", dict(SEVERITY), doc="Alert level -> CEF severity (0-10) used by cef() and the senders.")

@@ -22,13 +22,20 @@ USER_AGENT = "TB/3.0"
 VT_BASE = "https://www.virustotal.com/api/v3"
 ABUSEIPDB_URL = "https://api.abuseipdb.com/api/v2/check"
 URLHAUS_URL = "https://urlhaus-api.abuse.ch/v1/url/"
+OTX_BASE = "https://otx.alienvault.com/api/v1/indicators"
+GREYNOISE_BASE = "https://api.greynoise.io/v3/community"
+SHODAN_BASE = "https://api.shodan.io/shodan/host"
 
 SERVICES = {
     # name: (label, env var, where to get a key, key required?)
     "virustotal": ("VirusTotal", "VT_API_KEY", "https://www.virustotal.com/gui/my-apikey", True),
     "abuseipdb": ("AbuseIPDB", "ABUSEIPDB_API_KEY", "https://www.abuseipdb.com/account/api", True),
     "urlhaus": ("URLhaus", "URLHAUS_API_KEY", "https://auth.abuse.ch/", False),
+    "otx": ("AlienVault OTX", "OTX_API_KEY", "https://otx.alienvault.com/api", True),
+    "greynoise": ("GreyNoise", "GREYNOISE_API_KEY", "https://viz.greynoise.io/account/api-key", False),
+    "shodan": ("Shodan", "SHODAN_API_KEY", "https://account.shodan.io/", True),
 }
+SHODAN_BAD_TAGS = {"malware", "c2", "compromised"}
 
 HASH_RE = re.compile(r"^(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
 DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")
@@ -70,10 +77,11 @@ def load(api):
     m = Module(
         "intel",
         "Threat-intelligence lookups for IPs, domains, URLs and file hashes using VirusTotal, "
-        "AbuseIPDB and URLhaus. Every lookup gives back {\"source\", \"indicator\", \"verdict\" "
-        "(\"malicious\", \"suspicious\", \"harmless\" or \"unknown\"), \"score\" (0-100, higher is worse), "
-        "\"details\", \"raw\"}. API keys come from the last argument or the environment variables "
-        "VT_API_KEY, ABUSEIPDB_API_KEY and URLHAUS_API_KEY; TB never prints them.",
+        "AbuseIPDB, URLhaus, AlienVault OTX, GreyNoise and Shodan. Every lookup gives back {\"source\", "
+        "\"indicator\", \"verdict\" (\"malicious\", \"suspicious\", \"harmless\" or \"unknown\"), \"score\" "
+        "(0-100, higher is worse), \"details\", \"raw\"}. API keys come from environment variables (VT_API_KEY, "
+        "ABUSEIPDB_API_KEY, URLHAUS_API_KEY, OTX_API_KEY, GREYNOISE_API_KEY, SHODAN_API_KEY); the first three "
+        "also take one as the last argument. TB never prints or stores them.",
     )
 
     def key_for(line, service, key, fn):
@@ -294,11 +302,148 @@ def load(api):
         }
         return result("urlhaus", u, "malicious", 100 if online else 80, details, answer)
 
+    # -- AlienVault OTX, GreyNoise, Shodan (keys only from the environment) ---------------
+
+    @m.fn("otx", 1, doc=(
+        "otx(indicator) -> map\n"
+        "Look up an IP, domain, URL or file hash on AlienVault OTX: in how many community pulses (threat "
+        "reports) it appears.\n"
+        "\n"
+        "Verdicts:\n"
+        "- 5 or more pulses: \"malicious\".\n"
+        "- 1 to 4: \"suspicious\".\n"
+        "- none: \"unknown\", because OTX only records reported things.\n"
+        "\n"
+        "score is 10 per pulse, up to 100. details has pulses, pulse_names, tags, country, asn, "
+        "reputation and a link.\n"
+        "\n"
+        "The key comes only from the environment variable OTX_API_KEY."))
+    def otx(line, indicator):
+        api.need_desktop(line, "The intel library")
+        fn = "intel.otx"
+        check_type(line, indicator, "text", fn, "indicator")
+        kind, value = indicator_kind(indicator.strip())
+        if kind is None:
+            fail(line, f"{fn}() needs an IP address, domain, URL or file hash, but '{indicator}' isn't one.",
+                 reason="invalid")
+        key = key_for(line, "otx", None, fn)
+        url = f"{OTX_BASE}/{kind}/{urllib.parse.quote(value, safe='')}/general"
+        status, data = fetch(line, "otx", url, {"X-OTX-API-KEY": key}, fn, not_found_ok=True)
+        if status == 404 or not isinstance(data, dict):
+            return result("otx", value, "unknown", 0, {"pulses": 0, "note": "OTX has nothing on this."}, data)
+        info = data.get("pulse_info") if isinstance(data.get("pulse_info"), dict) else {}
+        pulses = [p for p in info.get("pulses") or [] if isinstance(p, dict)]
+        count = int(info.get("count") or len(pulses))
+        tags = []
+        for p in pulses:
+            tags.extend(t for t in p.get("tags") or [] if isinstance(t, str) and t not in tags)
+        verdict = "malicious" if count >= 5 else "suspicious" if count else "unknown"
+        details = {
+            "pulses": count, "pulse_names": [p.get("name") for p in pulses[:10]], "tags": tags[:20],
+            "country": data.get("country_name"), "asn": data.get("asn"), "reputation": data.get("reputation"),
+            "link": f"https://otx.alienvault.com/indicator/{OTX_LINK_KIND[kind]}/{urllib.parse.quote(value, safe='')}",
+        }
+        return result("otx", value, verdict, min(100, 10 * count), details, data)
+
+    @m.fn("greynoise", 1, doc=(
+        "greynoise(ip) -> map\n"
+        "Ask GreyNoise (Community API) whether an IP address is internet background noise: mass scanners, "
+        "crawlers and known business services.\n"
+        "\n"
+        "Verdicts:\n"
+        "- classified malicious: \"malicious\", score 90.\n"
+        "- a known benign service (riot) or classified benign: \"harmless\".\n"
+        "- seen scanning but not classified: \"suspicious\", score 50.\n"
+        "- never seen: \"unknown\".\n"
+        "\n"
+        "details has noise, riot, classification, name, last_seen and a link.\n"
+        "\n"
+        "Works without a key at a low rate; set GREYNOISE_API_KEY in the environment for more."))
+    def greynoise(line, ip):
+        api.need_desktop(line, "The intel library")
+        fn = "intel.greynoise"
+        addr = ip_arg(line, ip, fn)
+        key = key_for(line, "greynoise", None, fn)
+        status, data = fetch(line, "greynoise", f"{GREYNOISE_BASE}/{addr}", {"key": key} if key else {}, fn,
+                             not_found_ok=True)
+        if status == 404 or not isinstance(data, dict):
+            return result("greynoise", addr, "unknown", 0,
+                          {"noise": False, "riot": False, "note": "GreyNoise hasn't seen this IP."}, data)
+        classification = str(data.get("classification") or "unknown").lower()
+        if classification == "malicious":
+            verdict, score = "malicious", 90
+        elif classification == "benign" or data.get("riot"):
+            verdict, score = "harmless", 0
+        elif data.get("noise"):
+            verdict, score = "suspicious", 50
+        else:
+            verdict, score = "unknown", 0
+        details = {"noise": bool(data.get("noise")), "riot": bool(data.get("riot")), "classification": classification,
+                   "name": data.get("name"), "last_seen": data.get("last_seen"),
+                   "link": data.get("link") or f"https://viz.greynoise.io/ip/{addr}"}
+        return result("greynoise", addr, verdict, score, details, data)
+
+    @m.fn("shodan", 1, doc=(
+        "shodan(ip) -> map\n"
+        "What Shodan's internet scans found on an IP address: open ports, services, software and known "
+        "vulnerabilities.\n"
+        "\n"
+        "Verdicts:\n"
+        "- tagged malware, c2 or compromised: \"malicious\", score 80.\n"
+        "- known vulnerabilities (CVEs): \"suspicious\", 10 per CVE up to 70.\n"
+        "- otherwise \"unknown\": Shodan shows exposure, not reputation.\n"
+        "\n"
+        "details has ports, hostnames, org, isp, country, os, vulns, tags, last_update and a link.\n"
+        "\n"
+        "The key comes only from the environment variable SHODAN_API_KEY."))
+    def shodan(line, ip):
+        api.need_desktop(line, "The intel library")
+        fn = "intel.shodan"
+        addr = ip_arg(line, ip, fn)
+        key = key_for(line, "shodan", None, fn)
+        # Shodan only takes the key in the query string; fetch() never puts the URL in a message.
+        url = f"{SHODAN_BASE}/{addr}?" + urllib.parse.urlencode({"key": key})
+        status, data = fetch(line, "shodan", url, {}, fn, not_found_ok=True)
+        if status == 404 or not isinstance(data, dict):
+            return result("shodan", addr, "unknown", 0, {"found": False, "note": "Shodan has no scan of this IP."}, data)
+        vulns = data.get("vulns")
+        vulns = sorted(vulns) if isinstance(vulns, (list, dict)) else []
+        tags = [t for t in data.get("tags") or [] if isinstance(t, str)]
+        if SHODAN_BAD_TAGS & {t.lower() for t in tags}:
+            verdict, score = "malicious", 80
+        elif vulns:
+            verdict, score = "suspicious", min(70, 10 * len(vulns))
+        else:
+            verdict, score = "unknown", 0
+        details = {"found": True, "ports": sorted(p for p in data.get("ports") or [] if _tb.is_number(p)),
+                   "hostnames": list(data.get("hostnames") or []), "org": data.get("org"), "isp": data.get("isp"),
+                   "country": data.get("country_name"), "os": data.get("os"), "vulns": vulns, "tags": tags,
+                   "last_update": data.get("last_update"), "link": f"https://www.shodan.io/host/{addr}"}
+        return result("shodan", addr, verdict, score, details, data)
+
+    def indicator_kind(text):
+        """OTX's indicator section for a value: ('IPv4', '1.2.3.4'), ('file', hash) and so on."""
+        try:
+            addr = ipaddress.ip_address(text)
+            return ("IPv4" if addr.version == 4 else "IPv6"), str(addr)
+        except ValueError:
+            pass
+        if HASH_RE.match(text):
+            return "file", text.lower()
+        parts = urllib.parse.urlsplit(text)
+        if parts.scheme.lower() in ("http", "https") and parts.netloc:
+            return "url", text
+        d = text.lower().rstrip(".")
+        if DOMAIN_RE.match(d):
+            return "domain", d
+        return None, None
+
     # -- helpers ------------------------------------------------------------------------
 
     @m.fn("has_key", 1, doc=(
         "has_key(service) -> bool\n"
-        "True if an API key for \"virustotal\", \"abuseipdb\" or \"urlhaus\" is set in the environment. "
+        "True if an API key for a service (\"virustotal\", \"abuseipdb\", \"urlhaus\", \"otx\", \"greynoise\" "
+        "or \"shodan\") is set in the environment. "
         "(It never shows the key.)"))
     def has_key(line, service):
         check_type(line, service, "text", "intel.has_key", "service")
@@ -343,6 +488,9 @@ def load(api):
         return u
 
     return m
+
+
+OTX_LINK_KIND = {"IPv4": "ip", "IPv6": "ip", "domain": "domain", "url": "url", "file": "file"}
 
 
 def _vt_gui_id(kind: str, indicator: str) -> str:
