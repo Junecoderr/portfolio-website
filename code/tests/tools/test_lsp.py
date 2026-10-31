@@ -348,6 +348,41 @@ def test_references_and_rename_across_files_and_packages(session):
     assert list(rename["changes"]) == [uri]
 
 
+def test_cross_file_rename_respects_shadowing_and_unparsed_files(tmp_path):
+    from tbtools import lsp
+
+    (tmp_path / "helper.tb").write_text("fn twice(x) {\n  return x * 2\n}\n", encoding="utf-8")
+    main_text = ('import "helper.tb" as h\nsay(h.twice(2))\nfn other(h) {\n  return h.twice\n}\n'
+                 'say(other({"twice": 3}))\n')
+    (tmp_path / "main.tb").write_text(main_text, encoding="utf-8")
+    server = lsp.Server()
+    notes = []
+    server.notify = lambda method, params: notes.append((method, params))
+    server.on_initialize({"rootUri": path_to_uri(str(tmp_path))})
+    uris = {}
+    for name in ("helper.tb", "main.tb"):
+        uris[name] = path_to_uri(str(tmp_path / name))
+        server.on_textDocument_didOpen({"textDocument": {
+            "uri": uris[name], "text": (tmp_path / name).read_text(encoding="utf-8"), "languageId": "tb",
+            "version": 1}})
+    at_def = {"textDocument": {"uri": uris["helper.tb"]}, "position": {"line": 0, "character": 4}}
+    # `h.twice` inside other(h) is the parameter's field, not the import
+    rename = server.on_textDocument_rename({**at_def, "newName": "double"})
+    assert _lines(rename["changes"]) == {uris["helper.tb"]: [0], uris["main.tb"]: [1]}
+    assert server._target(uris["main.tb"], pos(main_text, "h.twice\n", 2)) is None
+    assert server._target(uris["main.tb"], pos(main_text, "h.twice(", 2)) is not None
+    refs = server.on_textDocument_references({**at_def, "context": {"includeDeclaration": True}})
+    assert _lines(refs) == {uris["helper.tb"]: [0], uris["main.tb"]: [1]}
+    # main.tb now has a new first line and doesn't parse: its old analysis must not be used
+    broken = "# a new first line\n" + main_text + "let x = (1 +\n\n"
+    server.on_textDocument_didChange({"textDocument": {"uri": uris["main.tb"]}, "contentChanges": [{"text": broken}]})
+    with pytest.raises(ValueError, match="Fix the errors in main.tb first"):
+        server.on_textDocument_rename({**at_def, "newName": "double"})
+    refs = server.on_textDocument_references({**at_def, "context": {"includeDeclaration": True}})
+    assert _lines(refs) == {uris["helper.tb"]: [0]}
+    assert any(m == "window/showMessage" and "main.tb" in p["message"] for m, p in notes)
+
+
 def test_code_actions_fix_typos_add_imports_and_organise(session):
     client, _init, uri, _tmp = session
     text = ('import "helpers.tb" as helpers\nimport text\n\nimport fs\nimport fs\n'
