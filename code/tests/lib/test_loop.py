@@ -1,6 +1,7 @@
 """TB 3.2: parallel.loop (the event loop), groups and time limits, and
 parallel.processes (worker processes) with shared queues."""
 
+import re
 import subprocess
 import sys
 import threading
@@ -25,15 +26,21 @@ def stop_servers():
 def test_async_fns_take_turns_on_the_loop():
     src = '''import parallel
 import time
+parallel.loop(fn() {})  # the first loop imports asyncio (50+ ms, far more on a slow machine): not timed
+let seen = []
+let start = time.timestamp()
+fn ms() { return round((time.timestamp() - start) * 1000) }
 async fn twice(x) {
+  seen.push(f"{x} sleeps at {ms()} ms")
   parallel.sleep(0.3)
+  seen.push(f"{x} wakes at {ms()} ms")
   return x * 2
 }
-let start = time.timestamp()
 say(parallel.loop(fn() { return parallel.all([twice(1), twice(2), twice(3)]) }))
-# One after another would take 0.9 s; together they take about 0.3 s. A wide margin
-# keeps busy CI machines from failing this.
-say(time.timestamp() - start < 0.75)
+# One after another would take 0.9 s; together they take about 0.3 s.
+let took = time.timestamp() - start
+say(took < 0.75)
+say(f"took {round(took * 1000)} ms: {seen}")
 let n = {"v": 0}
 parallel.loop(fn() {
   parallel.map(fn(i) {
@@ -43,7 +50,14 @@ parallel.loop(fn() {
 })
 say(n.v)
 say(parallel.loop(fn(a, b) { return parallel.loop(fn() { return a + b }) }, 2, 3))'''
-    assert run_tb(src) == ["[2, 4, 6]", "true", "200", "5"]
+    out = run_tb(src)
+    # other threads busy in Python (left by earlier tests) slow every hand-off: name them on failure
+    timeline = out.pop(2) + f"; other threads: {[t.name for t in threading.enumerate()]}"
+    # every task is asleep before the first one wakes: they really wait together
+    marks = [(int(m.group(2)), m.group(1)) for m in re.finditer(r"(sleeps|wakes) at (\d+) ms", timeline)]
+    assert len(marks) == 6, timeline
+    assert max(t for t, kind in marks if kind == "sleeps") < min(t for t, kind in marks if kind == "wakes"), timeline
+    assert out == ["[2, 4, 6]", "true", "200", "5"], timeline
 
 
 def test_loop_waits_for_every_task_and_passes_errors_on():
