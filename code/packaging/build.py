@@ -29,7 +29,10 @@ What it does:
                                                  needs ISCC.exe; --no-installer skips it)
      macOS arm64  -> tb-macos-arm64.zip         (folder tb/ with tb, _internal/, apps/, examples/,
                                                  welcome.tb; exec bits and symlinks kept)
-     macOS Intel  -> tb-macos-x64.zip           (local builds only; CI builds arm64)
+     macOS Intel  -> tb-macos-x64.zip
+     macOS both   -> tb-macos-universal.zip     (TB_TARGET_ARCH=universal2: one binary for Apple
+                                                 silicon and Intel; needs a universal2 Python
+                                                 such as python.org's or actions/setup-python's)
      Linux x64    -> tb-linux-x64.tar.gz        (folder tb/, same layout as macOS)
    apps/, examples/ and welcome.tb are copied into dist/tb/ first, so they
    ship next to the launcher. Each archive is unpacked again into a temp
@@ -42,6 +45,7 @@ What it does:
 
 Other modes:
 
+    python packaging/build.py --build-only      # only run PyInstaller (CI signs dist/tb/ next)
     python packaging/build.py --skip-build      # package an existing dist/tb/
     python packaging/build.py --checksums-only  # only rewrite SHA256SUMS.txt
     python packaging/build.py --checksums-only --dist some/folder
@@ -176,8 +180,13 @@ RELEASE_ASSETS = [
     "tb-windows-arm64.zip",
     "tb-macos-arm64.zip",
     "tb-macos-x64.zip",
+    "tb-macos-universal.zip",
     "tb-linux-x64.tar.gz",
     "tb-linux-arm64.tar.gz",
+    f"tb_{VERSION}_amd64.deb",
+    f"tb_{VERSION}_arm64.deb",
+    f"tb-{VERSION}-1.x86_64.rpm",
+    f"tb-{VERSION}-1.aarch64.rpm",
     "tb-python.zip",
     VSIX,
 ]
@@ -209,6 +218,10 @@ def detect_target() -> tuple[str, str]:
         arch = "arm64"
     else:
         fail(f"Unsupported CPU architecture: {machine}")
+    if os.environ.get("TB_TARGET_ARCH") == "universal2":
+        if os_name != "macos":
+            fail("TB_TARGET_ARCH=universal2 only makes sense on macOS")
+        arch = "universal"
     return os_name, arch
 
 
@@ -581,6 +594,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dist", default=str(ROOT / "dist"), help="output folder (default: dist/)")
     parser.add_argument("--skip-build", action="store_true", help="reuse an existing dist/tb/ folder")
+    parser.add_argument("--build-only", action="store_true", help="only run PyInstaller (to sign dist/tb/ before packaging)")
     parser.add_argument("--no-installer", action="store_true", help="Windows: skip the Inno Setup installer")
     parser.add_argument("--checksums-only", action="store_true", help="only rewrite SHA256SUMS.txt")
     args = parser.parse_args()
@@ -595,8 +609,6 @@ def main() -> int:
     os_name, arch = detect_target()
     name = asset_name(os_name, arch)
     log(f"target: {os_name}-{arch} -> {name}")
-    if os_name == "macos" and arch == "x64":
-        log("note: Intel Mac build. The official release (CI) only ships tb-macos-arm64.zip.")
 
     folder = dist / "tb"
     exe_name = "tb.exe" if os_name == "windows" else "tb"
@@ -605,6 +617,9 @@ def main() -> int:
         if folder.is_file() or folder.is_symlink():
             folder.unlink()  # an old one-file build used to live at dist/tb
         run_pyinstaller(dist, ROOT / "build" / "pyinstaller")
+        if args.build_only:
+            log(f"built {folder} (--build-only: not tested or packaged)")
+            return 0
     if not binary.is_file():
         fail(f"{binary} not found")
     programs = ["tbw.exe", "tblaunch.exe", "tblaunchw.exe"] if os_name == "windows" else ["tblaunch"]

@@ -7,10 +7,13 @@
 
   var OS = {
     windows: { name: "Windows", file: "tb-windows-x64-setup.exe", note: "The Windows installer for Windows 10 and 11 (64-bit): no admin needed, adds TB to the Start menu.", tab: "windows" },
-    mac: { name: "Mac", file: "tb-macos-arm64.zip", note: "For Macs with Apple silicon (M1 and newer). On an Intel Mac, use the Python version below.", tab: "mac" },
-    linux: { name: "Linux", file: "tb-linux-x64.tar.gz", note: "For 64-bit Intel or AMD computers.", tab: "linux" }
+    mac: { name: "Mac", file: "tb-macos-universal.zip", note: "One download for every Mac: Apple silicon (M1 and newer) and Intel.", tab: "mac" },
+    linux: { name: "Linux", file: "tb-linux-x64.tar.gz", note: "For 64-bit Intel or AMD computers. On Debian or Ubuntu, the .deb below installs it for you.", tab: "linux" },
+    linuxArm: { name: "Linux", file: "tb-linux-arm64.tar.gz", note: "For 64-bit ARM computers (arm64, such as a Raspberry Pi 4 or 5 with a 64-bit system).", tab: "linux" }
   };
 
+  // Browsers can't tell an Intel Mac from Apple silicon (Safari always says
+  // Intel), so every Mac gets the universal zip. Linux on ARM says aarch64.
   function detect() {
     var uad = navigator.userAgentData;
     var platform = (uad && uad.platform) || "";
@@ -21,7 +24,7 @@
     var os = "windows";
     if (/android|cros|chrome os/.test(s)) os = "windows";
     else if (/mac|iphone|ipad|ipod/.test(s)) os = "mac";
-    else if (/linux|x11/.test(s)) os = "linux";
+    else if (/linux|x11/.test(s)) os = /aarch64|arm64|armv8/.test(s) ? "linuxArm" : "linux";
     else if (/win/.test(s)) os = "windows";
     return { os: os, mobile: !!mobile };
   }

@@ -22,6 +22,8 @@
 #   uv run --group build pyinstaller packaging/tb.spec --distpath dist --workpath build
 #
 # PyInstaller cannot cross-compile: build on each OS you want a binary for.
+# Signing (Developer ID / Authenticode) happens after the build, in CI:
+# packaging/macos/sign.py and the Windows signing steps in tb-release.yml.
 
 import os
 import sys
@@ -204,7 +206,9 @@ def make_exe(name, console, scripts=None):
         console=console,
         disable_windowed_traceback=False,
         argv_emulation=False,
-        target_arch=None,
+        # TB_TARGET_ARCH=universal2 (macOS, universal2 Python): one binary for
+        # Apple silicon and Intel. Unset: the architecture of the build Python.
+        target_arch=os.environ.get("TB_TARGET_ARCH") or None,
         codesign_identity=None,
         entitlements_file=None,
         version=version_info,
