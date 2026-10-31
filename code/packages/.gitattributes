@@ -1,0 +1,3 @@
+# The registry seed and packages/<name>.zip hash these files, so keep the same
+# bytes on every OS (Windows checkouts would otherwise get CRLF).
+* text eol=lf

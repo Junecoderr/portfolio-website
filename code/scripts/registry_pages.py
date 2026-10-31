@@ -320,4 +320,4 @@ def render(out: Path, version: str) -> list[str]:
     }
     for path, text in pages.items():
         path.write_text(text, encoding="utf-8")
-    return [str(p.relative_to(out)) for p in [*pages, folder / "bundled.json"]]
+    return [p.relative_to(out).as_posix() for p in [*pages, folder / "bundled.json"]]
