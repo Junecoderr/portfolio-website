@@ -86,9 +86,36 @@ def check_url(line, url, fn) -> str:
     return url
 
 
-def open_url(request: urllib.request.Request, timeout: float):
-    """urlopen with TB's TLS settings (tests can swap this out)."""
-    return urllib.request.urlopen(request, timeout=timeout, context=ssl_context())
+def open_url(request: urllib.request.Request, timeout: float, verify: bool = True, same_site: bool = False):
+    """urlopen with TB's TLS settings (tests can swap this out). same_site=True for a request that
+    carries credentials: a redirect to another scheme, host or port is refused, so urllib can't hand
+    the API key or token to that site. verify=False skips the certificate check."""
+    if verify and not same_site:
+        return urllib.request.urlopen(request, timeout=timeout, context=ssl_context())
+    context = ssl_context()
+    if not verify:
+        context.check_hostname, context.verify_mode = False, ssl.CERT_NONE
+    handlers = [urllib.request.HTTPSHandler(context=context)] + ([SameSiteRedirects()] if same_site else [])
+    return urllib.request.build_opener(*handlers).open(request, timeout=timeout)
+
+
+def _origin(url: str):
+    parts = urllib.parse.urlsplit(url)
+    return parts.scheme.lower(), (parts.hostname or "").lower(), parts.port or {"http": 80, "https": 443}.get(
+        parts.scheme.lower())
+
+
+class SameSiteRedirects(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to the same scheme, host and port (urllib would otherwise send every
+    header, API keys included, to wherever the server points, even from https to plain http)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if _origin(req.full_url) != _origin(newurl):
+            scheme, host, port = _origin(newurl)
+            fp.close()
+            raise urllib.error.URLError(f"it redirected to {scheme}://{host}:{port}, another site, and TB doesn't "
+                                        "follow that with your credentials")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def _charset(headers: Message) -> str:

@@ -63,6 +63,114 @@ def url(srv):
     return f"http://127.0.0.1:{srv.server_address[1]}"
 
 
+class Redirector(BaseHTTPRequestHandler):
+    """Answers everything with a 302 to server.target + the same path."""
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        self.send_response(302)
+        self.send_header("Location", self.server.target + self.path)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        self.do_GET()
+
+
+@pytest.fixture
+def redirector():
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Redirector)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield srv
+    srv.shutdown()
+    srv.server_close()
+
+
+def test_credentials_never_follow_a_redirect_to_another_site(server, redirector, monkeypatch):
+    """A sender, intel lookup or TAXII fetch that is redirected to another port refuses to go: the
+    token, SEC header or API key never reaches the other server. A same-site redirect still works."""
+    import tblib.intel as intel
+    redirector.target = url(server)                     # same host, another port: another site
+    err = str(tb_error(f'import siem\nsiem.splunk("{url(redirector)}", "hec-secret-1").send([{{"a": 1}}])'))
+    assert "redirected to http://127.0.0.1:" in err and "hec-secret-1" not in err
+    monkeypatch.setenv("QRADAR_SEC_TOKEN", "qradar-secret-2")
+    tb_error(f'import siem\nsiem.qradar("http://x.example", {{"console": "{url(redirector)}"}}).reference_set("s", ["1"])')
+    monkeypatch.setenv("OTX_API_KEY", "otx-secret-3")
+    monkeypatch.setattr(intel, "OTX_BASE", url(redirector) + "/otx")
+    err = str(tb_error('import intel\nintel.otx("203.0.113.42")'))
+    assert "OTX lookup failed" in err and "redirected" in err and "otx-secret-3" not in err
+    err = str(tb_error(f'import stix\nstix.taxii("{url(redirector)}/taxii2/", "taxii-secret-4").collections()'))
+    assert "redirected" in err and "taxii-secret-4" not in err
+    assert server.seen == []                            # nothing - no header, no body - reached the target
+    # another host name on the same port, and https -> http, are other sites too
+    redirector.target = url(redirector).replace("127.0.0.1", "localhost")
+    assert "redirected" in str(tb_error(f'import siem\nsiem.splunk("{url(redirector)}", "t").send([{{"a": 1}}])'))
+    from tblib.http import _origin
+    assert _origin("https://h.example/a") != _origin("http://h.example/a")
+    assert _origin("https://h.example/a") == _origin("https://H.example:443/b")
+
+
+def test_same_site_redirect_is_followed(server):
+    import urllib.request
+    from tblib.http import open_url
+
+    class Moved(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            if self.path == "/old":
+                self.send_response(301)
+                self.send_header("Location", "/new")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+            else:
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"ok")
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Moved)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        resp = open_url(urllib.request.Request(url(srv) + "/old", headers={"SEC": "x"}), 5, same_site=True)
+        assert resp.read() == b"ok" and resp.geturl().endswith("/new")
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_verify_option_and_qradar_ipv6_console(server, monkeypatch):
+    import ssl
+    import urllib.request
+    from tblib import http as tbhttp
+    assert "the verify option" in str(tb_error('import siem\nsiem.splunk("https://x.example", "t", {"verify": "no"})'))
+    seen = {}
+    real_open = tbhttp.open_url
+
+    def spy(req, timeout, verify=True, same_site=False):
+        seen.update(verify=verify, same_site=same_site)
+        return real_open(req, timeout, verify, same_site)
+    monkeypatch.setattr(tbhttp, "open_url", spy)
+    run(f'siem.splunk("{url(server)}", "t", {{"verify": false}}).send([{{"a": 1}}])')
+    assert seen == {"verify": False, "same_site": True}
+    # verify=false turns the certificate check off in the opener; the default keeps it on
+    contexts = []
+    real_build = urllib.request.build_opener
+
+    def build(*handlers):
+        contexts.extend(h._context for h in handlers if isinstance(h, urllib.request.HTTPSHandler))
+        return real_build(*handlers)
+    monkeypatch.setattr(tbhttp.urllib.request, "build_opener", build)
+    real_open(urllib.request.Request(url(server), data=b"{}"), 5, verify=False, same_site=True)
+    real_open(urllib.request.Request(url(server), data=b"{}"), 5, verify=True, same_site=True)
+    assert [c.verify_mode for c in contexts] == [ssl.CERT_NONE, ssl.CERT_REQUIRED]
+    out = run('let q = siem.qradar("https://[2001:db8::5]:12469", {"dry_run": true})\n'
+              'say(q.reference_set("s", ["1"]).url)')
+    assert out == ["https://[2001:db8::5]/api/reference_data/sets/bulk_load/s"]
+
+
 # -- formats -------------------------------------------------------------------------------
 
 def test_cef_from_alert_and_escaping():
