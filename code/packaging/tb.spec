@@ -99,7 +99,8 @@ import importlib.util
 for mod in ("sqlite3", "zoneinfo", "tomllib", "ssl", "decimal", "difflib", "calendar", "bisect",
             "webbrowser", "ctypes", "csv", "gzip", "zipfile", "tarfile", "xml.etree.ElementTree",
             "html", "mimetypes", "secrets", "hmac", "uuid", "ipaddress", "heapq", "shlex",
-            "textwrap", "pkgutil", "concurrent.futures"):
+            "textwrap", "pkgutil", "concurrent.futures", "asyncio", "multiprocessing",
+            "multiprocessing.managers", "multiprocessing.pool"):
     if importlib.util.find_spec(mod) is not None:
         HIDDEN.add(mod)
 

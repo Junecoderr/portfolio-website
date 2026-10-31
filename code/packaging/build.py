@@ -144,6 +144,19 @@ square with area 16: big
 [9, 16, 25]
 """
 
+# TB 3.2: worker processes and a shared queue, in the frozen build.
+PROCS_SNIPPET = """import parallel
+const K = 2
+fn sq(x) { return x * x + K }
+say(parallel.processes(sq, [1, 2, 3], 2))
+let q = parallel.shared_queue()
+parallel.processes(fn(x) { q.put(x * 7) }, [1], 1)
+say(q.get(10))
+"""
+PROCS_SNIPPET_OUT = """[3, 6, 11]
+7
+"""
+
 # A small CLI app for `tb build`: imports a file next to it, reads os.args.
 BUILD_APP = {
     "main.tb": 'import os\nimport "greet.tb"\nsay(greet.hello(os.args))\n',
@@ -383,6 +396,13 @@ def smoke_test(binary: Path, label: str) -> None:
             out = check(binary, ["--engine", engine, str(snippet)], work)
             if out != LANG3_SNIPPET_OUT:
                 fail(f"3.0 snippet ({engine}) printed {out!r}, expected {LANG3_SNIPPET_OUT!r}")
+
+        # parallel.processes spawns copies of the frozen tb (freeze_support in tb.py).
+        snippet = work / "procs.tb"
+        snippet.write_text(PROCS_SNIPPET, encoding="utf-8")
+        out = check(binary, [str(snippet)], work)
+        if out != PROCS_SNIPPET_OUT:
+            fail(f"processes snippet printed {out!r}, expected {PROCS_SNIPPET_OUT!r}")
 
         ok, why = tk_available()
         if not ok:

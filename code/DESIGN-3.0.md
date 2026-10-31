@@ -391,6 +391,30 @@ Files: `tbcore/tasks.py` (Task, spawn, run_pool, cancel, wait), `tblib/parallel.
   `await` = call `wait` if present else identity; register the generator
   view on its thread; honour `view.trace` as the cancel hook (or poll
   `tasks.current_task().cancel_requested` at loop back-edges and calls).
+- **Event loop (3.2).** `parallel.loop(fn, ...args)` (`tasks.run_loop`)
+  runs an asyncio loop on the calling thread. Tasks started inside it are
+  coroutines: each still has a thread (Python has no stack switching), but
+  only the holder of the loop's FIFO `Baton` runs TB code, and every wait
+  (`wait_event`, `tasks.blocking()`: sleep, queues, locks, `await`, http,
+  net, websocket I/O) hands it on. Servers started inside a loop
+  (`server.App.bind_loop`) are asyncio protocols on the loop thread that
+  feed complete requests to the ordinary `BaseHTTPRequestHandler` code in
+  memory; handlers run there holding the baton (`_threads.guarded_call`
+  takes `tasks.turn(loop)` instead of the callback lock); WebSocket routes
+  become loop tasks over a socket-like `_TransportSock`. The loop ends when
+  its main task and all tasks started inside it are done; `loop.closers`
+  stop its servers. Structured concurrency: `parallel.group(fn)` (wait for
+  all, cancel the rest on the first failure or when the waiter is
+  cancelled) and `parallel.timeout(seconds, fn)` (a cancel scope). Thread
+  mode is unchanged outside `parallel.loop`.
+- **Processes (3.2).** `parallel.processes(fn, items, workers?)`
+  (`tblib/_procs.py`): fn is sent as its syntax tree plus the values of the
+  names it uses (plain data, std libraries, other functions, shared queues),
+  rebuilt in a fresh interpreter of the same engine in each spawn-started
+  worker (`multiprocessing` "spawn" everywhere; frozen builds call
+  `freeze_support()` in `tb.py`/`tblaunch.py`). Items and results must be
+  plain values; others are a TypeError naming the value. `shared_queue()`
+  is a Manager queue with the `Queue` methods.
 
 ## Part D — Gradual types and lint (types-agent, after Part A lands)
 

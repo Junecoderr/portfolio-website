@@ -847,6 +847,10 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    if getattr(sys, "frozen", False):  # a worker process of parallel.processes starts as tb.exe too
+        import multiprocessing
+
+        multiprocessing.freeze_support()
     try:
         exit_code = main()
     except KeyboardInterrupt:  # a stray Ctrl+C: leave quietly

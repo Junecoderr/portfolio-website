@@ -15,6 +15,7 @@ import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from tbcore import tasks as _tasks
 from tblib._api import MANY, Module, check_type, fail, fail_os
 from tblib._threads import guarded_call, ignore_sigpipe
 
@@ -90,6 +91,10 @@ class App:
         self.port = None
         self.handle = None
         self.errors: list = []
+        self.loop = None                # inside parallel.loop(): the Loop serving it
+        self.aserver = None             # ... and its asyncio server
+        self.conns: set = set()         # ... and its open connections
+        self.stopped = threading.Event()
 
     # -- routing ----------------------------------------------------------------
 
@@ -130,8 +135,7 @@ class App:
 
     # -- lifecycle --------------------------------------------------------------
 
-    def bind(self, line, host, port):
-        ignore_sigpipe()
+    def handler_class(self):
         app = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -150,6 +154,64 @@ class App:
             def do_HEAD(self): app.dispatch(self)
             def do_OPTIONS(self): app.dispatch(self)
 
+        return Handler
+
+    def bind_failed(self, line, err: OSError, host, port):
+        from tblib import _sockets
+
+        if _sockets.port_in_use(err, port):
+            fail(line, f"Port {port} is already in use by another program. Pick another port, or stop it.",
+                 reason="in_use", port=port)
+        if isinstance(err, PermissionError):
+            fail(line, f"I'm not allowed to listen on port {port} (ports below 1024 need administrator "
+                 "rights).", reason="permission", port=port)
+        if _sockets.no_such_address(err):
+            fail(line, f"This computer has no address '{host}' to listen on.", reason="bind", host=host)
+        fail(line, f"I couldn't listen on {host} port {port}: {err.strerror or err}.", reason="bind", port=port)
+
+    def bind(self, line, host, port):
+        loop = _tasks.current_loop()
+        if loop is not None:
+            self.bind_loop(line, host, port, loop)
+        else:
+            self.bind_threads(line, host, port)
+        RUNNING.append(self)
+        if host not in ("127.0.0.1", "::1", "localhost") and self.log:
+            self.api.output(f"Note: listening on {host}, so other computers on the network can reach this server.")
+
+    def bind_loop(self, line, host, port, loop):
+        """Inside parallel.loop(): one non-blocking socket served by the loop's
+        thread; requests are answered there, one at a time, with no thread per
+        connection."""
+        from tblib import _sockets
+
+        if loop.on_loop_thread():
+            fail(line, "Start a server from the loop's own code, not from inside a request handler.")
+        sock = socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            if not _sockets.WINDOWS:  # see bind_threads
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            _sockets.exclusive(sock)
+            sock.bind((host, port))
+            sock.listen(4096)
+            sock.setblocking(False)
+        except OSError as err:
+            sock.close()
+            self.bind_failed(line, err, host, port)
+        protocol = _loop_protocol(self, self.handler_class())
+
+        async def serve():
+            ignore_sigpipe()  # on the loop's thread
+            return await loop.aio.create_server(protocol, sock=sock)
+
+        self.aserver = loop.call(serve())
+        self.loop = loop
+        self.stopped.clear()
+        loop.closers.append(self.shutdown)
+        self.host, self.port = sock.getsockname()[:2]
+
+    def bind_threads(self, line, host, port):
+        ignore_sigpipe()
         from tblib import _sockets
 
         class Server(ThreadingHTTPServer):
@@ -167,22 +229,11 @@ class App:
                 super().server_bind()
 
         try:
-            self.server = Server((host, port), Handler)
+            self.server = Server((host, port), self.handler_class())
         except OSError as err:
-            if _sockets.port_in_use(err, port):
-                fail(line, f"Port {port} is already in use by another program. Pick another port, or stop it.",
-                     reason="in_use", port=port)
-            if isinstance(err, PermissionError):
-                fail(line, f"I'm not allowed to listen on port {port} (ports below 1024 need administrator "
-                     "rights).", reason="permission", port=port)
-            if _sockets.no_such_address(err):
-                fail(line, f"This computer has no address '{host}' to listen on.", reason="bind", host=host)
-            fail(line, f"I couldn't listen on {host} port {port}: {err.strerror or err}.", reason="bind", port=port)
+            self.bind_failed(line, err, host, port)
         self.server.timeout = 0.5
         self.host, self.port = self.server.server_address[0], self.server.server_address[1]
-        RUNNING.append(self)
-        if host not in ("127.0.0.1", "::1", "localhost") and self.log:
-            self.api.output(f"Note: listening on {host}, so other computers on the network can reach this server.")
 
     @property
     def url(self):
@@ -192,6 +243,9 @@ class App:
         return f"http://{host}:{self.port}"
 
     def serve_forever(self):
+        if self.loop is not None:  # the loop serves; this task just waits for stop()
+            _tasks.wait_event(self.stopped)
+            return
         server = self.server
         if server is None:
             return
@@ -204,6 +258,24 @@ class App:
                 pass
 
     def shutdown(self):
+        aserver, self.aserver = self.aserver, None
+        if aserver is not None:
+            loop = self.loop
+
+            def close():
+                aserver.close()
+                for conn in list(self.conns):
+                    conn.transport.close()
+
+            if loop.on_loop_thread():
+                close()
+            else:
+                try:
+                    loop.aio.call_soon_threadsafe(close)
+                except RuntimeError:  # the loop has closed already
+                    pass
+            self.loop = None
+        self.stopped.set()
         server, self.server = self.server, None
         if server is not None:
             server.shutdown()
@@ -382,38 +454,193 @@ class App:
         h.end_headers()
         h.wfile.flush()
         h.close_connection = True
-        conn = _ws.Connection(h.connection, mask=False, url=h.path)
+        loop_conn = getattr(h, "loop_conn", None)
+        sock = loop_conn.upgrade(h) if loop_conn is not None else h.connection
+        conn = _ws.Connection(sock, mask=False, url=h.path)
         req = self.request_map(h, "GET", path, params, parsed, b"")
         handle = _ws.make_handle(self.api, conn, owner="ws")
         handle["path"] = path
         handle["ip"] = h.client_address[0]
         if self.log:
             self.api.output(f"{h.client_address[0]} WS {h.path} open")
-        try:
-            # Long-lived: runs without the shared callback lock so other requests keep flowing.
-            self.api.call(fn, [handle, req])
-        except _tb.TBError as err:
-            self.errors.append(err)
-            if self.log:
-                self.api.output(f"Error in the WebSocket handler for {path}: {err.message}")
+
+        def session(view=None):
             try:
-                conn.close(1011, "server error")
-            except Exception:
-                pass
-        except Exception as err:
-            try:
-                conn.close(1011, "server error")
-            except Exception:
-                pass
-        finally:
-            if conn.open:
+                # Long-lived: runs without the shared callback lock so other requests keep flowing.
+                self.api.call(fn, [handle, req])
+            except _tb.TBError as err:
+                self.errors.append(err)
+                if self.log:
+                    self.api.output(f"Error in the WebSocket handler for {path}: {err.message}")
                 try:
-                    conn.close(1000, "")
+                    conn.close(1011, "server error")
                 except Exception:
                     pass
-            if self.log:
-                self.api.output(f"{h.client_address[0]} WS {h.path} closed")
+            except Exception:
+                try:
+                    conn.close(1011, "server error")
+                except Exception:
+                    pass
+            finally:
+                if conn.open:
+                    try:
+                        conn.close(1000, "")
+                    except Exception:
+                        pass
+                if self.log:
+                    self.api.output(f"{h.client_address[0]} WS {h.path} closed")
+
+        if loop_conn is not None:  # a task of the loop, so the loop's thread keeps serving
+            _tasks.spawn(self.api.interpreter, session, "ws")
+        else:
+            session()
         return 101
+
+
+# -- serving inside parallel.loop() ------------------------------------------------
+
+_LENGTH = re.compile(rb"\r\ncontent-length:[ \t]*([^\r]*)", re.IGNORECASE)
+_CHUNKED = re.compile(rb"\r\ntransfer-encoding:[^\r]*chunked", re.IGNORECASE)
+
+
+def _body_size(head: bytes, max_body: int):
+    """How many body bytes follow these headers, or None when the handler
+    should answer right away and the connection close (chunked, too big,
+    unreadable: read_body turns those into 411 / 413 / 400)."""
+    if _CHUNKED.search(head):
+        return None
+    found = _LENGTH.search(head)
+    if not found:
+        return 0
+    try:
+        size = int(found.group(1).strip())
+    except ValueError:
+        return None
+    return size if 0 <= size <= max_body else None
+
+
+def _loop_protocol(app, Handler):
+    """An asyncio protocol that feeds complete requests to the ordinary
+    request handler (reading from and writing to memory), so routing and
+    responses are the same code as the threaded server."""
+    import asyncio
+    import io
+
+    class Conn(asyncio.Protocol):
+        def connection_made(self, transport):
+            self.transport = transport
+            self.buf = bytearray()
+            self.ws = None
+            peer = transport.get_extra_info("peername") or ("?", 0)
+            self.peer = tuple(peer[:2])
+            app.conns.add(self)
+
+        def connection_lost(self, exc):
+            app.conns.discard(self)
+            if self.ws is not None:
+                self.ws.feed(None)
+
+        def data_received(self, data):
+            if self.ws is not None:
+                self.ws.feed(data)
+                return
+            self.buf += data
+            while self.buf and self.ws is None and not self.transport.is_closing():
+                end = self.buf.find(b"\r\n\r\n")
+                if end < 0:
+                    if len(self.buf) > MAX_HEADER:
+                        self.transport.write(b"HTTP/1.1 431 Request Header Fields Too Large\r\n"
+                                             b"Content-Length: 0\r\nConnection: close\r\n\r\n")
+                        self.transport.close()
+                    return
+                size = _body_size(bytes(self.buf[:end + 4]), app.max_body)
+                total = end + 4 + (size or 0)
+                if len(self.buf) < total:
+                    return
+                raw = bytes(self.buf[:total])
+                del self.buf[:total]
+                self.answer(raw, size is None)
+
+        def answer(self, raw: bytes, close: bool):
+            h = Handler.__new__(Handler)
+            h.rfile, h.wfile = io.BytesIO(raw), io.BytesIO()
+            h.client_address = self.peer
+            h.server = h.request = h.connection = None
+            h.loop_conn = self
+            h.close_connection = True
+            h.handle_one_request()
+            out = h.wfile.getvalue()
+            if out:
+                self.transport.write(out)
+            if self.ws is None and (h.close_connection or close):
+                self.buf.clear()
+                self.transport.close()
+
+        def upgrade(self, h):
+            """The handshake is written: from now on the bytes are WebSocket frames."""
+            self.transport.write(h.wfile.getvalue())
+            h.wfile = io.BytesIO()
+            self.ws = _TransportSock(app.loop, self.transport)
+            if self.buf:
+                self.ws.feed(bytes(self.buf))
+                self.buf.clear()
+            return self.ws
+
+    return Conn
+
+
+class _TransportSock:
+    """Just enough of a socket for websocket.Connection, over a loop's
+    transport: recv waits (its caller has handed on the loop's baton),
+    sendall and close are passed to the loop's thread."""
+
+    def __init__(self, loop, transport):
+        self.loop, self.transport = loop, transport
+        self.buf = bytearray()
+        self.eof = False
+        self.timeout = None
+        self.cond = threading.Condition()
+
+    def feed(self, data):  # on the loop's thread; None: the connection ended
+        with self.cond:
+            if data is None:
+                self.eof = True
+            else:
+                self.buf += data
+            self.cond.notify_all()
+
+    def settimeout(self, timeout):
+        self.timeout = timeout
+
+    def recv(self, n):
+        deadline = None if self.timeout is None else time.monotonic() + self.timeout
+        with self.cond:
+            while not self.buf and not self.eof:
+                _tasks.check_cancelled()
+                step = 0.05 if deadline is None else min(0.05, deadline - time.monotonic())
+                if step <= 0:
+                    raise TimeoutError("timed out")
+                self.cond.wait(step)
+            data = bytes(self.buf[:n])
+            del self.buf[:n]
+            return data
+
+    def _soon(self, fn, *args):
+        try:
+            self.loop.aio.call_soon_threadsafe(fn, *args)
+        except RuntimeError:  # the loop has closed
+            raise BrokenPipeError("the connection is closed") from None
+
+    def sendall(self, data):
+        if self.transport.is_closing():
+            raise BrokenPipeError("the connection is closed")
+        self._soon(self.transport.write, bytes(data))
+
+    def close(self):
+        try:
+            self._soon(self.transport.close)
+        except BrokenPipeError:
+            pass
 
 
 def json_error(status: int, message: str, **extra) -> dict:
@@ -656,7 +883,7 @@ def load(api):
             return port, host
 
         def started(line, port, host, fn):
-            if app.server is not None:
+            if app.server is not None or app.aserver is not None:
                 fail(line, f"app.{fn}(): this app is already running on {app.url}.")
             if not app.routes and not app.statics:
                 fail(line, f"app.{fn}(): add a route first, like app.get(\"/\", fn(req) {{ return \"hi\" }}).")
@@ -686,6 +913,8 @@ def load(api):
         def start(line, port=None, host=None):
             port, host = port_host(line, port, host, "start")
             started(line, port, host, "start")
+            if app.loop is not None:  # the loop's thread serves it
+                return app.url
             app.thread = threading.Thread(target=app.serve_forever, name=f"tb-server-{app.port}", daemon=True)
             app.thread.start()
             return app.url
@@ -698,6 +927,8 @@ def load(api):
         def wait(line, seconds=None):
             if seconds is not None:
                 check_type(line, seconds, "number", "app.wait", "seconds")
+            if app.loop is not None:
+                return _tasks.wait_event(app.stopped, seconds)
             if app.thread is None:
                 return True
             try:

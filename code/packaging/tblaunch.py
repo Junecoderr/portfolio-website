@@ -41,6 +41,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if getattr(sys, "frozen", False):  # worker processes of parallel.processes start as this program
+        import multiprocessing
+
+        multiprocessing.freeze_support()
     try:
         code = main()
     except KeyboardInterrupt:

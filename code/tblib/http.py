@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 from email.message import Message
 
+from tbcore import tasks as _tasks
 from tblib._api import Module, check_type, fail, fail_os
 
 import tb as _tb
@@ -223,6 +224,7 @@ def load(api):
             "elapsed": _tb.tidy_number(elapsed),
         }
 
+    @_tasks.releases  # inside parallel.loop(), other tasks run while this waits
     def do(line, method, url, options, fn, body=None):
         api.need_desktop(line, "The http library")
         options = options_arg(line, options, fn)
@@ -293,6 +295,7 @@ def load(api):
         "It fails, and saves nothing, if the answer isn't OK (like 404),\n"
         "or is bigger than the max_bytes option (default: 100 MB).\n"
         "Other options are as for get()."))
+    @_tasks.releases
     def download(line, url, path, options=None):
         api.need_desktop(line, "The http library")
         fn = "http.download"

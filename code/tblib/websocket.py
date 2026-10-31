@@ -11,6 +11,7 @@ import struct
 import threading
 import urllib.parse
 
+from tbcore import tasks as _tasks
 from tblib._api import Module, check_type, fail
 from tblib._threads import ignore_sigpipe
 
@@ -106,7 +107,7 @@ class Connection:
         self._write(encode_frame(opcode, bytes(payload), self.mask))
 
     def _write(self, raw: bytes):
-        with self.send_lock:
+        with _tasks.blocking(), self.send_lock:
             try:
                 self.sock.sendall(raw)
             except OSError as err:
@@ -115,7 +116,12 @@ class Connection:
 
     def receive(self, timeout=None):
         """The next text (or bytes) message; None on timeout; raises WsProblem
-        "closed" when the connection ends. Handles ping/pong and fragments."""
+        "closed" when the connection ends. Handles ping/pong and fragments.
+        Inside parallel.loop() other tasks run while it waits."""
+        with _tasks.blocking():
+            return self._receive(timeout)
+
+    def _receive(self, timeout):
         if not self.open:
             raise WsProblem("This WebSocket is closed.", "closed")
         with self.recv_lock:
@@ -172,6 +178,10 @@ class Connection:
                     return bytes(data)
 
     def close(self, code: int = 1000, reason: str = ""):
+        with _tasks.blocking():
+            self._close(code, reason)
+
+    def _close(self, code, reason):
         if not self.open:
             self._shutdown()
             return
@@ -435,7 +445,8 @@ def load(api):
             if options.get("insecure") is not None:
                 insecure = check_type(line, options["insecure"], "bool", "websocket.connect", '"insecure"')
         try:
-            conn = connect(url.strip(), headers, float(timeout), ca_file, insecure)
+            with _tasks.blocking():
+                conn = connect(url.strip(), headers, float(timeout), ca_file, insecure)
         except WsProblem as err:
             fail(line, err.message, reason=err.reason, url=url)
         handle = make_handle(api, conn, line)

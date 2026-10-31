@@ -1,0 +1,26 @@
+# CPU-bound work on 1 process vs 4 (parallel.processes, TB 3.2).
+# Run from code/:  uv run --python /opt/homebrew/bin/python3.12 python tb.py bench/processes.tb [n] [jobs]
+import os
+import parallel
+import time
+
+fn fib(n) {
+  if n < 2 { return n }
+  return fib(n - 1) + fib(n - 2)
+}
+
+let n = if len(os.args) > 0 then num(os.args[0]) else 24
+let jobs = if len(os.args) > 1 then num(os.args[1]) else 8
+let items = [n] * jobs
+
+let start = time.timestamp()
+let one = parallel.processes(fib, items, 1)
+let t1 = time.timestamp() - start
+start = time.timestamp()
+let four = parallel.processes(fib, items, 4)
+let t4 = time.timestamp() - start
+assert one == four
+say(f"{jobs} x fib({n}) on {parallel.cpu_count()} cores")
+say(f"1 worker:  {t1:.2f} s")
+say(f"4 workers: {t4:.2f} s")
+say(f"speed-up:  {t1 / t4:.2f}x")
