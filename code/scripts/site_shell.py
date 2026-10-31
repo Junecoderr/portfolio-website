@@ -45,7 +45,7 @@ def esc(text: str) -> str:
     return html.escape(text, quote=False)
 
 
-def header(current: str = "", prefix: str = "", version: str = "3.1.0") -> str:
+def header(current: str = "", prefix: str = "", version: str = "3.2.0") -> str:
     links = []
     for href, label in NAV:
         attrs = f'href="{prefix}{href}"'
@@ -68,7 +68,7 @@ def header(current: str = "", prefix: str = "", version: str = "3.1.0") -> str:
   </header>"""
 
 
-def footer(prefix: str = "", version: str = "3.1.0") -> str:
+def footer(prefix: str = "", version: str = "3.2.0") -> str:
     p = prefix
     return f"""  <footer class="site-footer">
     <div class="footer-inner">
@@ -117,7 +117,7 @@ def footer(prefix: str = "", version: str = "3.1.0") -> str:
 
 
 def page(title: str, description: str, main: str, *, current: str = "", prefix: str = "",
-         scripts: tuple[str, ...] = (), version: str = "3.1.0", styles: tuple[str, ...] = ()) -> str:
+         scripts: tuple[str, ...] = (), version: str = "3.2.0", styles: tuple[str, ...] = ()) -> str:
     """styles: extra stylesheets in assets/css/ after style.css (the library
     pages add visuals.css for their "Visualize" pictures)."""
     tags = "\n".join(f'  <script src="{prefix}assets/js/{s}" defer></script>' for s in scripts)

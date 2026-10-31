@@ -20,6 +20,10 @@ How to write an entry:
 
 ## Unreleased
 
+## 3.2.0 - 2026-10-31
+
+A faster engine, a profiler, an event loop and process workers for concurrency, streaming for files of any size, Mach-O and much more of YARA, Sigma correlations, official ATT&CK data, debugging from VS Code, and a playground that never freezes the page.
+
 ### Added
 
 - A faster engine: code that runs often is translated into a quicker form, more than twice as fast as TB 3.0 on the benchmark set. `TB_JIT=off` turns it off.

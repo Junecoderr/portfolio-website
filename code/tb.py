@@ -77,7 +77,7 @@ def engine_class(name: str | None = None):
 
 Interpreter = engine_class()
 
-__version__ = "3.1.0"
+__version__ = "3.2.0"
 
 
 # ---------------------------------------------------------------------------

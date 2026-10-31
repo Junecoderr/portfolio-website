@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.0
+
+- Released alongside TB 3.2. Debug TB programs with breakpoints, stepping and variables (`tb debug --dap`; needs TB 3.2), plus rename and find references across files, quick fixes and organise imports.
+
 ## 3.1.0
 
 - Released alongside TB 3.1. Signature help highlights the input you are typing, including named inputs (`workers = 8`) for standard-library functions.

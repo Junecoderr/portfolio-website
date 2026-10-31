@@ -361,7 +361,7 @@ def main(argv: list[str] | None = None) -> int:
     (ex_out / "index.json").write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     match = VERSION_RE.search((ROOT / "tb.py").read_text(encoding="utf-8"))
-    version = match.group(1) if match else "3.1.0"
+    version = match.group(1) if match else "3.2.0"
 
     sys.path.insert(0, str(SCRIPTS))
     import gen_lib_docs  # noqa: E402  (imports tb, so only after the checks above)

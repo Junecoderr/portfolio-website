@@ -27,8 +27,8 @@ import os
 import sys
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))  # noqa: F821 (SPECPATH is set by PyInstaller)
-VERSION = (3, 1, 0, 0)
-VERSION_TEXT = "3.1.0"
+VERSION = (3, 2, 0, 0)
+VERSION_TEXT = "3.2.0"
 ICON = os.path.join(ROOT, "packaging", "windows", "tb.ico")
 LAUNCHER = os.path.join(ROOT, "packaging", "tblaunch.py")
 

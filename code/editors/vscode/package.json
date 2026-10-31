@@ -2,7 +2,7 @@
   "name": "tb-vscode",
   "displayName": "TB Language",
   "description": "Syntax highlighting, snippets, formatting, checks, the language server and a debugger for TB (.tb files).",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "publisher": "tb-lang",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -263,7 +263,7 @@
     }
   },
   "scripts": {
-    "package": "vsce package --out tb-vscode-3.1.0.vsix --allow-missing-repository",
+    "package": "vsce package --out tb-vscode-3.2.0.vsix --allow-missing-repository",
     "lint": "node --check client/extension.js && node -e \"for (const f of ['package.json','language-configuration.json','syntaxes/tb.tmLanguage.json','snippets/tb.json']) JSON.parse(require('fs').readFileSync(f, 'utf8'))\""
   },
   "dependencies": {

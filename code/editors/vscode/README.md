@@ -34,7 +34,7 @@ run / format / check commands and the TB language server.
 
 1. Install TB from <https://code.tanisha.ceo/download.html> so that `tb`
    works in a terminal (`tb --version`).
-2. Install this extension (`tb-vscode-3.1.0.vsix` from the Downloads page:
+2. Install this extension (`tb-vscode-3.2.0.vsix` from the Downloads page:
    Extensions view > `...` > *Install from VSIX...*).
 3. Open a `.tb` file.
 
@@ -59,7 +59,7 @@ Format and Check are unavailable (they need TB 3.0), Run File still works.
 ```
 cd editors/vscode
 npm install
-npm run package        # writes tb-vscode-3.1.0.vsix
+npm run package        # writes tb-vscode-3.2.0.vsix
 ```
 
 The client is plain JavaScript (`client/extension.js`), no bundler; the only

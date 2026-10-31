@@ -179,7 +179,7 @@ Every function is documented in the reference
 | `tb login` / `tb publish` / `tb yank` | Publish your own packages |
 | `tb lsp` | Language server (used by editors) |
 
-**Editor support:** the VS Code extension (`tb-vscode-3.1.0.vsix`, from the
+**Editor support:** the VS Code extension (`tb-vscode-3.2.0.vsix`, from the
 download page) provides syntax highlighting, completion, hover documentation,
 diagnostics, go to definition, formatting and run/test commands. Any editor
 with Language Server Protocol support can use `tb lsp`.
@@ -232,7 +232,7 @@ takes a version out of ranges without breaking projects that pinned it.
 
 ## Compatibility and versioning
 
-TB follows semantic versioning. The current release is **3.1.0**. Breaking
+TB follows semantic versioning. The current release is **3.2.0**. Breaking
 changes between major versions are documented with migration steps; see
 [`MIGRATION-3.0.md`](MIGRATION-3.0.md) for 2.x to 3.0.
 

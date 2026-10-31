@@ -67,7 +67,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging" / "tb.spec"
 DEMO = ROOT / "welcome.tb"
-VERSION = "3.1.0"
+VERSION = "3.2.0"
 GUI_APP = ROOT / "apps" / "calculator" / "main.tb"
 
 # A program that touches several native libraries, with its exact output.

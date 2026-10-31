@@ -191,9 +191,9 @@ def test_comments_and_declarations(grammar):
 def test_package_metadata(package):
     assert package["name"] == "tb-vscode"
     assert package["publisher"] == "tb-lang"
-    assert package["version"] == "3.1.0"
+    assert package["version"] == "3.2.0"
     assert package["main"] == "./client/extension.js"
-    assert "tb-vscode-3.1.0.vsix" in package["scripts"]["package"]
+    assert "tb-vscode-3.2.0.vsix" in package["scripts"]["package"]
     assert package["icon"] == "images/icon.png"
     assert "vscode-languageclient" in package["dependencies"]
 

@@ -574,7 +574,7 @@ def test_changelog_matches_the_version_and_renders(tmp_path):
     assert [r.date for r in rels] == sorted((r.date for r in rels), reverse=True)
     assert all(r.summary and r.sections for r in rels)
     kinds = {r.version: changelog.kind(r, rels[i + 1] if i + 1 < len(rels) else None) for i, r in enumerate(rels)}
-    assert (kinds["3.0.0"], kinds["2.0.1"], kinds.get("3.1.0", "Minor")) == ("Major", "Patch", "Minor")
+    assert (kinds["3.0.0"], kinds["2.0.1"], kinds.get("3.2.0", "Minor")) == ("Major", "Patch", "Minor")
     # Every published version is a release on GitHub with downloads; 2.0.0 never was.
     assert [r.version for r in rels if not r.published] == ["2.0.0"]
     assert {r.version for r in rels if r.published} >= {"2.0.1", "3.0.0"}

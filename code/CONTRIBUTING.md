@@ -150,7 +150,7 @@ doesn't match `tb.__version__`. A notes-only fix (a typo, a missed item) just
 needs an edit to `CHANGELOG.md` and a redeploy. Then:
 
 ```sh
-git tag tb-v3.1.0 && git push origin tb-v3.1.0
+git tag tb-v3.2.0 && git push origin tb-v3.2.0
 ```
 
 `.github/workflows/tb-release.yml` builds and tests Windows, macOS and Linux
