@@ -11,6 +11,10 @@ needs no copy of the program. Items and results must be plain values (nil,
 true/false, numbers, text, bytes, lists, maps); anything else is refused with
 a clear error before any process starts (or when a result comes back).
 
+TB 3.3: the worker processes stay up between calls (a warm pool, stopped when
+the program ends), and each call's function travels with its chunks of items
+(pickled once per call, remade once per worker per call).
+
 Processes use the "spawn" start method on every system: fork is unsafe once
 threads exist and doesn't exist on Windows. Frozen builds (PyInstaller) call
 multiprocessing.freeze_support() first thing (tb.py, packaging/tblaunch.py),
@@ -29,6 +33,7 @@ from tbcore.compiler import UNSET
 from tblib._api import fail, fail_timeout, fail_type, make_object, method, native_class
 
 PLAIN = (type(None), bool, int, float, str, bytes)
+_PLAIN_TYPES = frozenset(PLAIN)
 _LIMIT = 60000 if sys.version_info >= (3, 11) else 20000
 
 
@@ -59,6 +64,9 @@ def check_plain(value, seen=None):
             raise CantCross("a list or map that contains itself")
         seen.add(id(value))
         if isinstance(value, list):
+            if set(map(type, value)) <= _PLAIN_TYPES:  # the common case, in C: several times faster
+                seen.discard(id(value))
+                return value
             for item in value:
                 check_plain(item, seen)
         else:
@@ -186,11 +194,18 @@ class Packer:
 _STATE: dict = {}
 
 
-def _child_init(engine, base_dir, script_path, argv, table, root) -> None:
-    """Pool initializer: never raises (a failing initializer makes Pool
-    restart workers forever), problems are reported by each call instead."""
+def _child_start() -> None:
+    """Pool initializer (once per worker process)."""
+    sys.setrecursionlimit(max(sys.getrecursionlimit(), _LIMIT))
+
+
+def _child_init(blob) -> None:
+    """Remake the call's function in a fresh interpreter. Never raises:
+    problems are reported by each item instead."""
     try:
-        sys.setrecursionlimit(max(sys.getrecursionlimit(), _LIMIT))
+        import pickle
+
+        engine, base_dir, script_path, argv, table, root = pickle.loads(blob)
 
         def output(text):
             print(text, flush=True)
@@ -247,7 +262,13 @@ def _child_call(job):
         return ("err", at, f"Something went wrong in a worker process: {err}", None, "Error")
 
 
-def _child_chunk(jobs):
+def _child_chunk(key, blob, jobs):
+    """Run some items of one call. The worker stays alive between calls, so
+    the function is remade only when a chunk of a new call arrives."""
+    if _STATE.get("key") != key:
+        _STATE.clear()
+        _child_init(blob)
+        _STATE["key"] = key
     return [_child_call(job) for job in jobs]
 
 
@@ -256,6 +277,68 @@ def _child_chunk(jobs):
 # ---------------------------------------------------------------------------
 
 PLAIN_HINT = "Use plain values: nil, true/false, numbers, text, bytes, lists and maps."
+
+
+DEAD = ("parallel.processes(): a worker process stopped suddenly (it may have run out of memory or been "
+        "killed), so its items have no results.")
+
+# One pool of worker processes per program, started by the first call and kept
+# warm for the next ones (starting a worker costs ~0.3-1 s: a new Python plus
+# importing TB). Workers are started as needed, up to `size`. tb.run() stops it
+# when the program ends, atexit as a backstop.
+_POOL: dict = {"pool": None, "size": 0, "users": 0, "started": 0}
+_pool_lock = threading.Lock()
+_calls = iter(range(1, 1 << 62))
+
+
+def _dead(pool) -> bool:
+    procs = list((getattr(pool, "_processes", None) or {}).values())
+    return bool(getattr(pool, "_broken", False)) or any(proc.exitcode is not None for proc in procs)
+
+
+def _take_pool(workers: int, line):
+    import atexit
+    import multiprocessing
+    import os
+    from concurrent.futures import ProcessPoolExecutor
+
+    with _pool_lock:
+        pool = _POOL["pool"]
+        if pool is not None and _POOL["users"] == 0 and (_dead(pool) or _POOL["size"] < workers):
+            _POOL["pool"] = None
+            _stop_pool(pool)
+            pool = None
+        if pool is None:
+            size = max(workers, os.cpu_count() or 1)
+            try:
+                pool = ProcessPoolExecutor(size, multiprocessing.get_context("spawn"), _child_start)
+            except (OSError, ImportError, ValueError) as err:
+                fail(line, f"parallel.processes() couldn't start worker processes: {err}")
+            if not _POOL["started"]:
+                atexit.register(stop_pool, True)
+            _POOL.update(pool=pool, size=size, started=_POOL["started"] + 1)
+        _POOL["users"] += 1
+        return pool
+
+
+def _give_back(pool, healthy: bool) -> None:
+    with _pool_lock:
+        _POOL["users"] -= 1
+        if healthy or _POOL["pool"] is not pool:
+            return
+        _POOL["pool"] = None
+    _stop_pool(pool)
+
+
+def stop_pool(force: bool = False) -> None:
+    """The program is over: stop its worker processes (unless a call is
+    still using them, then atexit does it)."""
+    with _pool_lock:
+        pool = _POOL["pool"]
+        if pool is None or (_POOL["users"] and not force):
+            return
+        _POOL["pool"] = None
+    _stop_pool(pool)
 
 
 def run(interp, fn, items, workers: int, line):
@@ -273,57 +356,57 @@ def run(interp, fn, items, workers: int, line):
                             f"process. {PLAIN_HINT}")
     if not items:
         return []
-    import multiprocessing
-    from concurrent.futures import ProcessPoolExecutor
+    import pickle
     from concurrent.futures.process import BrokenProcessPool
 
     workers = max(1, min(workers, len(items)))
-    args = (getattr(interp, "engine", "tree"), interp.base_dir, interp.script_path, list(interp.argv),
-            packer.table, root)
-    try:
-        pool = ProcessPoolExecutor(workers, multiprocessing.get_context("spawn"), _child_init, args)
-    except (OSError, ImportError, ValueError) as err:
+    try:  # pickled once here, not once per chunk
+        blob = pickle.dumps((getattr(interp, "engine", "tree"), interp.base_dir, interp.script_path,
+                             list(interp.argv), packer.table, root))
+    except Exception as err:  # pragma: no cover - the packer only keeps picklable values
         fail(line, f"parallel.processes() couldn't start worker processes: {err}")
+    key = next(_calls)
     jobs = list(enumerate(items))
     size = max(1, len(jobs) // (workers * 4))
+    chunks = [jobs[i:i + size] for i in range(0, len(jobs), size)]
+    # shortcut: blob goes with every chunk (workers*4 copies); fine unless fn uses huge data.
+    pool = _take_pool(workers, line)
+    healthy = False
     rows = []
     try:
-        finished = threading.Event()
-        try:
-            futures = [pool.submit(_child_chunk, jobs[i:i + size]) for i in range(0, len(jobs), size)]
-        except (OSError, BrokenProcessPool) as err:
-            fail(line, f"parallel.processes() couldn't start worker processes: {err}")
-        left = [len(futures)]
-        lock = threading.Lock()
-
-        def one_done(_):
-            with lock:
-                left[0] -= 1
-                if left[0] == 0:
-                    finished.set()
-
-        for future in futures:  # done callbacks run after the result is set, so result() never waits
-            future.add_done_callback(one_done)
-        # A worker that dies (out of memory, killed) breaks the pool and every future
-        # finishes. Python doesn't notice that promptly everywhere (seen on Windows), so
-        # also look at the worker processes ourselves.
-        while not _tasks.wait_event(finished, 0.5):
-            procs = list((getattr(pool, "_processes", None) or {}).values())
-            if any(proc.exitcode is not None for proc in procs) and not finished.is_set():
-                fail(line, "parallel.processes(): a worker process stopped suddenly (it may have run out of "
-                           "memory or been killed), so its items have no results.")
-        for future in futures:
-            try:
-                rows.extend(future.result())
-            except BrokenProcessPool:
-                fail(line, "parallel.processes(): a worker process stopped suddenly (it may have run out of "
-                           "memory or been killed), so its items have no results.")
-            except Exception as err:  # e.g. a value pickle refused
-                fail(line, f"parallel.processes(): a worker process failed: {err}")
+        wake = threading.Event()
+        running: set = set()
+        sent = 0
+        while sent < len(chunks) or running:
+            wake.clear()
+            for future in [f for f in running if f.done()]:
+                running.discard(future)
+                try:
+                    rows.extend(future.result())
+                except BrokenProcessPool:
+                    fail(line, DEAD)
+                except Exception as err:  # e.g. a value pickle refused
+                    fail(line, f"parallel.processes(): a worker process failed: {err}")
+            # At most `workers` chunks at a time: the pool may hold more processes.
+            while sent < len(chunks) and len(running) < workers:
+                try:
+                    future = pool.submit(_child_chunk, key, blob, chunks[sent])
+                except (OSError, BrokenProcessPool) as err:
+                    fail(line, f"parallel.processes() couldn't start worker processes: {err}")
+                sent += 1
+                running.add(future)
+                future.add_done_callback(lambda _: wake.set())
+            # A worker that dies (out of memory, killed) breaks the pool and every future
+            # finishes. Python doesn't notice that promptly everywhere (seen on Windows), so
+            # also look at the worker processes ourselves.
+            if running and not _tasks.wait_event(wake, 0.5):
+                if _dead(pool) and not all(f.done() for f in running):
+                    fail(line, DEAD)
+        healthy = True
     finally:
-        _stop_pool(pool)
+        _give_back(pool, healthy)
     results = [None] * len(items)
-    for row in rows:
+    for row in sorted(rows, key=lambda row: row[1]):
         if row[0] == "err":
             _, at, message, err_line, cls = row
             raise _tb.TBError(message, err_line or line, {"item": at + 1},
@@ -333,7 +416,7 @@ def run(interp, fn, items, workers: int, line):
 
 
 def _stop_pool(pool) -> None:
-    """Stop the workers now, finished or not (cancel, Ctrl+C, an error)."""
+    """Stop the workers now, finished or not (cancel, Ctrl+C, an error, the end)."""
     processes = list((getattr(pool, "_processes", None) or {}).values())
     pool.shutdown(wait=False, cancel_futures=True)
     for process in processes:

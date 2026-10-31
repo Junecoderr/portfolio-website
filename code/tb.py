@@ -129,7 +129,12 @@ def run(
         interp.loading = [interp.script_path]
     if args is not None:
         interp.argv = list(args)
-    _guarded(lambda: interp.run(parse(source, interp.base_dir)))
+    try:
+        _guarded(lambda: interp.run(parse(source, interp.base_dir)))
+    finally:
+        procs = sys.modules.get("tblib._procs")
+        if procs is not None:  # the program is over: so are its parallel.processes workers
+            procs.stop_pool()
     return interp
 
 

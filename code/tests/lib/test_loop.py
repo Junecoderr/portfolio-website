@@ -618,6 +618,142 @@ def test_processes_report_a_worker_that_dies():
     assert not [p for p in multiprocessing.active_children() if p.pid not in before]
 
 
+def _new_children(before):
+    import multiprocessing
+
+    return {p.pid for p in multiprocessing.active_children()} - before
+
+
+def test_processes_reuse_warm_workers_and_stop_them_when_the_program_ends():
+    import multiprocessing
+
+    from tblib import _procs
+
+    before = {p.pid for p in multiprocessing.active_children()}
+    started = _procs._POOL["started"]
+    seen = []
+
+    def output(text):
+        seen.append((text, _new_children(before)))
+
+    src = '''import parallel
+fn sq(x) { return x * x }
+say(parallel.processes(sq, [1, 2, 3, 4], 2))
+say(parallel.processes(x => x + 1, [1, 2, 3, 4], 2))
+say(parallel.processes(sq, [5, 6], 1))'''
+    tb.run(src, interpreter=tb.Interpreter(output=output))
+    assert [text for text, _ in seen] == ["[1, 4, 9, 16]", "[2, 3, 4, 5]", "[25, 36]"]
+    first = seen[0][1]
+    assert first and all(pids == first for _, pids in seen), seen  # the same processes every call
+    assert _procs._POOL["started"] == started + 1
+    time.sleep(0.5)
+    assert not _new_children(before), "worker processes outlived the program"
+
+
+def test_processes_errors_cross_from_a_reused_pool():
+    from tblib import _procs
+
+    started = _procs._POOL["started"]
+    src = '''import parallel
+fn check(x) {
+  if x % 2 == 0 {
+    throw ValueError(f"{x} is even")
+  }
+  return x
+}
+say(parallel.processes(check, [1, 3], 2))
+try { parallel.processes(check, [1, 2, 3, 4, 5, 6, 7, 8], 4) } catch err: ValueError { say(err.message, err.line, err.item) }
+say(parallel.processes(check, [5, 7], 2))'''
+    assert run_tb(src) == ["[1, 3]", "2 is even 4 2", "[5, 7]"]  # the first failing item, though 4 may finish first
+    assert _procs._POOL["started"] == started + 1
+
+
+def test_processes_replace_a_reused_pool_whose_worker_died(tmp_path):
+    import multiprocessing
+
+    from tblib import _procs
+
+    before = {p.pid for p in multiprocessing.active_children()}
+    mark = tmp_path / "started.txt"
+    src = f'''import fs
+import parallel
+say(parallel.processes(x => x * 2, [1, 2], 2))
+try {{
+  parallel.processes(fn(x) {{
+    fs.write({str(mark)!r}, "go")
+    parallel.sleep(60)
+  }}, [1, 2], 2)
+}} catch err {{ say(err.message) }}
+say(parallel.processes(x => x + 1, [1, 2], 2))'''.replace("'", '"')
+    outcome = {}
+
+    def go():
+        try:
+            outcome["lines"] = run_tb(src)
+        except BaseException as err:  # reported below
+            outcome["error"] = err
+
+    runner = threading.Thread(target=go, daemon=True)
+    runner.start()
+    deadline = time.monotonic() + 30
+    while not mark.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert mark.exists(), outcome
+    time.sleep(0.3)
+    next(iter(_procs._POOL["pool"]._processes.values())).terminate()  # like running out of memory
+    runner.join(30)
+    assert not runner.is_alive(), "parallel.processes() kept waiting for a dead worker"
+    assert outcome.get("lines") == ["[2, 4]", _procs.DEAD, "[2, 3]"], outcome
+    time.sleep(0.5)
+    assert not _new_children(before)
+
+
+def _alive(pid):
+    if sys.platform == "win32":
+        import ctypes
+
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    import os
+
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # pragma: no cover - someone else's process now
+        return False
+    return True
+
+
+def test_processes_workers_stop_when_python_exits():
+    # Like the REPL: interp.run() leaves the pool warm, so exiting must stop it.
+    from conftest import ROOT
+
+    code = '''import sys
+sys.path.insert(0, sys.argv[1])
+import tb
+from tblib import _procs
+interp = tb.Interpreter(output=print)
+interp.run(tb.parse("import parallel\\nsay(parallel.processes(x => x * 3, [1, 2, 3], 3))"))
+print(*_procs._POOL["pool"]._processes)
+'''
+    out = subprocess.run([sys.executable, "-c", code, str(ROOT)], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    lines = out.stdout.splitlines()
+    assert lines[0] == "[3, 6, 9]"
+    pids = [int(pid) for pid in lines[1].split()]
+    assert pids
+    deadline = time.monotonic() + 10
+    while any(_alive(pid) for pid in pids) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert not [pid for pid in pids if _alive(pid)], "worker processes outlived Python"
+
+
 def test_shared_queue_crosses_processes():
     src = '''import parallel
 let q = parallel.shared_queue()
