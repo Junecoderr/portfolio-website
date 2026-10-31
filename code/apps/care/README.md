@@ -2,7 +2,8 @@
 
 "How are you today?" A gentle mood check-in. Pick how you
 feel, write a few words if you like, and save it: you get a kind message
-back, and the check-in goes into a journal (`journal.json`, next to the app)
+back, and the check-in goes into a journal (`journal.json`, next to the app, or in `.tb/care` in your home folder
+if the app folder is read-only)
 shown newest first. Double-click a journal entry to read its note.
 
 ```

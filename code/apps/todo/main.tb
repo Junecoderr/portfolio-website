@@ -1,12 +1,31 @@
 # To-do: add tasks, tick them off, delete them.
-# Your list is saved in todo.json, next to this file.
+# Your list is saved in todo.json, next to this file (see data_file below).
 # Run: tb apps/todo/main.tb
 
 import gui
 import json
 import fs
 
-let FILE = fs.here("todo.json")
+# Saved next to this file. If this folder is read-only (TB installed with
+# apt or dnf), it's saved in .tb/todo in your home folder instead.
+fn data_file(name) {
+  let local = fs.here(name)
+  if fs.exists(local) {
+    return local
+  }
+  let probe = fs.here(".write-test")
+  try {
+    fs.write(probe, "")
+    fs.remove(probe)
+    return local
+  } catch err {
+    let folder = fs.join(fs.home(), ".tb", "todo")
+    fs.mkdir(folder)
+    return fs.join(folder, name)
+  }
+}
+
+let FILE = data_file("todo.json")
 
 # Each task is a map: {"text": "Buy flowers", "done": false}
 let tasks = []

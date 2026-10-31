@@ -2,7 +2,8 @@
 
 A to-do list in a window. Type a task and press Enter (or click **Add**),
 double-click a task to tick it off, and delete tasks or clear the finished ones with
-the buttons underneath. The list is saved in `todo.json` next to the app,
+the buttons underneath. The list is saved in `todo.json` next to the app (or in `.tb/todo` in your
+home folder if the app folder is read-only, as after an apt or dnf install),
 so it is still there next time.
 
 ```

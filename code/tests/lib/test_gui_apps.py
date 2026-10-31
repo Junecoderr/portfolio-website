@@ -6,8 +6,10 @@ typing, clicking, picking menu items.
 """
 
 import json
+import os
 import random
 import shutil
+import sys
 
 import pytest
 
@@ -78,6 +80,28 @@ def test_todo_add_tick_delete_and_save(fake, tmp_path):
     assert table.rows == []
     assert json.loads((folder / "todo.json").read_text()) == []
     assert lines == []
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0,
+                    reason="needs POSIX permissions (an apt/dnf install folder is read-only)")
+def test_todo_saves_in_home_when_its_folder_is_read_only(fake, tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    folder = tmp_path / "todo"
+    shutil.copytree(ROOT / "apps" / "todo", folder)
+    folder.chmod(0o555)
+    try:
+        main = folder / "main.tb"
+        tb.run(main.read_text(encoding="utf-8"), interpreter=tb.Interpreter(output=lambda s: None), path=str(main))
+        box = fake.window_.find("input")
+        box.type("Water plants")
+        box.enter()
+    finally:
+        folder.chmod(0o755)
+    assert not (folder / "todo.json").exists()
+    saved = json.loads((home / ".tb" / "todo" / "todo.json").read_text())
+    assert saved == [{"text": "Water plants", "done": False}]
 
 
 def test_todo_needs_a_selection(fake, tmp_path):
