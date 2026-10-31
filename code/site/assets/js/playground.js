@@ -11,6 +11,7 @@
   var gutter = document.getElementById("pg-gutter");
   var picker = document.getElementById("pg-example");
   var runBtn = document.getElementById("pg-run");
+  var stopBtn = document.getElementById("pg-stop");
   var resetBtn = document.getElementById("pg-reset");
   var clearBtn = document.getElementById("pg-clear");
   var output = document.getElementById("pg-output");
@@ -149,7 +150,9 @@
 
   function showAbout(ex, edited) {
     var text = ex && ex.description ? ex.description : "";
-    if (ex && ex.interactive) text += (text ? " " : "") + "This one asks you questions, so a little box will pop up while it runs.";
+    if (ex && ex.interactive) text += (text ? " " : "") + (window.TB.canAskInline
+      ? "This one asks you questions: type each answer in the console and press Enter."
+      : "This one asks you questions, so a little box will pop up while it runs.");
     about.textContent = text;
   }
 
@@ -258,6 +261,7 @@
     if (running) return;
     running = true;
     runBtn.disabled = true;
+    stopBtn.hidden = false;
     output.textContent = "";
     markError(null);
     var ready = window.TB.isLoaded();
@@ -266,18 +270,20 @@
       .then(function () {
         setStatus("Running...", true);
         return window.TB.run(code.value, {
-          onOutput: function (line) { output.appendChild(document.createTextNode(line + "\n")); },
-          onAsk: function (prompt, recent) {
-            var answer = window.TB.ask(prompt, recent);
-            output.appendChild(span("out-ask", prompt));
-            output.appendChild(span("out-answer", answer));
-            output.appendChild(document.createTextNode("\n"));
-            return answer;
-          }
+          onOutput: function (line) {
+            // Follow the output only while the reader is at the bottom.
+            var atEnd = output.scrollHeight - output.scrollTop - output.clientHeight < 24;
+            output.appendChild(document.createTextNode(line + "\n"));
+            if (atEnd) output.scrollTop = output.scrollHeight;
+          },
+          onAsk: function (prompt, recent) { return window.TB.askInline(output, prompt, recent); }
         });
       })
       .then(function (result) {
-        if (!result.ok) {
+        if (result.stopped) {
+          output.appendChild(span("out-done", result.error));
+          setStatus("");
+        } else if (!result.ok) {
           output.appendChild(span("out-error", result.error));
           var m = /On line (\d+)/.exec(result.error || "");
           if (m) markError(Number(m[1]));
@@ -295,9 +301,16 @@
       .then(function () {
         running = false;
         runBtn.disabled = false;
+        var hadFocus = document.activeElement === stopBtn;
+        stopBtn.hidden = true;
+        if (hadFocus) runBtn.focus();
       });
   }
   runBtn.addEventListener("click", run);
+  stopBtn.addEventListener("click", function () {
+    setStatus("Stopping...", true);
+    window.TB.stop();
+  });
 
   // ------------------------------------------------------------- share
   if (shareBtn) {

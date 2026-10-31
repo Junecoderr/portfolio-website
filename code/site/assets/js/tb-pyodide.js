@@ -1,217 +1,198 @@
-// Runs TB programs in the browser.
+// Runs TB programs in the browser, in a Web Worker (tb-worker.js) so the page
+// stays usable while a program runs.
 //
 //   TB.load()  -> Promise that resolves once Pyodide and tb.py are ready
-//   TB.run(source, { onOutput(line), onAsk(prompt, recent) -> string })
-//              recent = lines printed since the last question. While a
-//              program runs the page can't repaint, so the default ask()
-//              shows them inside the prompt box for context.
-//              -> Promise<{ ok: boolean, error: string | null }>
+//   TB.run(source, { onOutput(line), onAsk(prompt, recent) -> string | Promise })
+//              -> Promise<{ ok, error, stopped }>
+//              Output arrives while the program runs. recent = lines printed
+//              since the last question.
+//   TB.stop()  stops the running program at once
+//   TB.askInline(outputEl, prompt, recent) -> an onAsk that types the answer
+//              into the output box, or (when the browser can't) a prompt box
 //
-// Pyodide (Python compiled to WebAssembly, about 10 MB) is served from
-// vendor/pyodide/ on this same site; tb.py, tbcore/ (the language) and
-// tblib/ (the standard library, with tblib/data/) from the site root. Nothing
-// is fetched from anywhere else. Programs run on the page's main thread so
-// ask() can use the browser's built-in (synchronous) prompt box.
+// Inline answers and an instant Stop need a SharedArrayBuffer, which browsers
+// only give cross-origin isolated pages (the COOP/COEP headers in
+// vercel.json). Without one, Stop restarts the worker, and a program that
+// calls ask() is run again on the page's own thread with prompt boxes.
+//
+// Everything (Pyodide in vendor/pyodide/, tb.py, tbcore/, tblib/) comes from
+// this same site; nothing is fetched from anywhere else.
 (function () {
   "use strict";
 
-  // Work out the site root from this script's own URL so pages in any
-  // folder can use it.
   var here = (document.currentScript && document.currentScript.src) || location.href;
   var SITE_ROOT = new URL("../../", here).href;
-  var PYODIDE_URL = SITE_ROOT + "vendor/pyodide/";
-  var TIME_LIMIT_SECONDS = 10;
+  var WORKER_URL = new URL("tb-worker.js", here).href;
+  var MAIN_TIME_LIMIT = 10;  // seconds, only on the page's own thread
+  var STOP_GRACE_MS = 1000;  // then the worker is replaced
 
-  // The engine: TB 3.0's bytecode VM (the default everywhere). Pyodide has
-  // no threads, and the VM needs none: generators are suspended frames, and
-  // tasks (async fn, parallel) run one after another (tbcore/tasks.py).
-  // The time limit uses the interpreter's trace hook, which the VM calls on
-  // every loop turn and function call, so even `while true { }` stops after
-  // 10 seconds.
-  var ENGINE = "vm";
+  var SHARED = typeof SharedArrayBuffer === "function" && self.crossOriginIsolated === true;
 
-  var PY_HELPER = [
-    "import os, sys, time",
-    "os.environ['TB_ENGINE'] = " + JSON.stringify(ENGINE),
-    "import tb",
-    "",
-    "class _TBTimeout(BaseException):",
-    "    pass",
-    "",
-    "# Keep the VM's fast (untraced) bytecode even though a trace hook is set:",
-    "# its loop back-edges and function calls still call the hook, so the time",
-    "# limit stops any endless loop (even `while true { }`) at full speed.",
-    "def _tb_fast_hook():",
-    "    try:",
-    "        import tbcore.vm as _vm, tbcore.compiler as _c",
-    "        orig_program, orig_code = _c.compile_program, _c.FnTemplate.code",
-    "        _vm.compile_program = lambda body, file=None, traced=False: orig_program(body, file, False)",
-    "        _c.FnTemplate.code = lambda self, traced: orig_code(self, False)",
-    "        return True",
-    "    except Exception:",
-    "        return False  # then traced code: slower, still stops loops with a body",
-    "",
-    "_tb_fast_hook()",
-    "",
-    "def _tb_engine():",
-    "    cls = getattr(tb, 'VMInterpreter', None) if os.environ.get('TB_ENGINE') != 'tree' else None",
-    "    return cls or getattr(tb, 'TreeInterpreter', None) or tb.Interpreter",
-    "",
-    "def _tb_engine_name():",
-    "    return 'vm' if _tb_engine() is getattr(tb, 'VMInterpreter', object()) else 'tree'",
-    "",
-    "def _tb_web_run(source, on_output, on_ask, time_limit):",
-    "    deadline = [time.monotonic() + time_limit]",
-    "    ticks = [0]",
-    "    def hook(event, line, file, env):",
-    "        ticks[0] += 1",
-    "        if ticks[0] % 512 == 0 and time.monotonic() > deadline[0]:",
-    "            raise _TBTimeout()",
-    "    def output(text):",
-    "        on_output(str(text))",
-    "    def ask(prompt):",
-    "        answer = on_ask(str(prompt))",
-    "        deadline[0] = time.monotonic() + time_limit",
-    "        return '' if answer is None else str(answer)",
-    "    old_limit = sys.getrecursionlimit()",
-    "    real_set = sys.setrecursionlimit",
-    "    try:",
-    "        interp = _tb_engine()(output=output, input_fn=ask)",
-    "        interp.trace = hook",
-    "        tb.run(source, interpreter=interp)",
-    "        return None",
-    "    except tb.TBError as err:",
-    "        trace = err.trace_text() if hasattr(err, 'trace_text') else ''",
-    "        if len(trace) > 240:",
-    "            trace = trace[:240].rsplit(' ', 1)[0] + ' ...'",
-    "        return str(err) + ('\\n' + trace if trace else '')",
-    "    except tb.TBExit:",
-    "        return None",
-    "    except _TBTimeout:",
-    "        return ('Oops! The program ran for more than ' + str(int(time_limit)) +",
-    "                ' seconds, so TB stopped it. Is there a while loop that never ends?')",
-    "    except RecursionError:",
-    "        return 'Oops! The program went too deep (too many functions inside functions).'",
-    "    except Exception as err:",
-    "        return 'Oops! Something went wrong inside TB itself: ' + type(err).__name__ + ': ' + str(err)",
-    "    finally:",
-    "        real_set(old_limit)",
-  ].join("\n");
-
-  // Pyodide packages that live outside its standard library zip, vendored
-  // next to it by scripts/fetch_pyodide.py and loaded the first time a
-  // program imports a TB library that needs them.
-  var NEEDS = {
-    sqlite: ["sqlite3"],
-    crypto: ["hashlib"],
-    datetime: ["tzdata"],
-    // These import Python's ssl module when they load (stix and siem work in
-    // the browser; the others then explain that they need the TB app).
-    stix: ["ssl"], siem: ["ssl"], http: ["ssl"], intel: ["ssl"], tls: ["ssl"], websocket: ["ssl"]
-  };
-  var loadedPackages = {};
-
-  function packagesFor(source) {
-    var wanted = [];
-    var re = /^\s*(?:import\s+([a-z_]\w*)|from\s+([a-z_]\w*)\s+import)/gm;
-    var m;
-    while ((m = re.exec(String(source)))) {
-      var lib = m[1] || m[2];
-      (NEEDS[lib] || []).forEach(function (p) {
-        if (!loadedPackages[p] && wanted.indexOf(p) < 0) wanted.push(p);
-      });
-    }
-    return wanted;
-  }
-
-  var loading = null;
+  var worker = null, control = null, flags = null, answerBytes = null;
+  var loading = null, engineName = "vm", ready = false;
+  var job = null;   // the running program: { id, opts, source, resolve, recent }
+  var nextId = 1;
   var queue = Promise.resolve();
-  var pyRun = null;
-  var pyodideRef = null;
-  var engineName = ENGINE;
 
-  async function loadPackagesFor(source) {
-    var wanted = packagesFor(source);
-    if (!wanted.length || !pyodideRef) return;
-    try {
-      await pyodideRef.loadPackage(wanted, { messageCallback: function () {}, errorCallback: function () {} });
-    } catch (e) {
-      // Not vendored? The library gives its own friendly error when it runs.
-    }
-    wanted.forEach(function (p) { loadedPackages[p] = true; });
-    // hashlib may already be imported (by the hash library) without OpenSSL;
-    // reload it so scrypt and pbkdf2_hmac appear.
-    if (wanted.indexOf("hashlib") >= 0) {
-      try {
-        pyodideRef.runPython("import importlib, sys\nif 'hashlib' in sys.modules: importlib.reload(sys.modules['hashlib'])");
-      } catch (e) { /* keep going; crypto reports what is missing */ }
-    }
-  }
+  function fail(text) { return { ok: false, error: text, stopped: false }; }
 
-  function addScript(src) {
-    return new Promise(function (resolve, reject) {
-      if (typeof window.loadPyodide === "function") return resolve();
-      var s = document.createElement("script");
-      s.src = src;
-      s.onload = function () { resolve(); };
-      s.onerror = function () {
-        reject(new Error("Could not load " + src + ". Was the site built with scripts/fetch_pyodide.py?"));
-      };
-      document.head.appendChild(s);
-    });
-  }
-
-  function fetchBytes(url) {
-    return fetch(url, { cache: "no-cache" }).then(function (r) {
-      if (!r.ok) throw new Error("Could not load " + url + " (HTTP " + r.status + ").");
-      return r.arrayBuffer();
-    }).then(function (b) { return new Uint8Array(b); });
-  }
-  function fetchJSON(url) {
-    return fetch(url, { cache: "no-cache" }).then(function (r) {
-      if (!r.ok) throw new Error("Could not load " + url + " (HTTP " + r.status + ").");
-      return r.json();
-    });
-  }
-
-  function load() {
+  function startWorker() {
     if (loading) return loading;
-    loading = (async function () {
-      await addScript(PYODIDE_URL + "pyodide.js");
-      var pyodide = await window.loadPyodide({ indexURL: PYODIDE_URL, stdout: function () {}, stderr: function () {} });
-      // tb.py, the standard library (tblib/) and the sample data the
-      // guides use (apps/data/) all go into Pyodide's in-memory file system,
-      // laid out like the real project, so `import logs` and
-      // logs.read("apps/data/auth.log") work just as on a laptop.
-      var HOME = "/home/pyodide/";
-      // tbcore/ is the language itself (lexer, parser, compiler, VM, ...);
-      // build_site.py lists its files in tbcore/index.json.
-      var lists = await Promise.all([
-        fetchJSON(SITE_ROOT + "tbcore/index.json"),
-        fetchJSON(SITE_ROOT + "tblib/index.json"),
-        fetchJSON(SITE_ROOT + "apps/data/index.json").catch(function () { return []; })
-      ]);
-      var files = ["tb.py"]
-        .concat(lists[0].map(function (f) { return "tbcore/" + f; }))
-        .concat(lists[1].map(function (f) { return "tblib/" + f; }))
-        .concat(lists[2].map(function (f) { return "apps/data/" + f; }));
-      var blobs = await Promise.all(files.map(function (f) { return fetchBytes(SITE_ROOT + f); }));
-      files.forEach(function (f, i) {
-        var dir = (HOME + f).replace(/\/[^\/]*$/, "");
-        pyodide.FS.mkdirTree(dir);
-        pyodide.FS.writeFile(HOME + f, blobs[i]);
-      });
-      pyodide.runPython("import os, sys\nos.chdir('/home/pyodide')\nif '/home/pyodide' not in sys.path: sys.path.insert(0, '/home/pyodide')");
-      pyodide.runPython(PY_HELPER);
-      pyRun = pyodide.globals.get("_tb_web_run");
-      engineName = String(pyodide.runPython("_tb_engine_name()"));
-      pyodideRef = pyodide;
-      return pyodide;
-    })();
-    loading.catch(function () { loading = null; });
+    loading = new Promise(function (resolve, reject) {
+      if (typeof Worker !== "function") return reject(new Error("This browser can't run Web Workers."));
+      worker = new Worker(WORKER_URL);
+      if (SHARED) {
+        control = new SharedArrayBuffer(12 + 65536);
+        flags = new Int32Array(control, 0, 3);
+        answerBytes = new Uint8Array(control, 12);
+      }
+      worker.onmessage = function (e) {
+        var m = e.data || {};
+        if (m.type === "ready") { engineName = m.engine; ready = true; resolve(); }
+        else if (m.type === "failed") { reject(new Error(m.error)); }
+        else if (m.type === "out") { if (job) deliver(m.lines); }
+        else if (m.type === "ask") { if (job) answer(m.prompt); }
+        else if (m.type === "done") { if (job && job.id === m.id) finish(m); }
+      };
+      worker.onerror = function (e) {
+        e.preventDefault();
+        reject(new Error(e.message || "The TB worker could not start."));
+        if (job) finish({ error: "Oops! TB stopped unexpectedly: " + (e.message || "worker error") });
+      };
+      worker.postMessage({ type: "init", root: SITE_ROOT, control: control });
+    });
+    loading.catch(function () { killWorker(); });
     return loading;
   }
 
+  function killWorker() {
+    if (worker) worker.terminate();
+    worker = null; loading = null; ready = false;
+  }
+
+  // Output is painted at most once per frame.
+  // (tb-worker.js sends at most 10,000 lines per run.)
+  var pendingLines = [], painting = false;
+  function deliver(lines) {
+    for (var i = 0; i < lines.length; i++) pendingLines.push(lines[i]);
+    job.recent = job.recent.concat(lines).slice(-50);
+    if (!painting) { painting = true; requestAnimationFrame(paint); }
+  }
+  function paint() {
+    painting = false;
+    var lines = pendingLines, out = job ? job.opts.onOutput : null;
+    pendingLines = [];
+    if (typeof out === "function") lines.forEach(function (l) { out(l); });
+  }
+
+  function answer(prompt) {
+    paint();
+    var current = job, shown = job.recent;
+    job.recent = [];
+    var onAsk = typeof job.opts.onAsk === "function" ? job.opts.onAsk : defaultAsk;
+    Promise.resolve(onAsk(prompt, shown)).then(function (text) {
+      if (job !== current || !flags) return;
+      var bytes = new TextEncoder().encode(text == null ? "" : String(text));
+      var n = Math.min(bytes.length, answerBytes.length);
+      answerBytes.set(bytes.subarray(0, n));
+      Atomics.store(flags, 2, n);
+      Atomics.store(flags, 1, 1);
+      Atomics.notify(flags, 1);
+    });
+  }
+
+  function finish(m) {
+    var j = job;
+    paint();
+    job = null;
+    clearTimeout(j.stopTimer);
+    if (m.needsInput) return j.resolve(runOnPage(j));
+    if (m.stopped) return j.resolve({ ok: false, error: "You stopped the program.", stopped: true });
+    j.resolve(m.error == null ? { ok: true, error: null, stopped: false } : fail(String(m.error)));
+  }
+
+  function load() {
+    return startWorker();
+  }
+
+  function run(source, opts) {
+    opts = opts || {};
+    var p = queue.then(function () {
+      return new Promise(function (resolve) {
+        // The job exists while TB is still loading, so Stop works then too.
+        var j = job = { id: nextId++, opts: opts, source: String(source), resolve: resolve, recent: [], sent: false };
+        startWorker().then(function () {
+          if (job !== j) return;
+          j.sent = true;
+          if (flags) { Atomics.store(flags, 0, 0); Atomics.store(flags, 1, 0); }
+          worker.postMessage({ type: "run", id: j.id, source: j.source });
+        }, function (e) {
+          if (job === j) finish({ error: "TB could not start in this browser: " + (e && e.message ? e.message : e) });
+        });
+      });
+    });
+    queue = p.catch(function () {});
+    return p;
+  }
+
+  function stop() {
+    if (!job) return;
+    var j = job;
+    if (!j.sent) return finish({ stopped: true });  // still loading: never start it
+    if (flags) {
+      Atomics.store(flags, 0, 2);  // SIGINT: Python raises KeyboardInterrupt
+      Atomics.notify(flags, 1);
+    }
+    // No shared memory, or stuck in a long call that never checks: start over.
+    j.stopTimer = setTimeout(function () {
+      if (job !== j) return;
+      killWorker();
+      finish({ stopped: true });
+    }, flags ? STOP_GRACE_MS : 0);
+  }
+
+  // ----------------------------------------------- the page's own thread
+  // Only for a program that asks questions when there is no shared memory.
+  var pageEngine = null;
+  function loadPageEngine() {
+    if (pageEngine) return pageEngine;
+    pageEngine = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = WORKER_URL;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error("Could not load " + WORKER_URL)); };
+      document.head.appendChild(s);
+    }).then(function () { return self.TBEngine.load(SITE_ROOT); });
+    pageEngine.catch(function () { pageEngine = null; });
+    return pageEngine;
+  }
+
+  function runOnPage(j) {
+    var out = typeof j.opts.onOutput === "function" ? j.opts.onOutput : function () {};
+    var recent = [];
+    out("(This browser can't take answers inside the page, so TB is starting the program again with pop-up boxes.)");
+    return loadPageEngine().then(function () {
+      // Give the browser a frame to paint before the page is busy.
+      return new Promise(function (r) { setTimeout(r, 16); });
+    }).then(function () {
+      return self.TBEngine.run(j.source, function (lines) {
+        lines.forEach(function (l) { recent.push(l); if (recent.length > 50) recent.shift(); out(l); });
+      }, function (prompt) {
+        var shown = recent;
+        recent = [];
+        var onAsk = typeof j.opts.onAsk === "function" ? j.opts.onAsk : defaultAsk;
+        var a = onAsk(prompt, shown);
+        if (a && typeof a.then === "function") a = defaultAsk(prompt, shown);
+        return a == null ? "" : String(a);
+      }, MAIN_TIME_LIMIT);
+    }).then(function (err) {
+      return err == null ? { ok: true, error: null, stopped: false } : fail(err);
+    }, function (e) {
+      return fail("TB could not start in this browser: " + (e && e.message ? e.message : e));
+    });
+  }
+
+  // ----------------------------------------------- answering ask()
   // Text for window.prompt: the last few printed lines, then the question.
   function promptText(prompt, recent) {
     var lines = (recent || []).slice(-12);
@@ -226,44 +207,59 @@
     return answer == null ? "" : answer;
   }
 
-  function run(source, opts) {
-    opts = opts || {};
-    var userOutput = typeof opts.onOutput === "function" ? opts.onOutput : function () {};
-    var recent = [];
-    var onOutput = function (line) {
-      recent.push(line);
-      if (recent.length > 50) recent.shift();
-      userOutput(line);
-    };
-    var onAsk = typeof opts.onAsk === "function" ? opts.onAsk : defaultAsk;
-    var job = queue.then(async function () {
-      try {
-        await load();
-      } catch (e) {
-        return { ok: false, error: "TB could not start in this browser: " + (e && e.message ? e.message : e) };
+  function span(cls, text) {
+    var s = document.createElement("span");
+    s.className = cls;
+    s.textContent = text;
+    return s;
+  }
+
+  // Shows the question in outputEl with a text box after it; resolves with
+  // what was typed when Enter is pressed. On the page's own thread (job is
+  // null there) it falls back to a prompt box.
+  function askInline(outputEl, prompt, recent) {
+    if (!SHARED || !job) {
+      var a = defaultAsk(prompt, recent);
+      outputEl.appendChild(span("out-ask", prompt));
+      outputEl.appendChild(span("out-answer", a));
+      outputEl.appendChild(document.createTextNode("\n"));
+      return a;
+    }
+    var current = job;
+    return new Promise(function (resolve) {
+      outputEl.appendChild(span("out-ask", prompt));
+      var input = document.createElement("input");
+      input.type = "text";
+      input.className = "out-input";
+      input.setAttribute("aria-label", prompt && prompt.trim() ? prompt.trim() : "Your answer");
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      outputEl.appendChild(input);
+      var nl = document.createTextNode("\n");
+      outputEl.appendChild(nl);
+      input.focus({ preventScroll: true });
+      outputEl.scrollTop = outputEl.scrollHeight;
+      var done = false;
+      function finishAsk(text) {
+        if (done) return;
+        done = true;
+        clearInterval(watch);
+        outputEl.replaceChild(span("out-answer", text), input);
+        resolve(text);
       }
-      await loadPackagesFor(source);
-      // Give the browser one frame to paint "Running..." before we block.
-      await new Promise(function (r) { setTimeout(r, 16); });
-      try {
-        var err = pyRun(String(source), onOutput, function (p) {
-          var shown = recent;
-          recent = [];
-          var a = onAsk(p, shown);
-          return a == null ? "" : String(a);
-        }, TIME_LIMIT_SECONDS);
-        return err == null ? { ok: true, error: null } : { ok: false, error: String(err) };
-      } catch (e) {
-        return { ok: false, error: "Oops! Something went wrong while running: " + (e && e.message ? e.message : e) };
-      }
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); finishAsk(input.value); }
+      });
+      // Stop (or a new run) while waiting: drop the box.
+      var watch = setInterval(function () { if (job !== current) finishAsk(""); }, 200);
     });
-    queue = job.catch(function () {});
-    return job;
   }
 
   window.TB = {
-    load: load, run: run, promptText: promptText, ask: defaultAsk,
-    isLoaded: function () { return !!pyRun; },
+    load: load, run: run, stop: stop, promptText: promptText, ask: defaultAsk, askInline: askInline,
+    canAskInline: SHARED,
+    isLoaded: function () { return ready; },
+    isRunning: function () { return !!job; },
     engine: function () { return engineName; }
   };
 })();

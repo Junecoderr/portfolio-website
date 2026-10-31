@@ -76,9 +76,17 @@
 
       bar.appendChild(btn);
 
+      var STOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+      var running = false;
       btn.addEventListener("click", function () {
-        if (btn.disabled) return;
-        btn.disabled = true;
+        // While it runs, the same button is Stop.
+        if (running) {
+          status.textContent = "Stopping...";
+          if (window.TB) window.TB.stop();
+          return;
+        }
+        running = true;
+        btn.innerHTML = STOP_ICON + "<span>Stop</span>";
         output.hidden = false;
         wrap.classList.add("has-output");
         output.textContent = "";
@@ -90,26 +98,23 @@
               status.textContent = "Running...";
               return TB.run(source, {
                 onOutput: function (line) { output.appendChild(document.createTextNode(line + "\n")); },
-                onAsk: function (prompt, recent) {
-                  var answer = window.TB.ask(prompt, recent);
-                  output.appendChild(el("span", "out-ask", prompt));
-                  output.appendChild(el("span", "out-answer", answer));
-                  output.appendChild(document.createTextNode("\n"));
-                  return answer;
-                }
+                onAsk: function (prompt, recent) { return TB.askInline(output, prompt, recent); }
               });
             });
           })
           .then(function (result) {
-            if (!result.ok) output.appendChild(el("span", "out-error", result.error));
-            status.textContent = result.ok ? "Done." : "Stopped with a mistake.";
+            if (!result.ok) output.appendChild(el("span", result.stopped ? "out-done" : "out-error", result.error));
+            status.textContent = result.ok ? "Done." : result.stopped ? "Stopped." : "Stopped with a mistake.";
             if (!output.textContent) output.appendChild(el("span", "out-done", "(The program finished without printing anything.)"));
           })
           .catch(function (e) {
             output.appendChild(el("span", "out-error", "TB could not start: " + (e && e.message ? e.message : e)));
             status.textContent = "";
           })
-          .then(function () { btn.disabled = false; });
+          .then(function () {
+            running = false;
+            btn.innerHTML = PLAY_ICON + "<span>Run</span>";
+          });
       });
 
       var tryIt = el("a", "button button-ghost", example ? "Open in playground" : "Try changing it");

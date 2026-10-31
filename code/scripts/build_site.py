@@ -3,7 +3,7 @@
 Usage:
     uv run python scripts/fetch_pyodide.py          # once, downloads Pyodide
     uv run python scripts/build_site.py [--out dist/site]
-    uv run python -m http.server -d dist/site 8000  # then open http://localhost:8000
+    uv run python scripts/serve_site.py   # then open http://localhost:8000 (Vercel's headers)
 
 What it does:
   * copies site/ (pages, assets, vendored Pyodide) to --out
@@ -397,7 +397,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  packages: {', '.join(package_names) or 'none'}")
     print(f"  apps: {', '.join(app_names) or 'none'}; library pages: {len(lib_pages)}")
     print("  downloads point at /dl/<asset> (TB " + version + ")")
-    print(f"Serve it with:  uv run python -m http.server -d {out.relative_to(ROOT) if out.is_relative_to(ROOT) else out} 8000")
+    print(f"Serve it with:  uv run python scripts/serve_site.py --dir {(out.relative_to(ROOT) if out.is_relative_to(ROOT) else out).as_posix()}")
     return 0
 
 
