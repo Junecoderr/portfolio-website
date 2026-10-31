@@ -8,7 +8,7 @@ into queries for your SIEM, and run them on log files.
 ```
 tb apps/sigma-studio/main.tb                                  # tour: validate + convert + run the samples
 tb apps/sigma-studio/main.tb validate my-rules/               # is every rule readable? what does it read?
-tb apps/sigma-studio/main.tb convert rule.yml --to kql        # splunk, elastic, kql or all (default)
+tb apps/sigma-studio/main.tb convert rule.yml --to kql        # splunk, elastic, esql, kql or all (default)
 tb apps/sigma-studio/main.tb run my-rules/ auth.log access.log
 ```
 

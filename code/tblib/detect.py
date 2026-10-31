@@ -24,7 +24,7 @@ MODIFIERS = {"contains", "startswith", "endswith", "all", "re", "cidr", "gt", "g
 MODIFIER_LIST = ("contains, startswith, endswith, all, re (with i, m, s), cased, cidr, gt, gte, lt, lte, exists, "
                  "windash, base64, base64offset, utf16, utf16le, utf16be, wide, fieldref or expand")
 WINDASH = ["/", "–", "—", "―"]  # what Sigma's |windash swaps a - for
-BACKENDS = ["splunk", "elastic", "kql"]
+BACKENDS = ["splunk", "elastic", "esql", "kql"]
 CORRELATION_TYPES = ["event_count", "value_count", "temporal", "temporal_ordered"]
 # sshd writes "Invalid user" and a pam_unix line next to each "Failed password":
 # count only the main line so one guess counts once.
@@ -1027,27 +1027,38 @@ LOGSOURCES = [
     {"product": "linux", "service": "auditd", "formats": ["auth", "syslog"], "splunk": 'sourcetype="linux:audit"',
      "kql": "AuditLog", "elastic": "event.module:auditd"},
     {"product": "linux", "category": "process_creation", "formats": ["auth", "syslog", "json"],
-     "splunk": 'sourcetype="linux:audit" type=EXECVE', "kql": "Syslog", "elastic": "event.category:process"},
+     "splunk": 'sourcetype="linux:audit" type=EXECVE', "kql": "DeviceProcessEvents", "elastic": "event.category:process"},
     {"product": "linux", "formats": ["auth", "syslog", "text"], "splunk": 'sourcetype="syslog"', "kql": "Syslog",
      "elastic": "host.os.type:linux"},
     {"category": "webserver", "formats": ["apache", "nginx", "json", "csv"], "splunk": 'sourcetype="access_combined"',
      "kql": "W3CIISLog", "elastic": "event.category:web"},
-    {"category": "proxy", "formats": ["apache", "nginx", "json", "csv"], "splunk": 'sourcetype="squid"',
+    {"category": "proxy", "formats": ["apache", "nginx", "json", "csv", "cef", "leef"], "splunk": 'sourcetype="squid"',
      "kql": "CommonSecurityLog", "elastic": "event.category:web"},
     {"product": "apache", "formats": ["apache", "nginx", "json", "csv"], "splunk": 'sourcetype="access_combined"',
      "kql": "W3CIISLog", "elastic": "event.dataset:apache.access"},
     {"product": "nginx", "formats": ["apache", "nginx", "json", "csv"], "splunk": 'sourcetype="nginx:plus:access"',
      "kql": "W3CIISLog", "elastic": "event.dataset:nginx.access"},
-    {"category": "firewall", "formats": ["syslog", "json", "csv"], "splunk": 'sourcetype="firewall"',
+    {"category": "firewall", "formats": ["syslog", "json", "csv", "cef", "leef"], "splunk": 'sourcetype="firewall"',
      "kql": "CommonSecurityLog", "elastic": "event.category:network"},
-    {"category": "dns", "formats": ["syslog", "json", "csv"], "splunk": 'sourcetype="dns"', "kql": "DnsEvents",
+    {"category": "dns", "formats": ["syslog", "json", "csv", "zeek", "suricata"], "splunk": 'sourcetype="dns"', "kql": "DnsEvents",
      "elastic": "event.category:network AND network.protocol:dns"},
-    {"product": "aws", "service": "cloudtrail", "formats": ["json"], "splunk": 'sourcetype="aws:cloudtrail"',
+    {"product": "aws", "service": "cloudtrail", "formats": ["json", "cloudtrail"], "splunk": 'sourcetype="aws:cloudtrail"',
      "kql": "AWSCloudTrail", "elastic": "event.dataset:aws.cloudtrail"},
     {"product": "azure", "formats": ["json"], "splunk": 'sourcetype="azure:monitor:aad"', "kql": "AuditLogs",
      "elastic": "event.dataset:azure.auditlogs"},
-    {"product": "m365", "formats": ["json"], "splunk": 'sourcetype="o365:management:activity"', "kql": "OfficeActivity",
+    {"product": "m365", "formats": ["json", "m365"], "splunk": 'sourcetype="o365:management:activity"', "kql": "OfficeActivity",
      "elastic": "event.dataset:o365.audit"},
+    {"product": "okta", "formats": ["json", "okta"], "splunk": 'sourcetype="OktaIM2:log"', "kql": "Okta_CL",
+     "elastic": "event.dataset:okta.system"},
+    # Zeek in Sentinel: the ASIM parsers normalise Zeek (and other sensors) into one schema.
+    {"product": "zeek", "formats": ["zeek"], "splunk": 'sourcetype="bro:*:json"', "kql": "_Im_NetworkSession",
+     "elastic": "event.module:zeek"},
+    {"product": "zeek", "service": "conn", "formats": ["zeek"], "splunk": 'sourcetype="bro:conn:json"',
+     "kql": "_Im_NetworkSession", "elastic": "event.dataset:zeek.connection"},
+    {"product": "zeek", "service": "dns", "formats": ["zeek"], "splunk": 'sourcetype="bro:dns:json"', "kql": "_Im_Dns",
+     "elastic": "event.dataset:zeek.dns"},
+    {"product": "zeek", "service": "http", "formats": ["zeek"], "splunk": 'sourcetype="bro:http:json"',
+     "kql": "_Im_WebSession", "elastic": "event.dataset:zeek.http"},
 ]
 
 
@@ -1269,6 +1280,15 @@ FIELD_MAPS = {
             "dst_ip": "destination.ip", "dst_port": "destination.port", "user": "user.name", "path": "url.path",
             "agent": "user_agent.original", "status": "http.response.status_code", "method": "http.request.method",
             "action": "event.action", "message": "message", "host": "host.name",
+            # Zeek, CloudTrail and Okta (Sigma keeps their own field names)
+            "id.orig_h": "source.ip", "id.orig_p": "source.port", "id.resp_h": "destination.ip",
+            "id.resp_p": "destination.port", "query": "dns.question.name", "qtype_name": "dns.question.type",
+            "uri": "url.original", "user_agent": "user_agent.original", "status_code": "http.response.status_code",
+            "eventName": "event.action", "eventSource": "event.provider", "sourceIPAddress": "source.ip",
+            "errorCode": "aws.cloudtrail.error_code", "userIdentity.type": "aws.cloudtrail.user_identity.type",
+            "userIdentity.arn": "aws.cloudtrail.user_identity.arn", "awsRegion": "cloud.region",
+            "userAgent": "user_agent.original", "eventtype": "okta.event_type",
+            "displaymessage": "okta.display_message",
         },
     },
     "kql": {
@@ -1279,15 +1299,57 @@ FIELD_MAPS = {
                                 "ComputerName": "DeviceName", "OriginalFileName": "ProcessVersionInfoOriginalFileName",
                                 "IntegrityLevel": "ProcessIntegrityLevel", "md5": "MD5", "sha256": "SHA256"},
         "SysmonEvent": {"ComputerName": "Computer"},
+        "DnsEvents": {"query": "Name", "QueryName": "Name", "qtype_name": "QueryType", "ip": "ClientIP",
+                      "src_ip": "ClientIP", "answer": "IPAddresses"},
         "Syslog": {"message": "SyslogMessage", "host": "Computer", "process": "ProcessName", "program": "ProcessName",
-                   "ip": "SrcIp", "src_ip": "SrcIp", "port": "SrcPort", "user": "UserName", "action": "Action"},
+                   "ip": "SrcIp", "src_ip": "SrcIp", "port": "SrcPort", "user": "UserName", "action": "Action",
+                   "hostname": "HostName", "host_ip": "HostIP", "facility": "Facility", "severity": "SeverityLevel",
+                   "level": "SeverityLevel", "pid": "ProcessID", "ProcessId": "ProcessID", "time": "EventTime"},
         "W3CIISLog": {"path": "csUriStem", "agent": "csUserAgent", "status": "scStatus", "method": "csMethod", "ip": "cIP",
                       "user": "csUserName"},
-        "CommonSecurityLog": {"src_ip": "SourceIP", "dst_ip": "DestinationIP", "dst_port": "DestinationPort",
-                              "src_port": "SourcePort", "action": "DeviceAction"},
+        # CommonSecurityLog is CEF in a table: TB's logs names, CEF keys and Sigma's proxy / firewall names.
+        "CommonSecurityLog": {
+            "ip": "SourceIP", "src_ip": "SourceIP", "dst_ip": "DestinationIP", "src_port": "SourcePort",
+            "dst_port": "DestinationPort", "port": "DestinationPort", "action": "DeviceAction", "user": "SourceUserName",
+            "target_user": "DestinationUserName", "host": "DeviceName", "message": "Message", "proto": "Protocol",
+            "protocol": "Protocol", "vendor": "DeviceVendor", "product": "DeviceProduct", "name": "Activity",
+            "event_id": "DeviceEventClassID", "severity": "LogSeverity", "success": "EventOutcome",
+            "src": "SourceIP", "dst": "DestinationIP", "spt": "SourcePort", "dpt": "DestinationPort", "act": "DeviceAction",
+            "suser": "SourceUserName", "duser": "DestinationUserName", "shost": "SourceHostName",
+            "dhost": "DestinationHostName", "dvchost": "DeviceName", "dvc": "DeviceAddress", "msg": "Message",
+            "app": "ApplicationProtocol", "outcome": "EventOutcome", "reason": "Reason", "cat": "DeviceEventCategory",
+            "request": "RequestURL", "requestMethod": "RequestMethod", "requestClientApplication": "RequestClientApplication",
+            "requestContext": "RequestContext", "fname": "FileName", "fileHash": "FileHash", "in": "ReceivedBytes",
+            "out": "SentBytes", "cnt": "EventCount", "smac": "SourceMACAddress", "dmac": "DestinationMACAddress",
+            "sproc": "SourceProcessName", "dproc": "DestinationProcessName", "deviceExternalId": "DeviceExternalID",
+            "cs1": "DeviceCustomString1", "cs2": "DeviceCustomString2", "cs3": "DeviceCustomString3",
+            "cs4": "DeviceCustomString4", "cs5": "DeviceCustomString5", "cs6": "DeviceCustomString6",
+            "c-ip": "SourceIP", "c-uri": "RequestURL", "c-uri-query": "RequestURL", "c-useragent": "RequestClientApplication",
+            "cs-method": "RequestMethod", "cs-host": "DestinationHostName", "cs-referrer": "RequestContext",
+            "r-dns": "DestinationHostName", "cs-bytes": "SentBytes", "sc-bytes": "ReceivedBytes",
+            "dst_host": "DestinationHostName", "src_host": "SourceHostName", "SourceIp": "SourceIP",
+            "DestinationIp": "DestinationIP", "DestinationHostname": "DestinationHostName",
+        },
+        "AWSCloudTrail": {"eventName": "EventName", "eventSource": "EventSource", "sourceIPAddress": "SourceIpAddress",
+                          "errorCode": "ErrorCode", "errorMessage": "ErrorMessage", "userIdentity.type": "UserIdentityType",
+                          "userIdentity.arn": "UserIdentityArn", "userIdentity.accountId": "UserIdentityAccountId",
+                          "awsRegion": "AWSRegion", "userAgent": "UserAgent", "ip": "SourceIpAddress",
+                          "additionalEventData.MFAUsed": "AdditionalEventData.MFAUsed",
+                          "user": "UserIdentityUserName", "action": "EventName"},
+        "Okta_CL": {"eventtype": "eventType_s", "displaymessage": "displayMessage_s", "user": "actor_alternateId_s",
+                    "ip": "client_ipAddress_s", "action": "eventType_s"},
+        "OfficeActivity": {"user": "UserId", "ip": "ClientIP", "action": "Operation"},
+        "_Im_NetworkSession": {"id.orig_h": "SrcIpAddr", "id.orig_p": "SrcPortNumber", "id.resp_h": "DstIpAddr",
+                               "id.resp_p": "DstPortNumber", "proto": "NetworkProtocol", "ip": "SrcIpAddr",
+                               "src_ip": "SrcIpAddr", "dst_ip": "DstIpAddr", "dst_port": "DstPortNumber"},
+        "_Im_Dns": {"id.orig_h": "SrcIpAddr", "id.resp_h": "DstIpAddr", "query": "DnsQuery",
+                    "qtype_name": "DnsQueryTypeName", "rcode_name": "DnsResponseCodeName", "ip": "SrcIpAddr"},
+        "_Im_WebSession": {"id.orig_h": "SrcIpAddr", "id.resp_h": "DstIpAddr", "uri": "Url", "user_agent": "HttpUserAgent",
+                           "method": "HttpRequestMethod", "status_code": "HttpStatusCode", "ip": "SrcIpAddr"},
         "default": {"ComputerName": "Computer"},
     },
 }
+FIELD_MAPS["esql"] = FIELD_MAPS["elastic"]
 
 
 # Sentinel's Syslog table has no columns for what sshd / sudo put in the message, so the
@@ -1336,6 +1398,7 @@ class Backend:
         if isinstance(extra, dict):
             self.fields.update({str(k): _tb.to_text(v) for k, v in extra.items()})
         self.post = []  # pipeline stages added after the search (splunk's | regex)
+        self.parsed = []  # Syslog columns the KQL backend parses out of SyslogMessage
 
     def table_key(self):
         if self.name == "splunk":
@@ -1349,19 +1412,77 @@ class Backend:
 
     def build(self, compiled: CompiledRule) -> str:
         if compiled.rule.get("correlation"):
-            raise RuleError(f"detect.sigma_to_query() can't convert correlation rules yet; convert the rules inside "
-                            f"({', '.join(compiled.rule['correlation']['rule_names'])}) one by one")
+            return self.correlation(compiled)
         if compiled.rule.get("near"):
-            raise RuleError("detect.sigma_to_query() can't convert \"| near\" conditions; they need the SIEM's own "
-                            "correlation features")
+            return self.near(compiled)
+        return self.finish(self.body(compiled))
+
+    def body(self, compiled):
         if compiled.condition is not None:
-            body = self.condition(compiled.condition, compiled.selections, top=True)
-        else:
-            parts = [self.value_test(t, True) for t in compiled.where]
-            body = self.join_and(parts)
-            if compiled.unless:
-                body = self.join_and([body, self.negate(self.join_and([self.value_test(t) for t in compiled.unless]))])
-        return self.finish(body)
+            return self.condition(compiled.condition, compiled.selections, top=True)
+        body = self.join_and([self.value_test(t, True) for t in compiled.where])
+        if compiled.unless:
+            body = self.join_and([body, self.negate(self.join_and([self.value_test(t) for t in compiled.unless]))])
+        return body
+
+    # -- correlations and | near: tagged searches, counted per group and time window ------------
+
+    def correlation(self, compiled):
+        corr = compiled.rule["correlation"]
+        kind = corr["type"]
+        if kind == "temporal_ordered":
+            raise RuleError(f"the {self.name} backend can't check the order of a temporal_ordered correlation; "
+                            "use type: temporal (the same rules in any order), or let detect.run() check it")
+        aliases = corr.get("aliases") or {}
+        cond = corr.get("condition") or {}
+        group = list(corr.get("group_by") or [])
+        fields = group + ([cond["field"]] if kind == "value_count" and cond.get("field") not in group else [])
+        parts = []
+        for sub in compiled.sub_rules:
+            for key, what in (("correlation", "a correlation"), ("near", "| near"), ("aggregation", "an aggregation")):
+                if sub.rule.get(key):
+                    raise RuleError(f"the correlation's rule \"{sub.name}\" has {what} of its own; "
+                                    "detect.sigma_to_query() needs plain rules inside a correlation")
+
+            def real(field, sub=sub):
+                alias = aliases.get(field)
+                if isinstance(alias, dict):
+                    return _tb.to_text(alias.get(sub.rule.get("sigma_name") or "", alias.get(sub.name, field)))
+                return field
+            b = type(self)(sub.rule, self.options)
+            cols = {f: b.field(real(f)) for f in fields}
+            parts.append({"tag": sub.name, "backend": b, "body": b.body(sub), "cols": cols})
+        ops = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<=", "eq": "==", "neq": "!="}
+        spec = {"kind": kind, "group": group, "within": corr.get("timespan"), "field": cond.get("field"),
+                "op": ops.get(cond.get("op"), ">="), "value": cond.get("value", 1)}
+        if kind == "temporal":
+            spec["op"], spec["value"] = ">=", len(parts)
+        return self.combine(parts, spec)
+
+    def near(self, compiled):
+        near = compiled.rule["near"]
+
+        def part(tag, make):
+            b = type(self)(compiled.rule, self.options)
+            return {"tag": tag, "backend": b, "body": make(b), "cols": {}}
+        parts = [part(NEAR_ANCHOR, lambda b: b.body(compiled))]
+        parts += [part(n, lambda b, n=n: b.selection(compiled.selections[n], top=True))
+                  for n in near["required"] + near["excluded"]]
+        return self.combine(parts, {"kind": "near", "group": [], "within": compiled.rule.get("within"),
+                                    "required": [NEAR_ANCHOR] + near["required"], "excluded": near["excluded"]})
+
+    @staticmethod
+    def group_columns(parts, fields):
+        """One column per field: the SIEM's own name when every part agrees, else the Sigma name
+        (each part then renames its column to it)."""
+        out = {}
+        for f in fields:
+            cols = {p["cols"][f] for p in parts}
+            out[f] = cols.pop() if len(cols) == 1 else f
+        return out
+
+    def combine(self, parts, spec):
+        raise NotImplementedError
 
     def condition(self, node, selections, top=False):
         kind = node[0]
@@ -1529,8 +1650,9 @@ class Splunk(Backend):
             if isinstance(net, ipaddress.IPv4Network) and net.prefixlen in (8, 16, 24, 32):
                 octets = str(net.network_address).split(".")[:net.prefixlen // 8]
                 return f'{field}="{".".join(octets)}{".*" if net.prefixlen < 32 else ""}"'
-            self.post.append(f'| where cidrmatch("{net}", {field})')
-            return f"{field}=*"
+            # Splunk's search matches a CIDR value against an IP field; unlike a | where stage this
+            # also works inside NOT and OR.
+            return f'{field}="{net}"'
         if kind == "re":
             if not top:
                 raise RuleError("the splunk backend can only use |re in a selection that is ANDed at the top of the "
@@ -1581,6 +1703,33 @@ class Splunk(Backend):
             stats = f"| stats {expr} as {name}{by}" if expr != name else f"| stats {expr}{by}"
             query += f" {stats} | where {name} {agg['op']} {_tb.to_text(agg['value'])}"
         return query
+
+    def combine(self, parts, spec):
+        fields = spec["group"] + ([spec["field"]] if spec.get("field") and spec["field"] not in spec["group"] else [])
+        out = self.group_columns(parts, fields)
+        tagged = spec["kind"] in ("temporal", "near")
+        searches = []
+        for p in parts:
+            text = p["backend"].finish(p["body"])
+            text += "".join(f" | eval {f}={p['cols'][f]}" for f in fields if out[f] == f and p["cols"][f] != f)
+            if tagged:
+                text += f' | eval sigma_rule="{self.esc(p["tag"])}"'
+            searches.append(text)
+        # multisearch runs the searches side by side, each with its own source type and | regex stages.
+        query = searches[0] if len(searches) == 1 else "| multisearch " + " ".join(f"[search {q}]" for q in searches)
+        groups = [out[f] for f in spec["group"]]
+        if spec["within"]:
+            # shortcut: fixed time buckets, not a sliding window; an episode across a bucket edge can be missed.
+            query += f" | bin _time span={int(spec['within'])}s"
+            groups.insert(0, "_time")
+        by = f" by {', '.join(groups)}" if groups else ""
+        if spec["kind"] == "near":
+            tests = [f'rules="{self.esc(t)}"' for t in spec["required"]] + \
+                    [f'NOT rules="{self.esc(t)}"' for t in spec["excluded"]]
+            return f"{query} | stats values(sigma_rule) as rules{by} | search {' '.join(tests)}"
+        expr, name = {"event_count": ("count", "event_count"), "temporal": ("dc(sigma_rule)", "rule_count"),
+                      "value_count": (f"dc({out.get(spec.get('field'))})", "value_count")}[spec["kind"]]
+        return f"{query} | stats {expr} as {name}{by} | where {name} {spec['op']} {_tb.to_text(spec['value'])}"
 
 
 LUCENE_SPECIAL = set('+-=&|><!(){}[]^"~:\\/')
@@ -1637,14 +1786,187 @@ class Elastic(Backend):
     def negate(self, text):
         return f"NOT {self.wrap(text)}"
 
+    def build(self, compiled):
+        # Lucene query strings can't count or group, so those rules become ES|QL.
+        if compiled.rule.get("aggregation") or compiled.rule.get("correlation") or compiled.rule.get("near"):
+            return Esql(compiled.rule, self.options).build(compiled)
+        return super().build(compiled)
+
     def finish(self, body):
-        if self.rule.get("aggregation"):
-            raise RuleError("the elastic backend writes Lucene query strings, which can't count or group "
-                            f"(\"| {aggregation_text(self.rule['aggregation'])}\"); use the kql or splunk backend, or run "
-                            "the query and let detect.run() do the counting")
         if self.table and not self.options.get("no_logsource"):
             body = f"({self.table}) AND {self.wrap(body)}" if body else self.table
         return body or "*"
+
+
+ESQL_NAME = re.compile(r"^[A-Za-z_@][\w.@]*$")
+LUCENE_TERM = re.compile(r"^([\w.@]+):(\S+)$")
+NEAR_ANCHOR = "near_anchor"
+
+
+def esql_string(text):
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def esql_pattern(text):
+    """A LIKE / RLIKE pattern as a triple-quoted string, where backslashes are kept as written."""
+    return f'"""{text}"""' if '"""' not in text and not text.endswith('"') else esql_string(text)
+
+
+def esql_span(seconds):
+    seconds = int(seconds)
+    for size, unit in ((86400, "day"), (3600, "hour"), (60, "minute")):
+        if seconds % size == 0:
+            n = seconds // size
+            return f"{n} {unit}{'s' if n != 1 else ''}"
+    return f"{seconds} second{'s' if seconds != 1 else ''}"
+
+
+def lucene_to_esql(text):
+    """The logsource's Lucene filter ('event.category:process AND event.type:start') as an ES|QL condition.
+    Anything that isn't a plain field:value list is kept as written (a table option, say)."""
+    out = []
+    for clause in text.split(" AND "):
+        m = LUCENE_TERM.match(clause.strip())
+        if not m:
+            return text
+        field, value = m.groups()
+        out.append(f"{field} LIKE {esql_pattern(value)}" if "*" in value else f"{field} == {esql_string(value)}")
+    return " AND ".join(out)
+
+
+class Esql(Backend):
+    """Elasticsearch ES|QL: FROM index | WHERE ... | STATS ... BY ..., the Elastic language that can count."""
+
+    name = "esql"
+    and_word = " AND "
+    or_word = " OR "
+
+    def ident(self, name):
+        return name if ESQL_NAME.match(name) else "`" + name.replace("`", "``") + "`"
+
+    def column(self, name):
+        return self.ident(self.field(name))
+
+    def one(self, vt, test, top):
+        field = self.column(vt.field)
+        kind = test[0]
+        if kind in ("text", "glob"):
+            cased = vt.cased or (kind == "text" and test[2])
+            value = wildcard_value(vt, test)
+            col, value = (field, value) if cased else (f"TO_LOWER({field})", value.lower())
+            if "*" in value or "?" in value:
+                return f"{col} LIKE {esql_pattern(value.replace(chr(92), chr(92) * 2))}"
+            return f"{col} == {esql_string(value)}"
+        if kind == "number":
+            return f"TO_STRING({field}) == \"{_tb.to_text(test[1])}\""  # event.code is a keyword in ECS, ports are numbers
+        if kind == "bool":
+            return f"{field} == {'true' if test[1] else 'false'}"
+        if kind == "null":
+            return f"{field} IS NULL"
+        if kind == "exists":
+            return f"{field} IS NOT NULL" if test[1] else f"{field} IS NULL"
+        if kind in ("gt", "gte", "lt", "lte"):
+            return f"{field} { {'gt': '>', 'gte': '>=', 'lt': '<', 'lte': '<='}[kind] } {_tb.to_text(test[1])}"
+        if kind == "cidr":
+            return f'CIDR_MATCH({field}, "{test[1]}")'
+        if kind == "re":
+            if test[1].flags & re.IGNORECASE or test[1].pattern.startswith("(?i)"):
+                self.unsupported("a case-insensitive |re (ES|QL's RLIKE has no (?i)); use the kql backend")
+            pattern = test[1].pattern  # RLIKE matches the whole value; Sigma's |re searches inside it
+            pattern = pattern[1:] if pattern.startswith("^") else ".*" + pattern
+            pattern = pattern[:-1] if pattern.endswith("$") and not pattern.endswith("\\$") else pattern + ".*"
+            return f"{field} RLIKE {esql_pattern(pattern)}"
+        if kind == "fieldref":
+            other = self.column(test[1])
+            a, b = (field, other) if vt.cased else (f"TO_LOWER({field})", f"TO_LOWER({other})")
+            if vt.mode == "contains":
+                return f"LOCATE({a}, {b}) > 0"
+            if vt.mode in ("startswith", "endswith"):
+                return f"{'STARTS_WITH' if vt.mode == 'startswith' else 'ENDS_WITH'}({a}, {b})"
+            return f"{a} == {b}"
+        self.unsupported(kind)
+
+    def keyword(self, word):
+        value = word.strip("*").lower().replace("\\", "\\\\")
+        return f"TO_LOWER({self.column('message')}) LIKE {esql_pattern('*' + value + '*')}"
+
+    def negate(self, text):
+        return f"NOT {text}" if text.startswith("(") and text.endswith(")") and balanced(text[1:-1]) else f"NOT ({text})"
+
+    def logsource(self):
+        if self.options.get("no_logsource"):
+            return ""
+        source = self.options.get("table") or (self.entry.get("elastic") if self.entry else None)
+        return lucene_to_esql(source) if source else ""
+
+    def where(self, body):
+        return self.join_and([self.logsource(), body])
+
+    def head(self):
+        return f"FROM {self.options.get('index') or 'logs-*'}"
+
+    def bucket(self, within):
+        return f"bucket = BUCKET(@timestamp, {esql_span(within)})"
+
+    def finish(self, body):
+        lines = [self.head()]
+        where = self.where(body)
+        if where:
+            lines.append(f"| WHERE {where}")
+        agg = self.rule.get("aggregation")
+        if agg:
+            col = self.column(agg["field"]) if agg["field"] else None
+            if agg["fn"] == "count":
+                expr, name = (f"COUNT_DISTINCT({col})", "distinct_count") if col else ("COUNT(*)", "count")
+            else:
+                expr, name = f"{agg['fn'].upper()}({col})", "value"
+            by = [self.column(b) for b in (agg["by"] or [])]
+            if self.rule.get("within"):
+                by.append(self.bucket(self.rule["within"]))
+            lines.append(f"| STATS {name} = {expr}" + (f" BY {', '.join(by)}" if by else ""))
+            lines.append(f"| WHERE {name} {agg['op']} {_tb.to_text(agg['value'])}")
+        return "\n".join(lines)
+
+    def combine(self, parts, spec):
+        fields = spec["group"] + ([spec["field"]] if spec.get("field") and spec["field"] not in spec["group"] else [])
+        out = self.group_columns(parts, fields)
+        conds = [p["backend"].where(p["body"]) for p in parts]
+        lines = [self.head()]
+        if all(conds):
+            lines.append(f"| WHERE {self.join_or(conds)}")
+        flags, seen = [], set()
+        if spec["kind"] in ("temporal", "near"):
+            for p in parts:
+                prefix = "rule_" if spec["kind"] == "temporal" else ""
+                flag = prefix + (re.sub(r"\W+", "_", p["tag"]).strip("_").lower() or "part")
+                while flag in seen:
+                    flag += "_"
+                seen.add(flag)
+                flags.append(flag)
+            lines.append("| EVAL " + ", ".join(f"{f} = CASE({self.wrap(c)}, 1, 0)" for f, c in zip(flags, conds)))
+        for f in fields:
+            if out[f] == f and any(p["cols"][f] != f for p in parts):
+                cases = ", ".join(f"{self.wrap(c)}, {self.ident(p['cols'][f])}" for p, c in zip(parts, conds))
+                lines.append(f"| EVAL {self.ident(f)} = CASE({cases})")
+        by = [self.ident(out[f]) for f in spec["group"]]
+        if spec["within"]:
+            by.append(self.bucket(spec["within"]))
+        by_text = f" BY {', '.join(by)}" if by else ""
+        kind = spec["kind"]
+        if kind in ("temporal", "near"):
+            lines.append("| STATS " + ", ".join(f"{f} = MAX({f})" for f in flags) + by_text)
+            if kind == "temporal":
+                lines.append(f"| WHERE {' + '.join(flags)} >= {len(flags)}")
+            else:
+                tags = [p["tag"] for p in parts]
+                need = [f"{flags[tags.index(t)]} > 0" for t in spec["required"]]
+                lines.append("| WHERE " + " AND ".join(need + [f"{flags[tags.index(t)]} == 0" for t in spec["excluded"]]))
+            return "\n".join(lines)
+        expr, name = ("COUNT(*)", "event_count") if kind == "event_count" else \
+            (f"COUNT_DISTINCT({self.ident(out[spec['field']])})", "value_count")
+        lines.append(f"| STATS {name} = {expr}{by_text}")
+        lines.append(f"| WHERE {name} {spec['op']} {_tb.to_text(spec['value'])}")
+        return "\n".join(lines)
 
 
 class Kql(Backend):
@@ -1709,10 +2031,6 @@ class Kql(Backend):
             self.parsed.append(column)
         return column
 
-    def build(self, compiled):
-        self.parsed = []
-        return super().build(compiled)
-
     def finish(self, body):
         lines = [self.table or "Event"]
         where = self.entry.get("kql_where") if self.entry and not self.options.get("table") else None
@@ -1737,8 +2055,34 @@ class Kql(Backend):
             lines.append(f"| where {body}")
         return "\n".join(lines + tail)
 
+    def combine(self, parts, spec):
+        fields = spec["group"] + ([spec["field"]] if spec.get("field") and spec["field"] not in spec["group"] else [])
+        out = self.group_columns(parts, fields)
+        tagged = spec["kind"] in ("temporal", "near")
+        texts = []
+        for p in parts:
+            lines = [p["backend"].finish(p["body"])]
+            lines += [f"| extend {f} = {p['cols'][f]}" for f in fields if out[f] == f and p["cols"][f] != f]
+            if tagged:
+                lines.append(f'| extend sigma_rule = "{self.esc(p["tag"])}"')
+            texts.append("\n".join(lines))
+        query = texts[0] if len(texts) == 1 else "union\n" + ",\n".join(f"({t})" for t in texts)
+        by = [out[f] for f in spec["group"]]
+        if spec["within"]:
+            # shortcut: fixed time bins, not a sliding window; an episode across a bin edge can be missed.
+            by.append(f"bin(TimeGenerated, {int(spec['within'])}s)")
+        by_text = f" by {', '.join(by)}" if by else ""
+        if spec["kind"] == "near":
+            tests = [f'set_has_element(rules, "{self.esc(t)}")' for t in spec["required"]] + \
+                    [f'not(set_has_element(rules, "{self.esc(t)}"))' for t in spec["excluded"]]
+            return f"{query}\n| summarize rules = make_set(sigma_rule){by_text}\n| where {' and '.join(tests)}"
+        expr, name = {"event_count": ("count()", "event_count"), "temporal": ("dcount(sigma_rule)", "rule_count"),
+                      "value_count": (f"dcount({out.get(spec.get('field'))})", "value_count")}[spec["kind"]]
+        return (f"{query}\n| summarize {name} = {expr}{by_text}\n"
+                f"| where {name} {spec['op']} {_tb.to_text(spec['value'])}")
 
-BACKEND_CLASSES = {"splunk": Splunk, "elastic": Elastic, "kql": Kql}
+
+BACKEND_CLASSES = {"splunk": Splunk, "elastic": Elastic, "esql": Esql, "kql": Kql}
 
 
 def sigma_to_query(rule, backend, options=None, api=None, line=None) -> str:
@@ -1761,7 +2105,8 @@ def load(api):
         "rare values, and conversion of Sigma rules into Splunk, Elastic and Sentinel (KQL) queries are included.",
     )
     m.value("levels", list(LEVELS), doc="Alert levels from least to most serious: informational, low, medium, high, critical.")
-    m.value("backends", list(BACKENDS), doc="Query languages sigma_to_query() can write: splunk, elastic (Lucene), kql (Sentinel).")
+    m.value("backends", list(BACKENDS), doc="Query languages sigma_to_query() can write: splunk, elastic (Lucene, or "
+            "ES|QL when it must count), esql (always ES|QL), kql (Sentinel).")
     m.value("modifiers", sorted(MODIFIERS), doc="Every Sigma field modifier the rules engine understands.")
 
     def rule_error(line, err):
@@ -2138,6 +2483,7 @@ def load(api):
         "Backends:\n"
         "- \"splunk\": SPL.\n"
         "- \"elastic\": a Lucene query string for Kibana / Elasticsearch.\n"
+        "- \"esql\": Elasticsearch ES|QL (FROM ... | WHERE ... | STATS ...).\n"
         "- \"kql\": Microsoft Sentinel.\n"
         "\n"
         "The rule's logsource picks the index, source type or table. It also picks the field names, "
@@ -2148,11 +2494,15 @@ def load(api):
         "\n"
         "Options:\n"
         "- fields: a map {sigma_name: siem_name} that adds field mappings.\n"
-        "- table: the KQL table, Splunk source or Lucene filter.\n"
-        "- index: the Splunk index.\n"
+        "- table: the KQL table, Splunk source, Lucene filter or ES|QL condition.\n"
+        "- index: the Splunk index, or the ES|QL FROM pattern (default logs-*).\n"
         "\n"
-        "Aggregations become | stats (Splunk) or | summarize (KQL). "
-        "The elastic backend can't count, so it refuses those rules with a hint."))
+        "Aggregations become | stats (Splunk), | summarize (KQL) or STATS (ES|QL). "
+        "Lucene can't count, so the elastic backend writes those rules as ES|QL.\n"
+        "\n"
+        "Correlation rules (event_count, value_count, temporal) and \"| near\" become one query "
+        "over all their rules (multisearch in Splunk, union in KQL), counted per group and "
+        "timespan bucket. temporal_ordered can't be expressed and is refused with a hint."))
     def sigma_to_query_fn(line, rule, backend, options=None):
         check_type(line, rule, "map", "detect.sigma_to_query", "rule")
         check_type(line, backend, "text", "detect.sigma_to_query", "backend")
@@ -2161,6 +2511,8 @@ def load(api):
             name = "kql"
         if name in ("lucene", "elasticsearch", "kibana", "opensearch"):
             name = "elastic"
+        if name in ("es|ql", "es-ql"):
+            name = "esql"
         if name not in BACKEND_CLASSES:
             fail(line, f"detect.sigma_to_query() doesn't know the backend '{backend}'. Use one of: {', '.join(BACKENDS)}.")
         if options is not None:

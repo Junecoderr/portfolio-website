@@ -2,7 +2,7 @@
 #
 #   tb apps/sigma-studio/main.tb                                demo on the sample rules and logs
 #   tb apps/sigma-studio/main.tb validate rules/                check every rule in a folder (or one file)
-#   tb apps/sigma-studio/main.tb convert rule.yml --to kql      write queries (splunk, elastic, kql or all)
+#   tb apps/sigma-studio/main.tb convert rule.yml --to kql      write queries (splunk, elastic, esql, kql or all)
 #   tb apps/sigma-studio/main.tb run rules/ auth.log access.log run the rules on logs
 
 import os
@@ -12,9 +12,9 @@ import detect
 import attack
 import report
 
-let USAGE = "Usage: tb main.tb [validate|convert|run] [rules-folder-or-file] [--to splunk|elastic|kql|all] [log ...]"
+let USAGE = "Usage: tb main.tb [validate|convert|run] [rules-folder-or-file] [--to splunk|elastic|esql|kql|all] [log ...]"
 let data = fs.join(fs.here(), "..", "data")
-let BACKENDS = ["splunk", "elastic", "kql"]
+let BACKENDS = ["splunk", "elastic", "esql", "kql"]
 
 fn usage_error(message) {
   say(message)
@@ -34,7 +34,7 @@ while i < len(os.args) {
     exit(0)
   } else if arg == "--to" {
     if i + 1 >= len(os.args) {
-      usage_error("--to needs a backend: splunk, elastic, kql or all.")
+      usage_error("--to needs a backend: splunk, elastic, esql, kql or all.")
     }
     target = os.args[i + 1].lower()
     i += 1
@@ -50,7 +50,7 @@ if not rest.is_empty() and ["validate", "convert", "run", "demo"].contains(rest[
   rest = rest.slice(1)
 }
 if target != "all" and not BACKENDS.contains(target) {
-  usage_error(f"I don't know the backend '{target}'. Use splunk, elastic, kql or all.")
+  usage_error(f"I don't know the backend '{target}'. Use splunk, elastic, esql, kql or all.")
 }
 let rules_path = fs.join(data, "sigma")
 if not rest.is_empty() {

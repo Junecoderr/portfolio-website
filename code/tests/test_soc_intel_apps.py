@@ -45,7 +45,7 @@ def test_sigma_studio_tour():
     assert "ATT&CK T1110.001 Brute Force: Password Guessing" in out
     assert 'sourcetype="linux_secure" action="failed_login" | bin _time span=300s | stats count by _time, src | where count > 10' in out
     assert "| summarize count_ = count() by SrcIp, bin(TimeGenerated, 300s)" in out
-    assert "[elastic] not converted" in out and "Queries written: 11." in out
+    assert "[elastic]\nFROM logs-*\n| WHERE event.dataset == \"system.auth\"" in out and "Queries written: 16." in out
     assert "SSH Brute Force From One Address              203.0.113.42     22" in out
     assert "Credential Access (TA0006): T1110.001" in out
 
@@ -89,7 +89,7 @@ def test_ioc_feed_by_type_with_queries():
     out = run_app("ioc-feed", "--by-type", "--query", "splunk", str(DATA / "auth.log"))
     assert "# Threat intel match: ip (4 IOCs)" in out
     assert 'ip="203.0.113.42" OR ip="198.51.100.77"' in out
-    assert "cidrmatch(\"198.51.100.0/28\"" in out
+    assert 'ip="198.51.100.0/28"' in out  # CIDR search terms work inside OR, unlike a | where stage
 
 
 def test_ioc_feed_usage_errors():

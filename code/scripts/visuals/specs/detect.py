@@ -133,8 +133,10 @@ SPEC = {
             {"arrow": "detect.sigma_to_query"},
             {"result": True, "label": "result · a query to paste into the SIEM"},
         ],
-        "vary": {"param": "backend", "values": ['"splunk"', '"elastic"', '"kql"'], "labels": ["splunk", "elastic", "kql"]},
-        "roles": {"rule": "a rule from sigma() or rule()", "backend": "splunk (SPL), elastic (Lucene) or kql (Sentinel)",
+        "vary": {"param": "backend", "values": ['"splunk"', '"elastic"', '"esql"', '"kql"'],
+                 "labels": ["splunk", "elastic", "esql", "kql"]},
+        "roles": {"rule": "a rule from sigma() or rule()",
+                  "backend": "splunk (SPL), elastic (Lucene), esql (ES|QL) or kql (Sentinel)",
                   "options": "extra field mappings, table, index"},
     },
     "logsource": {

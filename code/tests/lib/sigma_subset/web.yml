@@ -1,0 +1,74 @@
+# Web server and proxy rules for the conversion test subset (written for TB; see windows.yml).
+title: Path traversal in a request
+logsource:
+  category: webserver
+detection:
+  selection:
+    path|contains:
+      - '../'
+      - '..%2f'
+      - '%2e%2e/'
+  condition: selection
+level: medium
+tags:
+  - attack.t1190
+---
+title: SQL injection keywords in a request
+logsource:
+  category: webserver
+detection:
+  selection:
+    path|contains|all:
+      - 'union'
+      - 'select'
+  condition: selection
+level: high
+---
+title: Web shell file requested
+logsource:
+  product: apache
+detection:
+  selection:
+    method: POST
+    path|re: '/(cmd|shell|c99|r57)\.php'
+  condition: selection
+level: high
+tags:
+  - attack.t1505.003
+---
+title: Scanner user agent
+logsource:
+  product: nginx
+detection:
+  selection:
+    agent|contains:
+      - 'sqlmap'
+      - 'nikto'
+      - 'Nmap Scripting Engine'
+  condition: selection
+level: low
+---
+title: Many 404s from one client
+logsource:
+  category: webserver
+detection:
+  selection:
+    status: 404
+  condition: selection | count() by ip > 50
+timeframe: 1m
+level: medium
+---
+title: Proxy download of an executable over plain HTTP
+logsource:
+  category: proxy
+detection:
+  selection:
+    c-uri|endswith:
+      - '.exe'
+      - '.ps1'
+      - '.hta'
+    cs-method: GET
+  filter:
+    cs-host|endswith: '.windowsupdate.com'
+  condition: selection and not filter
+level: medium

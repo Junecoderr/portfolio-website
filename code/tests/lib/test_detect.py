@@ -666,8 +666,14 @@ def test_sigma_to_query_backends():
     assert '| where Action =~ "failed_login" and not(ipv4_is_in_range(SrcIp, "10.0.0.0/8"))' in out[1]
     assert "| summarize count_ = count() by SrcIp, bin(TimeGenerated, 300s)\n| where count_ > 10" in out[1]
     assert out[-1] == "true"
-    err = str(tb_error(f"import detect\ndetect.sigma_to_query(detect.sigma({_json.dumps(BRUTE)}), \"elastic\")"))
-    assert "can't count or group" in err
+    # Lucene can't count, so the elastic backend writes the aggregation as ES|QL.
+    out = run(f"let r = detect.sigma({_json.dumps(BRUTE)})\nsay(detect.sigma_to_query(r, \"elastic\"))\n"
+              "say(detect.sigma_to_query(r, \"es|ql\") == detect.sigma_to_query(r, \"elastic\"))")
+    assert out == ["FROM logs-*\n"
+                   '| WHERE event.dataset == "system.auth" AND (TO_LOWER(event.action) == "failed_login" AND '
+                   'NOT (CIDR_MATCH(source.ip, "10.0.0.0/8")))\n'
+                   "| STATS count = COUNT(*) BY source.ip, bucket = BUCKET(@timestamp, 5 minutes)\n"
+                   "| WHERE count > 10", "true"]
 
 
 SYSLOG_COLUMNS = {"TimeGenerated", "Computer", "HostName", "HostIP", "Facility", "SeverityLevel", "ProcessName",
