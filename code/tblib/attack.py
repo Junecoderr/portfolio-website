@@ -36,6 +36,12 @@ class Table:
             raise AttackError("it has no \"techniques\" list")
         self.source = source
         self.snapshot = str(data.get("snapshot") or "unknown")
+        self.version = str(data["version"]) if data.get("version") else None
+        self.modified = str(data["modified"]) if data.get("modified") else None
+        self.copyright = str(data["copyright"]) if data.get("copyright") else None
+        self.mitigations, self.groups = ({str(x["id"]): x for x in data.get(key) or []
+                                          if isinstance(x, dict) and x.get("id") and x.get("name")}
+                                         for key in ("mitigations", "groups"))
         self.tactics = []
         for t in data.get("tactics") or []:
             if isinstance(t, dict) and t.get("shortname"):
@@ -50,6 +56,9 @@ class Table:
             item = {"id": tid, "name": str(t["name"]), "tactics": [str(x) for x in t.get("tactics") or []],
                     "platforms": [str(x) for x in t.get("platforms") or []],
                     "description": str(t.get("description") or "")}
+            for key in ("mitigations", "groups"):
+                if isinstance(t.get(key), list):
+                    item[key] = [str(x) for x in t[key]]
             if "." in tid:
                 item["parent"] = tid.split(".")[0]
             self.techniques[tid] = item
@@ -65,6 +74,10 @@ class Table:
             for key in (t["shortname"], t["id"], t["name"]):
                 if key:
                     self.tactic_index[norm_tactic(key)] = t
+        # ATT&CK v19 split Defense Evasion (TA0005) into Stealth and Defense Impairment; Sigma rules still
+        # tag attack.defense_evasion, so that name keeps pointing at TA0005.
+        if "defense-evasion" not in self.tactic_index and "ta0005" in self.tactic_index:
+            self.tactic_index["defense-evasion"] = self.tactic_index["ta0005"]
 
     def lookup(self, text):
         tid = technique_id(text)
@@ -76,6 +89,8 @@ class Table:
         out["tactics"] = list(item["tactics"])
         out["platforms"] = list(item["platforms"])
         out["url"] = url_of(item["id"])
+        for key, known in (("mitigations", self.mitigations), ("groups", self.groups)):
+            out[key] = [{"id": x, "name": known[x]["name"]} for x in item.get(key, []) if x in known]
         if "parent" in item:
             parent = self.techniques.get(item["parent"])
             out["parent_name"] = parent["name"] if parent else None
@@ -125,39 +140,93 @@ def first_sentence(text: str) -> str:
     return text[: m.start() + 1] if m else text[:300]
 
 
+def mitre_id(o):
+    ext = next((r for r in o.get("external_references") or []
+                if isinstance(r, dict) and r.get("source_name") == "mitre-attack" and r.get("external_id")), None)
+    return ext["external_id"] if ext else None
+
+
 def from_stix(bundle: dict) -> dict:
-    """The official enterprise-attack.json (a STIX 2 bundle) -> TB's compact table."""
+    """The official enterprise-attack.json (a STIX 2 bundle) -> TB's compact table, with the ATT&CK
+    version, the bundle's modified date, mitigations and groups (and which techniques each touches)."""
     objects = bundle.get("objects") if isinstance(bundle, dict) else None
     if not isinstance(objects, list):
         raise AttackError("it isn't a STIX bundle (no \"objects\" list)")
-    tactics, techniques, version = [], [], None
+    tactics, techniques, mitigations, groups = [], [], [], []
+    version = modified = copyright_ = None
+    by_stix, relations = {}, []
     for o in objects:
-        if not isinstance(o, dict) or o.get("revoked") or o.get("x_mitre_deprecated"):
+        if not isinstance(o, dict):
             continue
-        ext = next((r for r in o.get("external_references") or []
-                    if isinstance(r, dict) and r.get("source_name") == "mitre-attack" and r.get("external_id")), None)
         kind = o.get("type")
+        if kind == "relationship":
+            if not o.get("revoked") and not o.get("x_mitre_deprecated"):
+                relations.append(o)
+            continue
+        if kind == "marking-definition":
+            definition = o.get("definition") if isinstance(o.get("definition"), dict) else {}
+            statement = definition.get("statement")
+            if isinstance(statement, str) and "MITRE" in statement:
+                copyright_ = statement
+            continue
+        if o.get("revoked") or o.get("x_mitre_deprecated"):
+            continue
+        ext_id = mitre_id(o)
         if kind == "x-mitre-collection":
             version = o.get("x_mitre_version") or version
-        elif kind == "x-mitre-tactic" and ext:
-            tactics.append({"id": ext["external_id"], "shortname": o.get("x_mitre_shortname") or norm_tactic(o.get("name", "")),
+            modified = o.get("modified") or modified
+        elif kind == "x-mitre-tactic" and ext_id:
+            tactics.append({"id": ext_id, "shortname": o.get("x_mitre_shortname") or norm_tactic(o.get("name", "")),
                             "name": o.get("name", ""), "description": first_sentence(o.get("description", ""))})
-        elif kind == "attack-pattern" and ext:
-            techniques.append({
-                "id": ext["external_id"], "name": o.get("name", ""),
+        elif kind == "attack-pattern" and ext_id:
+            item = {
+                "id": ext_id, "name": o.get("name", ""),
                 "tactics": [p.get("phase_name") for p in o.get("kill_chain_phases") or []
                             if isinstance(p, dict) and p.get("kill_chain_name") == "mitre-attack"],
                 "platforms": list(o.get("x_mitre_platforms") or []),
                 "description": first_sentence(o.get("description", "")),
-            })
+            }
+            techniques.append(item)
+            by_stix[o.get("id")] = item
+        elif kind == "course-of-action" and ext_id and ext_id.startswith("M"):
+            item = {"id": ext_id, "name": o.get("name", ""), "description": first_sentence(o.get("description", ""))}
+            mitigations.append(item)
+            by_stix[o.get("id")] = item
+        elif kind == "intrusion-set" and ext_id:
+            item = {"id": ext_id, "name": o.get("name", ""),
+                    "aliases": [a for a in o.get("aliases") or [] if isinstance(a, str) and a != o.get("name")]}
+            groups.append(item)
+            by_stix[o.get("id")] = item
     if not techniques:
         raise AttackError("it has no ATT&CK techniques (attack-pattern objects)")
-    order = {"TA0043": 0, "TA0042": 1, "TA0001": 2, "TA0002": 3, "TA0003": 4, "TA0004": 5, "TA0005": 6, "TA0006": 7,
-             "TA0007": 8, "TA0008": 9, "TA0009": 10, "TA0011": 11, "TA0010": 12, "TA0040": 13}
+    tech_ids = {id(t) for t in techniques}
+    for r in relations:
+        src, dst = by_stix.get(r.get("source_ref")), by_stix.get(r.get("target_ref"))
+        if src is None or dst is None or id(dst) not in tech_ids:
+            continue
+        key = {"mitigates": "mitigations", "uses": "groups"}.get(r.get("relationship_type"))
+        if key and src["id"][0] == ("M" if key == "mitigations" else "G"):
+            dst.setdefault(key, [])
+            if src["id"] not in dst[key]:
+                dst[key].append(src["id"])
+    for t in techniques:
+        for key in ("mitigations", "groups"):
+            if key in t:
+                t[key].sort()
+    order = {"TA0043": 0, "TA0042": 1, "TA0001": 2, "TA0002": 3, "TA0003": 4, "TA0004": 5, "TA0005": 6, "TA0112": 6.5,
+             "TA0006": 7, "TA0007": 8, "TA0008": 9, "TA0009": 10, "TA0011": 11, "TA0010": 12, "TA0040": 13}
     tactics.sort(key=lambda t: (order.get(t["id"], 99), t["id"]))
-    techniques.sort(key=lambda t: t["id"])
-    return {"snapshot": f"official ATT&CK {version}" if version else "official ATT&CK", "tactics": tactics,
-            "techniques": techniques}
+    for items in (techniques, mitigations, groups):
+        items.sort(key=lambda t: t["id"])
+    out = {"snapshot": f"official ATT&CK v{version}" if version else "official ATT&CK"}
+    if version:
+        out["version"] = str(version)
+    if modified:
+        out["modified"] = str(modified)
+    if copyright_:
+        out["copyright"] = copyright_
+    out.update({"tactics": tactics, "techniques": techniques, "mitigations": mitigations, "groups": groups})
+    return out
 
 
 # =============================================================================
@@ -255,9 +324,10 @@ def load(api):
         "attack",
         "MITRE ATT&CK Enterprise at your fingertips: look up a technique by id (attack.technique(\"T1110\")), search "
         "by words, list a tactic's techniques, and map detect alerts to techniques through their Sigma tags "
-        "(attack.t1110.001). TB bundles a hand-curated, approximate snapshot of about 600 techniques and "
-        "sub-techniques (ids, names, tactics, platforms and a one-line summary); it is not the official dataset and "
-        "isn't complete. attack.load(path) switches to the official enterprise-attack.json from MITRE.",
+        "(attack.t1110.001). TB bundles the official Enterprise dataset from MITRE, made compact: ids, names, "
+        "tactics, platforms, the first sentence of each description, mitigations and groups. attack.info() tells "
+        "which ATT&CK version it is; attack.load(path) switches to another enterprise-attack.json. "
+        "ATT&CK is (c) The MITRE Corporation, used under its terms of use; attack.info().copyright has the notice.",
     )
     state = {"table": default_table()}
 
@@ -274,7 +344,8 @@ def load(api):
     @m.fn("technique", 1, doc=(
         "technique(id) -> map\n"
         "One technique or sub-technique: {\"id\", \"name\", \"full_name\", \"tactics\", \"platforms\", \"description\", "
-        "\"url\", \"sub_techniques\" (or \"parent\" and \"parent_name\")}. id can be \"T1110\", \"t1110.001\" or a "
+        "\"url\", \"sub_techniques\" (or \"parent\" and \"parent_name\"), \"mitigations\" and \"groups\" "
+        "(lists of {\"id\", \"name\"})}. id can be \"T1110\", \"t1110.001\" or a "
         "Sigma tag like \"attack.t1110.001\". Gives nil when the id isn't in the table."))
     def technique(line, text):
         tid = need_id(line, text, "attack.technique")
@@ -347,7 +418,7 @@ def load(api):
 
     @m.fn("tactics", 0, doc=(
         "tactics() -> list\n"
-        "The 14 Enterprise tactics in kill-chain order (reconnaissance first, impact last): "
+        "The Enterprise tactics in kill-chain order (reconnaissance first, impact last): "
         "[{\"id\": \"TA0043\", \"shortname\": \"reconnaissance\", \"name\", \"description\"}, ...]."))
     def tactics(line):
         return [dict(t) for t in table().tactics]
@@ -429,9 +500,11 @@ def load(api):
     def save(line, path):
         check_type(line, path, "text", "attack.save", "path")
         t = table()
-        data = {"snapshot": t.snapshot, "tactics": t.tactics,
+        data = {"snapshot": t.snapshot, "version": t.version, "modified": t.modified, "copyright": t.copyright,
+                "tactics": t.tactics,
                 "techniques": [{k: v for k, v in item.items() if k != "parent"} for item in
-                               sorted(t.techniques.values(), key=lambda x: x["id"])]}
+                               sorted(t.techniques.values(), key=lambda x: x["id"])],
+                "mitigations": list(t.mitigations.values()), "groups": list(t.groups.values())}
         full = path
         try:
             with open(full, "w", encoding="utf-8") as f:
@@ -443,12 +516,20 @@ def load(api):
 
     @m.fn("info", 0, doc=(
         "info() -> map\n"
-        "About the table in use: {\"snapshot\" (\"approximate, curated\" for the bundled one), \"source\", "
-        "\"techniques\", \"sub_techniques\", \"tactics\"}."))
+        "About the table in use.\n"
+        "\n"
+        "Fields:\n"
+        "- version: the ATT&CK release, like \"18.0\" (nil if the file doesn't say).\n"
+        "- modified: when MITRE last changed that release.\n"
+        "- snapshot: a label, like \"official ATT&CK v18.0\".\n"
+        "- source: \"bundled\" or the path given to attack.load().\n"
+        "- techniques, sub_techniques, tactics, mitigations, groups: how many.\n"
+        "- copyright: MITRE's notice for the data."))
     def info(line):
         t = table()
         subs = sum(1 for x in t.techniques.values() if "parent" in x)
-        return {"snapshot": t.snapshot, "source": t.source, "techniques": len(t.techniques) - subs,
-                "sub_techniques": subs, "tactics": len(t.tactics)}
+        return {"version": t.version, "modified": t.modified, "snapshot": t.snapshot, "source": t.source,
+                "techniques": len(t.techniques) - subs, "sub_techniques": subs, "tactics": len(t.tactics),
+                "mitigations": len(t.mitigations), "groups": len(t.groups), "copyright": t.copyright}
 
     return m

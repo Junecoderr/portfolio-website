@@ -1,4 +1,4 @@
-"""attack library: the bundled curated ATT&CK table, lookups, alert mapping, and loading the official STIX file."""
+"""attack library: the bundled official ATT&CK table, lookups, alert mapping, and loading the official STIX file."""
 
 import json
 
@@ -12,18 +12,25 @@ def run(source):
     return run_tb("import attack\n" + source)
 
 
-def test_bundled_table_is_curated_and_well_formed():
-    data = json.loads((ROOT / "tblib" / "data" / "attack.json").read_text(encoding="utf-8"))
-    assert data["snapshot"] == "approximate, curated"
+def test_bundled_table_is_official_and_well_formed():
+    path = ROOT / "tblib" / "data" / "attack.json"
+    assert path.stat().st_size < 3_000_000
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["snapshot"] == f"official ATT&CK v{data['version']}"
+    assert float(data["version"]) >= 15 and data["modified"][:2] == "20"
+    assert "The MITRE Corporation" in data["copyright"] and "royalty-free license" in data["notice"]
     ids = [t["id"] for t in data["techniques"]]
     assert len(ids) == len(set(ids)) == data["count"] >= 550
     shortnames = {t["shortname"] for t in data["tactics"]}
-    assert len(shortnames) == 14
+    assert len(shortnames) >= 14
+    mitigations, groups = {m["id"] for m in data["mitigations"]}, {g["id"] for g in data["groups"]}
+    assert len(mitigations) >= 40 and len(groups) >= 100
     for t in data["techniques"]:
         assert t["name"] and t["description"] and t["platforms"], t["id"]
         assert set(t["tactics"]) <= shortnames, t["id"]
+        assert set(t.get("mitigations", [])) <= mitigations and set(t.get("groups", [])) <= groups, t["id"]
         if "." in t["id"]:
-            assert t["parent"] in ids
+            assert t["id"].split(".")[0] in ids
 
 
 @pytest.mark.parametrize("tid,name", [
@@ -58,7 +65,9 @@ def test_tactic_names_and_platform_filter():
     assert out == ["true true true"]
     assert run('say(attack.tactic("execution", "macOS").map(fn(t) { return t.id }).contains("T1047"))') == ["false"]
     assert "doesn't know the tactic 'sparkle'" in str(tb_error('import attack\nattack.tactic("sparkle")'))
-    assert run('let t = attack.tactics()\nsay(len(t), t[0].shortname, t[13].shortname)') == ["14 reconnaissance impact"]
+    assert run('let t = attack.tactics()\nsay(t[0].shortname, t[-1].shortname)') == ["reconnaissance impact"]
+    # ATT&CK v19 split Defense Evasion; Sigma's attack.defense_evasion still finds TA0005.
+    assert run('say(attack.map([{"tags": ["attack.defense_evasion"]}]).tactics[0].id)') == ["TA0005"]
 
 
 def test_map_alerts_by_tags():
@@ -80,18 +89,37 @@ say(attack.tags({"tags": ["attack.T1110", "attack.credential_access"]}), attack.
                         '1 ["T1999"] ["SSH brute force"]', '["T1110"] attack.t1110.001']
 
 
-def test_info_and_techniques():
-    out = run('let i = attack.info()\nsay(i.snapshot, i.tactics, i.techniques + i.sub_techniques == len(attack.techniques(true)))')
-    assert out == ["approximate, curated 14 true"]
+def test_info_reports_the_official_version():
+    data = json.loads((ROOT / "tblib" / "data" / "attack.json").read_text(encoding="utf-8"))
+    out = run('let i = attack.info()\nsay(i.version, i.modified, i.snapshot, i.source, i.tactics >= 14)\n'
+              'say(i.techniques + i.sub_techniques == len(attack.techniques(true)), i.mitigations > 0, i.groups > 0)\n'
+              'say(i.copyright)')
+    assert out == [f"{data['version']} {data['modified']} official ATT&CK v{data['version']} bundled true",
+                   "true true true", data["copyright"]]
+
+
+def test_technique_has_mitigations_and_groups():
+    out = run('let t = attack.technique("T1110")\nsay(t.mitigations.map(fn(m) { return m.id }).contains("M1032"))\n'
+              'say(t.groups.map(fn(g) { return g.id }).contains("G0007"), t.groups[0].name != "")')
+    assert out == ["true", "true true"]
 
 
 def test_load_official_stix_bundle_and_save(tmp_path, monkeypatch):
     bundle = {"type": "bundle", "objects": [
-        {"type": "x-mitre-collection", "x_mitre_version": "15.1"},
+        {"type": "x-mitre-collection", "x_mitre_version": "15.1", "modified": "2024-05-02T14:00:00.188Z"},
+        {"type": "marking-definition", "definition": {"statement": "Copyright 2015-2024, The MITRE Corporation."}},
+        {"type": "course-of-action", "id": "course-of-action--1", "name": "Multi-factor Authentication",
+         "external_references": [{"source_name": "mitre-attack", "external_id": "M1032"}]},
+        {"type": "intrusion-set", "id": "intrusion-set--1", "name": "APT28", "aliases": ["APT28", "Fancy Bear"],
+         "external_references": [{"source_name": "mitre-attack", "external_id": "G0007"}]},
+        {"type": "relationship", "relationship_type": "mitigates", "source_ref": "course-of-action--1",
+         "target_ref": "attack-pattern--1"},
+        {"type": "relationship", "relationship_type": "uses", "source_ref": "intrusion-set--1",
+         "target_ref": "attack-pattern--1"},
         {"type": "x-mitre-tactic", "name": "Credential Access", "x_mitre_shortname": "credential-access",
          "external_references": [{"source_name": "mitre-attack", "external_id": "TA0006"}],
          "description": "The adversary is trying to steal account names and passwords."},
-        {"type": "attack-pattern", "name": "Brute Force", "x_mitre_platforms": ["Linux"],
+        {"type": "attack-pattern", "id": "attack-pattern--1", "name": "Brute Force", "x_mitre_platforms": ["Linux"],
          "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}],
          "external_references": [{"source_name": "mitre-attack", "external_id": "T1110"}],
          "description": "Adversaries may use brute force techniques. More text (Citation: Someone)."},
@@ -101,10 +129,27 @@ def test_load_official_stix_bundle_and_save(tmp_path, monkeypatch):
     (tmp_path / "enterprise-attack.json").write_text(json.dumps(bundle))
     monkeypatch.chdir(tmp_path)
     out = run('say(attack.load("enterprise-attack.json"))\nlet t = attack.technique("T1110")\nsay(t.description)\n'
-              'say(attack.info().snapshot)\nattack.save("small.json")\nsay(attack.load("small.json"))')
-    assert out == ["1", "Adversaries may use brute force techniques.", "official ATT&CK 15.1", "1"]
+              'say(attack.info().snapshot, attack.info().modified)\nattack.save("small.json")\nsay(attack.load("small.json"))\n'
+              'let t2 = attack.technique("T1110")\nsay(t2.mitigations, t2.groups, attack.info().version)')
+    assert out == ["1", "Adversaries may use brute force techniques.", "official ATT&CK v15.1 2024-05-02T14:00:00.188Z",
+                   "1", '[{"id": "M1032", "name": "Multi-factor Authentication"}] [{"id": "G0007", "name": "APT28"}] 15.1']
     # another program still sees the bundled table
-    assert run('say(attack.info().snapshot)') == ["approximate, curated"]
+    assert run('say(attack.info().source)') == ["bundled"]
+
+
+def test_update_script_builds_the_data_file(tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("update_attack", ROOT / "scripts" / "update_attack.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    bundle = {"type": "bundle", "objects": [
+        {"type": "x-mitre-collection", "x_mitre_version": "16.0", "modified": "2024-10-31T00:00:00Z"},
+        {"type": "attack-pattern", "name": "Brute Force", "x_mitre_platforms": ["Linux"], "description": "One. Two.",
+         "external_references": [{"source_name": "mitre-attack", "external_id": "T1110"}]}]}
+    data = json.loads(mod.dumps(mod.build(bundle)))
+    assert (data["version"], data["modified"], data["count"]) == ("16.0", "2024-10-31T00:00:00Z", 1)
+    assert "MITRE" in data["copyright"] and "royalty-free" in data["notice"]
+    assert data["techniques"][0]["description"] == "One."
 
 
 def test_load_errors(tmp_path, monkeypatch):
