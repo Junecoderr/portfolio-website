@@ -232,6 +232,7 @@ def test_entitlements_are_the_hardened_runtime_exceptions():
 
 def test_universal_target_and_asset_names(monkeypatch):
     monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(build.platform, "machine", lambda: "arm64")  # "" on Windows once sys.platform is faked
     monkeypatch.setenv("TB_TARGET_ARCH", "universal2")
     assert build.detect_target() == ("macos", "universal")
     assert build.asset_name("macos", "universal") == "tb-macos-universal.zip"

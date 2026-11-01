@@ -187,8 +187,9 @@ def test_generated_parser_is_up_to_date(tmp_path):
     result = run([TREE_SITTER, "generate", "--abi", "14", "-o", str(tmp_path), "grammar.js"], cwd=GRAMMAR, timeout=300)
     assert result.returncode == 0, result.stderr
     for name in ("grammar.json", "node-types.json", "parser.c"):
-        fresh = (tmp_path / name).read_text(encoding="utf-8")
-        assert fresh == (GRAMMAR / "src" / name).read_text(encoding="utf-8"), (
+        # The first line of parser.c names the CLI build, which differs between installs.
+        fresh, kept = ((d / name).read_text(encoding="utf-8").split("\n", 1)[-1] for d in (tmp_path, GRAMMAR / "src"))
+        assert fresh == kept, (
             f"src/{name} is stale: run `tree-sitter generate --abi 14` in editors/tree-sitter-tb"
         )
 

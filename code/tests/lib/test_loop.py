@@ -662,7 +662,7 @@ fn check(x) {
   return x
 }
 say(parallel.processes(check, [1, 3], 2))
-try { parallel.processes(check, [1, 2, 3, 4, 5, 6, 7, 8], 4) } catch err: ValueError { say(err.message, err.line, err.item) }
+try { parallel.processes(check, [1, 2, 3, 4, 5, 6, 7, 8], 2) } catch err: ValueError { say(err.message, err.line, err.item) }
 say(parallel.processes(check, [5, 7], 2))'''
     assert run_tb(src) == ["[1, 3]", "2 is even 4 2", "[5, 7]"]  # the first failing item, though 4 may finish first
     assert _procs._POOL["started"] == started + 1
