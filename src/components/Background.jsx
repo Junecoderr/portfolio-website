@@ -32,8 +32,13 @@ export default function Background({ motion = true }) {
     if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return undefined;
     const probe = () => {
       try {
+        // No shader on software rendering (no GPU): it would stall the whole page.
         const c = document.createElement('canvas');
-        if (alive) setWebgl(Boolean(c.getContext('webgl2') || c.getContext('webgl')));
+        const opts = { failIfMajorPerformanceCaveat: true };
+        const gl = c.getContext('webgl2', opts) || c.getContext('webgl', opts);
+        const info = gl && gl.getExtension('WEBGL_debug_renderer_info');
+        const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+        if (alive) setWebgl(Boolean(gl) && !/swiftshader|llvmpipe|softpipe|software/i.test(renderer));
       } catch {
         if (alive) setWebgl(false);
       }
