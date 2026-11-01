@@ -38,6 +38,7 @@ npm test           # playwright smoke test against the built site
 | `public/og/*` | Open Graph cards |
 | `vercel.json` | Clean URLs, cache headers, Content-Security-Policy |
 | `code/` | TB, the little programming language, served at https://code.tanisha.ceo (own Vercel project, Root Directory `code`; see `code/README.md`) |
+| `periods/` | Cycle care, a private menstrual-cycle self-care checklist, served at https://periods.tanisha.ceo (own Vercel project, Root Directory `periods`; see `periods/README.md`) |
 
 ## Environment
 
