@@ -7,7 +7,7 @@ import githubIcon from '../assets/icons/github.svg';
 import gpgIcon from '../assets/icons/gnuprivacyguard.svg';
 
 // Canonical origin. Change here when a custom domain lands.
-export const SITE_URL = 'https://portfolio-website-junix1.vercel.app';
+export const SITE_URL = 'https://www.tanisha.ceo';
 export const SITE_NAME = 'Tanisha Brahma';
 
 export const SEO = {

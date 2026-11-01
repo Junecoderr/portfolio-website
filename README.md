@@ -1,7 +1,7 @@
 # Tanisha Brahma — Portfolio
 
 Personal site for Tanisha Brahma, SOC analyst and cryptography developer.
-Live at https://portfolio-website-junix1.vercel.app.
+Live at https://www.tanisha.ceo.
 
 ## Stack
 

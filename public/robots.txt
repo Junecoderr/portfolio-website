@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://portfolio-website-junix1.vercel.app/sitemap.xml
+Sitemap: https://www.tanisha.ceo/sitemap.xml
